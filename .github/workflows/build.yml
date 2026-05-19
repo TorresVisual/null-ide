@@ -92,6 +92,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22.22.1'
+          cache: 'npm'
+          cache-dependency-path: vscode-src/package-lock.json
 
       - name: Enable long paths
         run: git config --system core.longpaths true
@@ -146,16 +148,13 @@ jobs:
           Copy-Item ide-overlay/workbench/custom.css `
             vscode-src/src/vs/code/electron-browser/workbench/null-custom.css -Force
 
-      - name: Cache node_modules
-        id: cache-deps
+      - name: Cache Electron build headers
         uses: actions/cache@v4
         with:
-          path: vscode-src/node_modules
-          key: vscode-node-modules-${{ steps.tag.outputs.tag }}-${{ hashFiles('vscode-src/package-lock.json') }}
-          restore-keys: vscode-node-modules-${{ steps.tag.outputs.tag }}-
+          path: ~/.electron-gyp
+          key: electron-gyp-${{ steps.tag.outputs.tag }}
 
       - name: Install dependencies
-        if: steps.cache-deps.outputs.cache-hit != 'true'
         working-directory: vscode-src
         run: npm ci
 
