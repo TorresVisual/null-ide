@@ -150,12 +150,6 @@ jobs:
           Copy-Item ide-overlay/workbench/custom.css `
             vscode-src/src/vs/code/electron-browser/workbench/null-custom.css -Force
 
-      - name: Cache Electron build headers
-        uses: actions/cache@v4
-        with:
-          path: ~/.electron-gyp
-          key: electron-gyp-${{ steps.tag.outputs.tag }}
-
       - name: Install dependencies
         working-directory: vscode-src
         run: npm ci
