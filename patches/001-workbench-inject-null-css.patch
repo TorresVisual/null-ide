@@ -5,30 +5,28 @@ Subject: [PATCH 1/1] feat: inject Null custom stylesheet into workbench HTML
 
 Adds a <link> for null-custom.css after the main workbench stylesheet.
 The source lives at workbench/custom.css in the overlay repo and is copied
-to src/vs/workbench/browser/null-custom.css before the gulp build runs
-(see "Copy workbench CSS" step in build.yml), so it ends up at
-out/vs/workbench/null-custom.css in the packaged artifact.
+to src/vs/code/electron-browser/workbench/null-custom.css before the gulp
+build runs (see "Copy workbench CSS" step in build.yml), so it ends up
+alongside workbench.html in the packaged artifact.
 
-The existing CSP already contains style-src 'self', so same-origin
-stylesheets load without any policy change.
-
-If a future VS Code version adds workbench.esm.html, apply the same
-one-line change to that file as well.
+The existing CSP already contains style-src 'self' and 'unsafe-inline',
+so same-origin stylesheets load without any policy change.
 ---
- src/vs/workbench/browser/workbench.html | 1 +
+ src/vs/code/electron-browser/workbench/workbench.html | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/src/vs/workbench/browser/workbench.html b/src/vs/workbench/browser/workbench.html
+diff --git a/src/vs/code/electron-browser/workbench/workbench.html b/src/vs/code/electron-browser/workbench/workbench.html
 index a1b2c3d..e4f5a89 100644
---- a/src/vs/workbench/browser/workbench.html
-+++ b/src/vs/workbench/browser/workbench.html
-@@ -5,6 +5,7 @@
- 		<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' https: data: blob: vscode-remote-resource: vscode-file:; media-src 'none'; child-src 'self'; object-src 'none'; script-src 'self' 'unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; connect-src 'self' https: ws:; worker-src blob:; font-src 'self' https: blob:;">
- 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
- 		<link data-name="vs/workbench/workbench.desktop.main" rel="stylesheet" href="workbench.desktop.main.css">
+--- a/src/vs/code/electron-browser/workbench/workbench.html
++++ b/src/vs/code/electron-browser/workbench/workbench.html
+@@ -68,6 +68,7 @@
+ 	"/>
+
+ 		<!-- Workbench CSS -->
+ 		<link rel="stylesheet" href="../../../workbench/workbench.desktop.main.css">
 +		<link rel="stylesheet" href="null-custom.css">
  	</head>
- 	<body aria-label=""></body>
- </html>
+
+ 	<body aria-label="">
 --
 2.43.0

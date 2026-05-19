@@ -141,10 +141,10 @@ jobs:
       - name: Copy workbench CSS into source tree
         shell: pwsh
         run: |
-          # Copies null-custom.css into the workbench browser source directory so
-          # gulp picks it up during compilation and it lands at out/vs/workbench/.
+          # Copies null-custom.css alongside workbench.html so gulp picks it up
+          # and it lands next to workbench.html in the packaged artifact.
           Copy-Item ide-overlay/workbench/custom.css `
-            vscode-src/src/vs/workbench/browser/null-custom.css -Force
+            vscode-src/src/vs/code/electron-browser/workbench/null-custom.css -Force
 
       - name: Install yarn
         run: npm install -g yarn
