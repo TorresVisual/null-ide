@@ -91,7 +91,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22.22.1'
 
       - name: Enable long paths
         run: git config --system core.longpaths true
@@ -146,20 +146,17 @@ jobs:
           Copy-Item ide-overlay/workbench/custom.css `
             vscode-src/src/vs/code/electron-browser/workbench/null-custom.css -Force
 
-      - name: Install yarn
-        run: npm install -g yarn
-
       - name: Install dependencies
         working-directory: vscode-src
-        run: yarn --frozen-lockfile
+        run: npm ci
 
       - name: Build
         working-directory: vscode-src
-        run: yarn gulp vscode-win32-x64
+        run: npx gulp vscode-win32-x64
 
       - name: Package archive
         working-directory: vscode-src
-        run: yarn gulp vscode-win32-x64-archive
+        run: npx gulp vscode-win32-x64-archive
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
