@@ -102,11 +102,13 @@ jobs:
         shell: pwsh
         working-directory: vscode-src
         run: |
-          $patches = Get-ChildItem ../vscodium-src/patches -Filter *.patch -ErrorAction SilentlyContinue |
-            Sort-Object Name
-          foreach ($p in $patches) {
-            Write-Host "Applying VSCodium patch: $($p.Name)"
-            git apply --ignore-whitespace $p.FullName
+          foreach ($dir in @('../vscodium-src/patches', '../vscodium-src/patches/windows')) {
+            Get-ChildItem $dir -Filter *.patch -ErrorAction SilentlyContinue |
+              Sort-Object Name |
+              ForEach-Object {
+                Write-Host "Applying: $($_.Name)"
+                git apply --ignore-whitespace $_.FullName
+              }
           }
 
       - name: Apply overlay patches
@@ -162,18 +164,25 @@ jobs:
         working-directory: vscode-src
         env:
           NODE_OPTIONS: --max-old-space-size=8192
+          VSCODE_QUALITY: stable
         run: npx gulp vscode-win32-x64
 
-      - name: Package archive
-        working-directory: vscode-src
-        env:
-          NODE_OPTIONS: --max-old-space-size=8192
-        run: npx gulp vscode-win32-x64-packing
+      - name: Create zip archive
+        shell: pwsh
+        run: |
+          Write-Host "Contents of workspace root:"
+          Get-ChildItem -Directory | Select-Object -ExpandProperty Name
+          $outDir = "VSCode-win32-x64"
+          if (-not (Test-Path $outDir)) {
+            Write-Error "Build output directory '$outDir' not found"
+            exit 1
+          }
+          Compress-Archive -Path "$outDir\*" -DestinationPath null-ide-win32-x64.zip -Force
+          Write-Host "Archive created: $((Get-Item null-ide-win32-x64.zip).Length / 1MB) MB"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: null-ide-win32-x64-${{ steps.tag.outputs.tag }}
-          path: VSCode-win32-x64.zip
-          if-no-files-found: warn
+          path: null-ide-win32-x64.zip
           retention-days: 30
