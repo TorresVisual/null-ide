@@ -168,11 +168,12 @@ jobs:
         working-directory: vscode-src
         env:
           NODE_OPTIONS: --max-old-space-size=8192
-        run: npx gulp vscode-win32-x64-archive
+        run: npx gulp vscode-win32-x64-packing
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: null-ide-win32-x64-${{ steps.tag.outputs.tag }}
           path: VSCode-win32-x64.zip
+          if-no-files-found: warn
           retention-days: 30
