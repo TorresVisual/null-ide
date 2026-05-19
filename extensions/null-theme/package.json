@@ -1,7 +1,7 @@
 {
   "name": "null-theme",
   "displayName": "Null Dark",
-  "description": "Dark navy and teal theme — built-in for Null IDE",
+  "description": "Dark gray theme with minimal activity bar — built-in for Null IDE",
   "version": "1.0.0",
   "publisher": "null",
   "license": "MIT",
