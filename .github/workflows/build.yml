@@ -161,10 +161,14 @@ jobs:
 
       - name: Build
         working-directory: vscode-src
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
         run: npx gulp vscode-win32-x64
 
       - name: Package archive
         working-directory: vscode-src
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
         run: npx gulp vscode-win32-x64-archive
 
       - name: Upload artifact
