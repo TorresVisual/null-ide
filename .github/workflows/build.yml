@@ -82,7 +82,7 @@ jobs:
         id: ms-tag
         shell: pwsh
         run: |
-          $msTag = (Get-Content vscodium-src/MS_TAG -Raw).Trim()
+          $msTag = (Get-Content vscodium-src/upstream/stable.json -Raw | ConvertFrom-Json).tag
           "ms_tag=$msTag" | Out-File -Append $env:GITHUB_OUTPUT
 
       - name: Clone VS Code source at MS tag
