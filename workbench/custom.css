@@ -1,87 +1,269 @@
 /*
  * Null IDE workbench overrides.
- * Injected via the workbench.ts patch (see patches/README.md → "Inject custom CSS").
- * Targets internal VS Code DOM structure — verify selectors after each major upstream bump.
+ * Injected via the workbench.ts patch — see patches/001-workbench-inject-null-css.patch.
+ * Targets internal VS Code DOM structure; verify selectors after upstream bumps.
+ *
+ * Design intent: ghost chrome. UI regions are invisible. Only content has presence.
  */
 
-/* ── Fonts ─────────────────────────────────────────────────────────────────── */
+/* ── Tokens ────────────────────────────────────────────────────────────────── */
 :root {
-  --null-font-ui:   "Geist Mono", "JetBrains Mono", "Cascadia Code", monospace;
-  --null-font-mono: "Geist Mono", "JetBrains Mono", "Cascadia Code", monospace;
+  --n-font:       "Geist Mono", "JetBrains Mono", "Cascadia Code", monospace;
+  --n-bg0:        #0f0f0f;
+  --n-bg1:        #141414;
+  --n-bg2:        #1a1a1a;
+  --n-border:     #ffffff08;
+  --n-accent:     #4d9ade;
+  --n-t:          120ms ease;
 }
 
+/* ── Base font ─────────────────────────────────────────────────────────────── */
 .monaco-workbench {
-  font-family: var(--null-font-ui) !important;
+  font-family: var(--n-font) !important;
 }
 
-.monaco-editor,
 .monaco-editor .view-lines,
 .terminal .xterm {
-  font-family: var(--null-font-mono) !important;
+  font-family: var(--n-font) !important;
 }
 
-/* ── Activity bar — hide text labels, keep icons compact ───────────────────── */
-.monaco-workbench .activitybar > .content .composite-bar-action-item .action-label {
-  display: none !important;
-}
-
+/* ── Activity bar — Antigravity: icon rail merges into sidebar ─────────────── */
 .monaco-workbench .activitybar {
   width: 44px !important;
 }
 
-/* ── Title bar — borderless, flush with editor ──────────────────────────────── */
+/* Labels are meaningless at this width */
+.monaco-workbench .activitybar > .content
+  .composite-bar-action-item .action-label {
+  display: none !important;
+}
+
+/* Icons: dim by default, glow on hover/active via opacity only */
+.monaco-workbench .activitybar .action-item .action-label.codicon {
+  opacity: 0.28 !important;
+  transition: opacity var(--n-t) !important;
+}
+
+.monaco-workbench .activitybar .action-item:hover .action-label.codicon,
+.monaco-workbench .activitybar .action-item.checked .action-label.codicon {
+  opacity: 1 !important;
+}
+
+/* Hide the colored active-indicator bar on the edge */
+.monaco-workbench .activitybar .active-item-indicator,
+.monaco-workbench .activitybar .action-item .active-item-indicator {
+  display: none !important;
+}
+
+/* Activity badge: shrink and flatten */
+.monaco-workbench .activitybar .action-item .badge .badge-content {
+  font-size: 9px !important;
+  min-width: 14px !important;
+  height: 14px !important;
+  line-height: 14px !important;
+  padding: 0 3px !important;
+  border-radius: 3px !important;
+  border: none !important;
+}
+
+/* ── Title bar — flush, borderless ────────────────────────────────────────── */
 .monaco-workbench .part.titlebar {
   border-bottom: none !important;
-  background-color: #0a0a17 !important;
+  background: var(--n-bg0) !important;
 }
 
-/* ── Tabs — tighter height ──────────────────────────────────────────────────── */
-.monaco-workbench .part.editor > .content .editor-group-container .title .tabs-container {
+.monaco-workbench .part.titlebar .titlebar-left,
+.monaco-workbench .part.titlebar .titlebar-right,
+.monaco-workbench .part.titlebar .titlebar-center {
+  opacity: 0.7;
+  transition: opacity var(--n-t) !important;
+}
+
+.monaco-workbench .part.titlebar:hover .titlebar-left,
+.monaco-workbench .part.titlebar:hover .titlebar-right,
+.monaco-workbench .part.titlebar:hover .titlebar-center {
+  opacity: 1 !important;
+}
+
+/* ── Tab bar ───────────────────────────────────────────────────────────────── */
+.monaco-workbench .part.editor > .content
+  .editor-group-container .title .tabs-container {
   height: 34px !important;
+  border-bottom: 1px solid var(--n-border) !important;
 }
 
-.monaco-workbench .part.editor > .content .editor-group-container .title .tabs-container .tab {
+.monaco-workbench .part.editor > .content
+  .editor-group-container .title .tabs-container .tab {
   height: 34px !important;
   min-width: 80px !important;
   max-width: 180px !important;
+  border: none !important;
+  border-right: 1px solid var(--n-border) !important;
+  transition: background var(--n-t) !important;
 }
 
-/* ── Sidebar — tighter section headers ─────────────────────────────────────── */
+/* Active tab: top-line accent only, no background box */
+.monaco-workbench .part.editor > .content
+  .editor-group-container .title .tabs-container .tab.active {
+  border-top: 1px solid var(--n-accent) !important;
+}
+
+/* Tab label fade for inactive */
+.monaco-workbench .part.editor > .content
+  .editor-group-container .title .tabs-container .tab:not(.active) .tab-label {
+  opacity: 0.45;
+  transition: opacity var(--n-t) !important;
+}
+
+.monaco-workbench .part.editor > .content
+  .editor-group-container .title .tabs-container .tab:hover .tab-label {
+  opacity: 0.8 !important;
+}
+
+/* Tab action buttons (close, dirty dot) — dim until hovered */
+.monaco-workbench .part.editor > .content
+  .editor-group-container .title .tabs-container .tab .tab-actions {
+  opacity: 0;
+  transition: opacity var(--n-t) !important;
+}
+
+.monaco-workbench .part.editor > .content
+  .editor-group-container .title .tabs-container .tab:hover .tab-actions,
+.monaco-workbench .part.editor > .content
+  .editor-group-container .title .tabs-container .tab.active .tab-actions {
+  opacity: 1 !important;
+}
+
+/* ── Sidebar — section headers almost invisible ─────────────────────────────── */
 .monaco-workbench .sidebar .composite > .title {
-  height: 28px !important;
-  line-height: 28px !important;
-  font-size: 10px !important;
-  letter-spacing: 0.08em !important;
+  height: 26px !important;
+  line-height: 26px !important;
+  font-size: 9px !important;
+  letter-spacing: 0.14em !important;
   text-transform: uppercase !important;
+  opacity: 0.38;
+  transition: opacity var(--n-t) !important;
 }
 
-/* ── Scrollbars — thinner ───────────────────────────────────────────────────── */
+.monaco-workbench .sidebar .composite > .title:hover {
+  opacity: 0.7 !important;
+}
+
+/* Explorer tree: tighter rows, subtle hover */
+.monaco-workbench .sidebar .monaco-list-row {
+  border-radius: 3px !important;
+}
+
+.monaco-workbench .sidebar .monaco-list-row:hover:not(.selected):not(.focused) {
+  transition: background var(--n-t) !important;
+}
+
+/* Indent guides: nearly invisible */
+.monaco-workbench .sidebar .monaco-tl-indent {
+  border-left-color: #ffffff0a !important;
+}
+
+/* ── Editor breadcrumb — ghost until hovered ───────────────────────────────── */
+.monaco-workbench .breadcrumbs-control .monaco-breadcrumb-item {
+  opacity: 0.4;
+  transition: opacity var(--n-t) !important;
+}
+
+.monaco-workbench .breadcrumbs-control:hover .monaco-breadcrumb-item {
+  opacity: 1 !important;
+}
+
+/* ── Scrollbars — near-invisible, thin ─────────────────────────────────────── */
 .monaco-scrollable-element > .scrollbar > .slider {
   border-radius: 2px !important;
+  background: rgba(255,255,255,0.1) !important;
+  transition: background var(--n-t) !important;
+}
+
+.monaco-scrollable-element > .scrollbar:hover > .slider,
+.monaco-scrollable-element > .scrollbar.active > .slider {
+  background: rgba(255,255,255,0.28) !important;
 }
 
 .monaco-scrollable-element > .scrollbar.vertical {
-  width: 6px !important;
+  width: 5px !important;
 }
 
 .monaco-scrollable-element > .scrollbar.horizontal {
-  height: 6px !important;
+  height: 5px !important;
 }
 
-/* ── Status bar — compact ───────────────────────────────────────────────────── */
+/* ── Status bar — compact, quiet ───────────────────────────────────────────── */
 .monaco-workbench .part.statusbar {
   height: 22px !important;
   font-size: 11px !important;
+  letter-spacing: 0.02em !important;
+  border-top: 1px solid var(--n-border) !important;
 }
 
-/* ── Panel (terminal/output) — minimal top border ───────────────────────────── */
+.monaco-workbench .part.statusbar .statusbar-item a {
+  transition: opacity var(--n-t) !important;
+}
+
+/* ── Panel (terminal / output) ─────────────────────────────────────────────── */
 .monaco-workbench .part.panel {
-  border-top: 1px solid #0a0a17 !important;
+  border-top: 1px solid var(--n-border) !important;
 }
 
-/* ── Input focus ring — teal instead of default blue ───────────────────────── */
+/* Panel title bar: same ghost treatment */
+.monaco-workbench .part.panel .panel-switcher-container .monaco-action-bar {
+  font-size: 11px !important;
+  letter-spacing: 0.06em !important;
+}
+
+/* ── Sash (resize handles) — invisible until hovered ───────────────────────── */
+.monaco-sash {
+  opacity: 0 !important;
+  transition: opacity 200ms ease !important;
+}
+
+.monaco-sash:hover,
+.monaco-sash.active {
+  opacity: 1 !important;
+  background: var(--n-accent) !important;
+}
+
+/* ── Input / focus ─────────────────────────────────────────────────────────── */
+.monaco-inputbox {
+  border-radius: 3px !important;
+}
+
 .monaco-inputbox.synthetic-focus,
 .monaco-list:focus {
-  outline: 1px solid #00b4d8 !important;
+  outline: 1px solid var(--n-accent) !important;
   outline-offset: -1px !important;
+}
+
+/* ── Suggest / hover widgets ─────────────────────────────────────────────────*/
+.suggest-widget,
+.monaco-hover {
+  border-radius: 4px !important;
+  border-color: var(--n-border) !important;
+}
+
+/* ── Notifications ─────────────────────────────────────────────────────────── */
+.notification-toast {
+  border-radius: 4px !important;
+}
+
+/* ── Context menus ─────────────────────────────────────────────────────────── */
+.context-view.monaco-menu-container .monaco-menu {
+  border-radius: 4px !important;
+}
+
+/* ── Quick input (command palette) ─────────────────────────────────────────── */
+.quick-input-widget {
+  border-radius: 6px !important;
+  border: 1px solid var(--n-border) !important;
+}
+
+/* ── Editor group no-tabs title (single editor) ─────────────────────────────── */
+.monaco-workbench .part.editor > .content
+  .editor-group-container .title.tabs.empty {
+  border-bottom: 1px solid var(--n-border) !important;
 }
