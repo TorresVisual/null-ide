@@ -1,0 +1,49 @@
+{
+	"nameShort": "Null",
+	"nameLong": "Null IDE",
+	"applicationName": "null",
+	"dataFolderName": "Null",
+	"win32MutexName": "nullide",
+	"win32DirName": "Null IDE",
+	"win32NameVersion": "Null IDE",
+	"win32RegValueName": "NullIDE",
+	"win32AppId": "{{INSERT-GUID-HERE}}",
+	"win32x64AppId": "{{INSERT-GUID-HERE}}",
+	"darwinBundleIdentifier": "com.nullide.app",
+	"linuxIconName": "null",
+
+	"reportIssueUrl": "https://github.com/YOUR_ORG/null-ide/issues/new",
+	"requestFeatureUrl": "https://github.com/YOUR_ORG/null-ide/issues/new",
+	"documentationUrl": "https://github.com/YOUR_ORG/null-ide",
+	"releaseNotesUrl": "https://github.com/YOUR_ORG/null-ide/releases/tag/v{{version}}",
+	"introductionDocumentationUrl": "https://github.com/YOUR_ORG/null-ide",
+
+	"privacyStatementUrl": "",
+	"twitterUrl": "",
+	"npeSurveyUrl": "",
+	"surveys": [],
+
+	"enableTelemetry": false,
+
+	"extensionRecommendations": [
+		{
+			"extensionId": "llvm-vs-code-extensions.vscode-clangd",
+			"reason": "C/C++ IntelliSense via clangd"
+		},
+		{
+			"extensionId": "twxs.cmake",
+			"reason": "CMake syntax and build support"
+		},
+		{
+			"extensionId": "ms-python.python",
+			"reason": "Python language support"
+		},
+		{
+			"extensionId": "eamodio.gitlens",
+			"reason": "Enhanced Git history and blame"
+		}
+	],
+
+	"defaultColorTheme": "Null Dark",
+	"defaultIconTheme": null
+}

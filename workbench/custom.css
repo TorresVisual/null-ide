@@ -1,0 +1,87 @@
+/*
+ * Null IDE workbench overrides.
+ * Injected via the workbench.ts patch (see patches/README.md → "Inject custom CSS").
+ * Targets internal VS Code DOM structure — verify selectors after each major upstream bump.
+ */
+
+/* ── Fonts ─────────────────────────────────────────────────────────────────── */
+:root {
+  --null-font-ui:   "Geist Mono", "JetBrains Mono", "Cascadia Code", monospace;
+  --null-font-mono: "Geist Mono", "JetBrains Mono", "Cascadia Code", monospace;
+}
+
+.monaco-workbench {
+  font-family: var(--null-font-ui) !important;
+}
+
+.monaco-editor,
+.monaco-editor .view-lines,
+.terminal .xterm {
+  font-family: var(--null-font-mono) !important;
+}
+
+/* ── Activity bar — hide text labels, keep icons compact ───────────────────── */
+.monaco-workbench .activitybar > .content .composite-bar-action-item .action-label {
+  display: none !important;
+}
+
+.monaco-workbench .activitybar {
+  width: 44px !important;
+}
+
+/* ── Title bar — borderless, flush with editor ──────────────────────────────── */
+.monaco-workbench .part.titlebar {
+  border-bottom: none !important;
+  background-color: #0a0a17 !important;
+}
+
+/* ── Tabs — tighter height ──────────────────────────────────────────────────── */
+.monaco-workbench .part.editor > .content .editor-group-container .title .tabs-container {
+  height: 34px !important;
+}
+
+.monaco-workbench .part.editor > .content .editor-group-container .title .tabs-container .tab {
+  height: 34px !important;
+  min-width: 80px !important;
+  max-width: 180px !important;
+}
+
+/* ── Sidebar — tighter section headers ─────────────────────────────────────── */
+.monaco-workbench .sidebar .composite > .title {
+  height: 28px !important;
+  line-height: 28px !important;
+  font-size: 10px !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+}
+
+/* ── Scrollbars — thinner ───────────────────────────────────────────────────── */
+.monaco-scrollable-element > .scrollbar > .slider {
+  border-radius: 2px !important;
+}
+
+.monaco-scrollable-element > .scrollbar.vertical {
+  width: 6px !important;
+}
+
+.monaco-scrollable-element > .scrollbar.horizontal {
+  height: 6px !important;
+}
+
+/* ── Status bar — compact ───────────────────────────────────────────────────── */
+.monaco-workbench .part.statusbar {
+  height: 22px !important;
+  font-size: 11px !important;
+}
+
+/* ── Panel (terminal/output) — minimal top border ───────────────────────────── */
+.monaco-workbench .part.panel {
+  border-top: 1px solid #0a0a17 !important;
+}
+
+/* ── Input focus ring — teal instead of default blue ───────────────────────── */
+.monaco-inputbox.synthetic-focus,
+.monaco-list:focus {
+  outline: 1px solid #00b4d8 !important;
+  outline-offset: -1px !important;
+}

@@ -1,0 +1,122 @@
+{
+  "name": "null-theme",
+  "displayName": "Null Dark",
+  "description": "Dark navy and teal theme — built-in for Null IDE",
+  "version": "1.0.0",
+  "publisher": "null",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Themes"
+  ],
+  "contributes": {
+    "themes": [
+      {
+        "label": "Null Dark",
+        "uiTheme": "vs-dark",
+        "path": "./themes/null-dark.json"
+      }
+    ],
+
+    "keybindings": [
+      {
+        "key": "ctrl+shift+a",
+        "command": "workbench.action.terminal.newWithProfile",
+        "args": { "profileName": "Claude Code" }
+      }
+    ],
+
+    "configurationDefaults": {
+      "workbench.colorTheme": "Null Dark",
+      "workbench.startupEditor": "none",
+      "workbench.tree.indent": 14,
+      "workbench.editor.tabSizing": "shrink",
+      "workbench.editor.showIcons": true,
+      "workbench.iconTheme": null,
+
+      "window.title": "${activeEditorShort}${separator}${rootName}",
+      "window.titleBarStyle": "custom",
+      "window.menuBarVisibility": "compact",
+
+      "editor.fontFamily": "'Geist Mono', 'JetBrains Mono', 'Cascadia Code', monospace",
+      "editor.fontSize": 13,
+      "editor.lineHeight": 1.65,
+      "editor.fontLigatures": true,
+      "editor.tabSize": 4,
+      "editor.insertSpaces": true,
+      "editor.detectIndentation": true,
+      "editor.renderWhitespace": "boundary",
+      "editor.minimap.enabled": false,
+      "editor.scrollBeyondLastLine": false,
+      "editor.cursorBlinking": "smooth",
+      "editor.cursorSmoothCaretAnimation": "on",
+      "editor.smoothScrolling": true,
+      "editor.formatOnSave": true,
+      "editor.bracketPairColorization.enabled": true,
+      "editor.guides.bracketPairs": "active",
+      "editor.stickyScroll.enabled": true,
+      "editor.inlayHints.enabled": "on",
+      "editor.suggest.preview": true,
+      "editor.acceptSuggestionOnCommitCharacter": true,
+
+      "terminal.integrated.fontFamily": "'Geist Mono', 'JetBrains Mono', 'Cascadia Code', monospace",
+      "terminal.integrated.fontSize": 13,
+      "terminal.integrated.lineHeight": 1.3,
+      "terminal.integrated.cursorBlinking": true,
+      "terminal.integrated.smoothScrolling": true,
+      "terminal.integrated.profiles.windows": {
+        "Claude Code": {
+          "path": "cmd.exe",
+          "args": ["/k", "claude"],
+          "icon": "hubot",
+          "color": "terminal.ansiCyan"
+        },
+        "PowerShell": {
+          "source": "PowerShell",
+          "icon": "terminal-powershell"
+        },
+        "Command Prompt": {
+          "path": "${env:windir}\\System32\\cmd.exe",
+          "icon": "terminal-cmd"
+        }
+      },
+
+      "C_Cpp.intelliSenseEngine": "disabled",
+      "clangd.arguments": [
+        "--header-insertion=never",
+        "--background-index",
+        "--clang-tidy",
+        "--completion-style=detailed",
+        "--pch-storage=memory"
+      ],
+      "clangd.onConfigChanged": "restart",
+
+      "python.defaultInterpreterPath": "python",
+      "python.analysis.typeCheckingMode": "basic",
+      "python.analysis.autoImportCompletions": true,
+      "python.analysis.inlayHints.functionReturnTypes": true,
+      "python.analysis.inlayHints.variableTypes": false,
+      "python.formatting.provider": "none",
+      "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter",
+        "editor.formatOnSave": true
+      },
+
+      "cmake.configureOnOpen": true,
+      "cmake.buildDirectory": "${workspaceFolder}/build",
+
+      "git.autofetch": true,
+      "git.confirmSync": false,
+      "git.enableSmartCommit": true,
+
+      "telemetry.telemetryLevel": "off",
+      "update.mode": "none",
+      "update.showReleaseNotes": false,
+      "extensions.autoCheckUpdates": false,
+      "security.workspace.trust.enabled": false,
+      "workbench.enableExperiments": false
+    }
+  }
+}

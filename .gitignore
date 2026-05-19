@@ -1,0 +1,22 @@
+# Build inputs cloned by CI — never commit
+vscode-src/
+vscodium-src/
+
+# Build outputs
+VSCode-*/
+*.zip
+*.tar.gz
+*.tar.xz
+
+# Local test artifacts
+tmp/
+
+# Node
+node_modules/
+
+# Claude Code internals
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db

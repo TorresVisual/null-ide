@@ -1,0 +1,169 @@
+name: Build Null IDE
+
+on:
+  workflow_dispatch:
+    inputs:
+      vscodium_tag:
+        description: 'VSCodium tag to build against (overrides pinned VSCODIUM_TAG)'
+        required: false
+        default: ''
+  push:
+    tags: ['v*']
+  schedule:
+    - cron: '0 6 * * 1'  # Monday 06:00 UTC — upstream check only
+
+env:
+  VSCODIUM_TAG: '1.96.2.25010'  # Pin; bumped automatically by upstream-check job
+  APP_NAME: null
+  APP_NAME_LONG: Null IDE
+
+jobs:
+  # ── Scheduled: open a PR when VSCodium releases a new version ──────────────
+  upstream-check:
+    name: Check for new VSCodium release
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compare latest VSCodium tag to pinned tag
+        run: |
+          LATEST=$(curl -fsSL https://api.github.com/repos/VSCodium/vscodium/releases/latest \
+            | jq -r '.tag_name')
+          PINNED="${{ env.VSCODIUM_TAG }}"
+          echo "Latest upstream: $LATEST   Pinned: $PINNED"
+          if [ "$LATEST" = "$PINNED" ]; then
+            echo "Already up to date."
+            exit 0
+          fi
+          # Bump the pinned tag in this file and open a PR
+          sed -i "s/VSCODIUM_TAG: '${PINNED}'/VSCODIUM_TAG: '${LATEST}'/" \
+            .github/workflows/build.yml
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          BRANCH="update/vscodium-${LATEST}"
+          git checkout -b "$BRANCH"
+          git add .github/workflows/build.yml
+          git commit -m "chore: bump VSCodium upstream to ${LATEST}"
+          git push origin "$BRANCH"
+          gh pr create \
+            --title "Update VSCodium upstream to ${LATEST}" \
+            --body "Automated upstream version bump. Verify patches apply cleanly before merging." \
+            --head "$BRANCH" \
+            --base main
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ── Build: patch → merge → build → package → upload ───────────────────────
+  build-windows:
+    name: Build Windows x64
+    if: github.event_name != 'schedule'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: ide-overlay
+
+      - name: Resolve VSCodium tag
+        id: tag
+        shell: pwsh
+        run: |
+          $tag = '${{ github.event.inputs.vscodium_tag }}'
+          if (-not $tag) { $tag = '${{ env.VSCODIUM_TAG }}' }
+          "tag=$tag" | Out-File -Append $env:GITHUB_OUTPUT
+
+      - name: Clone VSCodium at pinned tag
+        run: git clone https://github.com/VSCodium/vscodium --depth=1 --branch ${{ steps.tag.outputs.tag }} vscodium-src
+
+      - name: Read matching VS Code (MS) tag
+        id: ms-tag
+        shell: pwsh
+        run: |
+          $msTag = (Get-Content vscodium-src/MS_TAG -Raw).Trim()
+          "ms_tag=$msTag" | Out-File -Append $env:GITHUB_OUTPUT
+
+      - name: Clone VS Code source at MS tag
+        run: git clone https://github.com/microsoft/vscode --depth=1 --branch ${{ steps.ms-tag.outputs.ms_tag }} vscode-src
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Enable long paths
+        run: git config --system core.longpaths true
+
+      - name: Apply VSCodium patches
+        shell: pwsh
+        working-directory: vscode-src
+        run: |
+          $patches = Get-ChildItem ../vscodium-src/patches -Filter *.patch -ErrorAction SilentlyContinue |
+            Sort-Object Name
+          foreach ($p in $patches) {
+            Write-Host "Applying VSCodium patch: $($p.Name)"
+            git apply --ignore-whitespace $p.FullName
+          }
+
+      - name: Apply overlay patches
+        shell: pwsh
+        working-directory: vscode-src
+        run: |
+          $patches = Get-ChildItem ../ide-overlay/patches -Filter *.patch -ErrorAction SilentlyContinue |
+            Sort-Object Name
+          foreach ($p in $patches) {
+            Write-Host "Applying overlay patch: $($p.Name)"
+            git apply --ignore-whitespace $p.FullName
+          }
+
+      - name: Merge product.json overlay
+        shell: pwsh
+        run: |
+          node ide-overlay/scripts/merge-json.js `
+            vscode-src/product.json `
+            ide-overlay/product.json `
+            vscode-src/product.json
+
+      - name: Copy built-in theme extension
+        shell: pwsh
+        run: Copy-Item -Recurse -Force ide-overlay/extensions/null-theme vscode-src/extensions/
+
+      - name: Replace icons
+        shell: pwsh
+        run: |
+          if (Test-Path ide-overlay/icons/icon.ico) {
+            Copy-Item ide-overlay/icons/icon.ico vscode-src/resources/win32/code.ico -Force
+          }
+          # Add mappings for additional icon sizes/formats here as the icons/ dir grows
+
+      - name: Copy workbench CSS into source tree
+        shell: pwsh
+        run: |
+          # Copies null-custom.css into the workbench browser source directory so
+          # gulp picks it up during compilation and it lands at out/vs/workbench/.
+          Copy-Item ide-overlay/workbench/custom.css `
+            vscode-src/src/vs/workbench/browser/null-custom.css -Force
+
+      - name: Install yarn
+        run: npm install -g yarn
+
+      - name: Install dependencies
+        working-directory: vscode-src
+        run: yarn --frozen-lockfile
+
+      - name: Build
+        working-directory: vscode-src
+        run: yarn gulp vscode-win32-x64
+
+      - name: Package archive
+        working-directory: vscode-src
+        run: yarn gulp vscode-win32-x64-archive
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: null-ide-win32-x64-${{ steps.tag.outputs.tag }}
+          path: VSCode-win32-x64.zip
+          retention-days: 30
