@@ -16,6 +16,25 @@
         "icon": "$(sparkle)"
       }
     ],
+    "viewsContainers": {
+      "secondarySidebar": [
+        {
+          "id": "null-agents",
+          "title": "AI Agents",
+          "icon": "media/null.svg"
+        }
+      ]
+    },
+    "views": {
+      "null-agents": [
+        {
+          "type": "webview",
+          "id": "null.agentsView",
+          "name": "Claude Code",
+          "visibility": "visible"
+        }
+      ]
+    },
     "menus": {
       "scm/title": [
         {

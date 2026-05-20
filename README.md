@@ -30,6 +30,34 @@ Builds run in GitHub Actions on a `windows-latest` runner — you do not build l
 The Null Dark theme is active by default. Recommended extensions are prompted on
 first launch.
 
+## Installing and updating
+
+Tagged builds publish `null-ide-win32-x64.zip` to the matching GitHub Release.
+
+Install the latest release:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install-null-ide.ps1
+```
+
+Install from a ZIP you already downloaded:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install-null-ide.ps1 `
+  -ZipPath .\null-ide-win32-x64.zip `
+  -InstallDir "$env:LOCALAPPDATA\Programs\Null IDE"
+```
+
+Update an existing script-managed install:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\update-null-ide.ps1
+```
+
+The default install path is `%LOCALAPPDATA%\Programs\Null IDE`. The scripts do
+not modify PATH, the registry, or any VS Code/VSCodium install. If a release is
+private, set `GITHUB_TOKEN` before running the scripts.
+
 ## Claude Code integration
 
 Claude Code is available via the integrated terminal:
