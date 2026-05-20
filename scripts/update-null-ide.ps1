@@ -4,7 +4,8 @@ param(
     [string]$InstallDir = "$env:LOCALAPPDATA\Programs\Null IDE",
     [switch]$IncludePrerelease,
     [switch]$Force,
-    [switch]$Launch
+    [switch]$Launch,
+    [switch]$WaitForExit
 )
 
 $ErrorActionPreference = "Stop"
@@ -123,6 +124,27 @@ Write-Host "Latest version:    $latest"
 $installer = Join-Path $PSScriptRoot "install-null-ide.ps1"
 if (-not (Test-Path $installer)) {
     throw "Installer script not found next to updater: $installer"
+}
+
+if ($WaitForExit) {
+    Write-Step "Waiting for Null IDE to close"
+    $installPrefix = $installFullPath.TrimEnd('\') + '\'
+    while ($true) {
+        $running = Get-Process -Name "null" -ErrorAction SilentlyContinue | Where-Object {
+            try {
+                $_.MainModule.FileName.StartsWith($installPrefix, [System.StringComparison]::OrdinalIgnoreCase)
+            }
+            catch {
+                $true
+            }
+        }
+
+        if (-not $running) {
+            break
+        }
+
+        Start-Sleep -Seconds 1
+    }
 }
 
 Write-Step "Updating Null IDE"

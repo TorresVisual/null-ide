@@ -14,6 +14,16 @@
         "command": "null.generateCommitMessage",
         "title": "Null: Generate Commit Message",
         "icon": "$(sparkle)"
+      },
+      {
+        "command": "null.checkForUpdates",
+        "title": "Null: Check for Updates",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "null.installUpdate",
+        "title": "Null: Install Update",
+        "icon": "$(cloud-download)"
       }
     ],
     "viewsContainers": {
@@ -41,6 +51,12 @@
           "command": "null.generateCommitMessage",
           "when": "scmProvider == git",
           "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "null.installUpdate",
+          "when": "nullUpdateAvailable"
         }
       ]
     },

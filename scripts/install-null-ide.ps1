@@ -164,7 +164,7 @@ function Install-Zip {
             Write-Step "Backing up current app files"
             New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
             foreach ($item in $existingItems) {
-                if ($item.Name -eq "data") {
+                if ($item.Name -eq "data" -or $item.Name -like "unins*") {
                     continue
                 }
 
@@ -218,7 +218,7 @@ function Install-Zip {
         if ((Test-Path $backupDir) -and (Test-Path $destinationFullPath)) {
             Write-Warning "Install failed. Restoring previous app files."
             Get-ChildItem -LiteralPath $destinationFullPath -Force |
-                Where-Object { $_.Name -ne "data" } |
+                Where-Object { $_.Name -ne "data" -and $_.Name -notlike "unins*" } |
                 ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force }
             Get-ChildItem -LiteralPath $backupDir -Force |
                 ForEach-Object { Move-Item -LiteralPath $_.FullName -Destination $destinationFullPath -Force }

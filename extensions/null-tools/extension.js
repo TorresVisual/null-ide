@@ -2,7 +2,12 @@
 
 const vscode = require('vscode');
 const path   = require('path');
+const fs     = require('fs');
+const https  = require('https');
 const { execSync, spawn } = require('child_process');
+
+const UPDATE_REPO = 'TorresVisual/null-ide';
+const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
 // ── Commit message generator ───────────────────────────────────────────────
 
@@ -63,6 +68,210 @@ function loadNodePty(extensionPath) {
     if (typeof mod.spawn === 'function') return mod;
   } catch (_) {}
   return null;
+}
+
+function getInstallDir() {
+  return path.dirname(process.execPath);
+}
+
+function getUpdaterScriptPath(context) {
+  const installUpdater = path.join(getInstallDir(), 'resources', 'app', 'null-updater', 'update-null-ide.ps1');
+  if (fs.existsSync(installUpdater)) return installUpdater;
+
+  const repoUpdater = path.resolve(context.extensionPath, '..', '..', 'scripts', 'update-null-ide.ps1');
+  if (fs.existsSync(repoUpdater)) return repoUpdater;
+
+  return null;
+}
+
+function getInstallMetadata() {
+  const metadataPath = path.join(getInstallDir(), '.null-ide-install.json');
+  try {
+    return JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
+  } catch (_) {
+    return null;
+  }
+}
+
+function getCurrentVersion() {
+  const metadata = getInstallMetadata();
+  if (metadata?.version) return String(metadata.version);
+
+  const appRoot = path.join(getInstallDir(), 'resources', 'app');
+  for (const file of ['package.json', 'product.json']) {
+    try {
+      const json = JSON.parse(fs.readFileSync(path.join(appRoot, file), 'utf8'));
+      if (json.version) return String(json.version);
+    } catch (_) {}
+  }
+
+  return 'local';
+}
+
+function getUpdateRepo() {
+  return getInstallMetadata()?.repo || UPDATE_REPO;
+}
+
+function trimVersionTag(tag) {
+  return String(tag || '').replace(/^v/i, '');
+}
+
+function compareVersionTags(left, right) {
+  const leftParts = trimVersionTag(left).split(/[.-]/).map(part => Number.parseInt(part, 10));
+  const rightParts = trimVersionTag(right).split(/[.-]/).map(part => Number.parseInt(part, 10));
+
+  if (leftParts.some(Number.isNaN) || rightParts.some(Number.isNaN)) {
+    return String(left) === String(right) ? 0 : -1;
+  }
+
+  const count = Math.max(leftParts.length, rightParts.length);
+  for (let i = 0; i < count; i++) {
+    const diff = (leftParts[i] || 0) - (rightParts[i] || 0);
+    if (diff !== 0) return diff;
+  }
+
+  return 0;
+}
+
+function requestJson(url) {
+  return new Promise((resolve, reject) => {
+    const req = https.get(url, {
+      headers: {
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+        'User-Agent': 'Null-IDE',
+      },
+    }, res => {
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        res.resume();
+        reject(new Error(`GitHub returned ${res.statusCode}`));
+        return;
+      }
+
+      let body = '';
+      res.setEncoding('utf8');
+      res.on('data', chunk => { body += chunk; });
+      res.on('end', () => {
+        try { resolve(JSON.parse(body)); }
+        catch (err) { reject(err); }
+      });
+    });
+
+    req.on('error', reject);
+    req.setTimeout(10000, () => {
+      req.destroy(new Error('GitHub request timed out'));
+    });
+  });
+}
+
+async function getLatestRelease(repo) {
+  return requestJson(`https://api.github.com/repos/${repo}/releases/latest`);
+}
+
+function hasWindowsPackage(release) {
+  return Array.isArray(release.assets) &&
+    release.assets.some(asset => /^(null-ide-win32-x64.*\.zip|NullIDESetup.*\.exe)$/i.test(asset.name));
+}
+
+async function checkForUpdate(context, silent) {
+  const now = Date.now();
+  const lastCheck = context.globalState.get('null.lastUpdateCheck', 0);
+  if (silent && now - lastCheck < UPDATE_CHECK_INTERVAL_MS) {
+    return null;
+  }
+
+  await context.globalState.update('null.lastUpdateCheck', now);
+
+  const current = getCurrentVersion();
+  const repo = getUpdateRepo();
+  const release = await getLatestRelease(repo);
+  const latest = String(release.tag_name || '');
+
+  if (!latest || !hasWindowsPackage(release) || compareVersionTags(latest, current) <= 0) {
+    await context.globalState.update('null.availableUpdate', undefined);
+    await vscode.commands.executeCommand('setContext', 'nullUpdateAvailable', false);
+    if (!silent) vscode.window.showInformationMessage(`Null IDE is up to date (${current}).`);
+    return null;
+  }
+
+  const update = {
+    repo,
+    current,
+    latest,
+    url: release.html_url,
+    checkedAt: new Date().toISOString(),
+  };
+
+  await context.globalState.update('null.availableUpdate', update);
+  await vscode.commands.executeCommand('setContext', 'nullUpdateAvailable', true);
+  return update;
+}
+
+async function promptForUpdate(update) {
+  const action = await vscode.window.showInformationMessage(
+    `Null IDE ${update.latest} is available. You are running ${update.current}.`,
+    'Update Now',
+    'Release Notes',
+    'Later'
+  );
+
+  if (action === 'Update Now') {
+    await vscode.commands.executeCommand('null.installUpdate');
+  } else if (action === 'Release Notes' && update.url) {
+    await vscode.env.openExternal(vscode.Uri.parse(update.url));
+  }
+}
+
+async function installUpdate(context) {
+  const update = context.globalState.get('null.availableUpdate') || await checkForUpdate(context, false);
+  if (!update) return;
+
+  const updater = getUpdaterScriptPath(context);
+  if (!updater) {
+    vscode.window.showErrorMessage('Null IDE updater script was not found in this installation.');
+    return;
+  }
+
+  const installer = path.join(path.dirname(updater), 'install-null-ide.ps1');
+  if (!fs.existsSync(installer)) {
+    vscode.window.showErrorMessage('Null IDE installer script was not found in this installation.');
+    return;
+  }
+
+  const choice = await vscode.window.showWarningMessage(
+    `Install Null IDE ${update.latest}? The IDE will close, update, and reopen.`,
+    { modal: true },
+    'Restart and Update'
+  );
+  if (choice !== 'Restart and Update') return;
+
+  const updaterDir = path.join(
+    process.env.TEMP || process.env.TMP || getInstallDir(),
+    `null-ide-updater-${Date.now()}`
+  );
+  fs.mkdirSync(updaterDir, { recursive: true });
+  const stagedUpdater = path.join(updaterDir, 'update-null-ide.ps1');
+  fs.copyFileSync(updater, stagedUpdater);
+  fs.copyFileSync(installer, path.join(updaterDir, 'install-null-ide.ps1'));
+
+  const args = [
+    '-NoLogo',
+    '-ExecutionPolicy', 'Bypass',
+    '-File', stagedUpdater,
+    '-Repo', update.repo,
+    '-InstallDir', getInstallDir(),
+    '-WaitForExit',
+    '-Launch',
+  ];
+
+  const child = spawn('powershell.exe', args, {
+    detached: true,
+    stdio: 'ignore',
+    windowsHide: false,
+  });
+  child.unref();
+
+  setTimeout(() => vscode.commands.executeCommand('workbench.action.quit'), 500);
 }
 
 // ── AI Agents sidebar panel ────────────────────────────────────────────────
@@ -257,6 +466,23 @@ function activate(context) {
   bar.show();
   context.subscriptions.push(bar);
 
+  const updateBar = vscode.window.createStatusBarItem('null.update', vscode.StatusBarAlignment.Right, 1);
+  updateBar.text = '$(cloud-download) Update';
+  updateBar.tooltip = 'Null IDE update available';
+  updateBar.command = 'null.installUpdate';
+  context.subscriptions.push(updateBar);
+
+  function refreshUpdateButton() {
+    const update = context.globalState.get('null.availableUpdate');
+    if (update?.latest) {
+      updateBar.text = `$(cloud-download) ${update.latest}`;
+      updateBar.tooltip = `Install Null IDE ${update.latest}`;
+      updateBar.show();
+    } else {
+      updateBar.hide();
+    }
+  }
+
   const cmd = vscode.commands.registerCommand('null.generateCommitMessage', async () => {
     const folders = vscode.workspace.workspaceFolders;
     if (!folders?.length) { vscode.window.showErrorMessage('Open a folder first.'); return; }
@@ -280,6 +506,36 @@ function activate(context) {
     if (repo) { repo.inputBox.value = message; vscode.commands.executeCommand('workbench.view.scm'); }
   });
   context.subscriptions.push(cmd);
+
+  const checkUpdatesCmd = vscode.commands.registerCommand('null.checkForUpdates', async () => {
+    try {
+      const update = await checkForUpdate(context, false);
+      refreshUpdateButton();
+      if (update) await promptForUpdate(update);
+    } catch (err) {
+      vscode.window.showErrorMessage(`Null: update check failed - ${err.message}`);
+    }
+  });
+  context.subscriptions.push(checkUpdatesCmd);
+
+  const installUpdateCmd = vscode.commands.registerCommand('null.installUpdate', async () => {
+    try {
+      await installUpdate(context);
+    } catch (err) {
+      vscode.window.showErrorMessage(`Null: update failed - ${err.message}`);
+    }
+  });
+  context.subscriptions.push(installUpdateCmd);
+
+  refreshUpdateButton();
+  checkForUpdate(context, true)
+    .then(update => {
+      refreshUpdateButton();
+      if (update) return promptForUpdate(update);
+    })
+    .catch(() => {
+      // Startup update checks should never make the IDE noisy when offline.
+    });
 
   const nodePty      = loadNodePty(context.extensionUri.fsPath);
   const agentsProvider = new AgentsViewProvider(context.extensionUri, nodePty);

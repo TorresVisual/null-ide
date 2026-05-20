@@ -32,7 +32,21 @@ first launch.
 
 ## Installing and updating
 
-Tagged builds publish `null-ide-win32-x64.zip` to the matching GitHub Release.
+Tagged builds publish a Windows installer and portable ZIP to the matching
+GitHub Release.
+
+Recommended install:
+
+1. Download `NullIDESetup-<version>.exe` from the latest release.
+2. Run it and launch **Null IDE** from the Start Menu.
+
+The installer uses a per-user install at `%LOCALAPPDATA%\Programs\Null IDE`, so
+the in-app updater can replace files without administrator elevation.
+
+Null IDE checks for new GitHub releases on startup. When a newer release is
+available, an update button appears in the status bar and the command palette
+offers **Null: Install Update**. Installing an update closes the IDE, applies the
+new release, and reopens it.
 
 Install the latest release:
 
@@ -54,9 +68,8 @@ Update an existing script-managed install:
 powershell -ExecutionPolicy Bypass -File .\scripts\update-null-ide.ps1
 ```
 
-The default install path is `%LOCALAPPDATA%\Programs\Null IDE`. The scripts do
-not modify PATH, the registry, or any VS Code/VSCodium install. If a release is
-private, set `GITHUB_TOKEN` before running the scripts.
+The scripts are still useful for local testing and portable installs. If a
+release is private, set `GITHUB_TOKEN` before running them.
 
 ## Claude Code integration
 
