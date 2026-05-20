@@ -11,7 +11,7 @@ async function main() {
   const svg = fs.readFileSync(svgPath);
 
   // PNG sizes to generate
-  const pngSizes = [16, 32, 48, 64, 128, 256, 512, 1024];
+  const pngSizes = [16, 32, 48, 64, 70, 128, 150, 256, 512, 1024];
   const bufs = {};
 
   for (const s of pngSizes) {
@@ -22,6 +22,11 @@ async function main() {
   // icon.png — 1024px master
   fs.writeFileSync(path.join(outDir, 'icon.png'), bufs[1024]);
   console.log('✓ icon.png (1024px)');
+
+  // Windows window icon sizes (used by Electron BrowserWindow)
+  fs.writeFileSync(path.join(outDir, 'icon_150x150.png'), bufs[150]);
+  fs.writeFileSync(path.join(outDir, 'icon_70x70.png'),   bufs[70]);
+  console.log('✓ icon_150x150.png + icon_70x70.png (Electron window icon)');
 
   // icon.ico — 16/32/48/256 inside one container
   const ico = await toIco([bufs[16], bufs[32], bufs[48], bufs[256]]);

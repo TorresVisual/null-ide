@@ -137,13 +137,20 @@ jobs:
       - name: Replace icons
         shell: pwsh
         run: |
-          $ico = "ide-overlay/icons/icon.ico"
           $win32 = "vscode-src/resources/win32"
-          # Cover every name variant the gulp build or VSCodium patches might reference
+          # ICO — cover every name variant the gulp build or VSCodium patches might reference
           foreach ($name in @("code", "codium", "vscodium", "null")) {
-            Copy-Item $ico "$win32/$name.ico" -Force
+            Copy-Item ide-overlay/icons/icon.ico "$win32/$name.ico" -Force
             Write-Host "Replaced $win32/$name.ico"
           }
+          # PNG — Electron BrowserWindow reads these for the window/alt-tab icon on Windows
+          Copy-Item ide-overlay/icons/icon_150x150.png "$win32/code_150x150.png" -Force
+          Copy-Item ide-overlay/icons/icon_70x70.png   "$win32/code_70x70.png"   -Force
+          Write-Host "Replaced win32 PNG icons"
+          # SVG — custom title bar renders this via CSS background-image
+          Copy-Item ide-overlay/icons/icon.svg `
+            vscode-src/src/vs/workbench/browser/media/code-icon.svg -Force
+          Write-Host "Replaced code-icon.svg (title bar)"
 
       - name: Copy workbench assets into source tree
         shell: pwsh
@@ -184,8 +191,9 @@ jobs:
           $outDir = "VSCode-win32-x64"
           $exe = Get-ChildItem $outDir -Filter "*.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
           if (-not $exe) { Write-Warning "No .exe found in $outDir — skipping"; exit 0 }
-          npm install -g rcedit --silent
-          rcedit $exe.FullName --set-icon ide-overlay/icons/icon.ico
+          npm install rcedit --prefix ./rcedit-tool --silent
+          $rcedit = ".\rcedit-tool\node_modules\rcedit\bin\rcedit.exe"
+          & $rcedit $exe.FullName --set-icon ide-overlay/icons/icon.ico
           Write-Host "Stamped icon onto $($exe.Name)"
 
       - name: Create zip archive
