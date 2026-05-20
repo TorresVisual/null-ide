@@ -25,6 +25,12 @@
         "key": "ctrl+shift+a",
         "command": "workbench.action.terminal.newWithProfile",
         "args": { "profileName": "Claude Code" }
+      },
+      {
+        "key": "shift+enter",
+        "command": "workbench.action.terminal.sendSequence",
+        "args": { "text": "\r" },
+        "when": "terminalFocus"
       }
     ],
 
@@ -35,6 +41,8 @@
       "workbench.editor.tabSizing": "shrink",
       "workbench.editor.showIcons": true,
       "workbench.iconTheme": null,
+      "workbench.secondarySideBar.defaultVisibility": "hidden",
+      "workbench.editorLargeFileConfirmation": 102400,
 
       "window.title": "${activeEditorShort}${separator}${rootName}",
       "window.titleBarStyle": "custom",
@@ -82,6 +90,13 @@
           "icon": "terminal-cmd"
         }
       },
+
+      "files.autoSave": "afterDelay",
+      "explorer.confirmDelete": false,
+      "explorer.confirmDragAndDrop": false,
+      "security.workspace.trust.untrustedFiles": "open",
+      "python.createEnvironment.trigger": "off",
+      "claudeCode.preferredLocation": "terminal",
 
       "C_Cpp.intelliSenseEngine": "disabled",
       "clangd.arguments": [
