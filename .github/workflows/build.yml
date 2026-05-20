@@ -183,10 +183,9 @@ jobs:
         run: |
           $outDir = "VSCode-win32-x64"
           $exe = Get-ChildItem $outDir -Filter "*.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
-          if (-not $exe) { Write-Warning "No .exe found in $outDir — skipping rcedit"; exit 0 }
-          $rcedit = "vscode-src/node_modules/.bin/rcedit.cmd"
-          if (-not (Test-Path $rcedit)) { $rcedit = "vscode-src/node_modules/.bin/rcedit" }
-          & $rcedit $exe.FullName --set-icon ide-overlay/icons/icon.ico
+          if (-not $exe) { Write-Warning "No .exe found in $outDir — skipping"; exit 0 }
+          npm install -g rcedit --silent
+          rcedit $exe.FullName --set-icon ide-overlay/icons/icon.ico
           Write-Host "Stamped icon onto $($exe.Name)"
 
       - name: Create zip archive
