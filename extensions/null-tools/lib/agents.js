@@ -38,6 +38,17 @@
     vscode.postMessage({ type: 'input', data: data });
   });
 
+  // VS Code intercepts Ctrl+V before it reaches xterm.js in webviews.
+  // Catch the DOM paste event instead and forward the text directly to the pty.
+  document.addEventListener('paste', function (e) {
+    var text = e.clipboardData ? e.clipboardData.getData('text/plain') : '';
+    if (text) {
+      e.preventDefault();
+      e.stopPropagation();
+      vscode.postMessage({ type: 'input', data: text });
+    }
+  });
+
   term.onResize(function (size) {
     vscode.postMessage({ type: 'resize', cols: size.cols, rows: size.rows });
   });

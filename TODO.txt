@@ -1,7 +1,3 @@
-Claude Terminal in Side Panel
-
-AI Integration (Claude Code) (maybe Codex too, Ollama)
-
 Website
 
 Github
