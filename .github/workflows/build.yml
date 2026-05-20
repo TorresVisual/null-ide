@@ -149,20 +149,20 @@ jobs:
           Copy-Item -Recurse -Force ide-overlay/extensions/null-theme vscode-src/extensions/
           Copy-Item -Recurse -Force ide-overlay/extensions/null-tools  vscode-src/extensions/
 
-      - name: Bundle node-pty into null-tools
-        shell: pwsh
-        run: |
-          # vscode-src/node_modules/node-pty is already built for the correct Electron version
-          # by the upstream npm ci step. Copy it into the extension so it ships as a built-in.
-          $src  = "vscode-src/node_modules/node-pty"
-          $dest = "vscode-src/extensions/null-tools/node_modules/node-pty"
-          if (-not (Test-Path $src)) {
-            Write-Error "node-pty not found in vscode-src/node_modules — check npm ci output"
-            exit 1
-          }
-          New-Item -ItemType Directory -Force (Split-Path $dest) | Out-Null
-          Copy-Item $src $dest -Recurse -Force
-          Write-Host "Bundled node-pty into null-tools ($((Get-ChildItem $dest/build/Release -Filter *.node).Count) native addon(s))"
+      # - name: Bundle node-pty into null-tools
+      #   shell: pwsh
+      #   run: |
+      #     # vscode-src/node_modules/node-pty is already built for the correct Electron version
+      #     # by the upstream npm ci step. Copy it into the extension so it ships as a built-in.
+      #     $src  = "vscode-src/node_modules/node-pty"
+      #     $dest = "vscode-src/extensions/null-tools/node_modules/node-pty"
+      #     if (-not (Test-Path $src)) {
+      #       Write-Error "node-pty not found in vscode-src/node_modules — check npm ci output"
+      #       exit 1
+      #     }
+      #     New-Item -ItemType Directory -Force (Split-Path $dest) | Out-Null
+      #     Copy-Item $src $dest -Recurse -Force
+      #     Write-Host "Bundled node-pty into null-tools ($((Get-ChildItem $dest/build/Release -Filter *.node).Count) native addon(s))"
 
       - name: Replace icons
         shell: pwsh
