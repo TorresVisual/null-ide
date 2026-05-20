@@ -25,12 +25,6 @@
         "key": "ctrl+shift+a",
         "command": "workbench.action.terminal.newWithProfile",
         "args": { "profileName": "Claude Code" }
-      },
-      {
-        "key": "shift+enter",
-        "command": "workbench.action.terminal.sendSequence",
-        "args": { "text": "\r" },
-        "when": "terminalFocus"
       }
     ],
 
@@ -58,8 +52,8 @@
       "editor.renderWhitespace": "boundary",
       "editor.minimap.enabled": false,
       "editor.scrollBeyondLastLine": false,
-      "editor.cursorBlinking": "smooth",
-      "editor.cursorSmoothCaretAnimation": "explicit",
+      "editor.cursorBlinking": "blink",
+      "editor.cursorSmoothCaretAnimation": "off",
       "editor.smoothScrolling": true,
       "editor.formatOnSave": true,
       "editor.bracketPairColorization.enabled": true,
@@ -96,7 +90,7 @@
       "explorer.confirmDragAndDrop": false,
       "security.workspace.trust.untrustedFiles": "open",
       "python.createEnvironment.trigger": "off",
-      "claudeCode.preferredLocation": "terminal",
+      "claudeCode.preferredLocation": "panel",
 
       "C_Cpp.intelliSenseEngine": "disabled",
       "clangd.arguments": [
