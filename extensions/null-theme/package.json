@@ -59,7 +59,7 @@
       "editor.minimap.enabled": false,
       "editor.scrollBeyondLastLine": false,
       "editor.cursorBlinking": "smooth",
-      "editor.cursorSmoothCaretAnimation": "on",
+      "editor.cursorSmoothCaretAnimation": "explicit",
       "editor.smoothScrolling": true,
       "editor.formatOnSave": true,
       "editor.bracketPairColorization.enabled": true,

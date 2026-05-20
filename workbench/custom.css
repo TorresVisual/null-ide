@@ -10,11 +10,12 @@
   --n-border:  #252525;
   --n-accent:  #4d9ade;
   --n-ui-font: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-  --n-mono:    "Geist Mono", "JetBrains Mono", "Cascadia Code", monospace;
+  /* Override the VS Code runtime variable with !important to beat inline style */
+  --vscode-workbench-activitybar-font-size: 12px !important;
   background-color: var(--n-canvas) !important;
 }
 
-/* ── UI font — sidebar, statusbar, tabs, panels (not editor/terminal) ────────── */
+/* ── UI font — sidebar, statusbar, panels (not editor/terminal) ──────────────── */
 .part.sidebar,
 .part.statusbar,
 .part.titlebar,
@@ -26,35 +27,42 @@
   font-family: var(--n-ui-font) !important;
 }
 
-/* Editor and terminal keep monospace */
-.monaco-editor .view-lines,
-.xterm {
-  font-family: var(--n-mono) !important;
+/* ── Activity bar — background + border ─────────────────────────────────────── */
+.monaco-workbench .activitybar > .content {
+  background: var(--n-canvas) !important;
 }
 
-/* ── Activity bar — icons always fully visible, no dimming ───────────────────── */
-.part.activitybar {
-  background: var(--n-canvas) !important;
+.monaco-workbench .activitybar {
   border-right: 1px solid var(--n-border) !important;
 }
 
-.part.activitybar .action-item .action-label {
-  opacity: 1 !important;
-  transition: none !important;
+/* Icon size — exact selector from compiled workbench.desktop.main.css, line 9765 */
+.monaco-workbench .activitybar > .content :not(.monaco-menu) > .monaco-action-bar .action-label.codicon {
+  font-size: 17px !important;
 }
 
-.part.activitybar .action-item:hover .action-label {
-  opacity: 1 !important;
-  background: rgba(255,255,255,0.06) !important;
+/* Row height to match smaller icons */
+.monaco-workbench .activitybar > .content :not(.monaco-menu) > .monaco-action-bar .action-label {
+  height: 36px !important;
+  width: 36px !important;
+  line-height: 36px !important;
 }
 
-.part.activitybar .action-item.checked .action-label {
+/* Icons: always at full opacity, no dimming */
+.monaco-workbench .activitybar > .content .monaco-action-bar .action-item > .action-label {
   opacity: 1 !important;
-  background: rgba(255,255,255,0.10) !important;
+}
+
+.monaco-workbench .activitybar > .content .monaco-action-bar .action-item:hover > .action-label {
+  background: rgba(255,255,255,0.07) !important;
+}
+
+.monaco-workbench .activitybar > .content .monaco-action-bar .action-item.checked > .action-label {
+  background: rgba(255,255,255,0.12) !important;
 }
 
 /* Hide the default left-edge active indicator */
-.part.activitybar .action-item .active-item-indicator {
+.monaco-workbench .activitybar > .content .monaco-action-bar .action-item .active-item-indicator {
   display: none !important;
 }
 
@@ -67,11 +75,6 @@
 /* ── Sidebar ─────────────────────────────────────────────────────────────────── */
 .part.sidebar {
   border-right: 1px solid var(--n-border) !important;
-}
-
-/* ── Editor ──────────────────────────────────────────────────────────────────── */
-.part.editor {
-  border-left: none !important;
 }
 
 /* Tab close — hidden until hover/active */
