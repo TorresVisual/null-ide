@@ -137,10 +137,13 @@ jobs:
       - name: Replace icons
         shell: pwsh
         run: |
-          if (Test-Path ide-overlay/icons/icon.ico) {
-            Copy-Item ide-overlay/icons/icon.ico vscode-src/resources/win32/code.ico -Force
+          $ico = "ide-overlay/icons/icon.ico"
+          $win32 = "vscode-src/resources/win32"
+          # Cover every name variant the gulp build or VSCodium patches might reference
+          foreach ($name in @("code", "codium", "vscodium", "null")) {
+            Copy-Item $ico "$win32/$name.ico" -Force
+            Write-Host "Replaced $win32/$name.ico"
           }
-          # Add mappings for additional icon sizes/formats here as the icons/ dir grows
 
       - name: Copy workbench assets into source tree
         shell: pwsh
@@ -174,6 +177,17 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=8192
           VSCODE_QUALITY: stable
         run: npx gulp vscode-win32-x64
+
+      - name: Stamp icon into executable
+        shell: pwsh
+        run: |
+          $outDir = "VSCode-win32-x64"
+          $exe = Get-ChildItem $outDir -Filter "*.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $exe) { Write-Warning "No .exe found in $outDir — skipping rcedit"; exit 0 }
+          $rcedit = "vscode-src/node_modules/.bin/rcedit.cmd"
+          if (-not (Test-Path $rcedit)) { $rcedit = "vscode-src/node_modules/.bin/rcedit" }
+          & $rcedit $exe.FullName --set-icon ide-overlay/icons/icon.ico
+          Write-Host "Stamped icon onto $($exe.Name)"
 
       - name: Create zip archive
         shell: pwsh
