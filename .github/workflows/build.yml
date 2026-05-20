@@ -150,6 +150,20 @@ jobs:
           Copy-Item ide-overlay/workbench/custom.css  "$wb/null-custom.css"  -Force
           Copy-Item ide-overlay/workbench/splash.js   "$wb/null-splash.js"   -Force
 
+      - name: Inject custom assets into workbench.html
+        shell: pwsh
+        run: |
+          $file = "vscode-src/src/vs/code/electron-browser/workbench/workbench.html"
+          $html = Get-Content $file -Raw
+          $anchor = '<link rel="stylesheet" href="../../../workbench/workbench.desktop.main.css">'
+          if (-not $html.Contains($anchor)) {
+            Write-Error "Anchor line not found in workbench.html — check the path after a VS Code version bump"
+            exit 1
+          }
+          $inject = $anchor + "`n`t`t<link rel=`"stylesheet`" href=`"null-custom.css`">`n`t`t<script src=`"null-splash.js`"></script>"
+          $html = $html.Replace($anchor, $inject)
+          [System.IO.File]::WriteAllText($file, $html, [System.Text.UTF8Encoding]::new($false))
+
       - name: Install dependencies
         working-directory: vscode-src
         run: npm ci

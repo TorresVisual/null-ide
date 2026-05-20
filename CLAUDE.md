@@ -42,14 +42,14 @@ The build does **not** run on Windows — patches are authored locally, CI build
 
 ## Patches
 
-`patches/001-workbench-inject-null-css.patch` is the only source-level patch. It adds one `<link>` to `src/vs/workbench/browser/workbench.html`. Everything else (defaults, keybindings, terminal profile, telemetry off) is in the built-in extension's `contributes.configurationDefaults` — keeping the patch series trivial to rebase.
+The `patches/` directory holds git-format patches for vscode source changes that cannot be done via file copy. Currently empty — the workbench.html injection is handled by the "Inject custom assets into workbench.html" step in `build.yml` (PowerShell string replacement on the anchor line), which is more robust across VS Code version bumps than a patch.
 
-The CSS file is copied into the source tree before the gulp build (not inlined in the patch), so editing `workbench/custom.css` never requires regenerating the patch.
+The CSS and JS files are copied into the source tree before the gulp build by the "Copy workbench assets" step, so editing `workbench/custom.css` or `workbench/splash.js` never requires touching the CI workflow.
 
 ```bash
 # Test locally (with VSCODE_SRC pointing to a checked-out tree):
-bash build.sh --css-only       # copies workbench/custom.css into vscode source
-bash build.sh --patches-only   # applies patches/*.patch via git apply
+bash build.sh --css-only       # copies workbench/custom.css + splash.js into vscode source
+bash build.sh --patches-only   # applies patches/*.patch via git apply (if any exist)
 
 # Create an additional patch:
 cd vscode-src
