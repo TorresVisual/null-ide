@@ -1,0 +1,35 @@
+{
+  "name": "null-tools",
+  "displayName": "Null Tools",
+  "description": "IDE commands and productivity tools for Null IDE",
+  "version": "1.0.0",
+  "publisher": "null",
+  "license": "MIT",
+  "engines": { "vscode": "^1.85.0" },
+  "main": "./extension.js",
+  "activationEvents": ["onStartupFinished"],
+  "contributes": {
+    "commands": [
+      {
+        "command": "null.generateCommitMessage",
+        "title": "Null: Generate Commit Message",
+        "icon": "$(sparkle)"
+      }
+    ],
+    "menus": {
+      "scm/title": [
+        {
+          "command": "null.generateCommitMessage",
+          "when": "scmProvider == git",
+          "group": "navigation"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "null.generateCommitMessage",
+        "key": "ctrl+shift+alt+g"
+      }
+    ]
+  }
+}

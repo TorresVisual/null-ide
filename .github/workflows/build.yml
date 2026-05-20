@@ -130,9 +130,11 @@ jobs:
             ide-overlay/product.json `
             vscode-src/product.json
 
-      - name: Copy built-in theme extension
+      - name: Copy built-in extensions
         shell: pwsh
-        run: Copy-Item -Recurse -Force ide-overlay/extensions/null-theme vscode-src/extensions/
+        run: |
+          Copy-Item -Recurse -Force ide-overlay/extensions/null-theme vscode-src/extensions/
+          Copy-Item -Recurse -Force ide-overlay/extensions/null-tools  vscode-src/extensions/
 
       - name: Replace icons
         shell: pwsh

@@ -1,3 +1,4 @@
+// ── Splash screen ──────────────────────────────────────────────────────────
 (function () {
   var ICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="64" height="64"><circle cx="50" cy="50" r="27" fill="none" stroke="white" stroke-width="7" stroke-linecap="round"/><line x1="75" y1="25" x2="25" y2="75" stroke="white" stroke-width="7" stroke-linecap="round"/></svg>';
 
@@ -29,7 +30,6 @@
     splashEl.innerHTML = ICON + '<div class="ns-word">null</div>';
     document.body.appendChild(splashEl);
 
-    // Trigger fade-in on next two frames so the transition fires
     requestAnimationFrame(function () {
       requestAnimationFrame(function () { splashEl.classList.add('ns-in'); });
     });
@@ -46,7 +46,6 @@
   }
 
   function watchReady() {
-    // Dismiss once the status bar renders — one of the last workbench parts to appear
     var obs = new MutationObserver(function () {
       if (document.querySelector('.part.statusbar')) {
         obs.disconnect();
@@ -54,15 +53,9 @@
       }
     });
     obs.observe(document.body, { childList: true, subtree: true });
-
-    // Safety net: always dismiss after 8 s even if the observer never fires
     setTimeout(dismiss, 8000);
   }
 
-  if (document.body) {
-    mount();
-    watchReady();
-  } else {
-    document.addEventListener('DOMContentLoaded', function () { mount(); watchReady(); });
-  }
+  if (document.body) { mount(); watchReady(); }
+  else { document.addEventListener('DOMContentLoaded', function () { mount(); watchReady(); }); }
 }());
