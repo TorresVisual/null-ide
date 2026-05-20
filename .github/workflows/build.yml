@@ -12,6 +12,10 @@ on:
   schedule:
     - cron: '0 6 * * 1'  # Monday 06:00 UTC — upstream check only
 
+concurrency:
+  group: null-ide-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   VSCODIUM_TAG: '1.116.02821'  # Pin; bumped automatically by upstream-check job
   APP_NAME: null
@@ -97,6 +101,13 @@ jobs:
           cache: 'npm'
           cache-dependency-path: vscode-src/package-lock.json
 
+      - name: Restore VS Code node_modules cache
+        id: vscode-node-modules-cache
+        uses: actions/cache@v4
+        with:
+          path: vscode-src/node_modules
+          key: ${{ runner.os }}-vscode-node-modules-${{ steps.ms-tag.outputs.ms_tag }}-${{ hashFiles('vscode-src/package-lock.json') }}
+
       - name: Enable long paths
         run: git config --system core.longpaths true
 
@@ -179,8 +190,18 @@ jobs:
           [System.IO.File]::WriteAllText($file, $html, [System.Text.UTF8Encoding]::new($false))
 
       - name: Install dependencies
+        if: steps.vscode-node-modules-cache.outputs.cache-hit != 'true'
         working-directory: vscode-src
-        run: npm ci
+        run: npm ci --prefer-offline --no-audit --fund=false
+
+      - name: Verify dependencies
+        shell: pwsh
+        working-directory: vscode-src
+        run: |
+          if (-not (Test-Path node_modules)) {
+            Write-Error "node_modules missing after dependency restore/install"
+            exit 1
+          }
 
       - name: Build
         working-directory: vscode-src
@@ -247,7 +268,29 @@ jobs:
             $version = '${{ steps.tag.outputs.tag }}'
           }
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-          & $iscc ide-overlay/installer/null-ide.iss /DSourceDir="$((Resolve-Path VSCode-win32-x64).Path)" /DAppVersion="$version"
+          $sourceDir = (Resolve-Path VSCode-win32-x64).Path
+          & $iscc ide-overlay/installer/null-ide.iss /DSourceDir="$sourceDir" /DAppVersion="$version" /O"$PWD"
+
+          $expected = Join-Path $PWD "NullIDESetup-$version.exe"
+          $installer = Get-ChildItem -Path . -Recurse -Filter "NullIDESetup*.exe" |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+
+          if (-not $installer) {
+            Write-Error "Inno Setup completed, but no NullIDESetup*.exe was found."
+            exit 1
+          }
+
+          if ($installer.FullName -ne $expected) {
+            Copy-Item $installer.FullName $expected -Force
+          }
+
+          if (-not (Test-Path $expected)) {
+            Write-Error "Expected installer was not created at $expected"
+            exit 1
+          }
+
+          Write-Host "Installer created: $expected"
 
       - name: Publish release asset
         if: startsWith(github.ref, 'refs/tags/')
@@ -255,7 +298,8 @@ jobs:
         with:
           files: |
             null-ide-win32-x64.zip
-            NullIDESetup-${{ github.ref_name }}.exe
+            NullIDESetup-*.exe
+          fail_on_unmatched_files: true
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -264,4 +308,5 @@ jobs:
           path: |
             null-ide-win32-x64.zip
             NullIDESetup-*.exe
+          if-no-files-found: error
           retention-days: 30
