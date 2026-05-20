@@ -1,5 +1,13 @@
-Branding
+Claude Terminal in Side Panel
 
-Generate Commit Message
+Updater
+
+AI Integration (Claude Code) (maybe Codex too, Ollama)
+
+Installer
+
+Website
+
+Github
 
 
