@@ -9,7 +9,7 @@ Subject: [PATCH] feat: inject null CSS and splash screen into workbench.html
 diff --git a/src/vs/code/electron-browser/workbench/workbench.html b/src/vs/code/electron-browser/workbench/workbench.html
 --- a/src/vs/code/electron-browser/workbench/workbench.html
 +++ b/src/vs/code/electron-browser/workbench/workbench.html
-@@ -1,4 +1,6 @@
+@@ -70,2 +70,4 @@
  		<link rel="stylesheet" href="../../../workbench/workbench.desktop.main.css">
 +		<link rel="stylesheet" href="null-custom.css">
 +		<script src="null-splash.js"></script>
