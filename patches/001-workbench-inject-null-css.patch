@@ -2,25 +2,15 @@ From: Null IDE <build@nullide>
 Date: Mon, 1 Jan 2024 00:00:00 +0000
 Subject: [PATCH] feat: inject null CSS and splash screen into workbench.html
 
-Adds a stylesheet link for null-custom.css (workbench overrides) and a
-script tag for null-splash.js (branded loading screen). Both files are
-copied into the workbench/browser directory by build.sh before the gulp
-build runs, so this patch never needs to change between VS Code versions.
 ---
- src/vs/workbench/browser/workbench.html | 2 ++
+ src/vs/code/electron-browser/workbench/workbench.html | 2 ++
  1 file changed, 2 insertions(+)
 
-diff --git a/src/vs/workbench/browser/workbench.html b/src/vs/workbench/browser/workbench.html
---- a/src/vs/workbench/browser/workbench.html
-+++ b/src/vs/workbench/browser/workbench.html
-@@ -1,7 +1,9 @@
- <!DOCTYPE html>
- <html>
- 	<head>
- 		<meta charset="utf-8" />
- 		<link rel="stylesheet" data-name="vs/workbench/workbench.desktop.main" href="workbench.desktop.main.css">
+diff --git a/src/vs/code/electron-browser/workbench/workbench.html b/src/vs/code/electron-browser/workbench/workbench.html
+--- a/src/vs/code/electron-browser/workbench/workbench.html
++++ b/src/vs/code/electron-browser/workbench/workbench.html
+@@ -1,4 +1,6 @@
+ 		<link rel="stylesheet" href="../../../workbench/workbench.desktop.main.css">
 +		<link rel="stylesheet" href="null-custom.css">
 +		<script src="null-splash.js"></script>
  	</head>
- 	<body aria-label=""></body>
- </html>

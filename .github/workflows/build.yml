@@ -142,13 +142,13 @@ jobs:
           }
           # Add mappings for additional icon sizes/formats here as the icons/ dir grows
 
-      - name: Copy workbench CSS into source tree
+      - name: Copy workbench assets into source tree
         shell: pwsh
         run: |
-          # Copies null-custom.css alongside workbench.html so gulp picks it up
-          # and it lands next to workbench.html in the packaged artifact.
-          Copy-Item ide-overlay/workbench/custom.css `
-            vscode-src/src/vs/code/electron-browser/workbench/null-custom.css -Force
+          # Both files land alongside workbench.html so gulp includes them in the artifact.
+          $wb = "vscode-src/src/vs/code/electron-browser/workbench"
+          Copy-Item ide-overlay/workbench/custom.css  "$wb/null-custom.css"  -Force
+          Copy-Item ide-overlay/workbench/splash.js   "$wb/null-splash.js"   -Force
 
       - name: Install dependencies
         working-directory: vscode-src
