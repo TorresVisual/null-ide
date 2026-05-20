@@ -8,6 +8,7 @@ const { execSync, spawn } = require('child_process');
 
 const UPDATE_REPO = 'TorresVisual/null-ide';
 const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
+const output = vscode.window.createOutputChannel('Null IDE Updates');
 
 // ── Commit message generator ───────────────────────────────────────────────
 
@@ -70,13 +71,30 @@ function loadNodePty(extensionPath) {
   return null;
 }
 
-function getInstallDir() {
-  return path.dirname(process.execPath);
+function getInstallDir(context) {
+  const candidates = getInstallDirCandidates(context);
+  return candidates[0] || path.dirname(process.execPath);
+}
+
+function getInstallDirCandidates(context) {
+  const candidates = [path.dirname(process.execPath)];
+
+  if (process.resourcesPath) {
+    candidates.push(path.resolve(process.resourcesPath, '..'));
+  }
+
+  if (context?.extensionPath) {
+    candidates.push(path.resolve(context.extensionPath, '..', '..', '..', '..'));
+  }
+
+  return [...new Set(candidates.map(candidate => path.resolve(candidate)))];
 }
 
 function getUpdaterScriptPath(context) {
-  const installUpdater = path.join(getInstallDir(), 'resources', 'app', 'null-updater', 'update-null-ide.ps1');
-  if (fs.existsSync(installUpdater)) return installUpdater;
+  for (const installDir of getInstallDirCandidates(context)) {
+    const installUpdater = path.join(installDir, 'resources', 'app', 'null-updater', 'update-null-ide.ps1');
+    if (fs.existsSync(installUpdater)) return installUpdater;
+  }
 
   const repoUpdater = path.resolve(context.extensionPath, '..', '..', 'scripts', 'update-null-ide.ps1');
   if (fs.existsSync(repoUpdater)) return repoUpdater;
@@ -84,32 +102,45 @@ function getUpdaterScriptPath(context) {
   return null;
 }
 
-function getInstallMetadata() {
-  const metadataPath = path.join(getInstallDir(), '.null-ide-install.json');
-  try {
-    return JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
-  } catch (_) {
-    return null;
+function getInstallMetadata(context) {
+  const candidates = [];
+
+  for (const installDir of getInstallDirCandidates(context)) {
+    candidates.push(
+      path.join(installDir, '.null-ide-install.json'),
+      path.join(installDir, 'resources', 'app', '.null-ide-install.json')
+    );
   }
+
+  if (process.resourcesPath) {
+    candidates.push(
+      path.resolve(process.resourcesPath, '..', '.null-ide-install.json'),
+      path.join(process.resourcesPath, 'app', '.null-ide-install.json')
+    );
+  }
+
+  for (const metadataPath of [...new Set(candidates)]) {
+    try {
+      output.appendLine(`Reading install metadata from ${metadataPath}`);
+      const raw = fs.readFileSync(metadataPath, 'utf8').replace(/^\uFEFF/, '');
+      return JSON.parse(raw);
+    } catch (err) {
+      output.appendLine(`Could not read install metadata at ${metadataPath}: ${err.message}`);
+    }
+  }
+
+  return null;
 }
 
-function getCurrentVersion() {
-  const metadata = getInstallMetadata();
+function getCurrentVersion(context) {
+  const metadata = getInstallMetadata(context);
   if (metadata?.version) return String(metadata.version);
-
-  const appRoot = path.join(getInstallDir(), 'resources', 'app');
-  for (const file of ['package.json', 'product.json']) {
-    try {
-      const json = JSON.parse(fs.readFileSync(path.join(appRoot, file), 'utf8'));
-      if (json.version) return String(json.version);
-    } catch (_) {}
-  }
 
   return 'local';
 }
 
-function getUpdateRepo() {
-  return getInstallMetadata()?.repo || UPDATE_REPO;
+function getUpdateRepo(context) {
+  return getInstallMetadata(context)?.repo || UPDATE_REPO;
 }
 
 function trimVersionTag(tag) {
@@ -135,16 +166,31 @@ function compareVersionTags(left, right) {
 
 function requestJson(url) {
   return new Promise((resolve, reject) => {
+    const headers = {
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+      'User-Agent': 'Null-IDE',
+    };
+
+    if (process.env.GITHUB_TOKEN) {
+      headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+    }
+
     const req = https.get(url, {
-      headers: {
-        Accept: 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28',
-        'User-Agent': 'Null-IDE',
-      },
+      headers,
     }, res => {
       if (res.statusCode < 200 || res.statusCode >= 300) {
-        res.resume();
-        reject(new Error(`GitHub returned ${res.statusCode}`));
+        let body = '';
+        res.setEncoding('utf8');
+        res.on('data', chunk => { body += chunk; });
+        res.on('end', () => {
+          let detail = '';
+          try {
+            const parsed = JSON.parse(body);
+            detail = parsed?.message ? `: ${parsed.message}` : '';
+          } catch (_) {}
+          reject(new Error(`GitHub returned ${res.statusCode}${detail}`));
+        });
         return;
       }
 
@@ -177,20 +223,27 @@ async function checkForUpdate(context, silent) {
   const now = Date.now();
   const lastCheck = context.globalState.get('null.lastUpdateCheck', 0);
   if (silent && now - lastCheck < UPDATE_CHECK_INTERVAL_MS) {
+    output.appendLine(`Skipping startup update check; last check was ${new Date(lastCheck).toISOString()}.`);
     return null;
   }
 
   await context.globalState.update('null.lastUpdateCheck', now);
 
-  const current = getCurrentVersion();
-  const repo = getUpdateRepo();
+  const current = getCurrentVersion(context);
+  const repo = getUpdateRepo(context);
+  output.appendLine(`Checking for updates from ${repo}. Current version: ${current}`);
   const release = await getLatestRelease(repo);
   const latest = String(release.tag_name || '');
+  const hasPackage = hasWindowsPackage(release);
+  output.appendLine(`Latest release: ${latest || '(none)'}. Windows package: ${hasPackage ? 'yes' : 'no'}`);
 
-  if (!latest || !hasWindowsPackage(release) || compareVersionTags(latest, current) <= 0) {
+  if (!latest || !hasPackage || compareVersionTags(latest, current) <= 0) {
     await context.globalState.update('null.availableUpdate', undefined);
     await vscode.commands.executeCommand('setContext', 'nullUpdateAvailable', false);
-    if (!silent) vscode.window.showInformationMessage(`Null IDE is up to date (${current}).`);
+    if (!silent) {
+      const packageNote = hasPackage ? '' : ' No Windows package was found on the latest release.';
+      vscode.window.showInformationMessage(`Null IDE is up to date (${current}; latest ${latest || 'unknown'}).${packageNote}`);
+    }
     return null;
   }
 
@@ -204,6 +257,7 @@ async function checkForUpdate(context, silent) {
 
   await context.globalState.update('null.availableUpdate', update);
   await vscode.commands.executeCommand('setContext', 'nullUpdateAvailable', true);
+  output.appendLine(`Update available: ${current} -> ${latest}`);
   return update;
 }
 
@@ -246,7 +300,7 @@ async function installUpdate(context) {
   if (choice !== 'Restart and Update') return;
 
   const updaterDir = path.join(
-    process.env.TEMP || process.env.TMP || getInstallDir(),
+    process.env.TEMP || process.env.TMP || getInstallDir(context),
     `null-ide-updater-${Date.now()}`
   );
   fs.mkdirSync(updaterDir, { recursive: true });
@@ -259,7 +313,7 @@ async function installUpdate(context) {
     '-ExecutionPolicy', 'Bypass',
     '-File', stagedUpdater,
     '-Repo', update.repo,
-    '-InstallDir', getInstallDir(),
+    '-InstallDir', getInstallDir(context),
     '-WaitForExit',
     '-Launch',
   ];

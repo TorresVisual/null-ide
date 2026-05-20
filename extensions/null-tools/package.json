@@ -55,6 +55,9 @@
       ],
       "commandPalette": [
         {
+          "command": "null.checkForUpdates"
+        },
+        {
           "command": "null.installUpdate",
           "when": "nullUpdateAvailable"
         }
