@@ -52,9 +52,11 @@ case "$MODE" in
 
   --css-only)
     require_vscode_src
-    dest="$VSCODE_SRC/src/vs/workbench/browser/null-custom.css"
-    cp "$OVERLAY_DIR/workbench/custom.css" "$dest"
-    echo "Copied workbench/custom.css → $dest"
+    wb="$VSCODE_SRC/src/vs/workbench/browser"
+    cp "$OVERLAY_DIR/workbench/custom.css"  "$wb/null-custom.css"
+    echo "Copied workbench/custom.css → $wb/null-custom.css"
+    cp "$OVERLAY_DIR/workbench/splash.js"   "$wb/null-splash.js"
+    echo "Copied workbench/splash.js → $wb/null-splash.js"
     ;;
 
   --icons-only)

@@ -1,32 +1,26 @@
-From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
-From: Null IDE Build <build@nullide.local>
-Date: Mon, 01 Jan 2024 00:00:00 +0000
-Subject: [PATCH 1/1] feat: inject Null custom stylesheet into workbench HTML
+From: Null IDE <build@nullide>
+Date: Mon, 1 Jan 2024 00:00:00 +0000
+Subject: [PATCH] feat: inject null CSS and splash screen into workbench.html
 
-Adds a <link> for null-custom.css after the main workbench stylesheet.
-The source lives at workbench/custom.css in the overlay repo and is copied
-to src/vs/code/electron-browser/workbench/null-custom.css before the gulp
-build runs (see "Copy workbench CSS" step in build.yml), so it ends up
-alongside workbench.html in the packaged artifact.
-
-The existing CSP already contains style-src 'self' and 'unsafe-inline',
-so same-origin stylesheets load without any policy change.
+Adds a stylesheet link for null-custom.css (workbench overrides) and a
+script tag for null-splash.js (branded loading screen). Both files are
+copied into the workbench/browser directory by build.sh before the gulp
+build runs, so this patch never needs to change between VS Code versions.
 ---
- src/vs/code/electron-browser/workbench/workbench.html | 1 +
- 1 file changed, 1 insertion(+)
+ src/vs/workbench/browser/workbench.html | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/src/vs/code/electron-browser/workbench/workbench.html b/src/vs/code/electron-browser/workbench/workbench.html
-index a1b2c3d..e4f5a89 100644
---- a/src/vs/code/electron-browser/workbench/workbench.html
-+++ b/src/vs/code/electron-browser/workbench/workbench.html
-@@ -68,6 +68,7 @@
- 	"/>
-
- 		<!-- Workbench CSS -->
- 		<link rel="stylesheet" href="../../../workbench/workbench.desktop.main.css">
+diff --git a/src/vs/workbench/browser/workbench.html b/src/vs/workbench/browser/workbench.html
+--- a/src/vs/workbench/browser/workbench.html
++++ b/src/vs/workbench/browser/workbench.html
+@@ -1,7 +1,9 @@
+ <!DOCTYPE html>
+ <html>
+ 	<head>
+ 		<meta charset="utf-8" />
+ 		<link rel="stylesheet" data-name="vs/workbench/workbench.desktop.main" href="workbench.desktop.main.css">
 +		<link rel="stylesheet" href="null-custom.css">
++		<script src="null-splash.js"></script>
  	</head>
-
- 	<body aria-label="">
---
-2.43.0
+ 	<body aria-label=""></body>
+ </html>

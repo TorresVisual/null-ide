@@ -34,7 +34,7 @@
       "workbench.tree.indent": 14,
       "workbench.editor.tabSizing": "shrink",
       "workbench.editor.showIcons": true,
-      "workbench.iconTheme": null,
+      "workbench.iconTheme": "null-icons",
       "workbench.secondarySideBar.defaultVisibility": "hidden",
       "workbench.editorLargeFileConfirmation": 102400,
 
@@ -51,6 +51,7 @@
       "editor.detectIndentation": true,
       "editor.renderWhitespace": "boundary",
       "editor.minimap.enabled": false,
+      "editor.padding.top": 8,
       "editor.scrollBeyondLastLine": false,
       "editor.cursorBlinking": "blink",
       "editor.cursorSmoothCaretAnimation": "off",

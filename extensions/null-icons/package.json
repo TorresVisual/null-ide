@@ -1,0 +1,23 @@
+{
+  "name": "null-icons",
+  "displayName": "Null Icons",
+  "description": "File icon theme for Null IDE — based on Symbols by Miguel Solorio",
+  "version": "1.0.0",
+  "publisher": "null",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Themes"
+  ],
+  "contributes": {
+    "iconThemes": [
+      {
+        "id": "null-icons",
+        "label": "Null Icons",
+        "path": "./src/null-icon-theme.json"
+      }
+    ]
+  }
+}
