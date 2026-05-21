@@ -1,7 +1,5 @@
 // ── Splash screen ──────────────────────────────────────────────────────────
 (function () {
-  var ICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="64" height="64"><circle cx="50" cy="50" r="27" fill="none" stroke="white" stroke-width="7" stroke-linecap="round"/><line x1="75" y1="25" x2="25" y2="75" stroke="white" stroke-width="7" stroke-linecap="round"/></svg>';
-
   var CSS = [
     '#null-splash{',
       'position:fixed;inset:0;z-index:99999;',
@@ -18,6 +16,13 @@
     '}',
   ].join('');
 
+  var SVG_NS = 'http://www.w3.org/2000/svg';
+
+  function svgAttr(el, attrs) {
+    for (var k in attrs) el.setAttribute(k, attrs[k]);
+    return el;
+  }
+
   var styleEl, splashEl;
 
   function mount() {
@@ -25,9 +30,21 @@
     styleEl.textContent = CSS;
     document.head.appendChild(styleEl);
 
+    var svg = svgAttr(document.createElementNS(SVG_NS, 'svg'),
+      { viewBox: '0 0 100 100', width: '64', height: '64' });
+    svg.appendChild(svgAttr(document.createElementNS(SVG_NS, 'circle'),
+      { cx: '50', cy: '50', r: '27', fill: 'none', stroke: 'white', 'stroke-width': '7', 'stroke-linecap': 'round' }));
+    svg.appendChild(svgAttr(document.createElementNS(SVG_NS, 'line'),
+      { x1: '75', y1: '25', x2: '25', y2: '75', stroke: 'white', 'stroke-width': '7', 'stroke-linecap': 'round' }));
+
+    var word = document.createElement('div');
+    word.className = 'ns-word';
+    word.textContent = 'null';
+
     splashEl = document.createElement('div');
     splashEl.id = 'null-splash';
-    splashEl.innerHTML = ICON + '<div class="ns-word">null</div>';
+    splashEl.appendChild(svg);
+    splashEl.appendChild(word);
     document.body.appendChild(splashEl);
 
     requestAnimationFrame(function () {

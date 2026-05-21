@@ -25,9 +25,17 @@
 
 	"quality": "stable",
 	"version": "1.116.02821",
+	"release": "1.116.02821",
 	"serverApplicationName": "codium-server",
 	"serverDataFolderName": ".vscodium-server",
-	"serverDownloadUrlTemplate": "https://github.com/VSCodium/vscodium/releases/download/${version}/vscodium-reh-${os}-${arch}-${version}.tar.gz",
+	"serverDownloadUrlTemplate": "https://github.com/VSCodium/vscodium/releases/download/${release}/vscodium-reh-${os}-${arch}-${release}.tar.gz",
+
+	"urlProtocol": "null",
+	"tunnelApplicationName": "null-tunnel",
+	"win32AppUserModelId": "NullIDE",
+	"win32ShellNameShort": "Null",
+	"win32TunnelServiceMutex": "nullide-tunnelservice",
+	"win32TunnelMutex": "nullide-tunnel",
 
 	"enableTelemetry": false,
 
@@ -59,6 +67,28 @@
 		}
 	],
 
+	"extensionAllowedProposedApi": [
+		"jeanp413.open-remote-wsl",
+		"ms-vscode-remote.remote-ssh",
+		"ms-vscode-remote.remote-containers",
+		"ms-vscode.remote-server",
+		"ms-vscode.remote-explorer"
+	],
+
 	"defaultColorTheme": "Null Dark",
-	"defaultIconTheme": null
+	"defaultIconTheme": "null-icons",
+
+	"configurationDefaults": {
+		"workbench.colorTheme": "Null Dark",
+		"workbench.iconTheme": "null-icons",
+		"window.titleBarStyle": "custom",
+		"window.menuBarVisibility": "compact",
+		"telemetry.telemetryLevel": "off",
+		"update.mode": "none",
+		"update.showReleaseNotes": false,
+		"extensions.autoCheckUpdates": false,
+		"security.workspace.trust.untrustedFiles": "open",
+		"security.workspace.trust.enabled": false,
+		"workbench.enableExperiments": false
+	}
 }

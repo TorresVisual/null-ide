@@ -8,6 +8,8 @@ param(
     [switch]$Force,
     [switch]$NoDesktopShortcut,
     [switch]$NoStartMenuShortcut,
+    [switch]$NoContextMenu,
+    [switch]$RegisterContextMenu,
     [switch]$Launch
 )
 
@@ -121,6 +123,89 @@ function New-Shortcut {
     $shortcut.Save()
 }
 
+function Register-ContextMenu {
+    param([string]$ExePath)
+
+    $cmd = "`"$ExePath`" `"%1`""
+    $cmdBg = "`"$ExePath`" `"%V`""
+
+    $entries = @(
+        @{ Key = 'HKCU:\Software\Classes\*\shell\NullIDE';                    Label = 'Open in Null';          Cmd = $cmd   }
+        @{ Key = 'HKCU:\Software\Classes\Directory\shell\NullIDE';            Label = 'Open Folder in Null';   Cmd = $cmd   }
+        @{ Key = 'HKCU:\Software\Classes\Directory\Background\shell\NullIDE'; Label = 'Open Folder in Null';   Cmd = $cmdBg }
+    )
+
+    foreach ($entry in $entries) {
+        New-Item -Path $entry.Key -Force | Out-Null
+        Set-ItemProperty -Path $entry.Key -Name '(default)' -Value $entry.Label
+        Set-ItemProperty -Path $entry.Key -Name 'Icon'      -Value "$ExePath,0"
+        New-Item -Path "$($entry.Key)\command" -Force | Out-Null
+        Set-ItemProperty -Path "$($entry.Key)\command" -Name '(default)' -Value $entry.Cmd
+    }
+}
+
+function Unregister-ContextMenu {
+    $keys = @(
+        'HKCU:\Software\Classes\*\shell\NullIDE'
+        'HKCU:\Software\Classes\Directory\shell\NullIDE'
+        'HKCU:\Software\Classes\Directory\Background\shell\NullIDE'
+    )
+    foreach ($key in $keys) {
+        if (Test-Path $key) {
+            Remove-Item -Path $key -Recurse -Force
+        }
+    }
+}
+
+function Set-DefaultSettings {
+    $settingsDir = Join-Path $env:APPDATA "Null\User"
+    $settingsPath = Join-Path $settingsDir "settings.json"
+
+    $defaults = [ordered]@{
+        "workbench.colorTheme"                       = "Null Dark"
+        "workbench.iconTheme"                        = "null-icons"
+        "window.titleBarStyle"                       = "custom"
+        "window.menuBarVisibility"                   = "compact"
+        "telemetry.telemetryLevel"                   = "off"
+        "update.mode"                                = "none"
+        "update.showReleaseNotes"                    = $false
+        "extensions.autoCheckUpdates"                = $false
+        "security.workspace.trust.untrustedFiles"    = "open"
+        "security.workspace.trust.enabled"           = $false
+        "workbench.enableExperiments"                = $false
+    }
+
+    New-Item -ItemType Directory -Path $settingsDir -Force | Out-Null
+
+    $existing = [ordered]@{}
+    if (Test-Path $settingsPath) {
+        try {
+            $raw = Get-Content $settingsPath -Raw -Encoding UTF8
+            $parsed = $raw | ConvertFrom-Json
+            foreach ($prop in $parsed.PSObject.Properties) {
+                $existing[$prop.Name] = $prop.Value
+            }
+        }
+        catch {
+            Write-Warning "Could not parse existing settings.json - leaving it untouched."
+            return
+        }
+    }
+
+    $changed = $false
+    foreach ($key in $defaults.Keys) {
+        if (-not $existing.Contains($key)) {
+            $existing[$key] = $defaults[$key]
+            $changed = $true
+        }
+    }
+
+    if ($changed) {
+        $existing | ConvertTo-Json -Depth 10 | Set-Content $settingsPath -Encoding UTF8
+        Write-Host "Seeded default settings into $settingsPath"
+    }
+}
+
 function Install-Zip {
     param(
         [string]$SourceZip,
@@ -205,6 +290,14 @@ function Install-Zip {
                 -WorkingDirectory $destinationFullPath
         }
 
+        if (-not $NoContextMenu) {
+            Write-Step "Registering context menu entries"
+            Register-ContextMenu -ExePath $target
+        }
+
+        Write-Step "Seeding default settings"
+        Set-DefaultSettings
+
         if ($Launch) {
             Write-Step "Launching Null IDE"
             Start-Process -FilePath $target -WorkingDirectory $destinationFullPath
@@ -231,6 +324,17 @@ function Install-Zip {
             Remove-Item -LiteralPath $tempRoot -Recurse -Force
         }
     }
+}
+
+if ($RegisterContextMenu) {
+    $target = Join-Path ([System.IO.Path]::GetFullPath($InstallDir)) "null.exe"
+    if (-not (Test-Path $target)) {
+        throw "null.exe not found at $target - check -InstallDir."
+    }
+    Write-Step "Registering context menu entries"
+    Register-ContextMenu -ExePath $target
+    Write-Host "Done."
+    return
 }
 
 if ($ZipPath) {

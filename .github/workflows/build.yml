@@ -146,8 +146,9 @@ jobs:
       - name: Copy built-in extensions
         shell: pwsh
         run: |
-          Copy-Item -Recurse -Force ide-overlay/extensions/null-theme vscode-src/extensions/
+          Copy-Item -Recurse -Force ide-overlay/extensions/null-theme  vscode-src/extensions/
           Copy-Item -Recurse -Force ide-overlay/extensions/null-tools  vscode-src/extensions/
+          Copy-Item -Recurse -Force ide-overlay/extensions/null-icons  vscode-src/extensions/
 
       # - name: Bundle node-pty into null-tools
       #   shell: pwsh
@@ -224,6 +225,77 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=8192
           VSCODE_QUALITY: stable
         run: npx gulp vscode-win32-x64
+
+      - name: Fetch VSCodium server commit hash
+        id: vscodium-commit
+        shell: pwsh
+        run: |
+          $tag = '${{ steps.tag.outputs.tag }}'
+          $url = "https://github.com/VSCodium/vscodium/releases/download/$tag/vscodium-reh-linux-x64-$tag.tar.gz"
+          Write-Host "Downloading server tarball to extract commit hash..."
+          Invoke-WebRequest $url -OutFile vscodium-reh.tar.gz -UseBasicParsing
+          New-Item -ItemType Directory -Path server-extract -Force | Out-Null
+          tar -xzf vscodium-reh.tar.gz -C server-extract resources/app/product.json
+          $commit = (Get-Content server-extract/resources/app/product.json -Raw | ConvertFrom-Json).commit
+          Write-Host "VSCodium server commit: $commit"
+          "commit=$commit" | Out-File -Append $env:GITHUB_OUTPUT
+          Remove-Item vscodium-reh.tar.gz -Force
+          Remove-Item server-extract -Recurse -Force
+
+      - name: Stamp version and server URL into build output product.json
+        shell: pwsh
+        run: |
+          $productPath = "VSCode-win32-x64/resources/app/product.json"
+          $p = [System.IO.File]::ReadAllText($productPath) | ConvertFrom-Json
+          $vscodiumTag = '${{ steps.tag.outputs.tag }}'
+          $commit      = '${{ steps.vscodium-commit.outputs.commit }}'
+          $p.version   = $vscodiumTag
+          $p.commit    = $commit
+          $p | Add-Member -MemberType NoteProperty -Name "release" -Value $vscodiumTag -Force
+          $p.serverDownloadUrlTemplate           = "https://github.com/VSCodium/vscodium/releases/download/`${release}/vscodium-reh-`${os}-`${arch}-`${release}.tar.gz"
+          $p.webviewContentExternalBaseUrlTemplate = "https://{{uuid}}.vscode-cdn.net/stable/$commit/out/vs/workbench/contrib/webview/browser/pre/"
+          # Fix double-brace template artifacts left by VSCodium source product.json
+          $p.win32x64UserAppId   = $p.win32x64UserAppId   -replace '^\{\{', '{'
+          $p.win32arm64AppId     = $p.win32arm64AppId     -replace '^\{\{', '{'
+          $p.win32arm64UserAppId = $p.win32arm64UserAppId -replace '^\{\{', '{'
+          $json = $p | ConvertTo-Json -Depth 10
+          [System.IO.File]::WriteAllText($productPath, $json, [System.Text.UTF8Encoding]::new($false))
+          Write-Host "Stamped version=$vscodiumTag, release=$vscodiumTag, commit=$commit"
+
+      - name: Fix icons and VisualElementsManifest in build output
+        shell: pwsh
+        run: |
+          $outWin32 = "VSCode-win32-x64/resources/app/resources/win32"
+          # Ensure our icons are in the output (gulp may not have picked them all up)
+          foreach ($name in @("null", "code", "codium", "vscodium")) {
+            Copy-Item ide-overlay/icons/icon.ico "$outWin32/$name.ico" -Force
+          }
+          Copy-Item ide-overlay/icons/icon_150x150.png "$outWin32/code_150x150.png" -Force
+          Copy-Item ide-overlay/icons/icon_70x70.png   "$outWin32/code_70x70.png"   -Force
+          # Replace the gulp-generated manifest (ShortDisplayName, BackgroundColor)
+          Copy-Item ide-overlay/installer/Null.VisualElementsManifest.xml `
+            VSCode-win32-x64/Null.VisualElementsManifest.xml -Force
+          # Replace letterpress (empty-editor watermark) SVGs with our null symbol
+          $outMedia = "VSCode-win32-x64/resources/app/out/media"
+          foreach ($variant in @("letterpress-dark", "letterpress-hcDark")) {
+            Copy-Item ide-overlay/workbench/letterpress-dark.svg  "$outMedia/$variant.svg" -Force
+          }
+          foreach ($variant in @("letterpress-light", "letterpress-hcLight")) {
+            Copy-Item ide-overlay/workbench/letterpress-light.svg "$outMedia/$variant.svg" -Force
+          }
+          Write-Host "Fixed win32 icons, VisualElementsManifest, and letterpress SVGs"
+
+      - name: Copy workbench overlay files into build output
+        shell: pwsh
+        run: |
+          $outWb = "VSCode-win32-x64/resources/app/out/vs/code/electron-browser/workbench"
+          if (-not (Test-Path $outWb)) {
+            Write-Error "Build output workbench directory not found: $outWb"
+            exit 1
+          }
+          Copy-Item ide-overlay/workbench/custom.css "$outWb/null-custom.css" -Force
+          Copy-Item ide-overlay/workbench/splash.js  "$outWb/null-splash.js"  -Force
+          Write-Host "Copied null-custom.css and null-splash.js into build output"
 
       - name: Stamp icon into executable
         shell: pwsh

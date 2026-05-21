@@ -64,6 +64,9 @@
         {
           "command": "null.installUpdate",
           "when": "nullUpdateAvailable"
+        },
+        {
+          "command": "null.agentsPaste"
         }
       ]
     },
@@ -71,6 +74,11 @@
       {
         "command": "null.generateCommitMessage",
         "key": "ctrl+shift+alt+g"
+      },
+      {
+        "command": "null.agentsPaste",
+        "key": "ctrl+v",
+        "when": "focusedView == 'null.agentsView'"
       }
     ]
   }

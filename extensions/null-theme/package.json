@@ -39,8 +39,6 @@
       "workbench.editorLargeFileConfirmation": 102400,
 
       "window.title": "${activeEditorShort}${separator}${rootName}",
-      "window.titleBarStyle": "custom",
-      "window.menuBarVisibility": "compact",
 
       "editor.fontFamily": "'Geist Mono', 'JetBrains Mono', 'Cascadia Code', monospace",
       "editor.fontSize": 13,
@@ -89,7 +87,6 @@
       "files.autoSave": "afterDelay",
       "explorer.confirmDelete": false,
       "explorer.confirmDragAndDrop": false,
-      "security.workspace.trust.untrustedFiles": "open",
       "python.createEnvironment.trigger": "off",
       "claudeCode.preferredLocation": "panel",
 
@@ -119,14 +116,7 @@
 
       "git.autofetch": true,
       "git.confirmSync": false,
-      "git.enableSmartCommit": true,
-
-      "telemetry.telemetryLevel": "off",
-      "update.mode": "none",
-      "update.showReleaseNotes": false,
-      "extensions.autoCheckUpdates": false,
-      "security.workspace.trust.enabled": false,
-      "workbench.enableExperiments": false
+      "git.enableSmartCommit": true
     }
   }
 }

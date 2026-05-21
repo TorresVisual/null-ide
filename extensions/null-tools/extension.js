@@ -344,13 +344,54 @@ const AGENTS = {
   codex:  { label: 'codex',  cmd: 'codex'  },
 };
 
+const MAX_SCROLLBACK_BYTES = 300 * 1024;
+
 class AgentsViewProvider {
-  constructor(extensionUri, nodePty) {
+  constructor(extensionUri, nodePty, context) {
     this._extensionUri = extensionUri;
     this._nodePty      = nodePty;   // null if not set up yet
+    this._context      = context;
     this._view         = null;
     this._pty          = null;
     this._agent        = 'claude';
+    this._buffers      = { claude: '', agy: '', codex: '' };
+    this._saveTimer    = null;
+    this._loadBuffers();
+  }
+
+  _scrollbackDir() {
+    return path.join(this._context.globalStorageUri.fsPath, 'scrollback');
+  }
+
+  _loadBuffers() {
+    const dir = this._scrollbackDir();
+    for (const agent of Object.keys(this._buffers)) {
+      try {
+        this._buffers[agent] = fs.readFileSync(path.join(dir, `${agent}.bin`), 'utf8');
+      } catch {}
+    }
+  }
+
+  _saveBuffers() {
+    clearTimeout(this._saveTimer);
+    this._saveTimer = null;
+    const dir = this._scrollbackDir();
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      for (const [agent, buf] of Object.entries(this._buffers)) {
+        const p = path.join(dir, `${agent}.bin`);
+        if (buf) {
+          fs.writeFileSync(p, buf, 'utf8');
+        } else {
+          try { fs.unlinkSync(p); } catch {}
+        }
+      }
+    } catch {}
+  }
+
+  _scheduleSave() {
+    clearTimeout(this._saveTimer);
+    this._saveTimer = setTimeout(() => this._saveBuffers(), 5000);
   }
 
   resolveWebviewView(webviewView) {
@@ -371,13 +412,22 @@ class AgentsViewProvider {
     webviewView.webview.html = this._buildTermHtml(webviewView.webview);
     webviewView.webview.onDidReceiveMessage(msg => {
       switch (msg.type) {
-        case 'ready':  this._start(webviewView.webview, msg.agent || 'claude', msg.cols || 80, msg.rows || 24); break;
-        case 'input':  this._pty?.write(msg.data); break;
-        case 'resize': this._pty?.resize(msg.cols, msg.rows); break;
-        case 'launch': this._restart(webviewView.webview, msg.agent, msg.cols || 80, msg.rows || 24); break;
+        case 'ready':   this._start(webviewView.webview, msg.agent || 'claude', msg.cols || 80, msg.rows || 24); break;
+        case 'input':   this._pty?.write(msg.data); break;
+        case 'copy':    vscode.env.clipboard.writeText(msg.text ?? ''); break;
+        case 'paste':        vscode.env.clipboard.readText().then(text => { if (text) this._pty?.write(text.replace(/[\r\n]+$/, '')); }); break;
+        case 'focusChange':  vscode.commands.executeCommand('setContext', 'null.agentsFocused', msg.focused); break;
+        case 'resize':  this._pty?.resize(msg.cols, msg.rows); break;
+        case 'launch':  this._restart(webviewView.webview, msg.agent, msg.cols || 80, msg.rows || 24, false); break;
+        case 'restart': this._restart(webviewView.webview, this._agent, msg.cols || 80, msg.rows || 24, true); break;
       }
     });
-    webviewView.onDidDispose(() => this._kill());
+    webviewView.onDidDispose(() => {
+      clearTimeout(this._saveTimer);
+      this._saveBuffers();
+      this._kill();
+      vscode.commands.executeCommand('setContext', 'null.agentsFocused', false);
+    });
   }
 
   _runSetup() {
@@ -396,10 +446,11 @@ class AgentsViewProvider {
   }
 
   paste() {
-    vscode.env.clipboard.readText().then(text => { if (text) this._pty?.write(text); });
+    vscode.env.clipboard.readText().then(text => { if (text) this._pty?.write(text.replace(/[\r\n]+$/, '')); });
   }
 
-  _restart(webview, agent, cols, rows) {
+  _restart(webview, agent, cols, rows, fresh) {
+    if (fresh) this._buffers[agent] = '';
     this._kill();
     this._start(webview, agent, cols, rows);
   }
@@ -422,10 +473,19 @@ class AgentsViewProvider {
     }
 
     this._pty = proc;
-    webview.postMessage({ type: 'started', agent });
-    proc.onData(data => webview.postMessage({ type: 'data', text: data }));
+    webview.postMessage({ type: 'started', agent, restore: this._buffers[agent] || null });
+
+    proc.onData(data => {
+      const combined = this._buffers[agent] + data;
+      this._buffers[agent] = combined.length > MAX_SCROLLBACK_BYTES
+        ? combined.slice(combined.length - MAX_SCROLLBACK_BYTES)
+        : combined;
+      this._scheduleSave();
+      webview.postMessage({ type: 'data', text: data });
+    });
     proc.onExit(({ exitCode }) => {
       this._pty = null;
+      this._saveBuffers();
       webview.postMessage({ type: 'exit', code: exitCode });
     });
   }
@@ -492,6 +552,7 @@ Click below to run the setup in a terminal — takes ~30 s.</p>
   .tab:hover { color:#aaa; }
   .tab.active { color:#e0e0e0; border-bottom-color:#0078D4; }
   #wrap { flex:1; min-height:0; position:relative; }
+  #term { width:100%; height:100%; }
   .xterm { padding:4px 6px; }
   #banner {
     display:none; flex-shrink:0; background:#252526; border-top:1px solid #333;
@@ -604,12 +665,13 @@ function activate(context) {
     });
 
   const nodePty      = loadNodePty(context.extensionUri.fsPath);
-  const agentsProvider = new AgentsViewProvider(context.extensionUri, nodePty);
+  const agentsProvider = new AgentsViewProvider(context.extensionUri, nodePty, context);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider('null.agentsView', agentsProvider, {
       webviewOptions: { retainContextWhenHidden: true },
     })
   );
+  context.subscriptions.push({ dispose: () => agentsProvider._saveBuffers() });
 
   context.subscriptions.push(
     vscode.commands.registerCommand('null.agentsPaste', () => agentsProvider.paste())
