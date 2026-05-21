@@ -94,22 +94,25 @@ function Test-UpdateNeeded {
 $installFullPath = [System.IO.Path]::GetFullPath($InstallDir)
 $metadataPath = Join-Path $installFullPath ".null-ide-install.json"
 
-if (-not (Test-Path $metadataPath)) {
-    throw "Install metadata not found at $metadataPath. Install with scripts\install-null-ide.ps1 first, or pass the correct -InstallDir."
+$current = "local"
+if (Test-Path $metadataPath) {
+    try {
+        $raw = Get-Content $metadataPath -Raw | ForEach-Object { $_ -replace '^﻿', '' }
+        $metadata = $raw | ConvertFrom-Json
+        if (-not $Repo -and $metadata.repo) { $Repo = $metadata.repo }
+        if ($metadata.version) { $current = [string]$metadata.version }
+    }
+    catch {
+        Write-Warning "Could not read install metadata: $_"
+    }
 }
 
-$metadata = Get-Content $metadataPath -Raw | ConvertFrom-Json
 if (-not $Repo) {
-    $Repo = $metadata.repo
-}
-
-if (-not $Repo) {
-    throw "Repository is not set. Pass -Repo owner/name."
+    throw "Repository is not set. Pass -Repo owner/name or ensure .null-ide-install.json exists at $installFullPath."
 }
 
 Write-Step "Checking latest release from $Repo"
 $release = Get-LatestRelease -RepoName $Repo -AllowPrerelease $IncludePrerelease.IsPresent
-$current = [string]$metadata.version
 $latest = [string]$release.tag_name
 
 if (-not (Test-UpdateNeeded -Current $current -Latest $latest)) {
@@ -135,7 +138,7 @@ if ($WaitForExit) {
                 $_.MainModule.FileName.StartsWith($installPrefix, [System.StringComparison]::OrdinalIgnoreCase)
             }
             catch {
-                $true
+                $false
             }
         }
 

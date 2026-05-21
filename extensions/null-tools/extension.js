@@ -308,20 +308,28 @@ async function installUpdate(context) {
   fs.copyFileSync(updater, stagedUpdater);
   fs.copyFileSync(installer, path.join(updaterDir, 'install-null-ide.ps1'));
 
-  const args = [
-    '-NoLogo',
-    '-ExecutionPolicy', 'Bypass',
+  const installDir = getInstallDir(context);
+
+  // Build a tiny launcher script that uses Start-Process to create a new,
+  // independent console window. This ensures the updater survives the IDE's
+  // process group / job object being torn down on quit.
+  const launcherPath = path.join(updaterDir, 'launcher.ps1');
+  const psArgList = [
+    '-NoLogo', '-ExecutionPolicy', 'Bypass',
     '-File', stagedUpdater,
     '-Repo', update.repo,
-    '-InstallDir', getInstallDir(context),
+    '-InstallDir', installDir,
+    '-Force',       // skip redundant version re-check; extension already verified
     '-WaitForExit',
     '-Launch',
-  ];
+  ].map(a => `'${a.replace(/'/g, "''")}'`).join(', ');
+  fs.writeFileSync(launcherPath, `Start-Process -FilePath powershell.exe -ArgumentList @(${psArgList}) -WindowStyle Normal\n`, 'utf8');
 
-  const child = spawn('powershell.exe', args, {
+  const child = spawn('powershell.exe', [
+    '-NoLogo', '-ExecutionPolicy', 'Bypass', '-NonInteractive', '-File', launcherPath,
+  ], {
     detached: true,
     stdio: 'ignore',
-    windowsHide: false,
   });
   child.unref();
 
@@ -385,6 +393,10 @@ class AgentsViewProvider {
 
   _kill() {
     if (this._pty) { try { this._pty.kill(); } catch (_) {} this._pty = null; }
+  }
+
+  paste() {
+    vscode.env.clipboard.readText().then(text => { if (text) this._pty?.write(text); });
   }
 
   _restart(webview, agent, cols, rows) {
@@ -597,6 +609,10 @@ function activate(context) {
     vscode.window.registerWebviewViewProvider('null.agentsView', agentsProvider, {
       webviewOptions: { retainContextWhenHidden: true },
     })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('null.agentsPaste', () => agentsProvider.paste())
   );
 }
 

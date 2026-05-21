@@ -24,6 +24,10 @@
         "command": "null.installUpdate",
         "title": "Null: Install Update",
         "icon": "$(cloud-download)"
+      },
+      {
+        "command": "null.agentsPaste",
+        "title": "Null: Paste into AI Agents Terminal"
       }
     ],
     "viewsContainers": {

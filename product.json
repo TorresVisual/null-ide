@@ -23,7 +23,22 @@
 	"npeSurveyUrl": "",
 	"surveys": [],
 
+	"quality": "stable",
+	"version": "1.116.02821",
+	"serverApplicationName": "codium-server",
+	"serverDataFolderName": ".vscodium-server",
+	"serverDownloadUrlTemplate": "https://github.com/VSCodium/vscodium/releases/download/${version}/vscodium-reh-${os}-${arch}-${version}.tar.gz",
+
 	"enableTelemetry": false,
+
+	"extensionsGallery": {
+		"serviceUrl": "https://marketplace.visualstudio.com/_apis/public/gallery",
+		"itemUrl": "https://marketplace.visualstudio.com/items",
+		"resourceUrlTemplate": "https://{publisher}.vscode-unpkg.net/{publisher}/{name}/{version}/{path}",
+		"controlUrl": "https://az764295.vo.msecnd.net/extensions/marketplace.json",
+		"nlsBaseUrl": "https://download.visualstudio.microsoft.com/download/pr/",
+		"publisherUrl": "https://marketplace.visualstudio.com/publishers"
+	},
 
 	"extensionRecommendations": [
 		{

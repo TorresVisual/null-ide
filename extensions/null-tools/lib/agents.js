@@ -38,16 +38,17 @@
     vscode.postMessage({ type: 'input', data: data });
   });
 
-  // VS Code intercepts Ctrl+V before it reaches xterm.js in webviews.
-  // Catch the DOM paste event instead and forward the text directly to the pty.
+  // Intercept paste events in capture phase, before xterm's own handler sees them.
+  // stopImmediatePropagation prevents xterm from also writing the pasted text via onData.
+  // This covers both right-click paste and Ctrl+V (VS Code translates Ctrl+V to a paste event).
   document.addEventListener('paste', function (e) {
     var text = e.clipboardData ? e.clipboardData.getData('text/plain') : '';
     if (text) {
       e.preventDefault();
-      e.stopPropagation();
+      e.stopImmediatePropagation();
       vscode.postMessage({ type: 'input', data: text });
     }
-  });
+  }, true);
 
   term.onResize(function (size) {
     vscode.postMessage({ type: 'resize', cols: size.cols, rows: size.rows });
