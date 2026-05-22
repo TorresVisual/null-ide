@@ -1,125 +1,209 @@
 # Null IDE
 
-A custom IDE distribution built on VSCodium, with an Null Dark theme,
-pre-configured for C/C++ and Python development, and Claude Code integration.
-
-## Prerequisites
-
-- Windows 11
-- [Node.js 20](https://nodejs.org/) (for the `scripts/merge-json.js` build utility)
-- A GitHub repository with Actions enabled (for CI builds)
-- `git` available in your terminal
-
-## Building
-
-Builds run in GitHub Actions on a `windows-latest` runner — you do not build locally.
-
-1. Push a tag to trigger a release build:
-   ```powershell
-   git tag v1.0.0
-   git push origin v1.0.0
-   ```
-2. Or trigger manually: **Actions → Build Null IDE → Run workflow**.
-3. Download the artifact `null-ide-win32-x64-<tag>.zip` from the workflow run.
-
-## Running the IDE
-
-1. Extract `null-ide-win32-x64-*.zip` to a folder of your choice.
-2. Run `null.exe` (or whatever the compiled binary name resolves to).
-
-The Null Dark theme is active by default. Recommended extensions are prompted on
-first launch.
-
-## Installing and updating
-
-Tagged builds publish a Windows installer and portable ZIP to the matching
-GitHub Release.
-
-Recommended install:
-
-1. Download `NullIDESetup-<version>.exe` from the latest release.
-2. Run it and launch **Null IDE** from the Start Menu.
-
-The installer uses a per-user install at `%LOCALAPPDATA%\Programs\Null IDE`, so
-the in-app updater can replace files without administrator elevation.
-
-Null IDE checks for new GitHub releases on startup. When a newer release is
-available, an update button appears in the status bar and the command palette
-offers **Null: Install Update**. Installing an update closes the IDE, applies the
-new release, and reopens it.
-
-Install the latest release:
+A minimal, opinionated code editor for Windows — built on VSCodium, shipped with an AI agents panel, a dark theme, and a full icon pack.
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\install-null-ide.ps1
+irm https://github.com/TorresVisual/null-ide/releases/latest/download/install-null-ide.ps1 | iex
+```
+
+Or download `NullIDESetup-<version>.exe` from the [latest release](https://github.com/TorresVisual/null-ide/releases/latest).
+
+---
+
+## What's inside
+
+| | |
+|---|---|
+| **Null Dark theme** | Deep navy backgrounds, teal and indigo accents, Geist Mono font |
+| **null-icons** | Custom file and folder icon set |
+| **AI Agents panel** | Embedded terminals for `claude`, `agy`, and `codex` in the secondary sidebar |
+| **Claude commit messages** | One keystroke generates a conventional commit message from your staged diff |
+| **Terminal command** | `null .` opens the current folder from any terminal |
+| **Context menu** | "Open in Null" on files and folders in Explorer |
+| **Self-updating** | Checks GitHub Releases on startup; installs updates without elevation |
+
+---
+
+## Install
+
+### Installer (recommended)
+
+Download `NullIDESetup-<version>.exe` from the [latest release](https://github.com/TorresVisual/null-ide/releases/latest) and run it.
+
+The installer is per-user (`%LOCALAPPDATA%\Programs\Null IDE`) — no administrator rights required. It registers the context menu, adds `null` to your `PATH`, creates shortcuts, and seeds default settings.
+
+### PowerShell one-liner
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\install-null-ide.ps1
 ```
 
 Install from a ZIP you already downloaded:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\install-null-ide.ps1 `
-  -ZipPath .\null-ide-win32-x64.zip `
-  -InstallDir "$env:LOCALAPPDATA\Programs\Null IDE"
+powershell -ExecutionPolicy Bypass -File scripts\install-null-ide.ps1 `
+  -ZipPath .\null-ide-win32-x64.zip
 ```
 
-Update an existing script-managed install:
+To a custom location:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\update-null-ide.ps1
+powershell -ExecutionPolicy Bypass -File scripts\install-null-ide.ps1 `
+  -InstallDir "D:\Tools\NullIDE"
 ```
 
-The scripts are still useful for local testing and portable installs. If a
-release is private, set `GITHUB_TOKEN` before running them.
+### Updating
 
-## Claude Code integration
+Null IDE checks for updates on every startup. When one is available, a button appears in the status bar — click it, confirm, and the IDE will close, update, and reopen automatically.
 
-Claude Code is available via the integrated terminal:
+To update manually from the command palette: **Null: Check for Updates**.
 
-```
-Ctrl+` to open a terminal, then type: claude
-```
-
-A dedicated terminal profile is pre-configured so you can also open one directly:
-**Terminal → New Terminal → Claude Code**
-
-### Keyboard shortcut
-
-`Ctrl+Shift+A` — opens a new terminal panel and launches `claude`.
-
-## Installing extensions
-
-### Open VSX (default)
-
-The IDE is configured to use the [Open VSX Registry](https://open-vsx.org/) by default:
-
-1. Open the Extensions panel (`Ctrl+Shift+X`).
-2. Search and install normally.
-
-Or from the command line:
-```powershell
-null.exe --install-extension <publisher.extension-id>
-```
-
-### Microsoft Marketplace (optional override)
-
-Microsoft's marketplace is not enabled by default. To use it for a session, set the
-following environment variable **before** launching the IDE:
+Or from a terminal:
 
 ```powershell
-$env:EXTENSIONS_GALLERY = '{"serviceUrl":"https://marketplace.visualstudio.com/_apis/public/gallery","cacheUrl":"https://vscode.blob.core.windows.net/gallery/index","itemUrl":"https://marketplace.visualstudio.com/items"}'
-.\null.exe
+powershell -ExecutionPolicy Bypass -File scripts\update-null-ide.ps1
 ```
 
-> This is a per-session opt-in. It is not set automatically anywhere in this repo.
+---
 
-## Developing patches
+## Usage
 
-To add or modify workbench behaviour, write patches against the VS Code source and place
-them in `patches/`. See [`patches/README.md`](patches/README.md) for the full workflow.
+### Open from the terminal
 
-## Bumping the upstream VSCodium version
+After install, `null` is on your user `PATH`. Open any terminal and run:
 
-The scheduled CI job (Mondays, 06:00 UTC) checks for new VSCodium releases and opens a
-PR automatically if one is found. Review the PR, verify patches apply cleanly, then merge.
+```
+null .                          # open current folder
+null C:\path\to\project         # open a specific folder
+null README.md                  # open a file
+```
 
-To bump manually, edit `VSCODIUM_TAG` in `.github/workflows/build.yml`.
+> Open a new terminal window after install for `PATH` changes to take effect.
+
+### Open from Explorer
+
+Right-click any file or folder and choose **Open in Null** or **Open Folder in Null**.
+
+Right-click inside a folder (on the background) and choose **Open Folder in Null**.
+
+### AI Agents panel
+
+The secondary sidebar contains an **AI Agents** panel with embedded terminals for `claude`, `agy`, and `codex`. Switch between them using the tabs at the top.
+
+- Scrollback is persisted across reloads (up to 300 KB per agent)
+- Paste with `Ctrl+V` while the terminal is focused
+- The panel requires `node-pty` built for the current Electron version. If you see a setup screen, click **Install dependencies** (takes ~30 seconds, then reload the window)
+
+### Claude commit messages
+
+Press `Ctrl+Shift+Alt+G` (or click `$(sparkle)` in the status bar, or use the sparkle icon above the SCM commit box) to generate a conventional commit message from your staged diff via `claude --print`. The message is written directly into the commit input box.
+
+### Extensions
+
+The IDE connects to the VS Marketplace by default. Install extensions normally via `Ctrl+Shift+X` or from the terminal:
+
+```
+null --install-extension <publisher.extension-id>
+```
+
+Recommended extensions are suggested on first launch:
+
+| Purpose | ID |
+|---|---|
+| C/C++ IntelliSense | `llvm-vs-code-extensions.vscode-clangd` |
+| CMake | `twxs.cmake` |
+| Python | `ms-python.python` |
+| GitLens | `eamodio.gitlens` |
+
+---
+
+## Build
+
+Builds run in GitHub Actions on a `windows-latest` runner — you do not build locally.
+
+Trigger a release build by pushing a version tag:
+
+```powershell
+git tag v1.2.3
+git push origin v1.2.3
+```
+
+Or trigger manually: **Actions → Build Null IDE → Run workflow**.
+
+The pipeline checks out VSCodium and VS Code at the pinned tags, applies patches, merges `product.json`, copies built-in extensions and icons, builds with `npx gulp vscode-win32-x64`, packages a ZIP and an Inno Setup installer, and publishes both to the GitHub Release.
+
+### Upstream version
+
+The scheduled CI job (Mondays 06:00 UTC) checks for new VSCodium releases and opens a PR automatically. To bump manually, edit `VSCODIUM_TAG` in `.github/workflows/build.yml`.
+
+---
+
+## Development
+
+### Repository layout
+
+```
+extensions/null-theme/      Color theme (Null Dark)
+extensions/null-icons/      File icon theme
+extensions/null-tools/      AI agents, commit gen, updater
+icons/                      Source SVG → ICO/PNG/ICNS
+installer/null-ide.iss      Inno Setup script
+patches/                    git-format patches (currently empty)
+scripts/                    Install/update PowerShell scripts
+workbench/custom.css        Injected CSS into workbench.html
+workbench/splash.js         Runs in <head> before workbench init
+workbench/letterpress-*.svg Empty-editor watermarks (∅ symbol)
+product.json                Branding/config overlay
+docs/index.html             GitHub Pages homepage
+```
+
+### Editing the theme
+
+Edit `extensions/null-theme/themes/null-dark.json` directly and copy to your local install to preview:
+
+```powershell
+Copy-Item extensions\null-theme -Destination "$env:LOCALAPPDATA\Programs\Null IDE\resources\app\extensions\null-theme" -Recurse -Force
+```
+
+Then reload the window (`Ctrl+Shift+P` → *Reload Window*).
+
+### Editing workbench CSS
+
+Edit `workbench/custom.css`, then copy to the local install:
+
+```powershell
+Copy-Item workbench\custom.css "$env:LOCALAPPDATA\Programs\Null IDE\resources\app\out\vs\code\electron-browser\workbench\null-custom.css" -Force
+```
+
+Reload the window to see changes.
+
+### Adding a patch
+
+```bash
+cd vscode-src
+# make changes, then:
+git add -p && git commit -m "feat: describe change"
+git format-patch HEAD~1 -o ../patches/
+```
+
+Patches apply after VSCodium's patches, against the VS Code commit at `MS_TAG`.
+
+### Rebuilding node-pty (AI Agents panel)
+
+After changing the Electron version or on a fresh clone:
+
+```powershell
+cd extensions\null-tools
+pwsh -File setup.ps1
+```
+
+Then reload the window.
+
+---
+
+## Privacy
+
+Null IDE has telemetry fully disabled (`enableTelemetry: false` in `product.json`). No usage data is sent anywhere. The only network calls are:
+
+- Extension gallery lookups (VS Marketplace, only on user action)
+- GitHub Releases API (startup update check, once every 6 hours)

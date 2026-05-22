@@ -1,74 +1,84 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code when working with code in this repository.
 
 ## Project Overview
 
-A **forked VSCodium distribution** with a custom binary name, Null-aesthetic workbench UI, bundled built-in extensions, and stripped Microsoft code. Built via a repeatable GitHub Actions pipeline that tracks upstream VSCodium releases.
+**Null IDE** is a custom Windows desktop code editor built on VSCodium (itself a fork of VS Code with Microsoft telemetry removed). It ships with its own binary name, branding, built-in extensions, and an automated GitHub Actions release pipeline.
 
-The build does **not** run on Windows — patches are authored locally, CI builds on `ubuntu-latest`, and the resulting portable `.zip` artifact is downloaded for Windows use.
+Key characteristics:
+- Binary name: `null.exe` — accessible from the terminal as `null .`
+- Built on VSCodium, which strips Microsoft telemetry from VS Code
+- Three built-in extensions bundled at build time: `null-theme`, `null-icons`, `null-tools`
+- CI builds on `windows-latest`; the developer authors source changes locally
+- Releases publish a portable ZIP and an Inno Setup installer to GitHub Releases
+- The in-app updater (`null-tools`) checks GitHub Releases on startup and can self-update
 
 ## Repository Layout
 
 ```
-├── patches/                   # Git-format patches applied on top of VSCodium source
-│   ├── 001-binary-rename.patch
-│   ├── 002-workbench-ui.patch
-│   ├── 003-strip-telemetry.patch
-│   └── 004-builtin-extensions.patch
-├── icons/                     # Source icons: icon.ico, icon.png, icon.icns, icon.svg
-├── extensions/
-│   └── null-theme/     # Bundled as a built-in extension (ships in the binary)
-│       ├── package.json
-│       └── themes/null-dark.json
-├── workbench/                 # Assets injected into the workbench at build time
-│   └── custom.css             # Injected via workbench.html patch
-├── product.json               # Merged into vscode/product.json before build
-├── build.sh                   # CI build script (runs on ubuntu-latest)
 ├── .github/workflows/
-│   └── build.yml              # Triggered on VSCodium release tag or manual dispatch
-└── README.md
+│   └── build.yml              # Build, package, and release pipeline
+├── extensions/
+│   ├── null-icons/            # Built-in file icon theme (null-icons)
+│   ├── null-theme/            # Built-in color theme (Null Dark)
+│   └── null-tools/            # Built-in productivity extension
+│       ├── extension.js       # Main extension entry point
+│       ├── package.json       # Contributes commands, views, keybindings
+│       ├── setup.ps1          # Rebuilds node-pty for the installed Electron version
+│       ├── lib/               # xterm.js, xterm-addon-fit.js, agents.js (webview assets)
+│       └── node_modules/      # node-pty (native; must be rebuilt via setup.ps1)
+├── icons/                     # Source icons used by the build
+│   ├── icon.svg               # Master vector (∅ symbol, dark rounded square)
+│   ├── icon.ico               # Windows multi-size ICO
+│   ├── icon.png               # 1024×1024 PNG
+│   ├── icon_150x150.png       # Win32 tile PNG
+│   ├── icon_70x70.png         # Win32 tile PNG (small)
+│   └── icon.icns              # macOS (not used in current CI, kept for future)
+├── installer/
+│   ├── null-ide.iss           # Inno Setup script → NullIDESetup-<version>.exe
+│   └── Null.VisualElementsManifest.xml  # Win10 tile metadata
+├── patches/                   # Git-format patches — currently empty
+├── scripts/
+│   ├── convert-icons.js       # SVG → PNG/ICO/ICNS via sharp, to-ico, png2icons
+│   ├── merge-json.js          # Deep-merges product.json overlay (our values win)
+│   ├── install-null-ide.ps1   # Downloads from GitHub Releases or installs a local ZIP
+│   └── update-null-ide.ps1    # Checks latest release tag, delegates to installer
+├── workbench/
+│   ├── custom.css             # Injected as null-custom.css into workbench.html
+│   ├── splash.js              # Runs in <head> before the workbench (no Node/AMD)
+│   ├── letterpress-dark.svg   # Empty-editor watermark — dark variant (∅ symbol)
+│   └── letterpress-light.svg  # Empty-editor watermark — light variant
+├── docs/
+│   └── index.html             # GitHub Pages homepage
+└── product.json               # Deep-merged into vscode/product.json before build
 ```
 
 ## How the Build Works
 
-1. **`build.yml`** checks out the VSCodium repo at the target tag, then overlays this repo's files on top.
-2. **Patches** in `patches/` are applied via `git am` in numerical order against the checked-out vscode source.
-3. **`product.json`** is deep-merged (our values win) into `vscode/product.json`.
-4. **`extensions/null-theme/`** is copied into `vscode/extensions/` so it ships as a built-in.
-5. **`icons/`** replaces the upstream icon files before packaging.
-6. Build runs `yarn && yarn gulp vscode-linux-x64 vscode-win32-x64` (or the VSCodium equivalent build targets).
-7. Artifact is uploaded to the GitHub release.
+The entire build runs in GitHub Actions on a `windows-latest` runner — do **not** try to run it locally.
 
-## Patches
+1. Clone VSCodium at `VSCODIUM_TAG` and VS Code at the matching `MS_TAG`.
+2. Apply VSCodium's own patches against the VS Code source tree.
+3. Apply any patches in `patches/` (currently none).
+4. Deep-merge `product.json` overlay into `vscode-src/product.json`.
+5. Copy built-in extensions (`null-theme`, `null-icons`, `null-tools`) into `vscode-src/extensions/`.
+6. Replace upstream icons with files from `icons/`.
+7. Copy `workbench/custom.css` → `null-custom.css` and `workbench/splash.js` → `null-splash.js` into the source tree.
+8. Inject `<link>` and `<script>` tags into `workbench.html` pointing at those files.
+9. `npm ci && npx gulp vscode-win32-x64` produces `VSCode-win32-x64/`.
+10. Stamp version, commit hash, and server URL into the build output's `product.json`.
+11. Replace letterpress SVGs in the build output with the null-symbol versions.
+12. Run `rcedit` to stamp the custom icon into `null.exe`.
+13. Bundle `install-null-ide.ps1` and `update-null-ide.ps1` into `resources/app/null-updater/`.
+14. `Compress-Archive` → `null-ide-win32-x64.zip`.
+15. Inno Setup → `NullIDESetup-<version>.exe`.
+16. Both artifacts are uploaded to the GitHub Release (tag builds) and as workflow artifacts.
 
-The `patches/` directory holds git-format patches for vscode source changes that cannot be done via file copy. Currently empty — the workbench.html injection is handled by the "Inject custom assets into workbench.html" step in `build.yml` (PowerShell string replacement on the anchor line), which is more robust across VS Code version bumps than a patch.
+## Built-in Extensions
 
-The CSS and JS files are copied into the source tree before the gulp build by the "Copy workbench assets" step, so editing `workbench/custom.css` or `workbench/splash.js` never requires touching the CI workflow.
-
-```bash
-# Test locally (with VSCODE_SRC pointing to a checked-out tree):
-bash build.sh --css-only       # copies workbench/custom.css + splash.js into vscode source
-bash build.sh --patches-only   # applies patches/*.patch via git apply (if any exist)
-
-# Create an additional patch:
-cd vscode-src
-git add -p && git commit -m "feat: describe change"
-git format-patch HEAD~1 -o ../patches/
-```
-
-Patches apply against the vscode commit at `MS_TAG` (read from `vscodium-src/MS_TAG`) **after** VSCodium's own patches are applied. When the upstream version changes, rebase the patch series with `git rebase --onto <new-ms-tag> <old-ms-tag> HEAD` and re-export.
-
-## Updating Upstream Version
-
-1. Change `VSCODIUM_TAG` in `.github/workflows/build.yml`.
-2. Check out the new vscode tag locally and rebase the patch series: `git rebase --onto <new-tag> <old-tag> patch-branch`.
-3. Re-export patches with `git format-patch`.
-4. Push and verify CI passes.
-
-## Built-in Theme Extension
-
-`extensions/null-theme/` is a standard VS Code color theme extension. It is set as the default theme in `product.json` via `"defaultColorTheme": "Null Dark"`.
+### null-theme (`extensions/null-theme/`)
+Standard VS Code color theme extension. Set as the default via `product.json → defaultColorTheme`.
 
 Palette:
 - Background: `#0d0d1a` – `#1a1a2e`
@@ -76,46 +86,105 @@ Palette:
 - Accent indigo: `#4361ee` / `#3a0ca3`
 - Font: Geist Mono, JetBrains Mono (fallback: Cascadia Code)
 
-## Key Build Variables (build.yml)
+### null-icons (`extensions/null-icons/`)
+Built-in file icon theme. Set as the default via `product.json → defaultIconTheme`. Contains SVG icons for a wide range of file types and folder types.
+
+### null-tools (`extensions/null-tools/`)
+Activated on `onStartupFinished`. Provides:
+
+| Feature | Details |
+|---|---|
+| **AI Agents panel** | Secondary sidebar webview running xterm.js with node-pty; tabs for `claude`, `agy`, `codex` |
+| **Commit message generation** | `null.generateCommitMessage` — runs `claude --print` with staged diff; sets SCM input box |
+| **In-app updater** | Checks GitHub Releases on startup; shows status bar button; self-updates via PowerShell |
+| **Scrollback persistence** | Terminal buffers (up to 300 KB each) saved to globalStorage, restored on reload |
+| **Context paste** | `null.agentsPaste` command and `Ctrl+V` keybinding inside the agents webview |
+
+**node-pty note:** The AI Agents terminal requires `node-pty` native addon rebuilt for the exact Electron ABI. After a fresh install or IDE update, run `setup.ps1` in `extensions/null-tools/` if the panel shows the setup screen.
+
+## Workbench Assets
+
+`workbench/custom.css` and `workbench/splash.js` are injected into `workbench.html` at build time. They run in the Electron renderer process.
+
+Constraints for `splash.js`:
+- Runs in `<head>` before VS Code's workbench initialises
+- `require` (Node.js) is **not** available (contextIsolation)
+- The AMD loader is **not** available (VS Code 1.99+ uses ESM)
+- Only DOM APIs and synchronous script execution are safe
+
+## Installer and Scripts
+
+### `scripts/install-null-ide.ps1`
+- Installs from a GitHub Release (latest by default) or a local ZIP (`-ZipPath`)
+- Per-user install to `%LOCALAPPDATA%\Programs\Null IDE` — no administrator elevation required
+- Creates desktop and Start Menu shortcuts
+- Registers "Open in Null" and "Open Folder in Null" context menu entries in `HKCU`
+- Adds the install directory to the user's `PATH` (so `null .` works in new terminals)
+- Seeds default settings into `%APPDATA%\Null\User\settings.json`
+- Writes `.null-ide-install.json` (repo, version, timestamp) for the in-app updater
+
+### `scripts/update-null-ide.ps1`
+- Reads `.null-ide-install.json` to determine the current version and target repo
+- Fetches the latest GitHub Release tag and compares versions
+- Delegates to `install-null-ide.ps1` with `-Force` when an update is available
+- Used by the in-app update flow: the extension stages the scripts to `%TEMP%`, launches them detached, then quits so files can be replaced
+
+### `installer/null-ide.iss`
+Inno Setup script that builds `NullIDESetup-<version>.exe`. The installer runs `install-null-ide.ps1` with the bundled ZIP — it does not duplicate the installation logic.
+
+## Patches
+
+The `patches/` directory is currently **empty**. All workbench customisations are handled by direct file injection (CSS/JS copy + `workbench.html` string replacement) rather than git-format patches, which proved fragile across VS Code version bumps.
+
+To add a patch against the VS Code source:
+```bash
+cd vscode-src
+# Make the change, commit it
+git add -p && git commit -m "feat: describe change"
+git format-patch HEAD~1 -o ../patches/
+```
+
+Patches apply **after** VSCodium's own patches, against the VS Code commit at `MS_TAG`. When rebasing to a new upstream, re-export with `git format-patch`.
+
+## Updating the Upstream Version
+
+1. The scheduled CI job (Mondays 06:00 UTC) opens a PR automatically if VSCodium has a new release.
+2. To bump manually: edit `VSCODIUM_TAG` in `.github/workflows/build.yml`.
+3. Verify any patches in `patches/` still apply cleanly against the new MS tag.
+
+## Key Build Variables (`build.yml`)
 
 | Variable | Purpose |
 |---|---|
-| `VSCODIUM_TAG` | Upstream VSCodium release tag to build against |
-| `APP_NAME` | Binary and window title name |
-| `APP_ID` | Reverse-domain app identifier |
-| `PUBLISHER` | Extension publisher name for built-ins |
+| `VSCODIUM_TAG` | VSCodium release tag to build against |
+| `APP_NAME` | Binary name (`null`) |
+| `APP_NAME_LONG` | Display name (`Null IDE`) |
 
-## Telemetry / Microsoft Code Removal
+## product.json Overlay
 
-VSCodium already strips the bulk of Microsoft telemetry. `003-strip-telemetry.patch` handles anything that remains: crash reporter endpoints, update-check URLs, and any residual `vscode-telemetry` calls introduced in newer upstream versions. When rebasing to a new upstream, audit `grep -r "telemetry\|crashReporter\|updateUrl" vscode/src/` against the previous version's output.
+Values in `product.json` are deep-merged (our values win) over the VSCodium/VS Code defaults. Key fields set here:
+
+- `nameShort`, `nameLong`, `applicationName` — branding
+- `extensionsGallery` — VS Marketplace service URLs
+- `defaultColorTheme`, `defaultIconTheme` — point to built-in extensions
+- `configurationDefaults` — seed user settings (telemetry off, custom theme, etc.)
+- `enableTelemetry: false`
+- `reportIssueUrl`, `releaseNotesUrl` — point to this repo
 
 ## CI Pipeline Triggers
 
 ```yaml
 on:
-  workflow_dispatch:            # Manual run
+  workflow_dispatch:       # Manual run; optionally override vscodium_tag
   push:
-    tags: ['v*']               # Tag a release in this repo
+    tags: ['v*']          # Tag a release → builds and publishes to GitHub Releases
   schedule:
-    - cron: '0 6 * * 1'        # Weekly check for new VSCodium upstream tags
+    - cron: '0 6 * * 1'  # Monday 06:00 UTC — upstream version check only
 ```
-
-The scheduled run compares the latest VSCodium GitHub release tag against `VSCODIUM_TAG` and opens a PR if they differ.
-
-## Extension IDs (Open VSX, installed post-build via settings)
-
-These are not bundled — they are listed in `product.json` under `"extensionRecommendations"` and installed by the user or via a first-launch script:
-
-| Purpose | ID |
-|---|---|
-| C/C++ (clangd) | `llvm-vs-code-extensions.vscode-clangd` |
-| CMake Tools | `twxs.cmake` |
-| Python | `ms-python.python` |
-| GitLens | `eamodio.gitlens` |
 
 ## Scope Constraints
 
-- Work only inside `D:\Coding\Apps\ide\` and its subdirectories.
-- Do not touch system PATH, registry, or any existing VS Code/VSCodium installation.
-- Do not run CI or build scripts locally — patches are authored here, builds run in GitHub Actions.
-- Do not set the Microsoft extension gallery env var silently; document it in README only.
+- Work only inside `D:\Coding\Apps\null-ide\` and its subdirectories.
+- Do not touch system PATH, registry, or any existing VS Code/VSCodium installation outside this repo's installer scripts.
+- Do not run CI or build scripts locally — patches are authored here; builds run in GitHub Actions.
+- Do not set the Microsoft extension gallery env var silently; document it in the README only.
