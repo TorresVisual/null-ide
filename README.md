@@ -1,6 +1,7 @@
 # Null IDE
 
 A minimal, opinionated code editor for Windows — built on VSCodium, shipped with an AI agents panel, a dark theme, and a full icon pack.
+[Website](https://torresvisual.github.io/null-ide/)
 
 ```powershell
 irm https://github.com/TorresVisual/null-ide/releases/latest/download/install-null-ide.ps1 | iex
