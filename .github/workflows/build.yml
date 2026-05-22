@@ -18,7 +18,7 @@ concurrency:
 
 env:
   VSCODIUM_TAG: '1.116.02821'  # Pin; bumped automatically by upstream-check job
-  APP_NAME: null
+  APP_NAME: 'null'
   APP_NAME_LONG: Null IDE
 
 jobs:
@@ -235,8 +235,8 @@ jobs:
           Write-Host "Downloading server tarball to extract commit hash..."
           Invoke-WebRequest $url -OutFile vscodium-reh.tar.gz -UseBasicParsing
           New-Item -ItemType Directory -Path server-extract -Force | Out-Null
-          tar -xzf vscodium-reh.tar.gz -C server-extract resources/app/product.json
-          $commit = (Get-Content server-extract/resources/app/product.json -Raw | ConvertFrom-Json).commit
+          tar -xzf vscodium-reh.tar.gz -C server-extract product.json
+          $commit = (Get-Content server-extract/product.json -Raw | ConvertFrom-Json).commit
           Write-Host "VSCodium server commit: $commit"
           "commit=$commit" | Out-File -Append $env:GITHUB_OUTPUT
           Remove-Item vscodium-reh.tar.gz -Force

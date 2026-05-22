@@ -1,6 +1,2 @@
-Website
-
-Github
-
 // Open in Null / and terminal
 (Needs testing)
