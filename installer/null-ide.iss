@@ -35,8 +35,8 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
-Name: "contextmenu"; Description: "Add ""Open in Null"" context menu entries"; GroupDescription: "Shell integration:"; Flags: checked
-Name: "addtopath"; Description: "Add to user PATH (enables ""null ."" in new terminals)"; GroupDescription: "Shell integration:"; Flags: checked
+Name: "contextmenu"; Description: "Add ""Open in Null"" context menu entries"; GroupDescription: "Shell integration:"
+Name: "addtopath"; Description: "Add to user PATH (enables ""null ."" in new terminals)"; GroupDescription: "Shell integration:"
 
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
