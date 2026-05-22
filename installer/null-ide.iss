@@ -82,22 +82,24 @@ end;
 
 procedure RemoveFromUserPath(const Dir: string);
 var
-  OldPath: string;
-  Parts: TArrayOfString;
-  i: Integer;
-  NewPath: string;
+  OldPath, NewPath, Token: string;
+  p: Integer;
   First: Boolean;
 begin
   if not RegQueryStringValue(HKCU, 'Environment', 'Path', OldPath) then
     Exit;
-  Parts := SplitString(OldPath, ';');
   NewPath := '';
   First := True;
-  for i := 0 to GetArrayLength(Parts) - 1 do begin
-    if not SameText(Parts[i], Dir) and (Parts[i] <> '') then begin
+  OldPath := OldPath + ';';
+  p := Pos(';', OldPath);
+  while p > 0 do begin
+    Token := Copy(OldPath, 1, p - 1);
+    OldPath := Copy(OldPath, p + 1, Length(OldPath));
+    p := Pos(';', OldPath);
+    if (Token <> '') and not SameText(Token, Dir) then begin
       if not First then
         NewPath := NewPath + ';';
-      NewPath := NewPath + Parts[i];
+      NewPath := NewPath + Token;
       First := False;
     end;
   end;
