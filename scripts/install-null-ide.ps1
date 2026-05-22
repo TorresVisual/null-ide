@@ -9,6 +9,7 @@ param(
     [switch]$NoDesktopShortcut,
     [switch]$NoStartMenuShortcut,
     [switch]$NoContextMenu,
+    [switch]$NoPath,
     [switch]$RegisterContextMenu,
     [switch]$Launch
 )
@@ -157,6 +158,27 @@ function Unregister-ContextMenu {
     }
 }
 
+function Register-Path {
+    param([string]$Dir)
+    $current = [System.Environment]::GetEnvironmentVariable('PATH', 'User')
+    if (-not $current) { $current = '' }
+    $parts = $current -split ';' | Where-Object { $_ -ne '' }
+    if ($parts -notcontains $Dir) {
+        $new = ($parts + $Dir) -join ';'
+        [System.Environment]::SetEnvironmentVariable('PATH', $new, 'User')
+        Write-Host "Added to PATH: $Dir"
+        Write-Host "Open a new terminal to use 'null' from the command line."
+    }
+}
+
+function Unregister-Path {
+    param([string]$Dir)
+    $current = [System.Environment]::GetEnvironmentVariable('PATH', 'User')
+    if (-not $current) { return }
+    $parts = $current -split ';' | Where-Object { $_ -ne '' -and ($_ -ne $Dir) }
+    [System.Environment]::SetEnvironmentVariable('PATH', ($parts -join ';'), 'User')
+}
+
 function Set-DefaultSettings {
     $settingsDir = Join-Path $env:APPDATA "Null\User"
     $settingsPath = Join-Path $settingsDir "settings.json"
@@ -214,85 +236,100 @@ function Install-Zip {
         [string]$Repository
     )
 
-    if (Test-NullIdeRunning -Destination $Destination) {
-        throw "Null IDE is running. Close null.exe before installing or updating."
+    $destinationFullPath = [System.IO.Path]::GetFullPath($Destination)
+    $parentDir           = Split-Path $destinationFullPath -Parent
+    $installName         = Split-Path $destinationFullPath -Leaf
+    $guid                = [guid]::NewGuid().ToString("N").Substring(0, 8)
+    $extractDir          = Join-Path ([System.IO.Path]::GetTempPath()) "null-ide-extract-$guid"
+    $stageDir            = Join-Path $parentDir "null-ide-stage-$guid"
+    $bakDir              = Join-Path $parentDir "null-ide-bak-$guid"
+
+    $isUpdate   = Test-Path $destinationFullPath
+    $ideRunning = Test-NullIdeRunning -Destination $destinationFullPath
+
+    if ($ideRunning -and -not $isUpdate) {
+        throw "Null IDE is running. Close null.exe before installing."
+    }
+    if ($ideRunning) {
+        Write-Warning "Null IDE is running. Files will be swapped underneath it — restart the IDE after this completes."
     }
 
-    $destinationFullPath = [System.IO.Path]::GetFullPath($Destination)
-    $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("null-ide-install-" + [guid]::NewGuid())
-    $extractDir = Join-Path $tempRoot "extract"
-    $backupDir = Join-Path $tempRoot "backup"
+    if ($isUpdate -and -not $Force) {
+        throw "Install directory already exists: $destinationFullPath. Pass -Force to update it."
+    }
 
-    New-Item -ItemType Directory -Path $extractDir -Force | Out-Null
+    New-Item -ItemType Directory -Path $parentDir -Force | Out-Null
 
     try {
         Write-Step "Extracting package"
+        New-Item -ItemType Directory -Path $extractDir -Force | Out-Null
         Expand-Archive -Path $SourceZip -DestinationPath $extractDir -Force
 
         $exe = Get-ChildItem -Path $extractDir -Filter "null.exe" -Recurse -File |
-            Sort-Object { $_.FullName.Length } |
-            Select-Object -First 1
-
-        if (-not $exe) {
-            throw "The package does not contain null.exe."
-        }
-
+            Sort-Object { $_.FullName.Length } | Select-Object -First 1
+        if (-not $exe) { throw "The package does not contain null.exe." }
         $packageRoot = $exe.Directory.FullName
-        New-Item -ItemType Directory -Path $destinationFullPath -Force | Out-Null
 
-        $existingItems = Get-ChildItem -LiteralPath $destinationFullPath -Force -ErrorAction SilentlyContinue
-        if ($existingItems -and -not $Force) {
-            throw "Install directory is not empty: $destinationFullPath. Re-run with -Force to replace app files."
-        }
+        # Stage new files on the same volume as the install dir so Rename-Item is atomic
+        Write-Step "Staging new version"
+        New-Item -ItemType Directory -Path $stageDir -Force | Out-Null
+        Get-ChildItem -LiteralPath $packageRoot -Force |
+            ForEach-Object { Move-Item -LiteralPath $_.FullName -Destination $stageDir -Force }
+        Remove-Item -LiteralPath $extractDir -Recurse -Force -ErrorAction SilentlyContinue
+        $extractDir = $null
 
-        if ($existingItems) {
-            Write-Step "Backing up current app files"
-            New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
-            foreach ($item in $existingItems) {
-                if ($item.Name -eq "data" -or $item.Name -like "unins*") {
-                    continue
-                }
-
-                Move-Item -LiteralPath $item.FullName -Destination $backupDir -Force
+        if ($isUpdate) {
+            # Carry the portable data dir into the new install
+            $dataSource = Join-Path $destinationFullPath "data"
+            if (Test-Path $dataSource) {
+                Write-Step "Preserving data directory"
+                Move-Item -LiteralPath $dataSource -Destination (Join-Path $stageDir "data")
             }
+
+            # Rename-swap: directory rename works even when files inside are open/locked
+            Write-Step "Swapping installation ($(Split-Path $bakDir -Leaf))"
+            Rename-Item -LiteralPath $destinationFullPath -NewName (Split-Path $bakDir -Leaf)
         }
 
-        Write-Step "Installing to $destinationFullPath"
-        Get-ChildItem -LiteralPath $packageRoot -Force | ForEach-Object {
-            Move-Item -LiteralPath $_.FullName -Destination $destinationFullPath -Force
-        }
+        # Promote staged dir to the real install path
+        Rename-Item -LiteralPath $stageDir -NewName $installName
+        $stageDir = $null
 
-        $metadata = [ordered]@{
+        [ordered]@{
             repo        = $Repository
             version     = $InstalledVersion
             installedAt = (Get-Date).ToUniversalTime().ToString("o")
             installDir  = $destinationFullPath
-        }
+        } | ConvertTo-Json | Set-Content -Path (Join-Path $destinationFullPath ".null-ide-install.json") -Encoding UTF8
 
-        $metadataPath = Join-Path $destinationFullPath ".null-ide-install.json"
-        $metadata | ConvertTo-Json | Set-Content -Path $metadataPath -Encoding UTF8
+        # Delete old backup — may fail if IDE is still holding handles; that is non-fatal
+        if (Test-Path $bakDir) {
+            try   { Remove-Item -LiteralPath $bakDir -Recurse -Force -ErrorAction Stop }
+            catch { Write-Warning "Old files left at '$bakDir' (IDE still running?) — delete manually after closing Null IDE." }
+        }
 
         $target = Join-Path $destinationFullPath "null.exe"
 
         if (-not $NoDesktopShortcut) {
             Write-Step "Creating desktop shortcut"
-            New-Shortcut `
-                -ShortcutPath (Join-Path ([Environment]::GetFolderPath("Desktop")) "Null IDE.lnk") `
-                -TargetPath $target `
-                -WorkingDirectory $destinationFullPath
+            New-Shortcut -ShortcutPath (Join-Path ([Environment]::GetFolderPath("Desktop")) "Null IDE.lnk") `
+                         -TargetPath $target -WorkingDirectory $destinationFullPath
         }
 
         if (-not $NoStartMenuShortcut) {
             Write-Step "Creating Start Menu shortcut"
-            New-Shortcut `
-                -ShortcutPath (Join-Path ([Environment]::GetFolderPath("Programs")) "Null IDE\Null IDE.lnk") `
-                -TargetPath $target `
-                -WorkingDirectory $destinationFullPath
+            New-Shortcut -ShortcutPath (Join-Path ([Environment]::GetFolderPath("Programs")) "Null IDE\Null IDE.lnk") `
+                         -TargetPath $target -WorkingDirectory $destinationFullPath
         }
 
         if (-not $NoContextMenu) {
             Write-Step "Registering context menu entries"
             Register-ContextMenu -ExePath $target
+        }
+
+        if (-not $NoPath) {
+            Write-Step "Adding to user PATH"
+            Register-Path -Dir $destinationFullPath
         }
 
         Write-Step "Seeding default settings"
@@ -304,25 +341,22 @@ function Install-Zip {
         }
 
         Write-Host ""
-        Write-Host "Null IDE installed: $destinationFullPath"
+        Write-Host "Null IDE $(if ($isUpdate) { 'updated' } else { 'installed' }): $destinationFullPath"
         Write-Host "Version: $InstalledVersion"
     }
     catch {
-        if ((Test-Path $backupDir) -and (Test-Path $destinationFullPath)) {
-            Write-Warning "Install failed. Restoring previous app files."
-            Get-ChildItem -LiteralPath $destinationFullPath -Force |
-                Where-Object { $_.Name -ne "data" -and $_.Name -notlike "unins*" } |
-                ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force }
-            Get-ChildItem -LiteralPath $backupDir -Force |
-                ForEach-Object { Move-Item -LiteralPath $_.FullName -Destination $destinationFullPath -Force }
+        # Rollback: rename backup back to install dir name
+        if (Test-Path $bakDir) {
+            Write-Warning "Install failed — restoring previous installation."
+            if (Test-Path $destinationFullPath) {
+                Remove-Item -LiteralPath $destinationFullPath -Recurse -Force -ErrorAction SilentlyContinue
+            }
+            try   { Rename-Item -LiteralPath $bakDir -NewName $installName }
+            catch { Write-Warning "Rollback also failed — backup preserved at: $bakDir" }
         }
-
+        if ($stageDir   -and (Test-Path $stageDir))   { Remove-Item -LiteralPath $stageDir   -Recurse -Force -ErrorAction SilentlyContinue }
+        if ($extractDir -and (Test-Path $extractDir)) { Remove-Item -LiteralPath $extractDir -Recurse -Force -ErrorAction SilentlyContinue }
         throw
-    }
-    finally {
-        if (Test-Path $tempRoot) {
-            Remove-Item -LiteralPath $tempRoot -Recurse -Force
-        }
     }
 }
 

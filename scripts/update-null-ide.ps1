@@ -124,9 +124,10 @@ if (-not (Test-UpdateNeeded -Current $current -Latest $latest)) {
 Write-Host "Installed version: $current"
 Write-Host "Latest version:    $latest"
 
-$installer = Join-Path $PSScriptRoot "install-null-ide.ps1"
+$scriptDir = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Definition }
+$installer = Join-Path $scriptDir "install-null-ide.ps1"
 if (-not (Test-Path $installer)) {
-    throw "Installer script not found next to updater: $installer"
+    throw "install-null-ide.ps1 not found at '$installer'. Both scripts must be in the same directory."
 }
 
 if ($WaitForExit) {
@@ -150,19 +151,8 @@ if ($WaitForExit) {
     }
 }
 
-$settingsPath = Join-Path $env:APPDATA "Null\User\settings.json"
-$settingsSnapshot = $null
-if (Test-Path $settingsPath) {
-    try {
-        $settingsSnapshot = Get-Content $settingsPath -Raw -Encoding UTF8 | ConvertFrom-Json
-        Write-Step "Snapshotted settings.json ($($settingsSnapshot.PSObject.Properties.Count) keys)"
-    }
-    catch {
-        Write-Warning "Could not snapshot settings.json — update will continue without restore: $_"
-    }
-}
-
 Write-Step "Updating Null IDE"
+
 $installerArgs = @{
     Repo                = $Repo
     Version             = $latest
@@ -170,46 +160,9 @@ $installerArgs = @{
     Force               = $true
     NoDesktopShortcut   = $true
     NoStartMenuShortcut = $true
+    NoPath              = $true
 }
-
-if ($IncludePrerelease) {
-    $installerArgs.IncludePrerelease = $true
-}
-
-if ($Launch) {
-    $installerArgs.Launch = $true
-}
+if ($IncludePrerelease) { $installerArgs.IncludePrerelease = $true }
+if ($Launch)            { $installerArgs.Launch            = $true }
 
 & $installer @installerArgs
-
-if ($settingsSnapshot) {
-    $after = $null
-    if (Test-Path $settingsPath) {
-        try { $after = Get-Content $settingsPath -Raw -Encoding UTF8 | ConvertFrom-Json }
-        catch {}
-    }
-
-    $merged = [ordered]@{}
-    if ($after) {
-        foreach ($prop in $after.PSObject.Properties) {
-            $merged[$prop.Name] = $prop.Value
-        }
-    }
-
-    $restored = @()
-    foreach ($prop in $settingsSnapshot.PSObject.Properties) {
-        if (-not $merged.Contains($prop.Name)) {
-            $merged[$prop.Name] = $prop.Value
-            $restored += $prop.Name
-        }
-    }
-
-    if ($restored.Count -gt 0) {
-        New-Item -ItemType Directory -Path (Split-Path $settingsPath) -Force | Out-Null
-        $merged | ConvertTo-Json -Depth 10 | Set-Content $settingsPath -Encoding UTF8
-        Write-Host "Restored $($restored.Count) setting(s) that were missing after update: $($restored -join ', ')"
-    }
-    else {
-        Write-Host "Settings intact — nothing to restore."
-    }
-}
