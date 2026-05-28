@@ -2,6 +2,9 @@
 vscode-src/
 vscodium-src/
 
+# Shell extension: wil headers fetched by CI
+shell-ext/deps/
+
 # Build outputs
 VSCode-*/
 *.zip
@@ -16,6 +19,7 @@ node_modules/
 
 # Claude Code internals
 .claude/
+.antigravitycli/
 
 # OS
 .DS_Store

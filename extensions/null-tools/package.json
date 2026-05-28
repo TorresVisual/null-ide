@@ -28,6 +28,10 @@
       {
         "command": "null.agentsPaste",
         "title": "Null: Paste into AI Agents Terminal"
+      },
+      {
+        "command": "null.clearWebviewCache",
+        "title": "Null: Clear Webview Cache and Reload"
       }
     ],
     "viewsContainers": {
@@ -67,6 +71,9 @@
         },
         {
           "command": "null.agentsPaste"
+        },
+        {
+          "command": "null.clearWebviewCache"
         }
       ]
     },

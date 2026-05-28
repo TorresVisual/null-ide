@@ -341,14 +341,14 @@
     "editorBracketHighlight.foreground3": "#2EA043",
     "editorBracketHighlight.foreground4": "#CCA700",
     "editorBracketHighlight.foreground5": "#4daafc",
-    "editorBracketHighlight.foreground6": "#F85149",
-    "editorBracketHighlight.unexpectedBracket.foreground": "#F85149",
+    "editorBracketHighlight.foreground6": "#C586C0",
+    "editorBracketHighlight.unexpectedBracket.foreground": "#CCA700",
     "editorBracketPairGuide.activeBackground1": "#0078D4",
     "editorBracketPairGuide.activeBackground2": "#BC8CFF",
     "editorBracketPairGuide.activeBackground3": "#2EA043",
     "editorBracketPairGuide.activeBackground4": "#CCA700",
     "editorBracketPairGuide.activeBackground5": "#4daafc",
-    "editorBracketPairGuide.activeBackground6": "#F85149"
+    "editorBracketPairGuide.activeBackground6": "#C586C0"
   },
 
   "tokenColors": [

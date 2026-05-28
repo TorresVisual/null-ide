@@ -11,6 +11,7 @@ param(
     [switch]$NoContextMenu,
     [switch]$NoPath,
     [switch]$RegisterContextMenu,
+    [switch]$RegisterWin11ContextMenu,
     [switch]$Launch
 )
 
@@ -143,6 +144,10 @@ function Register-ContextMenu {
         New-Item -Path "$($entry.Key)\command" -Force | Out-Null
         Set-ItemProperty -Path "$($entry.Key)\command" -Name '(default)' -Value $entry.Cmd
     }
+
+    # Enable key read by the Win11 shell-extension DLL (IsContextMenuEnabled / GetTitle)
+    New-Item -Path 'HKCU:\Software\Classes\NullIDEContextMenu' -Force | Out-Null
+    Set-ItemProperty -Path 'HKCU:\Software\Classes\NullIDEContextMenu' -Name 'Title' -Value 'Open in Null'
 }
 
 function Unregister-ContextMenu {
@@ -150,11 +155,53 @@ function Unregister-ContextMenu {
         'HKCU:\Software\Classes\*\shell\NullIDE'
         'HKCU:\Software\Classes\Directory\shell\NullIDE'
         'HKCU:\Software\Classes\Directory\Background\shell\NullIDE'
+        'HKCU:\Software\Classes\NullIDEContextMenu'
     )
     foreach ($key in $keys) {
         if (Test-Path $key) {
             Remove-Item -Path $key -Recurse -Force
         }
+    }
+}
+
+function Register-Win11ContextMenu {
+    param([string]$InstallDir)
+
+    $appxPath = Join-Path $InstallDir "shell-ext\null-shell-ext.appx"
+    if (-not (Test-Path $appxPath)) {
+        Write-Warning "Shell extension package not found at '$appxPath' — Win11 primary context menu skipped."
+        return
+    }
+
+    $cerPath = Join-Path $InstallDir "shell-ext\NullIDECert.cer"
+    if (Test-Path $cerPath) {
+        try {
+            $cert  = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($cerPath)
+            $store = New-Object System.Security.Cryptography.X509Certificates.X509Store("TrustedPeople", "CurrentUser")
+            $store.Open("ReadWrite")
+            $store.Add($cert)
+            $store.Close()
+        } catch {
+            Write-Warning "Could not install signing certificate: $_"
+        }
+    }
+
+    $existing = Get-AppxPackage -Name "NullIDE.ExplorerCommand" -ErrorAction SilentlyContinue
+    if ($existing) {
+        Remove-AppxPackage -Package $existing.PackageFullName -ErrorAction SilentlyContinue
+    }
+
+    try {
+        Add-AppxPackage -Path $appxPath -ExternalLocation $InstallDir
+    } catch {
+        Write-Warning "Win11 context menu registration failed: $_"
+    }
+}
+
+function Unregister-Win11ContextMenu {
+    $pkg = Get-AppxPackage -Name "NullIDE.ExplorerCommand" -ErrorAction SilentlyContinue
+    if ($pkg) {
+        Remove-AppxPackage -Package $pkg.PackageFullName -ErrorAction SilentlyContinue
     }
 }
 
@@ -325,6 +372,7 @@ function Install-Zip {
         if (-not $NoContextMenu) {
             Write-Step "Registering context menu entries"
             Register-ContextMenu -ExePath $target
+            Register-Win11ContextMenu -InstallDir $destinationFullPath
         }
 
         if (-not $NoPath) {
@@ -367,6 +415,17 @@ if ($RegisterContextMenu) {
     }
     Write-Step "Registering context menu entries"
     Register-ContextMenu -ExePath $target
+    Write-Host "Done."
+    return
+}
+
+if ($RegisterWin11ContextMenu) {
+    $dir = [System.IO.Path]::GetFullPath($InstallDir)
+    if (-not (Test-Path (Join-Path $dir "null.exe"))) {
+        throw "null.exe not found at $dir - check -InstallDir."
+    }
+    Write-Step "Registering Win11 context menu"
+    Register-Win11ContextMenu -InstallDir $dir
     Write-Host "Done."
     return
 }

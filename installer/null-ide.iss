@@ -58,8 +58,11 @@ Root: HKCU; Subkey: "Software\Classes\Directory\shell\NullIDE\command"; ValueTyp
 Root: HKCU; Subkey: "Software\Classes\Directory\Background\shell\NullIDE"; ValueType: string; ValueName: ""; ValueData: "Open Folder in Null"; Flags: uninsdeletekey; Tasks: contextmenu
 Root: HKCU; Subkey: "Software\Classes\Directory\Background\shell\NullIDE"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\null.exe,0"; Tasks: contextmenu
 Root: HKCU; Subkey: "Software\Classes\Directory\Background\shell\NullIDE\command"; ValueType: string; ValueName: ""; ValueData: """{app}\null.exe"" ""%V"""; Tasks: contextmenu
+; Enable key read by the Win11 shell-extension DLL (IsContextMenuEnabled / GetTitle)
+Root: HKCU; Subkey: "Software\Classes\NullIDEContextMenu"; ValueType: string; ValueName: "Title"; ValueData: "Open in Null"; Flags: uninsdeletekey; Tasks: contextmenu
 
 [Run]
+Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\resources\app\null-updater\install-null-ide.ps1"" -RegisterWin11ContextMenu -InstallDir ""{app}"""; Flags: runhidden; Tasks: contextmenu; Description: "Registering Win11 context menu"
 Filename: "{app}\null.exe"; Description: "{cm:LaunchProgram,Null IDE}"; Flags: nowait postinstall skipifsilent
 
 [Code]
@@ -113,7 +116,14 @@ begin
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  ResultCode: Integer;
 begin
-  if CurUninstallStep = usPostUninstall then
+  if CurUninstallStep = usPostUninstall then begin
     RemoveFromUserPath(ExpandConstant('{app}'));
+    Exec('powershell.exe',
+         '-NoProfile -ExecutionPolicy Bypass -Command '
+         + '"Get-AppxPackage -Name NullIDE.ExplorerCommand | Remove-AppxPackage"',
+         '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  end;
 end;

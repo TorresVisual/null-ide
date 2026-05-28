@@ -1,2 +1,5 @@
 // Open in Null / and terminal
 (Needs testing)
+
+
+integrate tavernari/git-commit-message

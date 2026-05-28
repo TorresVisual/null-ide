@@ -345,18 +345,51 @@ const AGENTS = {
 };
 
 const MAX_SCROLLBACK_BYTES = 300 * 1024;
+const MAX_SCROLLBACK_LINES = 2000;
 
 class AgentsViewProvider {
   constructor(extensionUri, nodePty, context) {
     this._extensionUri = extensionUri;
-    this._nodePty      = nodePty;   // null if not set up yet
+    this._nodePty      = nodePty;
     this._context      = context;
     this._view         = null;
-    this._pty          = null;
-    this._agent        = 'claude';
-    this._buffers      = { claude: '', agy: '', codex: '' };
-    this._saveTimer    = null;
+    this._ptys             = {};
+    this._buffers          = {};
+    this._currentSessionId = {};  // termId → session ID for the running PTY
+    this._firstInput       = {};  // termId → first user message (locked on Enter)
+    this._saveTimer        = null;
+
+    // Restore tab list from previous session, or default to a single claude tab.
+    const saved = context.globalState.get('null.agentTabs');
+    if (saved && Array.isArray(saved.tabs) && saved.tabs.length > 0) {
+      this._tabs        = saved.tabs;
+      this._activeTabId = saved.activeId || saved.tabs[0].id;
+    } else {
+      this._tabs        = [{ id: 'claude-1', type: 'claude', label: 'claude' }];
+      this._activeTabId = 'claude-1';
+    }
+
     this._loadBuffers();
+  }
+
+  _newTab(type) {
+    // Find the lowest number not already in use so closed tabs free up their number.
+    const used = new Set(
+      this._tabs
+        .filter(t => t.type === type)
+        .map(t => { const m = t.id.match(/^[a-z]+-(\d+)$/); return m ? +m[1] : 0; })
+    );
+    let n = 1;
+    while (used.has(n)) n++;
+    const label = n === 1 ? type : `${type} ${n}`;
+    return { id: `${type}-${n}`, type, label };
+  }
+
+  _saveTabs() {
+    this._context.globalState.update('null.agentTabs', {
+      tabs:     this._tabs,
+      activeId: this._activeTabId,
+    });
   }
 
   _scrollbackDir() {
@@ -365,9 +398,9 @@ class AgentsViewProvider {
 
   _loadBuffers() {
     const dir = this._scrollbackDir();
-    for (const agent of Object.keys(this._buffers)) {
+    for (const tab of this._tabs) {
       try {
-        this._buffers[agent] = fs.readFileSync(path.join(dir, `${agent}.bin`), 'utf8');
+        this._buffers[tab.id] = fs.readFileSync(path.join(dir, `${tab.id}.bin`), 'utf8');
       } catch {}
     }
   }
@@ -378,8 +411,8 @@ class AgentsViewProvider {
     const dir = this._scrollbackDir();
     try {
       fs.mkdirSync(dir, { recursive: true });
-      for (const [agent, buf] of Object.entries(this._buffers)) {
-        const p = path.join(dir, `${agent}.bin`);
+      for (const [termId, buf] of Object.entries(this._buffers)) {
+        const p = path.join(dir, `${termId}.bin`);
         if (buf) {
           fs.writeFileSync(p, buf, 'utf8');
         } else {
@@ -392,6 +425,67 @@ class AgentsViewProvider {
   _scheduleSave() {
     clearTimeout(this._saveTimer);
     this._saveTimer = setTimeout(() => this._saveBuffers(), 5000);
+  }
+
+  _historyDir(termId) {
+    return path.join(this._scrollbackDir(), termId);
+  }
+
+  _getHistory(termId) {
+    try {
+      return JSON.parse(fs.readFileSync(path.join(this._historyDir(termId), 'index.json'), 'utf8'));
+    } catch { return []; }
+  }
+
+  static _getPreview(buf) {
+    const clean = (buf || '')
+      .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '')
+      .replace(/\x1b./g, '')
+      .replace(/\r/g, '')
+      .trim();
+    const lines = clean.split('\n').filter(l => l.trim()).slice(-4);
+    return lines.join('\n').slice(0, 300);
+  }
+
+  _saveSession(webview, termId, clearBuffer) {
+    const buf = this._buffers[termId];
+    if (!buf) return;
+    // Use the stable ID created when the PTY spawned so manual save + auto-save
+    // on exit both update the same record instead of creating two entries.
+    const id = this._currentSessionId[termId];
+    if (!id) return;
+    const dir = this._historyDir(termId);
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, `${id}.bin`), buf, 'utf8');
+      const index = this._getHistory(termId);
+      const now   = new Date().toISOString();
+      const first = (this._firstInput[termId] || '').trim();
+      const tab   = this._tabs.find(t => t.id === termId);
+      const d     = new Date();
+      const hh    = String(d.getHours()).padStart(2, '0');
+      const mm    = String(d.getMinutes()).padStart(2, '0');
+      const name  = first.length > 2 ? first.slice(0, 60)
+                  : `${tab?.type || 'session'} · ${hh}:${mm}`;
+      const preview = AgentsViewProvider._getPreview(buf);
+      const existing = index.findIndex(s => s.id === id);
+      if (existing >= 0) {
+        index[existing] = { id, savedAt: now, name, preview };
+      } else {
+        index.push({ id, savedAt: now, name, preview });
+        while (index.length > 20) {
+          const removed = index.shift();
+          try { fs.unlinkSync(path.join(dir, `${removed.id}.bin`)); } catch {}
+        }
+      }
+      fs.writeFileSync(path.join(dir, 'index.json'), JSON.stringify(index), 'utf8');
+      if (clearBuffer) {
+        this._buffers[termId] = '';
+        delete this._currentSessionId[termId];
+        this._saveBuffers();
+      }
+      webview?.postMessage({ type: 'sessionSaved', termId, sessions: index });
+    } catch {}
   }
 
   resolveWebviewView(webviewView) {
@@ -410,23 +504,63 @@ class AgentsViewProvider {
     }
 
     webviewView.webview.html = this._buildTermHtml(webviewView.webview);
+    const webview = webviewView.webview;
     webviewView.webview.onDidReceiveMessage(msg => {
       switch (msg.type) {
-        case 'ready':   this._start(webviewView.webview, msg.agent || 'claude', msg.cols || 80, msg.rows || 24); break;
-        case 'input':   this._pty?.write(msg.data); break;
+        case 'ready': {
+          const tabs = this._tabs.map(t => ({ ...t, sessions: this._getHistory(t.id) }));
+          webview.postMessage({ type: 'initTabs', tabs, activeId: this._activeTabId });
+          break;
+        }
+        case 'launch':
+          this._activeTabId = msg.termId;
+          this._start(webview, msg.termId, msg.agentType, msg.cols || 80, msg.rows || 24);
+          break;
+        case 'spawn': {
+          const tab = this._newTab(msg.agentType);
+          this._tabs.push(tab);
+          this._saveTabs();
+          webview.postMessage({ type: 'tabCreated', id: tab.id, agentType: tab.type, label: tab.label });
+          break;
+        }
+        case 'close': {
+          const termId = msg.termId;
+          this._killTerm(termId);
+          this._buffers[termId] = '';
+          this._saveBuffers();
+          delete this._buffers[termId];
+          this._tabs = this._tabs.filter(t => t.id !== termId);
+          if (this._activeTabId === termId) this._activeTabId = this._tabs[0]?.id ?? null;
+          this._saveTabs();
+          break;
+        }
+        case 'input':
+          this._ptys[msg.termId]?.write(msg.data);
+          this._captureFirstInput(msg.termId, msg.data);
+          break;
         case 'copy':    vscode.env.clipboard.writeText(msg.text ?? ''); break;
-        case 'paste':        vscode.env.clipboard.readText().then(text => { if (text) this._pty?.write(text.replace(/[\r\n]+$/, '')); }); break;
-        case 'focusChange':  vscode.commands.executeCommand('setContext', 'null.agentsFocused', msg.focused); break;
-        case 'resize':  this._pty?.resize(msg.cols, msg.rows); break;
-        case 'launch':  this._restart(webviewView.webview, msg.agent, msg.cols || 80, msg.rows || 24, false); break;
-        case 'restart': this._restart(webviewView.webview, this._agent, msg.cols || 80, msg.rows || 24, true); break;
+        case 'paste':   vscode.env.clipboard.readText().then(text => {
+          if (text) {
+            const content = text.replace(/[\r\n]+$/, '');
+            this._ptys[msg.termId]?.write(content);
+            this._captureFirstInput(msg.termId, content + '\r');
+          }
+        }); break;
+        case 'resize':  this._ptys[msg.termId]?.resize(msg.cols, msg.rows); break;
+        case 'restart': this._restart(webview, msg.termId, msg.agentType, msg.cols || 80, msg.rows || 24); break;
+        case 'saveSession': this._saveSession(webview, msg.termId, false); break;
+        case 'loadSession': {
+          let content = null;
+          try { content = fs.readFileSync(path.join(this._historyDir(msg.termId), `${msg.sessionId}.bin`), 'utf8'); } catch {}
+          webview.postMessage({ type: 'sessionContent', termId: msg.termId, sessionId: msg.sessionId, content });
+          break;
+        }
       }
     });
     webviewView.onDidDispose(() => {
       clearTimeout(this._saveTimer);
       this._saveBuffers();
       this._kill();
-      vscode.commands.executeCommand('setContext', 'null.agentsFocused', false);
     });
   }
 
@@ -441,23 +575,50 @@ class AgentsViewProvider {
     term.show();
   }
 
+  _killTerm(termId) {
+    if (this._ptys[termId]) { try { this._ptys[termId].kill(); } catch (_) {} this._ptys[termId] = null; }
+  }
+
   _kill() {
-    if (this._pty) { try { this._pty.kill(); } catch (_) {} this._pty = null; }
+    for (const termId of Object.keys(this._ptys)) this._killTerm(termId);
   }
 
   paste() {
-    vscode.env.clipboard.readText().then(text => { if (text) this._pty?.write(text.replace(/[\r\n]+$/, '')); });
+    if (!this._activeTabId) return;
+    vscode.env.clipboard.readText().then(text => { if (text) this._ptys[this._activeTabId]?.write(text.replace(/[\r\n]+$/, '')); });
   }
 
-  _restart(webview, agent, cols, rows, fresh) {
-    if (fresh) this._buffers[agent] = '';
-    this._kill();
-    this._start(webview, agent, cols, rows);
+  _captureFirstInput(termId, data) {
+    if (this._firstInput[termId + '_done']) return;
+    const acc = (this._firstInput[termId] || '') + data;
+    const nl  = acc.search(/[\r\n]/);
+    if (nl >= 0) {
+      this._firstInput[termId]        = acc.slice(0, nl).trim();
+      this._firstInput[termId + '_done'] = true;
+    } else {
+      this._firstInput[termId] = acc;
+    }
   }
 
-  _start(webview, agent, cols, rows) {
-    this._agent = agent;
-    const cfg = AGENTS[agent] ?? AGENTS.claude;
+  _restart(webview, termId, agentType, cols, rows) {
+    this._buffers[termId] = '';
+    delete this._currentSessionId[termId];
+    delete this._firstInput[termId];
+    delete this._firstInput[termId + '_done'];
+    this._killTerm(termId);
+    this._start(webview, termId, agentType, cols, rows);
+  }
+
+  _start(webview, termId, agentType, cols, rows) {
+    if (this._ptys[termId]) {
+      webview.postMessage({ type: 'resumed', termId });
+      return;
+    }
+    this._currentSessionId[termId] = String(Date.now());
+    delete this._firstInput[termId];
+    delete this._firstInput[termId + '_done'];
+
+    const cfg = AGENTS[agentType] ?? AGENTS.claude;
     const folders = vscode.workspace.workspaceFolders;
     const cwd = folders?.[0]?.uri?.fsPath ?? process.env.USERPROFILE ?? '.';
     const env = { ...process.env, TERM: 'xterm-256color', FORCE_COLOR: '3', COLORTERM: 'truecolor' };
@@ -468,25 +629,31 @@ class AgentsViewProvider {
     try {
       proc = this._nodePty.spawn(shell, ['/c', cfg.cmd], { name: 'xterm-256color', cols, rows, cwd, env });
     } catch (err) {
-      webview.postMessage({ type: 'error', message: err.message });
+      webview.postMessage({ type: 'error', termId, message: err.message });
       return;
     }
 
-    this._pty = proc;
-    webview.postMessage({ type: 'started', agent, restore: this._buffers[agent] || null });
+    this._ptys[termId] = proc;
+    webview.postMessage({ type: 'started', termId, restore: this._buffers[termId] || null, sessions: this._getHistory(termId) });
 
     proc.onData(data => {
-      const combined = this._buffers[agent] + data;
-      this._buffers[agent] = combined.length > MAX_SCROLLBACK_BYTES
-        ? combined.slice(combined.length - MAX_SCROLLBACK_BYTES)
-        : combined;
+      const combined = (this._buffers[termId] || '') + data;
+      if (combined.length > MAX_SCROLLBACK_BYTES) {
+        const lines = combined.split('\n');
+        const kept = lines.slice(Math.max(0, lines.length - MAX_SCROLLBACK_LINES)).join('\n');
+        this._buffers[termId] = kept.length > MAX_SCROLLBACK_BYTES
+          ? kept.slice(kept.length - MAX_SCROLLBACK_BYTES)
+          : kept;
+      } else {
+        this._buffers[termId] = combined;
+      }
       this._scheduleSave();
-      webview.postMessage({ type: 'data', text: data });
+      webview.postMessage({ type: 'data', termId, text: data });
     });
     proc.onExit(({ exitCode }) => {
-      this._pty = null;
-      this._saveBuffers();
-      webview.postMessage({ type: 'exit', code: exitCode });
+      this._ptys[termId] = null;
+      this._saveSession(webview, termId, true);
+      webview.postMessage({ type: 'exit', termId, code: exitCode });
     });
   }
 
@@ -543,38 +710,102 @@ Click below to run the setup in a terminal — takes ~30 s.</p>
 <style>
   html,body { margin:0; padding:0; width:100%; height:100%; background:#181818;
               overflow:hidden; display:flex; flex-direction:column; }
-  #tabs { display:flex; gap:1px; background:#111; flex-shrink:0; padding:0 4px; }
+  #tabs { display:flex; align-items:stretch; background:#111; flex-shrink:0; }
+  #tab-list { display:flex; align-items:stretch; overflow-x:auto; scrollbar-width:none; flex:1; min-width:0; }
+  #tab-list::-webkit-scrollbar { display:none; }
   .tab {
-    padding:5px 12px; background:transparent; border:none; cursor:pointer;
+    display:flex; align-items:center; gap:5px;
+    padding:5px 10px 5px 12px; background:transparent; border:none; cursor:pointer;
     font:11px/1 'Cascadia Code',Consolas,monospace; color:#666;
-    border-bottom:2px solid transparent; letter-spacing:.04em;
+    border-bottom:2px solid transparent; letter-spacing:.04em; flex-shrink:0; white-space:nowrap;
   }
   .tab:hover { color:#aaa; }
   .tab.active { color:#e0e0e0; border-bottom-color:#0078D4; }
-  #wrap { flex:1; min-height:0; position:relative; }
-  #term { width:100%; height:100%; }
+  .tab-close { font-size:12px; line-height:1; color:#555; opacity:0; border-radius:2px; padding:1px 2px; }
+  .tab:hover .tab-close, .tab.active .tab-close { opacity:1; }
+  .tab-close:hover { color:#e05555; background:#2a2a2a; }
+  #add-btn, #history-btn {
+    padding:5px 10px; background:transparent; border:none; cursor:pointer;
+    font:11px/1 'Cascadia Code',Consolas,monospace; color:#555; flex-shrink:0;
+  }
+  #add-btn:hover, #history-btn:hover { color:#aaa; }
+  #agent-picker {
+    display:none; position:fixed; background:#1e1e1e;
+    border:1px solid #333; border-radius:3px; z-index:100; padding:2px; min-width:80px;
+  }
+  #agent-picker button {
+    display:block; width:100%; text-align:left; padding:5px 12px;
+    background:transparent; border:none; cursor:pointer;
+    font:11px/1 'Cascadia Code',Consolas,monospace; color:#ccc; white-space:nowrap;
+  }
+  #agent-picker button:hover { background:#2a2a2a; color:#fff; }
+  #wrap, #history-view { flex:1; min-height:0; }
+  .term-pane { display:none; width:100%; height:100%; }
+  .term-pane.active { display:block; }
   .xterm { padding:4px 6px; }
+  #history-view {
+    display:none; flex-direction:column; background:#181818; overflow:hidden;
+  }
+  #history-header {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:8px 12px 7px; border-bottom:1px solid #2b2b2b; flex-shrink:0;
+    font:11px/1 'Cascadia Code',Consolas,monospace; color:#666;
+  }
+  #history-header span { letter-spacing:.06em; }
+  #history-back {
+    padding:2px 8px; background:transparent; border:1px solid #333; border-radius:2px;
+    cursor:pointer; font:11px/1 inherit; color:#666;
+  }
+  #history-back:hover { color:#ccc; border-color:#555; }
+  #history-list { flex:1; overflow-y:auto; }
+  .hist-item {
+    padding:10px 12px; border-bottom:1px solid #1e1e1e; cursor:pointer;
+    font:11px/1.5 'Cascadia Code',Consolas,monospace;
+  }
+  .hist-item:hover { background:#1e1e1e; }
+  .hist-name { color:#ccc; margin-bottom:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .hist-time { color:#555; font-size:10px; margin-bottom:4px; }
+  .hist-preview { color:#484848; white-space:pre; overflow:hidden; max-height:3.4em; font-size:10px; }
+  #history-empty { padding:20px 12px; color:#444; text-align:center; font:11px/1 'Cascadia Code',Consolas,monospace; }
   #banner {
-    display:none; flex-shrink:0; background:#252526; border-top:1px solid #333;
-    padding:5px 10px; align-items:center; gap:8px;
+    display:flex; flex-shrink:0; background:#1e1e1e; border-top:1px solid #2b2b2b;
+    padding:3px 8px; align-items:center; gap:6px; min-height:26px;
     font:11px/1 'Cascadia Code',Consolas,monospace; color:#888;
   }
-  #banner-msg { flex:1; }
+  #banner-msg { color:#666; }
+  #save-btn {
+    margin-left:auto; padding:2px 8px; background:transparent; color:#555;
+    border:none; cursor:pointer; font:11px/1 inherit;
+  }
+  #save-btn:hover { color:#aaa; }
   #restart-btn {
-    padding:3px 12px; background:#0078D4; color:#fff; border:none;
+    padding:2px 10px; background:#0078D4; color:#fff; border:none;
     border-radius:2px; cursor:pointer; font:11px/1 inherit; white-space:nowrap;
   }
   #restart-btn:hover { background:#106EBE; }
 </style></head><body>
 <div id="tabs">
-  <button class="tab active" data-agent="claude">claude</button>
-  <button class="tab"        data-agent="agy">agy</button>
-  <button class="tab"        data-agent="codex">codex</button>
+  <div id="tab-list"></div>
+  <button id="history-btn" title="Session history">/</button>
+  <button id="add-btn" title="New terminal">+</button>
 </div>
-<div id="wrap"><div id="term"></div></div>
+<div id="agent-picker">
+  <button data-type="claude">claude</button>
+  <button data-type="agy">agy</button>
+  <button data-type="codex">codex</button>
+</div>
+<div id="wrap"></div>
+<div id="history-view">
+  <div id="history-header">
+    <span>past sessions</span>
+    <button id="history-back">&#8592; back</button>
+  </div>
+  <div id="history-list"></div>
+</div>
 <div id="banner">
   <span id="banner-msg"></span>
-  <button id="restart-btn">restart</button>
+  <button id="save-btn">save</button>
+  <button id="restart-btn">new session</button>
 </div>
 <script src="${xtermJs}"></script>
 <script src="${fitJs}"></script>
@@ -653,6 +884,30 @@ function activate(context) {
     }
   });
   context.subscriptions.push(installUpdateCmd);
+
+  const clearCacheCmd = vscode.commands.registerCommand('null.clearWebviewCache', async () => {
+    const appData = process.env.APPDATA;
+    if (!appData) { vscode.window.showErrorMessage('Null: cannot locate %APPDATA%.'); return; }
+    const userDataDir = path.join(appData, 'Null');
+    const targets = ['Cache', 'CachedData', 'Code Cache', 'WebStorage'];
+    const cleared = [];
+    const failed  = [];
+    for (const name of targets) {
+      const p = path.join(userDataDir, name);
+      try {
+        if (fs.existsSync(p)) { fs.rmSync(p, { recursive: true, force: true }); }
+        cleared.push(name);
+      } catch { failed.push(name); }
+    }
+    const detail = cleared.length ? `Cleared: ${cleared.join(', ')}.` : 'Nothing to clear.';
+    const warning = failed.length ? ` Could not delete: ${failed.join(', ')}.` : '';
+    const choice = await vscode.window.showInformationMessage(
+      `${detail}${warning} Reload window to apply.`,
+      'Reload Now'
+    );
+    if (choice === 'Reload Now') vscode.commands.executeCommand('workbench.action.reloadWindow');
+  });
+  context.subscriptions.push(clearCacheCmd);
 
   refreshUpdateButton();
   checkForUpdate(context, true)

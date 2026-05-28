@@ -150,20 +150,7 @@ jobs:
           Copy-Item -Recurse -Force ide-overlay/extensions/null-tools  vscode-src/extensions/
           Copy-Item -Recurse -Force ide-overlay/extensions/null-icons  vscode-src/extensions/
 
-      # - name: Bundle node-pty into null-tools
-      #   shell: pwsh
-      #   run: |
-      #     # vscode-src/node_modules/node-pty is already built for the correct Electron version
-      #     # by the upstream npm ci step. Copy it into the extension so it ships as a built-in.
-      #     $src  = "vscode-src/node_modules/node-pty"
-      #     $dest = "vscode-src/extensions/null-tools/node_modules/node-pty"
-      #     if (-not (Test-Path $src)) {
-      #       Write-Error "node-pty not found in vscode-src/node_modules — check npm ci output"
-      #       exit 1
-      #     }
-      #     New-Item -ItemType Directory -Force (Split-Path $dest) | Out-Null
-      #     Copy-Item $src $dest -Recurse -Force
-      #     Write-Host "Bundled node-pty into null-tools ($((Get-ChildItem $dest/build/Release -Filter *.node).Count) native addon(s))"
+
 
       - name: Replace icons
         shell: pwsh
@@ -218,6 +205,21 @@ jobs:
             Write-Error "node_modules missing after dependency restore/install"
             exit 1
           }
+
+      - name: Bundle node-pty into null-tools
+        shell: pwsh
+        run: |
+          # vscode-src/node_modules/node-pty is already built for the correct Electron version
+          # by the upstream npm ci step. Copy it into the extension so it ships as a built-in.
+          $src  = "vscode-src/node_modules/node-pty"
+          $dest = "vscode-src/extensions/null-tools/node_modules/node-pty"
+          if (-not (Test-Path $src)) {
+            Write-Error "node-pty not found in vscode-src/node_modules — check npm ci output"
+            exit 1
+          }
+          New-Item -ItemType Directory -Force (Split-Path $dest) | Out-Null
+          Copy-Item $src $dest -Recurse -Force
+          Write-Host "Bundled node-pty into null-tools ($((Get-ChildItem $dest/build/Release -Filter *.node).Count) native addon(s))"
 
       - name: Build
         working-directory: vscode-src
@@ -308,6 +310,103 @@ jobs:
           & $rcedit $exe.FullName --set-icon ide-overlay/icons/icon.ico
           Write-Host "Stamped icon onto $($exe.Name)"
 
+      - name: Build Win11 shell extension
+        shell: pwsh
+        run: |
+          $outDir    = "VSCode-win32-x64"
+          $shellSrc  = "ide-overlay/shell-ext"
+          $dllDest   = "$outDir/shell-ext/NullIDE.ExplorerCommand/x64"
+          $assetDest = "$outDir/shell-ext/Assets"
+          $pkgDir    = "$outDir/shell-ext"
+
+          # ── 1. Fetch wil (header-only) ──────────────────────────────────────
+          if (-not (Test-Path "$shellSrc/deps/wil")) {
+            Write-Host "Fetching microsoft/wil headers..."
+            Invoke-WebRequest "https://github.com/microsoft/wil/archive/refs/heads/master.zip" `
+              -OutFile wil.zip
+            Expand-Archive wil.zip "$shellSrc/deps" -Force
+            Rename-Item "$shellSrc/deps/wil-master" "$shellSrc/deps/wil"
+            Remove-Item wil.zip
+          }
+
+          # ── 2. Build DLL with CMake + MSVC ──────────────────────────────────
+          New-Item -ItemType Directory -Path $dllDest -Force | Out-Null
+          cmake -S $shellSrc -B shell-ext-build `
+            -G "Visual Studio 17 2022" -A x64 `
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build shell-ext-build --config Release
+          Copy-Item "shell-ext-build/Release/null_explorer_command.dll" $dllDest -Force
+          Write-Host "DLL built: $(Get-Item "$dllDest/null_explorer_command.dll" | Select-Object -Expand Length) bytes"
+
+          # ── 3. Prepare icon assets ───────────────────────────────────────────
+          New-Item -ItemType Directory -Path $assetDest -Force | Out-Null
+          Add-Type -AssemblyName System.Drawing
+          function Resize-Png($src, $dst, $w, $h) {
+            $img = [System.Drawing.Image]::FromFile((Resolve-Path $src))
+            $bmp = New-Object System.Drawing.Bitmap($w, $h)
+            $g   = [System.Drawing.Graphics]::FromImage($bmp)
+            $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+            $g.DrawImage($img, 0, 0, $w, $h)
+            $bmp.Save($dst, [System.Drawing.Imaging.ImageFormat]::Png)
+            $g.Dispose(); $bmp.Dispose(); $img.Dispose()
+          }
+          $icon1024 = "ide-overlay/icons/icon.png"
+          Resize-Png $icon1024 "$assetDest/Square150x150Logo.png" 150 150
+          Resize-Png $icon1024 "$assetDest/Square44x44Logo.png"   44  44
+          Resize-Png $icon1024 "$assetDest/StoreLogo.png"         50  50
+
+          # ── 4. Copy manifest into package staging dir ────────────────────────
+          Copy-Item "$shellSrc/AppxManifest.xml" $pkgDir -Force
+
+          # ── 5. Generate self-signed cert (CN must match manifest Publisher) ──
+          $cert = New-SelfSignedCertificate `
+            -Subject "CN=Null IDE" `
+            -CertStoreLocation "Cert:\CurrentUser\My" `
+            -Type CodeSigning `
+            -KeySpec Signature `
+            -KeyAlgorithm RSA `
+            -KeyLength 2048 `
+            -HashAlgorithm SHA256 `
+            -NotAfter (Get-Date).AddYears(10)
+          Export-Certificate -Cert $cert -FilePath "$pkgDir/NullIDECert.cer" | Out-Null
+          $pfxPwd = ConvertTo-SecureString -String "nullbuild" -Force -AsPlainText
+          Export-PfxCertificate -Cert $cert -FilePath NullIDECert.pfx -Password $pfxPwd | Out-Null
+          Write-Host "Signing cert thumbprint: $($cert.Thumbprint)"
+
+          # ── 6. Pack sparse .appx ─────────────────────────────────────────────
+          $makeappx = Get-ChildItem `
+            "C:\Program Files (x86)\Windows Kits\10\bin" `
+            -Recurse -Filter makeappx.exe -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match "x64" } |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1 -ExpandProperty FullName
+          if (-not $makeappx) { Write-Error "makeappx.exe not found"; exit 1 }
+
+          # Stage only the files the .appx itself contains (manifest + assets)
+          $appxStage = "appx-stage"
+          New-Item -ItemType Directory -Path $appxStage -Force | Out-Null
+          Copy-Item "$pkgDir/AppxManifest.xml" $appxStage
+          New-Item -ItemType Directory -Path "$appxStage/Assets" -Force | Out-Null
+          Copy-Item "$assetDest/*" "$appxStage/Assets/"
+          & $makeappx pack /d $appxStage /p "$pkgDir/null-shell-ext.appx" /nv /o
+          Remove-Item $appxStage -Recurse -Force
+
+          # ── 7. Sign .appx ────────────────────────────────────────────────────
+          $signtool = Get-ChildItem `
+            "C:\Program Files (x86)\Windows Kits\10\bin" `
+            -Recurse -Filter signtool.exe -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match "x64" } |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1 -ExpandProperty FullName
+          if (-not $signtool) { Write-Error "signtool.exe not found"; exit 1 }
+          & $signtool sign /fd SHA256 /f NullIDECert.pfx /p nullbuild "$pkgDir/null-shell-ext.appx"
+          Remove-Item NullIDECert.pfx -Force
+          Write-Host "Shell extension package built and signed."
+
+          # ── Final layout under VSCode-win32-x64/shell-ext/ ──────────────────
+          Write-Host "Shell-ext layout:"
+          Get-ChildItem $pkgDir -Recurse | Select-Object FullName
+
       - name: Prepare installer and updater payload
         shell: pwsh
         run: |
@@ -386,6 +485,7 @@ jobs:
           files: |
             null-ide-win32-x64.zip
             NullIDESetup-*.exe
+            ide-overlay/scripts/install-null-ide.ps1
           fail_on_unmatched_files: true
 
       - name: Upload artifact
@@ -395,5 +495,6 @@ jobs:
           path: |
             null-ide-win32-x64.zip
             NullIDESetup-*.exe
+            ide-overlay/scripts/install-null-ide.ps1
           if-no-files-found: error
           retention-days: 30
