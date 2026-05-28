@@ -29,7 +29,7 @@
     <TargetDeviceFamily
       Name="Windows.Desktop"
       MinVersion="10.0.18362.0"
-      MaxVersion="10.0.99999.0" />
+      MaxVersionTested="10.0.99999.0" />
   </Dependencies>
 
   <Resources>
