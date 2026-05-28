@@ -2,10 +2,13 @@
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
-  xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
+  xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
   xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10"
+  xmlns:desktop4="http://schemas.microsoft.com/appx/manifest/desktop/windows10/4"
+  xmlns:desktop5="http://schemas.microsoft.com/appx/manifest/desktop/windows10/5"
+  xmlns:desktop6="http://schemas.microsoft.com/appx/manifest/desktop/windows10/6"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
-  IgnorableNamespaces="uap uap3 com rescap">
+  IgnorableNamespaces="uap uap10 com desktop4 desktop5 desktop6 rescap">
 
   <!--
     Publisher must exactly match the CN of the signing certificate.
@@ -22,13 +25,17 @@
     <DisplayName>Null IDE</DisplayName>
     <PublisherDisplayName>Null IDE</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
+    <!-- DLL and null.exe live outside the .appx (ExternalLocation install root) -->
+    <uap10:AllowExternalContent>true</uap10:AllowExternalContent>
+    <desktop6:RegistryWriteVirtualization>disabled</desktop6:RegistryWriteVirtualization>
+    <desktop6:FileSystemWriteVirtualization>disabled</desktop6:FileSystemWriteVirtualization>
   </Properties>
 
   <Dependencies>
-    <!-- Minimum: Windows 10 May 2019 Update (1903) for ExternalLocation support -->
+    <!-- desktop4 fileExplorerContextMenus requires 10.0.19041+ -->
     <TargetDeviceFamily
       Name="Windows.Desktop"
-      MinVersion="10.0.18362.0"
+      MinVersion="10.0.19041.0"
       MaxVersionTested="10.0.65535.0" />
   </Dependencies>
 
@@ -36,8 +43,13 @@
     <Resource Language="en-us" />
   </Resources>
 
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+    <rescap:Capability Name="unvirtualizedResources" />
+  </Capabilities>
+
   <Applications>
-    <!--
+  <!--
       Executable is relative to ExternalLocation (= the Null IDE install root).
       null.exe must be present there; this entry makes Windows aware of the app
       so it can display the correct name/icon in the Win11 context menu.
@@ -45,7 +57,8 @@
     <Application
       Id="NullIDE"
       Executable="null.exe"
-      EntryPoint="Windows.FullTrustApplication">
+      uap10:TrustLevel="mediumIL"
+      uap10:RuntimeBehavior="win32App">
 
       <uap:VisualElements
         DisplayName="Null IDE"
@@ -57,43 +70,38 @@
       </uap:VisualElements>
 
       <Extensions>
+        <!-- Win11 Explorer context menu (IExplorerCommand) -->
+        <desktop4:Extension Category="windows.fileExplorerContextMenus">
+          <desktop4:FileExplorerContextMenus>
+            <desktop5:ItemType Type="Directory">
+              <desktop5:Verb Id="NullOpen" Clsid="A72D088B-AC8B-4AB5-ABFE-49C5CE37A466" />
+            </desktop5:ItemType>
+            <desktop5:ItemType Type="Directory\Background">
+              <desktop5:Verb Id="NullOpen" Clsid="A72D088B-AC8B-4AB5-ABFE-49C5CE37A466" />
+            </desktop5:ItemType>
+            <desktop5:ItemType Type="*">
+              <desktop5:Verb Id="NullOpen" Clsid="A72D088B-AC8B-4AB5-ABFE-49C5CE37A466" />
+            </desktop5:ItemType>
+          </desktop4:FileExplorerContextMenus>
+        </desktop4:Extension>
+
         <!--
-          Register the COM in-process DLL.
+          Register the COM surrogate that loads the explorer-command DLL.
           Path is relative to ExternalLocation.
           DLL_UUID must match the DLL_UUID compile definition in CMakeLists.txt.
         -->
         <com:Extension Category="windows.comServer">
           <com:ComServer>
-            <com:InProcessServer>
-              <com:Path>shell-ext\NullIDE.ExplorerCommand\x64\null_explorer_command.dll</com:Path>
+            <com:SurrogateServer DisplayName="Null IDE">
               <com:Class
                 Id="A72D088B-AC8B-4AB5-ABFE-49C5CE37A466"
+                Path="shell-ext\NullIDE.ExplorerCommand\x64\null_explorer_command.dll"
                 ThreadingModel="STA" />
-            </com:InProcessServer>
+            </com:SurrogateServer>
           </com:ComServer>
         </com:Extension>
-
-        <!--
-          Hook into the Win11 file/folder context menu.
-          Both file and folder verbs map to the same COM class.
-        -->
-        <uap3:Extension Category="windows.fileTypeAssociation">
-          <uap3:FileTypeAssociation Name="nullide-files" UseUrl="false">
-            <uap:SupportedVerbs>
-              <uap3:Verb Id="open" Parameters="%1"
-                         MultiSelectModel="Player">Open in Null</uap3:Verb>
-            </uap:SupportedVerbs>
-            <uap:SupportedFileTypes>
-              <uap:SupportsAnyFileType />
-            </uap:SupportedFileTypes>
-          </uap3:FileTypeAssociation>
-        </uap3:Extension>
       </Extensions>
     </Application>
   </Applications>
-
-  <Capabilities>
-    <rescap:Capability Name="runFullTrust" />
-  </Capabilities>
 
 </Package>
