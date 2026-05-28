@@ -311,7 +311,7 @@ jobs:
           Write-Host "Stamped icon onto $($exe.Name)"
 
       - name: Build Win11 shell extension
-        shell: pwsh
+        shell: powershell
         run: |
           $outDir    = "VSCode-win32-x64"
           $shellSrc  = "ide-overlay/shell-ext"
@@ -325,7 +325,7 @@ jobs:
             Invoke-WebRequest "https://github.com/microsoft/wil/archive/refs/heads/master.zip" `
               -OutFile wil.zip
             Expand-Archive wil.zip "$shellSrc/deps" -Force
-            Rename-Item "$shellSrc/deps/wil-master" "$shellSrc/deps/wil"
+            Rename-Item "$shellSrc/deps/wil-master" "wil"
             Remove-Item wil.zip
           }
 
