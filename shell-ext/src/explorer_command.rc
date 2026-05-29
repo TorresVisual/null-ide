@@ -1,0 +1,3 @@
+#include "resource.h"
+
+IDI_NULL_CONTEXT ICON "..\\..\\icons\\icon.ico"

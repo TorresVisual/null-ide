@@ -46,7 +46,7 @@ Since commit generation already exists:
 * [ ] Auto conventional commit validation
 * [ ] Commit templates per repo
 * [ ] Workspace dirty-state overview
-*  [ ]  Fallback for git commit gen free (usage limit)
+* [ ]  Fallback for git commit gen free (usage limit)
 
 ---
 
@@ -89,7 +89,7 @@ This seems important for your project identity.
 ## Markdown System
 
 
-*  [ ]  Own Markdown Previw extension [view](https://marketplace.visualstudio.com/items?itemName=bierner.github-markdown-preview) this!
+* [ ]  Own Markdown Previw extension [view](https://marketplace.visualstudio.com/items?itemName=bierner.github-markdown-preview) this!
 * [ ] Live synchronized scrolling
 * [ ] Mermaid support
 * [ ] KaTeX support

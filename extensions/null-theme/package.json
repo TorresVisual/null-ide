@@ -17,6 +17,21 @@
         "label": "Null Dark",
         "uiTheme": "vs-dark",
         "path": "./themes/null-dark.json"
+      },
+      {
+        "label": "Null OLED",
+        "uiTheme": "vs-dark",
+        "path": "./themes/null-oled.json"
+      },
+      {
+        "label": "Null Light",
+        "uiTheme": "vs",
+        "path": "./themes/null-light.json"
+      },
+      {
+        "label": "Null Retro",
+        "uiTheme": "vs-dark",
+        "path": "./themes/null-retro.json"
       }
     ],
 

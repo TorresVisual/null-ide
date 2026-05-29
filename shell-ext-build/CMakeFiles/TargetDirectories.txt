@@ -1,0 +1,3 @@
+D:/Coding/Apps/null-ide/shell-ext-build/CMakeFiles/null_explorer_command.dir
+D:/Coding/Apps/null-ide/shell-ext-build/CMakeFiles/ALL_BUILD.dir
+D:/Coding/Apps/null-ide/shell-ext-build/CMakeFiles/ZERO_CHECK.dir

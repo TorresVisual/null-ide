@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include <shlwapi.h>
 #include <shobjidl_core.h>
@@ -17,6 +18,7 @@
 #include <wrl/module.h>
 #include <wrl/implements.h>
 #include <wrl/client.h>
+#include "resource.h"
 #include "wil/stl.h"
 #include "wil/filesystem.h"
 #include "wil/win32_helpers.h"
@@ -112,6 +114,87 @@ static int IsContextMenuEnabled() {
   return enabled;
 }
 
+std::filesystem::path GetInstallRootFromRegistry() {
+  wchar_t value[MAX_PATH]{};
+  DWORD value_size = sizeof(value);
+  DWORD type = REG_SZ;
+
+  HKEY key = nullptr;
+  if (RegOpenKeyExW(HKEY_CURRENT_USER, kTitleRegkey, 0,
+                    KEY_QUERY_VALUE | KEY_WOW64_64KEY, &key) != ERROR_SUCCESS) {
+    return {};
+  }
+
+  if (RegQueryValueExW(key, L"InstallDir", nullptr, &type,
+                       reinterpret_cast<LPBYTE>(value),
+                       &value_size) != ERROR_SUCCESS ||
+      type != REG_SZ || value[0] == L'\0') {
+    RegCloseKey(key);
+    return {};
+  }
+
+  RegCloseKey(key);
+  return value;
+}
+
+std::filesystem::path GetInstallRootFromModule() {
+  std::filesystem::path module_path{
+      wil::GetModuleFileNameW<std::wstring>(wil::GetModuleInstanceHandle())};
+  return module_path.remove_filename()
+      .parent_path()
+      .parent_path()
+      .parent_path();
+}
+
+std::filesystem::path GetInstallRoot() {
+  std::filesystem::path root = GetInstallRootFromRegistry();
+  if (root.empty()) {
+    root = GetInstallRootFromModule();
+  }
+  return root;
+}
+
+std::filesystem::path GetMainExecutable(const std::filesystem::path& root) {
+  for (const wchar_t* name : {L"Null.exe", L"null.exe"}) {
+    const std::filesystem::path candidate = root / name;
+    if (std::filesystem::exists(candidate)) {
+      return candidate;
+    }
+  }
+  return root / L"Null.exe";
+}
+
+bool LaunchNullIde(const std::filesystem::path& exe,
+                   const std::filesystem::path& install_root,
+                   const std::wstring& target_path) {
+  const std::wstring args = QuoteForCommandLineArg(target_path);
+  std::wstring command_line = L"\"" + exe.wstring() + L"\" " + args;
+  std::vector<wchar_t> mutable_command(command_line.begin(), command_line.end());
+  mutable_command.push_back(L'\0');
+
+  STARTUPINFOW startup_info{};
+  startup_info.cb = sizeof(startup_info);
+  PROCESS_INFORMATION process_info{};
+
+  if (CreateProcessW(nullptr, mutable_command.data(), nullptr, nullptr, FALSE,
+                     CREATE_DEFAULT_ERROR_MODE, nullptr,
+                     install_root.c_str(), &startup_info, &process_info)) {
+    CloseHandle(process_info.hThread);
+    CloseHandle(process_info.hProcess);
+    return true;
+  }
+
+  SHELLEXECUTEINFOW execute_info{};
+  execute_info.cbSize = sizeof(execute_info);
+  execute_info.fMask = SEE_MASK_FLAG_NO_UI;
+  execute_info.lpVerb = L"open";
+  execute_info.lpFile = exe.c_str();
+  execute_info.lpParameters = args.c_str();
+  execute_info.lpDirectory = install_root.c_str();
+  execute_info.nShow = SW_SHOW;
+  return ShellExecuteExW(&execute_info) != FALSE;
+}
+
 }  // namespace
 
 class __declspec(uuid(DLL_UUID)) ExplorerCommandHandler final
@@ -129,21 +212,25 @@ class __declspec(uuid(DLL_UUID)) ExplorerCommandHandler final
       DWORD value_size_w = sizeof(value_w);
 
       HKEY subhkey = nullptr;
-      LONG result = RegOpenKeyEx(HKEY_LOCAL_MACHINE, kTitleRegkey, 0, KEY_READ, &subhkey);
+      LONG result = RegOpenKeyExW(HKEY_LOCAL_MACHINE, kTitleRegkey, 0,
+                                  KEY_QUERY_VALUE | KEY_WOW64_64KEY, &subhkey);
       if (result != ERROR_SUCCESS) {
-        result = RegOpenKeyEx(HKEY_CURRENT_USER, kTitleRegkey, 0, KEY_READ, &subhkey);
+        result = RegOpenKeyExW(HKEY_CURRENT_USER, kTitleRegkey, 0,
+                               KEY_QUERY_VALUE | KEY_WOW64_64KEY, &subhkey);
       }
 
-      DWORD type = REG_EXPAND_SZ;
-      RegQueryValueEx(subhkey, L"Title", nullptr, &type,
-                      reinterpret_cast<LPBYTE>(&value_w), &value_size_w);
-      RegCloseKey(subhkey);
+      if (result == ERROR_SUCCESS) {
+        DWORD type = REG_EXPAND_SZ;
+        RegQueryValueExW(subhkey, L"Title", nullptr, &type,
+                        reinterpret_cast<LPBYTE>(&value_w), &value_size_w);
+        RegCloseKey(subhkey);
+      }
       value_size_w = ExpandEnvironmentStrings(value_w, expanded_value_w, kMaxStringLength);
 
       if (value_size_w && value_size_w < kMaxStringLength) {
         cached_title = expanded_value_w;
       } else {
-        cached_title = L"Open in Null";
+        cached_title = L"Open with Null";
       }
       title_cached = true;
     }
@@ -152,16 +239,19 @@ class __declspec(uuid(DLL_UUID)) ExplorerCommandHandler final
   }
 
   IFACEMETHODIMP GetIcon(IShellItemArray* items, PWSTR* icon) {
-    // DLL is at {install}\shell-ext\NullIDE.ExplorerCommand\x64\DLL.dll
-    // remove_filename() + 3x parent_path() navigates back to {install}
-    std::filesystem::path module_path{
-        wil::GetModuleFileNameW<std::wstring>(wil::GetModuleInstanceHandle())};
-    module_path = module_path.remove_filename()
-                             .parent_path()
-                             .parent_path()
-                             .parent_path();
-    module_path /= EXE_NAME;
-    return SHStrDupW(module_path.c_str(), icon);
+    UNREFERENCED_PARAMETER(items);
+    static std::wstring cached_icon;
+    static bool icon_cached = false;
+
+    if (!icon_cached) {
+      // Icon resource embedded in this DLL (reliable from dllhost surrogate).
+      std::filesystem::path dll_path{
+          wil::GetModuleFileNameW<std::wstring>(wil::GetModuleInstanceHandle())};
+      cached_icon = dll_path.wstring() + L",-" + std::to_wstring(IDI_NULL_CONTEXT);
+      icon_cached = true;
+    }
+
+    return SHStrDupW(cached_icon.c_str(), icon);
   }
 
   IFACEMETHODIMP GetToolTip(IShellItemArray* items, PWSTR* infoTip) {
@@ -191,35 +281,36 @@ class __declspec(uuid(DLL_UUID)) ExplorerCommandHandler final
   }
 
   IFACEMETHODIMP Invoke(IShellItemArray* items, IBindCtx* bindCtx) {
-    if (items) {
-      std::filesystem::path module_path{
-          wil::GetModuleFileNameW<std::wstring>(wil::GetModuleInstanceHandle())};
-      module_path = module_path.remove_filename()
-                               .parent_path()
-                               .parent_path()
-                               .parent_path();
-      module_path /= EXE_NAME;
+    UNREFERENCED_PARAMETER(bindCtx);
+    if (!items) {
+      return S_OK;
+    }
 
-      DWORD count;
-      RETURN_IF_FAILED(items->GetCount(&count));
-      for (DWORD i = 0; i < count; ++i) {
-        ComPtr<IShellItem> item;
-        auto result = items->GetItemAt(i, &item);
-        if (SUCCEEDED(result)) {
-          wil::unique_cotaskmem_string path;
-          result = item->GetDisplayName(SIGDN_FILESYSPATH, &path);
-          if (SUCCEEDED(result)) {
-            HINSTANCE ret = ShellExecuteW(
-                nullptr, L"open", module_path.c_str(),
-                QuoteForCommandLineArg(path.get()).c_str(),
-                nullptr, SW_SHOW);
-            if ((INT_PTR)ret <= HINSTANCE_ERROR) {
-              RETURN_LAST_ERROR();
-            }
-          }
-        }
+    const std::filesystem::path install_root = GetInstallRoot();
+    if (install_root.empty()) {
+      return HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND);
+    }
+
+    const std::filesystem::path exe_path = GetMainExecutable(install_root);
+    if (!std::filesystem::exists(exe_path)) {
+      return HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND);
+    }
+
+    DWORD count = 0;
+    RETURN_IF_FAILED(items->GetCount(&count));
+
+    for (DWORD i = 0; i < count; ++i) {
+      ComPtr<IShellItem> item;
+      RETURN_IF_FAILED(items->GetItemAt(i, &item));
+
+      wil::unique_cotaskmem_string path;
+      RETURN_IF_FAILED(item->GetDisplayName(SIGDN_FILESYSPATH, &path));
+
+      if (!LaunchNullIde(exe_path, install_root, path.get())) {
+        return HRESULT_FROM_WIN32(GetLastError());
       }
     }
+
     return S_OK;
   }
 };

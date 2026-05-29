@@ -146,8 +146,10 @@ function Register-ContextMenu {
     }
 
     # Enable key read by the Win11 shell-extension DLL (IsContextMenuEnabled / GetTitle)
+    $installRoot = [System.IO.Path]::GetDirectoryName($ExePath)
     New-Item -Path 'HKCU:\Software\Classes\NullIDEContextMenu' -Force | Out-Null
-    Set-ItemProperty -Path 'HKCU:\Software\Classes\NullIDEContextMenu' -Name 'Title' -Value 'Open in Null'
+    Set-ItemProperty -Path 'HKCU:\Software\Classes\NullIDEContextMenu' -Name 'Title' -Value 'Open with Null'
+    Set-ItemProperty -Path 'HKCU:\Software\Classes\NullIDEContextMenu' -Name 'InstallDir' -Value $installRoot
 }
 
 function Unregister-ContextMenu {
@@ -164,38 +166,128 @@ function Unregister-ContextMenu {
     }
 }
 
+function Add-ShellExtCertToStore {
+    param(
+        [System.Security.Cryptography.X509Certificates.X509Certificate2]$Certificate,
+        [ValidateSet('CurrentUser', 'LocalMachine')]
+        [string]$StoreLocation
+    )
+
+    $store = New-Object System.Security.Cryptography.X509Certificates.X509Store('TrustedPeople', $StoreLocation)
+    $store.Open('ReadWrite')
+    try {
+        $existing = $store.Certificates.Find(
+            [System.Security.Cryptography.X509Certificates.X509FindType]::FindByThumbprint,
+            $Certificate.Thumbprint,
+            $false)
+        if ($existing.Count -eq 0) {
+            $store.Add($Certificate)
+        }
+    }
+    finally {
+        $store.Close()
+    }
+}
+
+function Install-ShellExtSigningCertificate {
+    param([string]$CerPath)
+
+    if (-not (Test-Path $CerPath)) {
+        throw "Shell extension certificate not found: $CerPath"
+    }
+
+    $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($CerPath)
+    Add-ShellExtCertToStore -Certificate $cert -StoreLocation 'CurrentUser'
+}
+
+function Install-ShellExtSigningCertificateElevated {
+    param([string]$CerPath)
+
+    $escapedCer = $CerPath.Replace("'", "''")
+    $command = "Import-Certificate -FilePath '$escapedCer' -CertStoreLocation Cert:\LocalMachine\TrustedPeople | Out-Null"
+    $proc = Start-Process -FilePath 'powershell.exe' `
+        -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', $command) `
+        -Verb RunAs -Wait -PassThru
+    if ($proc.ExitCode -ne 0) {
+        throw "Could not install the shell extension certificate (exit $($proc.ExitCode)). Approve the UAC prompt or run as administrator."
+    }
+}
+
+function Test-AppxUntrustedRootError {
+    param($ErrorRecord)
+    $msg = "$($ErrorRecord.Exception.Message)"
+    return $msg -match '0x800B0109|800B0109|CERT_E_UNTRUSTEDROOT|not trusted'
+}
+
+function Restart-FileExplorer {
+    try {
+        Stop-Process -Name explorer -Force -ErrorAction Stop
+    }
+    catch {
+        # Explorer restarts automatically when killed.
+    }
+}
+
+function Ensure-NullIDEContextMenuRegistry {
+    param([string]$InstallDir)
+
+    $ctxKey = 'HKCU:\Software\Classes\NullIDEContextMenu'
+    New-Item -Path $ctxKey -Force | Out-Null
+    Set-ItemProperty -Path $ctxKey -Name 'Title' -Value 'Open with Null'
+    if ($InstallDir) {
+        Set-ItemProperty -Path $ctxKey -Name 'InstallDir' -Value ([System.IO.Path]::GetFullPath($InstallDir))
+    }
+}
+
 function Register-Win11ContextMenu {
     param([string]$InstallDir)
 
-    $appxPath = Join-Path $InstallDir "shell-ext\null-shell-ext.appx"
+    $installDir = [System.IO.Path]::GetFullPath($InstallDir)
+    $appxPath = Join-Path $installDir 'shell-ext\null-shell-ext.appx'
     if (-not (Test-Path $appxPath)) {
-        Write-Warning "Shell extension package not found at '$appxPath' — Win11 primary context menu skipped."
+        Write-Warning "Shell extension package not found at '$appxPath' - Win11 primary context menu skipped."
         return
     }
 
-    $cerPath = Join-Path $InstallDir "shell-ext\NullIDECert.cer"
-    if (Test-Path $cerPath) {
-        try {
-            $cert  = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($cerPath)
-            $store = New-Object System.Security.Cryptography.X509Certificates.X509Store("TrustedPeople", "CurrentUser")
-            $store.Open("ReadWrite")
-            $store.Add($cert)
-            $store.Close()
-        } catch {
-            Write-Warning "Could not install signing certificate: $_"
-        }
+    $cerPath = Join-Path $installDir 'shell-ext\NullIDECert.cer'
+    Ensure-NullIDEContextMenuRegistry -InstallDir $installDir
+
+    try {
+        Install-ShellExtSigningCertificate -CerPath $cerPath
+    }
+    catch {
+        Write-Warning "Could not install signing certificate to CurrentUser\TrustedPeople: $_"
     }
 
-    $existing = Get-AppxPackage -Name "NullIDE.ExplorerCommand" -ErrorAction SilentlyContinue
+    $existing = Get-AppxPackage -Name 'NullIDE.ExplorerCommand' -ErrorAction SilentlyContinue
     if ($existing) {
         Remove-AppxPackage -Package $existing.PackageFullName -ErrorAction SilentlyContinue
     }
 
+    $registered = $false
     try {
-        Add-AppxPackage -Path $appxPath -ExternalLocation $InstallDir
-    } catch {
-        Write-Warning "Win11 context menu registration failed: $_"
+        Add-AppxPackage -Path $appxPath -ExternalLocation $installDir -ForceUpdateFromAnyVersion -ErrorAction Stop
+        $registered = $true
     }
+    catch {
+        if (-not (Test-AppxUntrustedRootError $_)) {
+            throw "Win11 context menu registration failed: $($_.Exception.Message)"
+        }
+    }
+
+    if (-not $registered) {
+        Write-Host 'Windows requires a one-time UAC approval to trust the Null IDE shell extension certificate.'
+        Install-ShellExtSigningCertificateElevated -CerPath $cerPath
+        Add-AppxPackage -Path $appxPath -ExternalLocation $installDir -ForceUpdateFromAnyVersion -ErrorAction Stop
+    }
+
+    $pkg = Get-AppxPackage -Name 'NullIDE.ExplorerCommand' -ErrorAction SilentlyContinue
+    if (-not $pkg) {
+        throw 'Win11 context menu registration failed: NullIDE.ExplorerCommand package is not registered.'
+    }
+
+    Restart-FileExplorer
+    Write-Host 'Win11 context menu registered.'
 }
 
 function Unregister-Win11ContextMenu {
@@ -298,7 +390,7 @@ function Install-Zip {
         throw "Null IDE is running. Close null.exe before installing."
     }
     if ($ideRunning) {
-        Write-Warning "Null IDE is running. Files will be swapped underneath it — restart the IDE after this completes."
+        Write-Warning "Null IDE is running. Files will be swapped underneath it - restart the IDE after this completes."
     }
 
     if ($isUpdate -and -not $Force) {
@@ -349,13 +441,13 @@ function Install-Zip {
             installDir  = $destinationFullPath
         } | ConvertTo-Json | Set-Content -Path (Join-Path $destinationFullPath ".null-ide-install.json") -Encoding UTF8
 
-        # Delete old backup — may fail if IDE is still holding handles; that is non-fatal
+        # Delete old backup - may fail if IDE is still holding handles; that is non-fatal
         if (Test-Path $bakDir) {
             try   { Remove-Item -LiteralPath $bakDir -Recurse -Force -ErrorAction Stop }
-            catch { Write-Warning "Old files left at '$bakDir' (IDE still running?) — delete manually after closing Null IDE." }
+            catch { Write-Warning "Old files left at '$bakDir' (IDE still running?) - delete manually after closing Null IDE." }
         }
 
-        $target = Join-Path $destinationFullPath "null.exe"
+        $target = Get-NullIdeExecutable -Dir $destinationFullPath
 
         if (-not $NoDesktopShortcut) {
             Write-Step "Creating desktop shortcut"
@@ -395,12 +487,12 @@ function Install-Zip {
     catch {
         # Rollback: rename backup back to install dir name
         if (Test-Path $bakDir) {
-            Write-Warning "Install failed — restoring previous installation."
+            Write-Warning "Install failed - restoring previous installation."
             if (Test-Path $destinationFullPath) {
                 Remove-Item -LiteralPath $destinationFullPath -Recurse -Force -ErrorAction SilentlyContinue
             }
             try   { Rename-Item -LiteralPath $bakDir -NewName $installName }
-            catch { Write-Warning "Rollback also failed — backup preserved at: $bakDir" }
+            catch { Write-Warning "Rollback also failed - backup preserved at: $bakDir" }
         }
         if ($stageDir   -and (Test-Path $stageDir))   { Remove-Item -LiteralPath $stageDir   -Recurse -Force -ErrorAction SilentlyContinue }
         if ($extractDir -and (Test-Path $extractDir)) { Remove-Item -LiteralPath $extractDir -Recurse -Force -ErrorAction SilentlyContinue }
@@ -408,11 +500,20 @@ function Install-Zip {
     }
 }
 
-if ($RegisterContextMenu) {
-    $target = Join-Path ([System.IO.Path]::GetFullPath($InstallDir)) "null.exe"
-    if (-not (Test-Path $target)) {
-        throw "null.exe not found at $target - check -InstallDir."
+function Get-NullIdeExecutable {
+    param([string]$Dir)
+    $mainExe = Get-ChildItem -Path $Dir -Filter "*.exe" -File |
+        Where-Object { $_.Name -notmatch '^(unins|setup)' } |
+        Select-Object -First 1
+    if (-not $mainExe) {
+        throw "Null IDE executable not found in $Dir"
     }
+    return $mainExe.FullName
+}
+
+if ($RegisterContextMenu) {
+    $dir = [System.IO.Path]::GetFullPath($InstallDir)
+    $target = Get-NullIdeExecutable -Dir $dir
     Write-Step "Registering context menu entries"
     Register-ContextMenu -ExePath $target
     Write-Host "Done."
@@ -421,9 +522,7 @@ if ($RegisterContextMenu) {
 
 if ($RegisterWin11ContextMenu) {
     $dir = [System.IO.Path]::GetFullPath($InstallDir)
-    if (-not (Test-Path (Join-Path $dir "null.exe"))) {
-        throw "null.exe not found at $dir - check -InstallDir."
-    }
+    $null = Get-NullIdeExecutable -Dir $dir
     Write-Step "Registering Win11 context menu"
     Register-Win11ContextMenu -InstallDir $dir
     Write-Host "Done."

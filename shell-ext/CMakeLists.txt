@@ -11,6 +11,7 @@ endif()
 add_library(null_explorer_command SHARED
     src/explorer_command.cc
     src/explorer_command.def
+    src/explorer_command.rc
 )
 
 target_include_directories(null_explorer_command PRIVATE "${WIL_INCLUDE}")

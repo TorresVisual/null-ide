@@ -309,6 +309,13 @@ jobs:
           $rcedit = ".\rcedit-tool\node_modules\rcedit\bin\rcedit.exe"
           & $rcedit $exe.FullName --set-icon ide-overlay/icons/icon.ico
           Write-Host "Stamped icon onto $($exe.Name)"
+          # product.json applicationName is "null"; ensure the on-disk binary matches AppxManifest.xml
+          $nullExe = Join-Path $outDir "null.exe"
+          if ($exe.Name -ne "null.exe") {
+            if (Test-Path $nullExe) { Remove-Item $nullExe -Force }
+            Rename-Item $exe.FullName $nullExe
+            Write-Host "Renamed $($exe.Name) -> null.exe"
+          }
 
       - name: Build Win11 shell extension
         shell: powershell
@@ -389,7 +396,12 @@ jobs:
           New-Item -ItemType Directory -Path "$appxStage/Assets" -Force | Out-Null
           Copy-Item "$assetDest/*" "$appxStage/Assets/"
           & $makeappx pack /d $appxStage /p "$pkgDir/null-shell-ext.appx" /nv /o
+          if ($LASTEXITCODE -ne 0) { Write-Error "makeappx pack failed with exit code $LASTEXITCODE"; exit $LASTEXITCODE }
           Remove-Item $appxStage -Recurse -Force
+          if (-not (Test-Path "$pkgDir/null-shell-ext.appx")) {
+            Write-Error "makeappx did not produce null-shell-ext.appx"
+            exit 1
+          }
 
           # ── 7. Sign .appx ────────────────────────────────────────────────────
           $signtool = Get-ChildItem `
@@ -400,7 +412,13 @@ jobs:
             Select-Object -First 1 -ExpandProperty FullName
           if (-not $signtool) { Write-Error "signtool.exe not found"; exit 1 }
           & $signtool sign /fd SHA256 /f NullIDECert.pfx /p nullbuild "$pkgDir/null-shell-ext.appx"
+          if ($LASTEXITCODE -ne 0) { Write-Error "signtool sign failed with exit code $LASTEXITCODE"; exit $LASTEXITCODE }
           Remove-Item NullIDECert.pfx -Force
+          $sig = Get-AuthenticodeSignature "$pkgDir/null-shell-ext.appx"
+          if ($sig.Status -ne "Valid") {
+            Write-Error "Shell extension .appx signature is not valid: $($sig.StatusMessage)"
+            exit 1
+          }
           Write-Host "Shell extension package built and signed."
 
           # ── Final layout under VSCode-win32-x64/shell-ext/ ──────────────────

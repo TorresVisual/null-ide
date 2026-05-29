@@ -18,7 +18,7 @@
   <Identity
     Name="NullIDE.ExplorerCommand"
     Publisher="CN=Null IDE"
-    Version="1.0.0.0"
+    Version="1.0.0.2"
     ProcessorArchitecture="x64" />
 
   <Properties>
@@ -56,16 +56,17 @@
     -->
     <Application
       Id="NullIDE"
-      Executable="null.exe"
+      Executable="Null.exe"
       uap10:TrustLevel="mediumIL"
       uap10:RuntimeBehavior="win32App">
 
       <uap:VisualElements
+        AppListEntry="none"
         DisplayName="Null IDE"
         Description="Code editor"
         BackgroundColor="transparent"
-        Square150x150Logo="Assets\Square150x150Logo.png"
-        Square44x44Logo="Assets\Square44x44Logo.png">
+        Square150x150Logo="resources\app\resources\win32\code_150x150.png"
+        Square44x44Logo="resources\app\resources\win32\code_70x70.png">
         <uap:DefaultTile />
       </uap:VisualElements>
 
@@ -74,13 +75,13 @@
         <desktop4:Extension Category="windows.fileExplorerContextMenus">
           <desktop4:FileExplorerContextMenus>
             <desktop5:ItemType Type="Directory">
-              <desktop5:Verb Id="NullOpen" Clsid="A72D088B-AC8B-4AB5-ABFE-49C5CE37A466" />
+              <desktop5:Verb Id="OpenWithCodeNull" Clsid="A72D088B-AC8B-4AB5-ABFE-49C5CE37A466" />
             </desktop5:ItemType>
             <desktop5:ItemType Type="Directory\Background">
-              <desktop5:Verb Id="NullOpen" Clsid="A72D088B-AC8B-4AB5-ABFE-49C5CE37A466" />
+              <desktop5:Verb Id="OpenWithCodeNull" Clsid="A72D088B-AC8B-4AB5-ABFE-49C5CE37A466" />
             </desktop5:ItemType>
             <desktop5:ItemType Type="*">
-              <desktop5:Verb Id="NullOpen" Clsid="A72D088B-AC8B-4AB5-ABFE-49C5CE37A466" />
+              <desktop5:Verb Id="OpenWithCodeNull" Clsid="A72D088B-AC8B-4AB5-ABFE-49C5CE37A466" />
             </desktop5:ItemType>
           </desktop4:FileExplorerContextMenus>
         </desktop4:Extension>

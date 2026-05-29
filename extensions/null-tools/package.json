@@ -32,6 +32,14 @@
       {
         "command": "null.clearWebviewCache",
         "title": "Null: Clear Webview Cache and Reload"
+      },
+      {
+        "command": "null.showWelcome",
+        "title": "Null: Show Welcome Page"
+      },
+      {
+        "command": "null.toggleSoundDesign",
+        "title": "Null: Toggle Sound Design"
       }
     ],
     "viewsContainers": {
@@ -74,8 +82,31 @@
         },
         {
           "command": "null.clearWebviewCache"
+        },
+        {
+          "command": "null.showWelcome"
+        },
+        {
+          "command": "null.toggleSoundDesign"
         }
       ]
+    },
+    "configuration": {
+      "title": "Null IDE",
+      "properties": {
+        "null.soundDesign.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable subtle UI sound effects (requires AI Agents panel to be open)."
+        },
+        "null.soundDesign.volume": {
+          "type": "number",
+          "default": 0.5,
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Sound design volume (0–1)."
+        }
+      }
     },
     "keybindings": [
       {
