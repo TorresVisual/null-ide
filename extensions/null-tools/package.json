@@ -6,7 +6,15 @@
   "publisher": "null",
   "license": "MIT",
   "engines": { "vscode": "^1.85.0" },
-  "main": "./extension.js",
+  "main": "./out/extension.js",
+  "scripts": {
+    "compile": "tsc -p tsconfig.json && tsc -p tsconfig.webview.json"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0",
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^22.0.0"
+  },
   "activationEvents": ["onStartupFinished"],
   "contributes": {
     "commands": [
@@ -40,6 +48,31 @@
       {
         "command": "null.toggleSoundDesign",
         "title": "Null: Toggle Sound Design"
+      },
+      {
+        "command": "null.ollamaModel",
+        "title": "Null: Switch Ollama Model",
+        "icon": "$(list-selection)"
+      },
+      {
+        "command": "null.ollamaChat",
+        "title": "Null: Ask Ollama (inline chat)",
+        "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "null.ollamaReview",
+        "title": "Null: Ollama Code Review",
+        "icon": "$(search)"
+      },
+      {
+        "command": "null.insertPromptTemplate",
+        "title": "Null: Insert Prompt Template",
+        "icon": "$(library)"
+      },
+      {
+        "command": "null.injectContext",
+        "title": "Null: Inject File Context into Agent",
+        "icon": "$(file-code)"
       }
     ],
     "viewsContainers": {
@@ -69,26 +102,35 @@
           "group": "navigation"
         }
       ],
-      "commandPalette": [
+      "view/title": [
         {
-          "command": "null.checkForUpdates"
+          "command": "null.injectContext",
+          "when": "view == null.agentsView",
+          "group": "navigation@1"
         },
         {
-          "command": "null.installUpdate",
-          "when": "nullUpdateAvailable"
+          "command": "null.insertPromptTemplate",
+          "when": "view == null.agentsView",
+          "group": "navigation@2"
         },
         {
-          "command": "null.agentsPaste"
-        },
-        {
-          "command": "null.clearWebviewCache"
-        },
-        {
-          "command": "null.showWelcome"
-        },
-        {
-          "command": "null.toggleSoundDesign"
+          "command": "null.ollamaModel",
+          "when": "view == null.agentsView",
+          "group": "navigation@3"
         }
+      ],
+      "commandPalette": [
+        { "command": "null.checkForUpdates" },
+        { "command": "null.installUpdate", "when": "nullUpdateAvailable" },
+        { "command": "null.agentsPaste" },
+        { "command": "null.clearWebviewCache" },
+        { "command": "null.showWelcome" },
+        { "command": "null.toggleSoundDesign" },
+        { "command": "null.ollamaModel" },
+        { "command": "null.ollamaChat" },
+        { "command": "null.ollamaReview" },
+        { "command": "null.insertPromptTemplate" },
+        { "command": "null.injectContext" }
       ]
     },
     "configuration": {
@@ -105,6 +147,28 @@
           "minimum": 0,
           "maximum": 1,
           "description": "Sound design volume (0–1)."
+        },
+        "null.ollama.model": {
+          "type": "string",
+          "default": "llama3.2",
+          "description": "Default Ollama model to use for the ollama agent tab and AI commands."
+        },
+        "null.promptTemplates": {
+          "type": "array",
+          "default": [
+            { "label": "Explain this", "text": "Explain the following code:\n\n" },
+            { "label": "Write tests for", "text": "Write unit tests for:\n\n" },
+            { "label": "Review for bugs", "text": "Review this code carefully for bugs and improvements:\n\n" },
+            { "label": "Refactor", "text": "Refactor the following code for clarity and maintainability:\n\n" }
+          ],
+          "description": "Prompt templates available via the Insert Prompt Template command.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": { "type": "string" },
+              "text":  { "type": "string" }
+            }
+          }
         }
       }
     },
@@ -117,6 +181,15 @@
         "command": "null.agentsPaste",
         "key": "ctrl+v",
         "when": "focusedView == 'null.agentsView'"
+      },
+      {
+        "command": "null.ollamaChat",
+        "key": "ctrl+shift+o"
+      },
+      {
+        "command": "null.injectContext",
+        "key": "ctrl+shift+k",
+        "when": "editorFocus || focusedView == 'null.agentsView'"
       }
     ]
   }

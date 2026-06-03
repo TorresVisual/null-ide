@@ -17,7 +17,6 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  VSCODIUM_TAG: '1.116.02821'  # Pin; bumped automatically by upstream-check job
   APP_NAME: 'null'
   APP_NAME_LONG: Null IDE
 
@@ -37,20 +36,18 @@ jobs:
         run: |
           LATEST=$(curl -fsSL https://api.github.com/repos/VSCodium/vscodium/releases/latest \
             | jq -r '.tag_name')
-          PINNED="${{ env.VSCODIUM_TAG }}"
+          PINNED=$(cat VSCODIUM_TAG)
           echo "Latest upstream: $LATEST   Pinned: $PINNED"
           if [ "$LATEST" = "$PINNED" ]; then
             echo "Already up to date."
             exit 0
           fi
-          # Bump the pinned tag in this file and open a PR
-          sed -i "s/VSCODIUM_TAG: '${PINNED}'/VSCODIUM_TAG: '${LATEST}'/" \
-            .github/workflows/build.yml
+          echo "$LATEST" > VSCODIUM_TAG
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           BRANCH="update/vscodium-${LATEST}"
           git checkout -b "$BRANCH"
-          git add .github/workflows/build.yml
+          git add VSCODIUM_TAG
           git commit -m "chore: bump VSCodium upstream to ${LATEST}"
           git push origin "$BRANCH"
           gh pr create \
@@ -78,7 +75,7 @@ jobs:
         shell: pwsh
         run: |
           $tag = '${{ github.event.inputs.vscodium_tag }}'
-          if (-not $tag) { $tag = '${{ env.VSCODIUM_TAG }}' }
+          if (-not $tag) { $tag = (Get-Content ide-overlay/VSCODIUM_TAG -Raw).Trim() }
           "tag=$tag" | Out-File -Append $env:GITHUB_OUTPUT
 
       - name: Clone VSCodium at pinned tag
@@ -143,12 +140,24 @@ jobs:
             ide-overlay/product.json `
             vscode-src/product.json
 
+      - name: Install null-markdown dependencies
+        shell: pwsh
+        run: npm ci --prefix ide-overlay/extensions/null-markdown
+
+      - name: Compile null-tools TypeScript
+        shell: pwsh
+        run: |
+          Set-Location ide-overlay/extensions/null-tools
+          npm ci --ignore-scripts
+          npm run compile
+
       - name: Copy built-in extensions
         shell: pwsh
         run: |
-          Copy-Item -Recurse -Force ide-overlay/extensions/null-theme  vscode-src/extensions/
-          Copy-Item -Recurse -Force ide-overlay/extensions/null-tools  vscode-src/extensions/
-          Copy-Item -Recurse -Force ide-overlay/extensions/null-icons  vscode-src/extensions/
+          Copy-Item -Recurse -Force ide-overlay/extensions/null-theme    vscode-src/extensions/
+          Copy-Item -Recurse -Force ide-overlay/extensions/null-tools    vscode-src/extensions/
+          Copy-Item -Recurse -Force ide-overlay/extensions/null-icons    vscode-src/extensions/
+          Copy-Item -Recurse -Force ide-overlay/extensions/null-markdown vscode-src/extensions/
 
 
 

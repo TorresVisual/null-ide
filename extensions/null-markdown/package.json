@@ -1,0 +1,47 @@
+{
+	"name": "null-markdown",
+	"displayName": "Null Markdown",
+	"description": "Enhanced markdown preview for Null IDE: GFM, task lists, Mermaid, KaTeX, GitHub Alerts",
+	"version": "1.1.0",
+	"publisher": "null",
+	"license": "MIT",
+	"engines": {
+		"vscode": "^1.85.0"
+	},
+	"main": "./extension.js",
+	"activationEvents": [
+		"onLanguage:markdown",
+		"onCommand:markdown.showPreview",
+		"onCommand:markdown.showPreviewToSide"
+	],
+	"contributes": {
+		"commands": [
+			{
+				"command": "null-markdown.openPreview",
+				"title": "Open Null Markdown Preview",
+				"category": "Markdown",
+				"icon": "$(open-preview)"
+			}
+		],
+		"keybindings": [
+			{
+				"command": "null-markdown.openPreview",
+				"key": "ctrl+shift+v",
+				"when": "editorLangId == markdown"
+			},
+			{
+				"command": "null-markdown.openPreview",
+				"key": "ctrl+k v",
+				"when": "editorLangId == markdown"
+			}
+		]
+	},
+	"dependencies": {
+		"katex": "^0.16.11",
+		"markdown-it": "^14.2.0",
+		"markdown-it-emoji": "^3.0.0",
+		"markdown-it-footnote": "^4.0.0",
+		"markdown-it-texmath": "^1.0.0",
+		"mermaid": "^10.9.1"
+	}
+}

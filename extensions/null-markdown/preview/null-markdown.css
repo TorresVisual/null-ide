@@ -1,0 +1,150 @@
+/* Null Markdown — preview styles tuned for the Null Dark palette */
+
+html {
+	scroll-behavior: smooth;
+}
+
+body {
+	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+	background-color: #1f1f1f;
+	color: #e6e6f0;
+	line-height: 1.65;
+	padding: 20px 32px;
+	max-width: 900px;
+	margin: 0 auto;
+}
+
+/* Headings */
+h1, h2, h3, h4, h5, h6 {
+	color: #ffffff;
+	font-weight: 600;
+	margin-top: 28px;
+	margin-bottom: 8px;
+}
+
+h1, h2 {
+	border-bottom: 1px solid #1e1e35;
+	padding-bottom: 6px;
+}
+
+/* Links */
+a { color: #3c93f8; text-decoration: none; }
+a:hover { color: #48cae4; text-decoration: underline; }
+
+/* Inline code */
+code {
+	font-family: 'Geist Mono', 'JetBrains Mono', 'Cascadia Code', monospace;
+	background: #1c1c1c;
+	color: #3c93f8;
+	padding: 2px 6px;
+	border-radius: 4px;
+	font-size: 0.9em;
+}
+
+/* Fenced code blocks */
+pre {
+	background: #1c1c1c;
+	border: 1px solid #252540;
+	border-radius: 8px;
+	padding: 16px;
+	overflow-x: auto;
+}
+
+pre code {
+	background: transparent;
+	color: #e6e6f0;
+	padding: 0;
+	font-size: 0.875em;
+}
+
+/* Blockquotes */
+blockquote {
+	border-left: 4px solid #3c93f8;
+	margin: 16px 0;
+	padding: 8px 16px;
+	background: #11112a;
+	color: #9898b8;
+	border-radius: 0 6px 6px 0;
+}
+
+blockquote p { margin: 0; }
+
+/* Tables */
+table {
+	border-collapse: collapse;
+	width: 100%;
+	margin: 16px 0;
+}
+
+th {
+	background: #1c1c1c;
+	color: #ffffff;
+	padding: 10px 14px;
+	text-align: left;
+	border: 1px solid #252540;
+	font-weight: 600;
+}
+
+td {
+	padding: 8px 14px;
+	border: 1px solid #252540;
+}
+
+tr:nth-child(even) td { background: #1c1c1c; }
+
+/* Horizontal rule */
+hr {
+	border: none;
+	border-top: 1px solid #252540;
+	margin: 28px 0;
+}
+
+/* Images */
+img { max-width: 100%; border-radius: 4px; }
+
+/* Task lists */
+.task-list-item { list-style: none; }
+.task-list-item-checkbox {
+	accent-color: #3c93f8;
+	margin-right: 6px;
+	margin-left: -20px;
+	vertical-align: middle;
+}
+
+/* Footnotes */
+.footnotes {
+	margin-top: 32px;
+	padding-top: 16px;
+	border-top: 1px solid #252540;
+	font-size: 0.875em;
+	color: #9898b8;
+}
+
+/* Mermaid diagrams */
+.mermaid {
+	text-align: center;
+	max-width: 100%;
+	margin: 20px auto;
+	overflow-x: auto;
+}
+
+/* GitHub Alerts */
+.markdown-alert {
+	border-left: 4px solid;
+	border-radius: 0 6px 6px 0;
+	padding: 10px 16px;
+	margin: 16px 0;
+}
+.markdown-alert .alert-title { display: block; margin-bottom: 4px; font-size: 0.9em; }
+.markdown-alert p { margin: 0; color: #e6e6f0; }
+.markdown-alert-note      { border-color: #3c93f8; background: rgba(60,147,248,.1); }
+.markdown-alert-tip       { border-color: #22c55e; background: rgba(34,197,94,.1); }
+.markdown-alert-important { border-color: #a855f7; background: rgba(168,85,247,.1); }
+.markdown-alert-warning   { border-color: #f59e0b; background: rgba(245,158,11,.1); }
+.markdown-alert-caution   { border-color: #ef4444; background: rgba(239,68,68,.1); }
+
+/* KaTeX display math */
+.katex-display {
+	overflow-x: auto;
+	padding: 8px 0;
+}

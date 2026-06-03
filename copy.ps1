@@ -1,6 +1,5 @@
 $root    = "D:\Coding\Apps\null-ide"
 $targets = @(
-    "$root\tmp\null-ide-win32-x64\resources\app",
     "C:\Users\Moritz\AppData\Local\Programs\Null IDE\resources\app"
 )
 
@@ -47,11 +46,18 @@ foreach ($app in $targets) {
 
     # --- 3. Built-in extensions ---
     # null-theme and null-icons: full replace (no native code)
-    foreach ($ext in @("null-theme", "null-icons")) {
+    foreach ($ext in @("null-theme", "null-icons", "null-markdown")) {
         $dest = "$app\extensions\$ext"
         Remove-Item $dest -Recurse -Force -ErrorAction SilentlyContinue
         Copy-Item "$root\extensions\$ext" $dest -Recurse -Force
     }
+
+    # null-tools: compile TypeScript before syncing so out/ is up-to-date.
+    Push-Location "$root\extensions\null-tools"
+    npm run compile 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) { Write-Warning "  [warn] TypeScript compile failed -- out/ may be stale" }
+    Pop-Location
+    Write-Host "  [ok] null-tools compiled"
 
     # null-tools: preserve node_modules so compiled node-pty binaries survive.
     # Only seed node_modules from source if destination has none (first install).
@@ -59,7 +65,9 @@ foreach ($app in $targets) {
     $toolsDest = "$app\extensions\null-tools"
     if (-not (Test-Path $toolsDest)) { New-Item -ItemType Directory -Path $toolsDest -Force | Out-Null }
     Get-ChildItem $toolsSrc -Recurse | Where-Object {
-        $_.FullName -notmatch '\\node_modules(\\|$)' -and (-not $_.PSIsContainer)
+        $_.FullName -notmatch '\\node_modules(\\|$)' -and
+        $_.FullName -notmatch '\\src(\\|$)' -and
+        (-not $_.PSIsContainer)
     } | ForEach-Object {
         $rel    = $_.FullName.Substring($toolsSrc.Length + 1)
         $target = Join-Path $toolsDest $rel
@@ -70,7 +78,7 @@ foreach ($app in $targets) {
     if (-not (Test-Path "$toolsDest\node_modules")) {
         Copy-Item "$toolsSrc\node_modules" "$toolsDest\node_modules" -Recurse -Force
     }
-    Write-Host "  [ok] extensions (null-theme, null-icons, null-tools)"
+    Write-Host "  [ok] extensions (null-theme, null-icons, null-tools, null-markdown)"
 
     # --- 4. Win32 icons ---
     $win32 = "$app\resources\win32"
@@ -134,19 +142,19 @@ foreach ($app in $targets) {
     }
 
     # --- 8. Exe icon (skip if IDE is running) ---
-    $rcedit = "$root\rcedit-tool\node_modules\rcedit\bin\rcedit.exe"
-    $exe    = Get-ChildItem $installDir -Filter "*.exe" -ErrorAction SilentlyContinue |
-              Where-Object { $_.Name -notmatch 'unins' } | Select-Object -First 1
-    if ($exe -and (Test-Path $rcedit)) {
-        if (Get-Process -Name $exe.BaseName -ErrorAction SilentlyContinue) {
-            Write-Warning "  [skip] exe icon: close $($exe.Name) and re-run to stamp"
-        } else {
-            & $rcedit $exe.FullName --set-icon "$root\icons\icon.ico" | Out-Null
-            Write-Host "  [ok] exe icon stamped ($($exe.Name))"
-        }
-    } elseif (-not (Test-Path $rcedit)) {
-        Write-Warning "  [skip] exe icon: run 'npm install rcedit --prefix $root\rcedit-tool' first"
-    }
+    # $rcedit = "$root\rcedit-tool\node_modules\rcedit\bin\rcedit.exe"
+    # $exe    = Get-ChildItem $installDir -Filter "*.exe" -ErrorAction SilentlyContinue |
+    #           Where-Object { $_.Name -notmatch 'unins' } | Select-Object -First 1
+    # if ($exe -and (Test-Path $rcedit)) {
+    #     if (Get-Process -Name $exe.BaseName -ErrorAction SilentlyContinue) {
+    #         Write-Warning "  [skip] exe icon: close $($exe.Name) and re-run to stamp"
+    #     } else {
+    #         & $rcedit $exe.FullName --set-icon "$root\icons\icon.ico" | Out-Null
+    #         Write-Host "  [ok] exe icon stamped ($($exe.Name))"
+    #     }
+    # } elseif (-not (Test-Path $rcedit)) {
+    #     Write-Warning "  [skip] exe icon: run 'npm install rcedit --prefix $root\rcedit-tool' first"
+    # }
 }
 
 Write-Host ""
