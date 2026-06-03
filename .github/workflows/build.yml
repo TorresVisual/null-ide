@@ -78,6 +78,16 @@ jobs:
           if (-not $tag) { $tag = (Get-Content ide-overlay/VSCODIUM_TAG -Raw).Trim() }
           "tag=$tag" | Out-File -Append $env:GITHUB_OUTPUT
 
+      - name: Warn if a newer VSCodium release is available
+        shell: pwsh
+        run: |
+          $current = '${{ steps.tag.outputs.tag }}'
+          $latest  = (Invoke-RestMethod 'https://api.github.com/repos/VSCodium/vscodium/releases/latest').tag_name
+          Write-Host "Building against: $current   Latest upstream: $latest"
+          if ($current -ne $latest) {
+            Write-Host "::warning::Building against VSCodium $current but $latest is available. Update VSCODIUM_TAG to get the latest."
+          }
+
       - name: Clone VSCodium at pinned tag
         run: git clone https://github.com/VSCodium/vscodium --depth=1 --branch ${{ steps.tag.outputs.tag }} vscodium-src
 
