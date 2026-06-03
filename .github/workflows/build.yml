@@ -225,6 +225,9 @@ jobs:
             exit 1
           }
 
+      - name: Install @anthropic-ai/sdk (required by VS Code agentHost source)
+        working-directory: vscode-src
+        run: npm install @anthropic-ai/sdk --no-save --no-audit --fund=false
 
       - name: Build
         working-directory: vscode-src
