@@ -9,10 +9,11 @@ This file provides guidance to Claude Code when working with code in this reposi
 Key characteristics:
 - Binary name: `null.exe` — accessible from the terminal as `null .`
 - Built on VSCodium, which strips Microsoft telemetry from VS Code
-- Three built-in extensions bundled at build time: `null-theme`, `null-icons`, `null-tools`
+- Four built-in extensions bundled at build time: `null-theme`, `null-icons`, `null-tools`, `null-markdown`
 - CI builds on `windows-latest`; the developer authors source changes locally
 - Releases publish a portable ZIP and an Inno Setup installer to GitHub Releases
 - The in-app updater (`null-tools`) checks GitHub Releases on startup and can self-update
+- Win11 Explorer context menu provided by a native IExplorerCommand DLL (`shell-ext/`) built with CMake + MSVC
 
 ## Repository Layout
 
@@ -22,12 +23,17 @@ Key characteristics:
 ├── extensions/
 │   ├── null-icons/            # Built-in file icon theme (null-icons)
 │   ├── null-theme/            # Built-in color theme (Null Dark)
+│   ├── null-markdown/         # Enhanced markdown preview (GFM, Mermaid, KaTeX, GitHub Alerts)
 │   └── null-tools/            # Built-in productivity extension
-│       ├── extension.js       # Main extension entry point
-│       ├── package.json       # Contributes commands, views, keybindings
-│       ├── setup.ps1          # Rebuilds node-pty for the installed Electron version
-│       ├── lib/               # xterm.js, xterm-addon-fit.js, agents.js (webview assets)
-│       └── node_modules/      # node-pty (native; must be rebuilt via setup.ps1)
+│       ├── src/               # TypeScript source (extension.ts, ollama.ts, claudeHistory.ts)
+│       ├── out/               # Compiled JS output (extension.js — built during CI)
+│       ├── package.json       # Contributes commands, views, keybindings, settings
+│       ├── setup.ps1          # Rebuilds node-pty for the installed Electron version (local dev)
+│       └── lib/               # xterm.js, xterm-addon-fit.js, agents.js (webview assets)
+├── shell-ext/                 # Win11 native Explorer context menu extension
+│   ├── src/                   # C++ IExplorerCommand implementation
+│   ├── deps/wil/              # Microsoft WIL headers (fetched by CI)
+│   └── AppxManifest.xml       # Sparse APPX manifest (ExternalLocation install)
 ├── icons/                     # Source icons used by the build
 │   ├── icon.svg               # Master vector (∅ symbol, dark rounded square)
 │   ├── icon.ico               # Windows multi-size ICO
@@ -62,18 +68,22 @@ The entire build runs in GitHub Actions on a `windows-latest` runner — do **no
 2. Apply VSCodium's own patches against the VS Code source tree.
 3. Apply any patches in `patches/` (currently none).
 4. Deep-merge `product.json` overlay into `vscode-src/product.json`.
-5. Copy built-in extensions (`null-theme`, `null-icons`, `null-tools`) into `vscode-src/extensions/`.
-6. Replace upstream icons with files from `icons/`.
-7. Copy `workbench/custom.css` → `null-custom.css` and `workbench/splash.js` → `null-splash.js` into the source tree.
-8. Inject `<link>` and `<script>` tags into `workbench.html` pointing at those files.
-9. `npm ci && npx gulp vscode-win32-x64` produces `VSCode-win32-x64/`.
-10. Stamp version, commit hash, and server URL into the build output's `product.json`.
-11. Replace letterpress SVGs in the build output with the null-symbol versions.
-12. Run `rcedit` to stamp the custom icon into `null.exe`.
-13. Bundle `install-null-ide.ps1` and `update-null-ide.ps1` into `resources/app/null-updater/`.
-14. `Compress-Archive` → `null-ide-win32-x64.zip`.
-15. Inno Setup → `NullIDESetup-<version>.exe`.
-16. Both artifacts are uploaded to the GitHub Release (tag builds) and as workflow artifacts.
+5. Install `null-markdown` npm dependencies (`npm ci --prefix extensions/null-markdown`).
+6. Compile `null-tools` TypeScript (`npm ci && npm run compile` in `extensions/null-tools/`).
+7. Copy all four built-in extensions (`null-theme`, `null-icons`, `null-tools`, `null-markdown`) into `vscode-src/extensions/`.
+8. Replace upstream icons with files from `icons/`.
+9. Copy `workbench/custom.css` → `null-custom.css` and `workbench/splash.js` → `null-splash.js` into the source tree.
+10. Inject `<link>` and `<script>` tags into `workbench.html` pointing at those files.
+11. `npm ci && npx gulp vscode-win32-x64` produces `VSCode-win32-x64/`.
+12. Bundle `node-pty` from `vscode-src/node_modules/node-pty` into the built `null-tools` output (bypasses VS Code native module checks).
+13. Build Win11 shell extension: fetch WIL headers, compile DLL with CMake + MSVC, pack and sign sparse APPX (`null-shell-ext.appx`).
+14. Stamp version, commit hash, and server URL into the build output's `product.json`.
+15. Replace letterpress SVGs in the build output with the null-symbol versions.
+16. Run `rcedit` to stamp the custom icon into `null.exe`.
+17. Bundle `install-null-ide.ps1` and `update-null-ide.ps1` into `resources/app/null-updater/`.
+18. `Compress-Archive` → `null-ide-win32-x64.zip`.
+19. Inno Setup → `NullIDESetup-<version>.exe`.
+20. Both artifacts are uploaded to the GitHub Release (tag builds) and as workflow artifacts.
 
 ## Built-in Extensions
 
@@ -89,18 +99,32 @@ Palette:
 ### null-icons (`extensions/null-icons/`)
 Built-in file icon theme. Set as the default via `product.json → defaultIconTheme`. Contains SVG icons for a wide range of file types and folder types.
 
+### null-markdown (`extensions/null-markdown/`)
+Enhanced markdown preview activated on `onLanguage:markdown`. Provides:
+- GitHub Flavored Markdown (GFM), task lists, emoji, footnotes
+- Mermaid diagram rendering (flowcharts, sequence, Gantt, etc.)
+- KaTeX math rendering (inline `$...$` and block `$$...$$`)
+- GitHub-style alert blocks (`> [!NOTE]`, `> [!WARNING]`, etc.)
+
+Keybindings: `Ctrl+Shift+V` and `Ctrl+K V` open the preview (same as VS Code default).
+
 ### null-tools (`extensions/null-tools/`)
-Activated on `onStartupFinished`. Provides:
+Written in TypeScript (`src/`), compiled to `out/` during CI. Activated on `onStartupFinished`. Provides:
 
 | Feature | Details |
 |---|---|
-| **AI Agents panel** | Secondary sidebar webview running xterm.js with node-pty; tabs for `claude`, `agy`, `codex` |
-| **Commit message generation** | `null.generateCommitMessage` — runs `claude --print` with staged diff; sets SCM input box |
+| **AI Agents panel** | Secondary sidebar webview running xterm.js with node-pty; tabs for `claude`, `agy`, `codex`, `ollama` |
+| **Session history** | Reads Claude Code session JSONL files from `~/.claude/projects/`; browse and resume past conversations |
+| **Commit message generation** | `null.generateCommitMessage` (`Ctrl+Shift+Alt+G`) — runs `claude --print` with staged diff; sets SCM input box |
+| **Ollama integration** | `null.ollamaChat` (`Ctrl+Shift+O`) inline chat; `null.ollamaReview` code review; `null.ollamaModel` to switch models |
+| **Prompt templates** | `null.insertPromptTemplate` — insert configurable snippets into the active agent terminal |
+| **File context injection** | `null.injectContext` (`Ctrl+Shift+K`) — sends the open file's content into the agent panel |
 | **In-app updater** | Checks GitHub Releases on startup; shows status bar button; self-updates via PowerShell |
 | **Scrollback persistence** | Terminal buffers (up to 300 KB each) saved to globalStorage, restored on reload |
 | **Context paste** | `null.agentsPaste` command and `Ctrl+V` keybinding inside the agents webview |
+| **Sound design** | Subtle UI sounds; toggle via `null.toggleSoundDesign`; configurable via `null.soundDesign.*` settings |
 
-**node-pty note:** The AI Agents terminal requires `node-pty` native addon rebuilt for the exact Electron ABI. After a fresh install or IDE update, run `setup.ps1` in `extensions/null-tools/` if the panel shows the setup screen.
+**node-pty note:** In CI, `node-pty` is bundled from `vscode-src/node_modules/node-pty` after the gulp build. For local development, run `setup.ps1` in `extensions/null-tools/` to rebuild for the installed Electron version.
 
 ## Workbench Assets
 
@@ -131,6 +155,18 @@ Constraints for `splash.js`:
 
 ### `installer/null-ide.iss`
 Inno Setup script that builds `NullIDESetup-<version>.exe`. The installer runs `install-null-ide.ps1` with the bundled ZIP — it does not duplicate the installation logic.
+
+## Win11 Shell Extension (`shell-ext/`)
+
+A native C++ COM in-process server that implements `IExplorerCommand` for the Win11 Explorer context menu. The CI build:
+
+1. Fetches Microsoft WIL headers into `shell-ext/deps/wil/`.
+2. Compiles the DLL with CMake + Visual Studio 2022: `null_explorer_command.dll` (x64).
+3. Stages the DLL alongside icons and `AppxManifest.xml` under `VSCode-win32-x64/shell-ext/`.
+4. Packs a **sparse APPX** (`null-shell-ext.appx`) using `makeappx` — the manifest points `ExternalLocation` at the Null IDE install root, so the DLL and `null.exe` live outside the package.
+5. Signs the APPX with a self-signed cert (CN=Null IDE); the installer trusts the cert before calling `Add-AppxPackage`.
+
+The APPX registers three context menu verbs via `IFileExplorerContextMenus`: files (`*`), folders (`Directory`), and folder backgrounds (`Directory\Background`). This replaces the older HKCU registry approach on Windows 11+.
 
 ## Patches
 

@@ -17,10 +17,13 @@ Or download `NullIDESetup-<version>.exe` from the [latest release](https://githu
 |---|---|
 | **Null Dark theme** | Deep navy backgrounds, teal and indigo accents, Geist Mono font |
 | **null-icons** | Custom file and folder icon set |
-| **AI Agents panel** | Embedded terminals for `claude`, `agy`, and `codex` in the secondary sidebar |
+| **AI Agents panel** | Embedded terminals for `claude`, `agy`, `codex`, and `ollama` in the secondary sidebar |
+| **Session history** | Browse and resume past Claude Code sessions from inside the IDE |
+| **Ollama integration** | Inline chat (`Ctrl+Shift+O`) and code review via local Ollama models |
+| **Enhanced markdown** | GFM, Mermaid diagrams, KaTeX math, GitHub Alerts — built-in preview |
 | **Claude commit messages** | One keystroke generates a conventional commit message from your staged diff |
 | **Terminal command** | `null .` opens the current folder from any terminal |
-| **Context menu** | "Open in Null" on files and folders in Explorer |
+| **Context menu** | "Open in Null" on files and folders — Win11 native IExplorerCommand |
 | **Self-updating** | Checks GitHub Releases on startup; installs updates without elevation |
 
 ---
@@ -89,11 +92,23 @@ Right-click inside a folder (on the background) and choose **Open Folder in Null
 
 ### AI Agents panel
 
-The secondary sidebar contains an **AI Agents** panel with embedded terminals for `claude`, `agy`, and `codex`. Switch between them using the tabs at the top.
+The secondary sidebar contains an **AI Agents** panel with embedded terminals for `claude`, `agy`, `codex`, and `ollama`. Switch between them using the tabs at the top.
 
 - Scrollback is persisted across reloads (up to 300 KB per agent)
 - Paste with `Ctrl+V` while the terminal is focused
+- **Session history**: click the history icon to browse past Claude Code sessions for the current project; click any session to resume it
+- **Inject file context**: press `Ctrl+Shift+K` (or the file-code icon in the panel toolbar) to send the active editor's content into the agent terminal
+- **Prompt templates**: click the library icon to insert a saved prompt template; templates are configurable via `null.promptTemplates` in settings
 - The panel requires `node-pty` built for the current Electron version. If you see a setup screen, click **Install dependencies** (takes ~30 seconds, then reload the window)
+
+### Ollama integration
+
+With [Ollama](https://ollama.com) running locally:
+
+- `Ctrl+Shift+O` — open an inline chat panel for the active editor using the configured model
+- **Null: Ollama Code Review** — review the active file for bugs and improvements
+- **Null: Switch Ollama Model** — pick a different model from those pulled in Ollama
+- Default model is `llama3.2`; change it via `null.ollama.model` in settings
 
 ### Claude commit messages
 
