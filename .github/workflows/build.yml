@@ -247,8 +247,10 @@ jobs:
             ForEach-Object { Remove-Item $_.FullName -Force; Write-Host "Deleted (has @github/copilot-sdk import): $($_.Name)" }
           $f = "vscode-src/src/vs/platform/agentHost/node/agentHostServerMain.ts"
           if (Test-Path $f) {
-            (Get-Content $f) | Where-Object { $_ -notmatch "mockAgent" } | Set-Content $f
-            Write-Host "Stripped mockAgent references from agentHostServerMain.ts"
+            $c = [System.IO.File]::ReadAllText($f)
+            $c = $c -replace '(?s)\n\tif \(options\.enableMockAgent\) \{.+?\n\t\}', ''
+            [System.IO.File]::WriteAllText($f, $c, [System.Text.UTF8Encoding]::new($false))
+            Write-Host "Removed enableMockAgent block from agentHostServerMain.ts"
           }
 
       - name: Build
