@@ -227,7 +227,19 @@ jobs:
 
       - name: Install @anthropic-ai/sdk (required by VS Code agentHost source)
         working-directory: vscode-src
-        run: npm install @anthropic-ai/sdk --no-save --no-audit --fund=false
+        # Pin to 0.82.0 — the version VS Code 1.121 was designed for. @anthropic-ai/claude-agent-sdk
+        # (still installed) bundles @anthropic-ai/sdk@^0.81.0 nested inside itself; pinning to 0.82.0
+        # satisfies that range so npm deduplicates both to a single copy and avoids type conflicts.
+        run: npm install @anthropic-ai/sdk@0.82.0 --no-save --no-audit --fund=false
+
+      - name: Remove agentHost copilot source and test directories
+        # VSCodium's 52-ext-copilot-remove-it patch strips @github/copilot-sdk from package.json
+        # but leaves the source files that import it. The test/ subtree and copilot/ source subtree
+        # both reference the removed package; deleting them prevents TypeScript from compiling them.
+        shell: pwsh
+        run: |
+          Remove-Item -Recurse -Force "vscode-src/src/vs/platform/agentHost/test"    -ErrorAction SilentlyContinue
+          Remove-Item -Recurse -Force "vscode-src/src/vs/platform/agentHost/node/copilot" -ErrorAction SilentlyContinue
 
       - name: Build
         working-directory: vscode-src
