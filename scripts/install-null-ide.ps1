@@ -286,6 +286,16 @@ function Register-Win11ContextMenu {
         throw 'Win11 context menu registration failed: NullIDE.ExplorerCommand package is not registered.'
     }
 
+    # Keep registry InstallDir in sync with the ExternalLocation used for this package.
+    Ensure-NullIDEContextMenuRegistry -InstallDir $installDir
+
+    $mainExe = Get-ChildItem -Path $installDir -Filter "*.exe" -File |
+        Where-Object { $_.Name -match '^(null|Null)\.exe$' } |
+        Select-Object -First 1
+    if (-not $mainExe) {
+        Write-Warning "null.exe not found under '$installDir' - context menu may not launch Null IDE."
+    }
+
     Restart-FileExplorer
     Write-Host 'Win11 context menu registered.'
 }

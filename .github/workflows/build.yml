@@ -460,12 +460,17 @@ jobs:
           & $signtool sign /fd SHA256 /f NullIDECert.pfx /p nullbuild "$pkgDir/null-shell-ext.appx"
           if ($LASTEXITCODE -ne 0) { Write-Error "signtool sign failed with exit code $LASTEXITCODE"; exit $LASTEXITCODE }
           Remove-Item NullIDECert.pfx -Force
+          # Self-signed appx certs are not in the build agent trust store; verify thumbprint instead of Status=Valid.
           $sig = Get-AuthenticodeSignature "$pkgDir/null-shell-ext.appx"
-          if ($sig.Status -ne "Valid") {
-            Write-Error "Shell extension .appx signature is not valid: $($sig.StatusMessage)"
+          if (-not $sig.SignerCertificate) {
+            Write-Error "Shell extension .appx is not signed."
             exit 1
           }
-          Write-Host "Shell extension package built and signed."
+          if ($sig.SignerCertificate.Thumbprint -ne $cert.Thumbprint) {
+            Write-Error "Shell extension .appx signed with unexpected certificate."
+            exit 1
+          }
+          Write-Host "Shell extension package built and signed (thumbprint: $($cert.Thumbprint))."
 
           # ── Final layout under VSCode-win32-x64/shell-ext/ ──────────────────
           Write-Host "Shell-ext layout:"

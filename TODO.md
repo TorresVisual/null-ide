@@ -29,6 +29,7 @@
 * [ ] Integrated scratchpad/temp files
 * [ ] Built-in quick notes panel
 * [ ] Floating terminal mode
+* [ ] Fix broken updater
 
 ---
 

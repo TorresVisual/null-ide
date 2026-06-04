@@ -114,6 +114,26 @@ static int IsContextMenuEnabled() {
   return enabled;
 }
 
+bool IsNullIdeInstallRoot(const std::filesystem::path& root) {
+  if (root.empty()) {
+    return false;
+  }
+  if (std::filesystem::exists(root / L"resources" / L"app" / L"product.json")) {
+    return true;
+  }
+  return std::filesystem::exists(root / L".null-ide-install.json");
+}
+
+std::filesystem::path GetInstallRootFromModule() {
+  std::filesystem::path module_path{
+      wil::GetModuleFileNameW<std::wstring>(wil::GetModuleInstanceHandle())};
+  // DLL path: {ExternalLocation}\shell-ext\NullIDE.ExplorerCommand\x64\*.dll
+  return module_path.remove_filename()
+      .parent_path()
+      .parent_path()
+      .parent_path();
+}
+
 std::filesystem::path GetInstallRootFromRegistry() {
   wchar_t value[MAX_PATH]{};
   DWORD value_size = sizeof(value);
@@ -137,31 +157,30 @@ std::filesystem::path GetInstallRootFromRegistry() {
   return value;
 }
 
-std::filesystem::path GetInstallRootFromModule() {
-  std::filesystem::path module_path{
-      wil::GetModuleFileNameW<std::wstring>(wil::GetModuleInstanceHandle())};
-  return module_path.remove_filename()
-      .parent_path()
-      .parent_path()
-      .parent_path();
-}
-
 std::filesystem::path GetInstallRoot() {
-  std::filesystem::path root = GetInstallRootFromRegistry();
-  if (root.empty()) {
-    root = GetInstallRootFromModule();
+  // Prefer the sparse package ExternalLocation (where this DLL is installed).
+  // Registry InstallDir can be stale after moves or dev installs and would launch the wrong exe.
+  const std::filesystem::path from_module = GetInstallRootFromModule();
+  if (IsNullIdeInstallRoot(from_module)) {
+    return from_module;
   }
-  return root;
+
+  const std::filesystem::path from_registry = GetInstallRootFromRegistry();
+  if (IsNullIdeInstallRoot(from_registry)) {
+    return from_registry;
+  }
+
+  return {};
 }
 
 std::filesystem::path GetMainExecutable(const std::filesystem::path& root) {
-  for (const wchar_t* name : {L"Null.exe", L"null.exe"}) {
+  for (const wchar_t* name : {L"null.exe", L"Null.exe"}) {
     const std::filesystem::path candidate = root / name;
     if (std::filesystem::exists(candidate)) {
       return candidate;
     }
   }
-  return root / L"Null.exe";
+  return root / L"null.exe";
 }
 
 bool LaunchNullIde(const std::filesystem::path& exe,

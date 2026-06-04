@@ -18,7 +18,7 @@
   <Identity
     Name="NullIDE.ExplorerCommand"
     Publisher="CN=Null IDE"
-    Version="1.0.0.2"
+    Version="1.0.0.3"
     ProcessorArchitecture="x64" />
 
   <Properties>
@@ -56,7 +56,7 @@
     -->
     <Application
       Id="NullIDE"
-      Executable="Null.exe"
+      Executable="null.exe"
       uap10:TrustLevel="mediumIL"
       uap10:RuntimeBehavior="win32App">
 
