@@ -232,14 +232,24 @@ jobs:
         # satisfies that range so npm deduplicates both to a single copy and avoids type conflicts.
         run: npm install @anthropic-ai/sdk@0.82.0 --no-save --no-audit --fund=false
 
-      - name: Remove agentHost copilot source and test directories
+      - name: Remove agentHost files that import @github/copilot-sdk
         # VSCodium's 52-ext-copilot-remove-it patch strips @github/copilot-sdk from package.json
-        # but leaves the source files that import it. The test/ subtree and copilot/ source subtree
-        # both reference the removed package; deleting them prevents TypeScript from compiling them.
+        # but leaves source files that import it. Scan the whole agentHost tree and delete any .ts
+        # file that references the removed package. Some copilot/ files (pendingEditContentStore,
+        # copilotGitProject) have no SDK import and must be kept because production code still
+        # references them. Deleting only the SDK-importing files avoids cascade "cannot find module"
+        # errors in files that reference the kept ones.
         shell: pwsh
         run: |
-          Remove-Item -Recurse -Force "vscode-src/src/vs/platform/agentHost/test"    -ErrorAction SilentlyContinue
-          Remove-Item -Recurse -Force "vscode-src/src/vs/platform/agentHost/node/copilot" -ErrorAction SilentlyContinue
+          Remove-Item -Recurse -Force "vscode-src/src/vs/platform/agentHost/test" -ErrorAction SilentlyContinue
+          Get-ChildItem "vscode-src/src/vs/platform/agentHost" -Recurse -Filter "*.ts" |
+            Where-Object { (Get-Content $_.FullName -Raw) -match "'@github/copilot-sdk'" } |
+            ForEach-Object { Remove-Item $_.FullName -Force; Write-Host "Deleted (has @github/copilot-sdk import): $($_.Name)" }
+          $f = "vscode-src/src/vs/platform/agentHost/node/agentHostServerMain.ts"
+          if (Test-Path $f) {
+            (Get-Content $f) | Where-Object { $_ -notmatch "mockAgent" } | Set-Content $f
+            Write-Host "Stripped mockAgent references from agentHostServerMain.ts"
+          }
 
       - name: Build
         working-directory: vscode-src
