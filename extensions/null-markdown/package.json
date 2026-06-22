@@ -21,6 +21,18 @@
 				"title": "Open Null Markdown Preview",
 				"category": "Markdown",
 				"icon": "$(open-preview)"
+			},
+			{
+				"command": "null-markdown.exportPdf",
+				"title": "Export to PDF (Print)",
+				"category": "Markdown",
+				"icon": "$(file-pdf)"
+			},
+			{
+				"command": "null-markdown.openSlides",
+				"title": "Open as Presentation",
+				"category": "Markdown",
+				"icon": "$(play)"
 			}
 		],
 		"keybindings": [
@@ -32,6 +44,16 @@
 			{
 				"command": "null-markdown.openPreview",
 				"key": "ctrl+k v",
+				"when": "editorLangId == markdown"
+			},
+			{
+				"command": "null-markdown.exportPdf",
+				"key": "ctrl+shift+alt+p",
+				"when": "editorLangId == markdown"
+			},
+			{
+				"command": "null-markdown.openSlides",
+				"key": "ctrl+shift+alt+s",
 				"when": "editorLangId == markdown"
 			}
 		]

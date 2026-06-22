@@ -148,3 +148,25 @@ img { max-width: 100%; border-radius: 4px; }
 	overflow-x: auto;
 	padding: 8px 0;
 }
+
+/* Wiki links */
+a.wiki-link {
+	color: #48cae4;
+	text-decoration: underline dotted;
+	cursor: pointer;
+}
+a.wiki-link:hover { color: #00b4d8; text-decoration: underline; }
+
+/* Print / Export to PDF */
+@media print {
+	body { background: #fff; color: #000; max-width: none; padding: 20px; }
+	a, a.wiki-link { color: #1a5fb4; text-decoration: underline; }
+	pre, code { background: #f5f5f5; color: #000; border: 1px solid #ddd; }
+	blockquote { background: #f9f9f9; border-left-color: #999; color: #444; }
+	th { background: #eee; color: #000; }
+	tr:nth-child(even) td { background: #f9f9f9; }
+	.task-list-item-checkbox { display: none; }
+	.mermaid { display: none; }
+	h1, h2, h3 { page-break-after: avoid; }
+	pre, blockquote, table { page-break-inside: avoid; }
+}

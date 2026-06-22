@@ -73,6 +73,20 @@
         "command": "null.injectContext",
         "title": "Null: Inject File Context into Agent",
         "icon": "$(file-code)"
+      },
+      {
+        "command": "null.revertAgentChange",
+        "title": "Null: Revert Agent Change"
+      },
+      {
+        "command": "null.acceptProposedDiff",
+        "title": "Accept Changes",
+        "icon": "$(check)"
+      },
+      {
+        "command": "null.rejectProposedDiff",
+        "title": "Reject Changes",
+        "icon": "$(discard)"
       }
     ],
     "viewsContainers": {
@@ -95,6 +109,18 @@
       ]
     },
     "menus": {
+      "editor/title": [
+        {
+          "command": "null.acceptProposedDiff",
+          "when": "null.viewingProposedDiff",
+          "group": "navigation"
+        },
+        {
+          "command": "null.rejectProposedDiff",
+          "when": "null.viewingProposedDiff",
+          "group": "navigation"
+        }
+      ],
       "scm/title": [
         {
           "command": "null.generateCommitMessage",
@@ -152,6 +178,16 @@
           "type": "string",
           "default": "llama3.2",
           "description": "Default Ollama model to use for the ollama agent tab and AI commands."
+        },
+        "null.plans.autoOpen": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically open new Claude Code plan files as a Markdown preview."
+        },
+        "null.agentFileWatch.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show diffs and offer revert when an agent terminal modifies workspace files."
         },
         "null.promptTemplates": {
           "type": "array",

@@ -48,6 +48,15 @@
 		}, 80);
 	}, { passive: true });
 
+	// ── wiki link navigation (preview → extension) ───────────────────────────
+
+	document.addEventListener('click', e => {
+		const a = e.target.closest('a.wiki-link');
+		if (!a) return;
+		e.preventDefault();
+		vscode.postMessage({ type: 'wikiLink', target: a.dataset.wiki });
+	});
+
 	// ── checkbox sync (preview → editor) ─────────────────────────────────────
 
 	document.addEventListener('change', e => {

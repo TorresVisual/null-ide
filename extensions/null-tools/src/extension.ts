@@ -1,6 +1,7 @@
 'use strict';
 
 import * as vscode from 'vscode';
+import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as https from 'https';
@@ -409,6 +410,136 @@ async function installUpdate(context: vscode.ExtensionContext): Promise<void> {
   setTimeout(() => vscode.commands.executeCommand('workbench.action.quit'), 500);
 }
 
+// ── Agent file watcher ────────────────────────────────────────────────────
+
+const WATCH_IGNORE = /[/\\](\.git|node_modules|out|dist|\.vscodium)[/\\]|\.(?:map|log|bin)$/;
+
+// Serves "before" content for vscode.diff — snapshots open docs at PTY start.
+class AgentBeforeProvider implements vscode.TextDocumentContentProvider {
+  readonly scheme = 'null-agent-before';
+  private _byPath: Map<string, string> = new Map();
+  private _idToPath: Map<number, string> = new Map();
+  private _counter = 0;
+  private _wsRoot: string = '';
+
+  setWsRoot(p: string): void { this._wsRoot = p; }
+
+  snapshot(): void {
+    for (const doc of vscode.workspace.textDocuments) {
+      if (!doc.isUntitled) this._byPath.set(doc.uri.fsPath, doc.getText());
+    }
+  }
+
+  snapshotFromGit(fsPath: string): void {
+    if (this._byPath.has(fsPath)) return;
+    let content = '';
+    if (this._wsRoot) {
+      try {
+        const rel = path.relative(this._wsRoot, fsPath).replace(/\\/g, '/');
+        content = execSync(`git show HEAD:"${rel}"`, { cwd: this._wsRoot, encoding: 'utf8', timeout: 5000 });
+      } catch {}
+    }
+    this._byPath.set(fsPath, content);
+  }
+
+  has(fsPath: string): boolean { return this._byPath.has(fsPath); }
+
+  makeUri(diskUri: vscode.Uri): vscode.Uri {
+    const id = this._counter++;
+    this._idToPath.set(id, diskUri.fsPath);
+    return vscode.Uri.from({ scheme: this.scheme, path: `/${id}/${path.basename(diskUri.fsPath)}` });
+  }
+
+  provideTextDocumentContent(uri: vscode.Uri): string {
+    const id = parseInt(uri.path.split('/')[1], 10);
+    const fsPath = this._idToPath.get(id);
+    return fsPath ? (this._byPath.get(fsPath) ?? '') : '';
+  }
+
+  clear(): void {
+    this._byPath.clear();
+    this._idToPath.clear();
+    this._counter = 0;
+  }
+}
+
+class AgentFileWatcher {
+  private _watcher: vscode.FileSystemWatcher;
+  private _running = false;
+  private _pending: Set<string> = new Set();
+  private _debounce: ReturnType<typeof setTimeout> | null = null;
+  private _userSaving: Set<string> = new Set();
+  private _termApproved: Map<string, number> = new Map();
+  private readonly _before: AgentBeforeProvider;
+
+  constructor(wsRoot: vscode.Uri, before: AgentBeforeProvider) {
+    this._before = before;
+    this._watcher = vscode.workspace.createFileSystemWatcher(
+      new vscode.RelativePattern(wsRoot, '**/*'),
+      false, false, true,
+    );
+    this._watcher.onDidCreate(uri => this._onChange(uri));
+    this._watcher.onDidChange(uri => this._onChange(uri));
+  }
+
+  setRunning(on: boolean): void {
+    this._running = on;
+    if (on) {
+      this._before.clear();
+      this._before.snapshot();
+    } else {
+      clearTimeout(this._debounce!);
+      this._debounce = null;
+      this._pending.clear();
+    }
+  }
+
+  markUserSave(fsPath: string): void {
+    this._userSaving.add(fsPath);
+    setTimeout(() => this._userSaving.delete(fsPath), 1000);
+  }
+
+  markTerminalApproval(fsPath: string): void {
+    this._termApproved.set(fsPath, Date.now());
+    setTimeout(() => this._termApproved.delete(fsPath), 15_000);
+  }
+
+  private _onChange(uri: vscode.Uri): void {
+    if (!this._running) return;
+    if (!vscode.workspace.getConfiguration('null.agentFileWatch').get<boolean>('enabled', true)) return;
+    if (WATCH_IGNORE.test(uri.fsPath)) return;
+    if (this._userSaving.has(uri.fsPath)) return;
+    const approvedAt = this._termApproved.get(uri.fsPath);
+    if (approvedAt && Date.now() - approvedAt < 15_000) {
+      this._termApproved.delete(uri.fsPath);
+      return;
+    }
+    this._pending.add(uri.fsPath);
+    clearTimeout(this._debounce!);
+    this._debounce = setTimeout(() => this._flush(), 500);
+  }
+
+  private _flush(): void {
+    this._debounce = null;
+    if (this._pending.size === 0) return;
+    const allUris = [...this._pending].map(p => vscode.Uri.file(p));
+    this._pending.clear();
+
+    for (const diskUri of allUris) {
+      // Ensure a before-snapshot exists: open-doc snapshot first, git HEAD as fallback.
+      this._before.snapshotFromGit(diskUri.fsPath);
+      const baseName = path.basename(diskUri.fsPath);
+      const beforeUri = this._before.makeUri(diskUri);
+      vscode.commands.executeCommand('vscode.diff', beforeUri, diskUri, `✻ Agent · ${baseName}`);
+    }
+  }
+
+  dispose(): void {
+    clearTimeout(this._debounce!);
+    this._watcher.dispose();
+  }
+}
+
 // ── AI Agents sidebar panel ────────────────────────────────────────────────
 
 const AGENTS: Record<string, AgentConfig> = {
@@ -435,6 +566,9 @@ class AgentsViewProvider implements vscode.WebviewViewProvider {
   private _tabs: AgentTab[] = [];
   private _activeTabId: string | null = null;
   private _claudeHistory: ClaudeHistoryIndex | null = null;
+  _fileWatcher: AgentFileWatcher | null = null;
+
+  setFileWatcher(w: AgentFileWatcher): void { this._fileWatcher = w; }
 
   constructor(
     extensionUri: vscode.Uri,
@@ -636,7 +770,13 @@ class AgentsViewProvider implements vscode.WebviewViewProvider {
           const sessionsByType: Record<string, SessionEntry[]> = {};
           types.forEach(type => { sessionsByType[type] = this._getHistory(type); });
           const runningTabs = Object.keys(this._ptys).filter(k => !!this._ptys[k]);
-          webview.postMessage({ type: 'initTabs', tabs: this._tabs, activeId: this._activeTabId, sessionsByType, runningTabs });
+          const sessionNames: Record<string, string> = {};
+          for (const [termId, sessionId] of Object.entries(this._currentSessionId)) {
+            const tab   = this._tabs.find(t => t.id === termId);
+            const entry = tab ? (sessionsByType[tab.type] || []).find(s => s.id === sessionId) : undefined;
+            if (entry?.name) { sessionNames[termId] = entry.name; }
+          }
+          webview.postMessage({ type: 'initTabs', tabs: this._tabs, activeId: this._activeTabId, sessionsByType, runningTabs, sessionNames });
           break;
         }
         case 'launch':
@@ -726,6 +866,7 @@ class AgentsViewProvider implements vscode.WebviewViewProvider {
       this._saveBuffers();
       try { this._ptys[termId]!.kill(); } catch (_) {}
       this._ptys[termId] = null;
+      if (!Object.values(this._ptys).some(p => p !== null)) this._fileWatcher?.setRunning(false);
     }
   }
 
@@ -807,6 +948,7 @@ class AgentsViewProvider implements vscode.WebviewViewProvider {
     }
 
     this._ptys[termId] = proc;
+    this._fileWatcher?.setRunning(true);
     webview.postMessage({ type: 'started', termId, restore: this._buffers[termId] || null, sessions: this._getHistory(agentType) });
 
     proc.onData(data => {
@@ -821,9 +963,24 @@ class AgentsViewProvider implements vscode.WebviewViewProvider {
       }
       this._scheduleSave();
       webview.postMessage({ type: 'data', termId, text: data });
+
+      // Detect files Claude Code is about to edit via terminal approval so the
+      // watcher can suppress the redundant diff that would otherwise open.
+      if (this._fileWatcher && cwd) {
+        const stripped = data.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+        const pat = /(?:Edit|Create|Write|Update)[ \t]+([^ \t\r\n"']+)/g;
+        let m: RegExpExecArray | null;
+        while ((m = pat.exec(stripped)) !== null) {
+          const rel = m[1].trim();
+          if (!rel.includes('..') && rel.length > 0) {
+            this._fileWatcher.markTerminalApproval(path.join(cwd, rel));
+          }
+        }
+      }
     });
     proc.onExit(({ exitCode }) => {
       this._ptys[termId] = null;
+      if (!Object.values(this._ptys).some(p => p !== null)) this._fileWatcher?.setRunning(false);
       webview.postMessage({ type: 'exit', termId, code: exitCode });
     });
   }
@@ -882,7 +1039,16 @@ Click below to run the setup in a terminal — takes ~30 s.</p>
 <style>
   html,body { margin:0; padding:0; width:100%; height:100%; background:#181818;
               overflow:hidden; display:flex; flex-direction:column; }
-  #tabs { display:flex; align-items:stretch; background:#111; flex-shrink:0; }
+  /* Row 1: agent type selector */
+  #type-bar { display:flex; align-items:stretch; background:#0d0d0d; flex-shrink:0;
+    border-bottom:1px solid #1a1a1a; }
+  .type-btn { padding:7px 14px; background:transparent; border:none; cursor:pointer;
+    font:11px/1 'Cascadia Code',Consolas,monospace; color:#444; flex-shrink:0;
+    border-bottom:2px solid transparent; letter-spacing:.04em; }
+  .type-btn:hover { color:#999; }
+  .type-btn.active { color:#e0e0e0; border-bottom-color:#4EC9B0; }
+  /* Row 2: session tab bar */
+  #session-bar { display:flex; align-items:stretch; background:#111; flex-shrink:0; }
   #tab-list { display:flex; align-items:stretch; overflow-x:auto; scrollbar-width:none; flex:1; min-width:0; }
   #tab-list::-webkit-scrollbar { display:none; }
   .tab { display:flex; align-items:center; gap:5px; padding:5px 10px 5px 12px;
@@ -894,22 +1060,23 @@ Click below to run the setup in a terminal — takes ~30 s.</p>
   .tab-close { font-size:12px; line-height:1; color:#555; opacity:0; border-radius:2px; padding:1px 2px; }
   .tab:hover .tab-close, .tab.active .tab-close { opacity:1; }
   .tab-close:hover { color:#e05555; background:#2a2a2a; }
+  #history-btn { padding:5px 10px; background:transparent; border:none; cursor:pointer;
+    font:13px/1 'Cascadia Code',Consolas,monospace; color:#555; flex-shrink:0; }
+  #history-btn:hover { color:#aaa; }
+  #history-btn.active { color:#4EC9B0; }
   #add-btn { padding:5px 10px; background:transparent; border:none; cursor:pointer;
     font:11px/1 'Cascadia Code',Consolas,monospace; color:#555; flex-shrink:0; }
   #add-btn:hover { color:#aaa; }
-  #agent-picker { display:none; position:fixed; background:#1e1e1e;
-    border:1px solid #333; border-radius:3px; z-index:100; padding:2px; min-width:80px; }
-  #agent-picker button { display:block; width:100%; text-align:left; padding:5px 12px;
-    background:transparent; border:none; cursor:pointer;
-    font:11px/1 'Cascadia Code',Consolas,monospace; color:#ccc; white-space:nowrap; }
-  #agent-picker button:hover { background:#2a2a2a; color:#fff; }
-  /* sessions view */
-  #sessions-view { display:flex; flex-direction:column; flex:1; min-height:0; overflow:hidden; }
-  #sessions-header { padding:8px 10px 6px; flex-shrink:0; }
-  #new-btn { width:100%; padding:7px 10px; background:transparent; color:#4EC9B0;
-    border:1px solid #2a3d3a; border-radius:2px; cursor:pointer; text-align:left;
-    font:11px/1 'Cascadia Code',Consolas,monospace; letter-spacing:.04em; }
-  #new-btn:hover { background:#1a2e2b; color:#6ddfcc; }
+  /* Row 3: title bar */
+  #title-bar { padding:3px 10px; background:#0f0f0f; border-bottom:1px solid #1a1a1a;
+    flex-shrink:0; display:flex; align-items:center; min-height:20px; }
+  #sess-title { font:10px/1 'Cascadia Code',Consolas,monospace; color:#555;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  /* Row 4: content area */
+  #content { display:flex; flex-direction:column; flex:1; min-height:0; }
+  /* history view */
+  #history-view { display:none; flex-direction:column; flex:1; min-height:0; overflow:hidden; }
+  #history-header { padding:8px 10px 6px; flex-shrink:0; }
   #sessions-list { flex:1; overflow-y:auto; }
   .sess-item { padding:10px 12px; border-bottom:1px solid #1e1e1e; cursor:pointer; }
   .sess-item:hover { background:#1e1e1e; }
@@ -935,21 +1102,12 @@ Click below to run the setup in a terminal — takes ~30 s.</p>
   .cc-section-header:first-child { border-top:none; }
   .date-group-header { padding:5px 12px 2px; font:9px/1 'Cascadia Code',Consolas,monospace;
     color:#3a3a3a; letter-spacing:.05em; }
-  #sess-search { width:100%; box-sizing:border-box; margin-top:6px; padding:5px 8px;
+  #sess-search { width:100%; box-sizing:border-box; padding:5px 8px;
     background:#111; border:1px solid #2b2b2b; border-radius:2px; color:#ccc;
     font:11px/1 'Cascadia Code',Consolas,monospace; outline:none; }
   #sess-search:focus { border-color:#0078D4; }
   #sess-search::placeholder { color:#3a3a3a; }
-  /* terminal view */
-  #terminal-view { display:none; flex-direction:column; flex:1; min-height:0; }
-  #term-header { display:flex; align-items:center; gap:8px; padding:3px 8px;
-    background:#111; border-bottom:1px solid #1a1a1a; flex-shrink:0; }
-  #back-btn { padding:2px 7px; background:transparent; border:1px solid #2b2b2b;
-    border-radius:2px; cursor:pointer; font:10px/1 'Cascadia Code',Consolas,monospace;
-    color:#555; flex-shrink:0; }
-  #back-btn:hover { color:#aaa; border-color:#555; }
-  #term-title { font:10px/1 'Cascadia Code',Consolas,monospace; color:#888;
-    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  /* terminal area */
   #wrap { flex:1; min-height:0; }
   .term-pane { display:none; width:100%; height:100%; }
   .term-pane.active { display:block; }
@@ -962,27 +1120,26 @@ Click below to run the setup in a terminal — takes ~30 s.</p>
     border-radius:2px; cursor:pointer; font:11px/1 inherit; white-space:nowrap; }
   #new-session-btn:hover { background:#106EBE; }
 </style></head><body>
-<div id="tabs">
+<div id="type-bar">
+  <button class="type-btn active" data-type="claude">claude</button>
+  <button class="type-btn" data-type="agy">agy</button>
+  <button class="type-btn" data-type="codex">codex</button>
+  <button class="type-btn" data-type="ollama">ollama</button>
+</div>
+<div id="session-bar">
   <div id="tab-list"></div>
-  <button id="add-btn" title="New agent tab">+</button>
+  <button id="history-btn" title="Session history">/</button>
+  <button id="add-btn" title="New session">+</button>
 </div>
-<div id="agent-picker">
-  <button data-type="claude">claude</button>
-  <button data-type="agy">agy</button>
-  <button data-type="codex">codex</button>
-  <button data-type="ollama">ollama</button>
+<div id="title-bar">
+  <span id="sess-title"></span>
 </div>
-<div id="sessions-view">
-  <div id="sessions-header">
-    <button id="new-btn">+ new session</button>
-    <input id="sess-search" type="text" placeholder="filter..." spellcheck="false" autocomplete="off">
-  </div>
-  <div id="sessions-list"></div>
-</div>
-<div id="terminal-view">
-  <div id="term-header">
-    <button id="back-btn">&#8592; sessions</button>
-    <span id="term-title"></span>
+<div id="content">
+  <div id="history-view">
+    <div id="history-header">
+      <input id="sess-search" type="text" placeholder="filter sessions..." spellcheck="false" autocomplete="off">
+    </div>
+    <div id="sessions-list"></div>
   </div>
   <div id="wrap"></div>
   <div id="banner">
@@ -1246,6 +1403,61 @@ export function activate(context: vscode.ExtensionContext): void {
   );
   context.subscriptions.push({ dispose: () => agentsProvider._saveBuffers() });
 
+  const beforeProvider = new AgentBeforeProvider();
+  context.subscriptions.push(
+    vscode.workspace.registerTextDocumentContentProvider(beforeProvider.scheme, beforeProvider),
+  );
+
+  const agentWsRoot = vscode.workspace.workspaceFolders?.[0]?.uri;
+  if (agentWsRoot) {
+    beforeProvider.setWsRoot(agentWsRoot.fsPath);
+    const fw = new AgentFileWatcher(agentWsRoot, beforeProvider);
+    agentsProvider.setFileWatcher(fw);
+    context.subscriptions.push(fw);
+    context.subscriptions.push(
+      vscode.workspace.onWillSaveTextDocument(e => {
+        agentsProvider._fileWatcher?.markUserSave(e.document.uri.fsPath);
+      }),
+    );
+  }
+
+  // Track whether the active tab is one of our agent diffs and expose context.
+  const updateDiffContext = () => {
+    const active = vscode.window.tabGroups.activeTabGroup.activeTab;
+    const viewing = active?.input instanceof vscode.TabInputTextDiff &&
+      active.input.original.scheme === beforeProvider.scheme;
+    vscode.commands.executeCommand('setContext', 'null.viewingProposedDiff', !!viewing);
+  };
+  context.subscriptions.push(
+    vscode.window.tabGroups.onDidChangeTabs(updateDiffContext),
+    vscode.window.onDidChangeActiveTextEditor(updateDiffContext),
+  );
+
+  context.subscriptions.push(vscode.commands.registerCommand('null.acceptProposedDiff', async () => {
+    const active = vscode.window.tabGroups.activeTabGroup.activeTab;
+    if (active) await vscode.window.tabGroups.close(active);
+  }));
+
+  context.subscriptions.push(vscode.commands.registerCommand('null.rejectProposedDiff', async () => {
+    const active = vscode.window.tabGroups.activeTabGroup.activeTab;
+    if (!(active?.input instanceof vscode.TabInputTextDiff)) return;
+    const diskUri = active.input.modified;
+    await vscode.window.tabGroups.close(active);
+    await vscode.commands.executeCommand('null.revertAgentChange', diskUri);
+  }));
+
+  context.subscriptions.push(vscode.commands.registerCommand(
+    'null.revertAgentChange',
+    async (uri: vscode.Uri) => {
+      try {
+        await vscode.commands.executeCommand('git.revertFile', uri);
+      } catch {
+        try { execSync(`git checkout -- "${uri.fsPath}"`, { cwd: path.dirname(uri.fsPath) }); }
+        catch (err) { vscode.window.showErrorMessage(`Null: revert failed — ${(err as Error).message}`); }
+      }
+    },
+  ));
+
   context.subscriptions.push(
     vscode.commands.registerCommand('null.agentsPaste', () => agentsProvider.paste()),
   );
@@ -1388,6 +1600,20 @@ export function activate(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(vscode.workspace.onDidSaveTextDocument(() => sounds.post('save')));
   context.subscriptions.push(vscode.workspace.onDidOpenTextDocument(() => sounds.post('open')));
+
+  const plansDir = path.join(os.homedir(), '.claude', 'plans');
+  const plansWatcher = vscode.workspace.createFileSystemWatcher(
+    new vscode.RelativePattern(vscode.Uri.file(plansDir), '*.md'),
+    false, true, true,
+  );
+  plansWatcher.onDidCreate((uri) => {
+    setTimeout(() => {
+      if (vscode.workspace.getConfiguration('null').get<boolean>('plans.autoOpen', true)) {
+        vscode.window.showTextDocument(uri);
+      }
+    }, 500);
+  });
+  context.subscriptions.push(plansWatcher);
 }
 
 export function deactivate(): void {}

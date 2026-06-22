@@ -19,42 +19,42 @@ declare namespace FitAddon {
 }
 declare function acquireVsCodeApi(): { postMessage(msg: object): void };
 
-interface AgentTab    { id: string; type: string; label: string; }
-interface SessionEntry { id: string; savedAt: string; name: string; preview: string; running?: boolean; }
+interface AgentTab          { id: string; type: string; label: string; }
+interface SessionEntry      { id: string; savedAt: string; name: string; preview: string; running?: boolean; }
 interface ClaudeCodeSession { sessionId: string; title: string; lastActive: string; messageCount: number; model?: string; branch?: string; }
+interface PendingLoad       { agentType: string; sessionId: string; }
 
 (function () {
   var vscode = acquireVsCodeApi();
 
   // ── DOM refs ───────────────────────────────────────────────────────────────
-  var tabListEl    = document.getElementById('tab-list')      as HTMLElement;
-  var addBtn       = document.getElementById('add-btn')       as HTMLButtonElement;
-  var picker       = document.getElementById('agent-picker')  as HTMLElement;
-  var sessionsView = document.getElementById('sessions-view') as HTMLElement;
-  var sessionsList = document.getElementById('sessions-list') as HTMLElement;
-  var newBtn       = document.getElementById('new-btn')       as HTMLButtonElement;
-  var terminalView = document.getElementById('terminal-view') as HTMLElement;
-  var backBtn      = document.getElementById('back-btn')      as HTMLButtonElement;
-  var termTitle    = document.getElementById('term-title')    as HTMLElement;
-  var wrap         = document.getElementById('wrap')          as HTMLElement;
-  var banner       = document.getElementById('banner')        as HTMLElement;
-  var bannerMsg    = document.getElementById('banner-msg')    as HTMLElement;
+  var tabListEl     = document.getElementById('tab-list')        as HTMLElement;
+  var addBtn        = document.getElementById('add-btn')         as HTMLButtonElement;
+  var historyBtn    = document.getElementById('history-btn')     as HTMLButtonElement;
+  var historyView   = document.getElementById('history-view')    as HTMLElement;
+  var sessionsList  = document.getElementById('sessions-list')   as HTMLElement;
+  var sessTitle     = document.getElementById('sess-title')      as HTMLElement;
+  var wrap          = document.getElementById('wrap')            as HTMLElement;
+  var banner        = document.getElementById('banner')          as HTMLElement;
+  var bannerMsg     = document.getElementById('banner-msg')      as HTMLElement;
   var newSessionBtn = document.getElementById('new-session-btn') as HTMLButtonElement;
+  var sessSearchEl  = document.getElementById('sess-search')     as HTMLInputElement;
 
   // ── State ──────────────────────────────────────────────────────────────────
-  var currentTermId: string | null = null;
-  var tabOrder:  string[] = [];
-  var terminals: Record<string, Terminal>           = {};
-  var fitAddons: Record<string, FitAddon.FitAddon>  = {};
-  var running:   Record<string, boolean>            = {};   // PTY is alive
-  var exitMsgs:  Record<string, string>             = {};
-  var viewMode:  Record<string, 'sessions' | 'terminal'> = {};
-  var sessionsByType: Record<string, SessionEntry[]> = {};
-  var claudeCodeSessions: ClaudeCodeSession[] = [];
-  var pendingTabTitle: string | null = null;
+  var currentTermId:      string | null   = null;
+  var currentAgentType:   string          = 'claude';
+  var historyVisible:     boolean         = false;
+  var tabOrder:           string[]        = [];
+  var terminals:          Record<string, Terminal>           = {};
+  var fitAddons:          Record<string, FitAddon.FitAddon>  = {};
+  var running:            Record<string, boolean>            = {};
+  var exitMsgs:           Record<string, string>             = {};
+  var sessionsByType:     Record<string, SessionEntry[]>     = {};
+  var claudeCodeSessions: ClaudeCodeSession[]                = [];
+  var pendingTabTitle:    string | null   = null;
+  var pendingSessionLoad: PendingLoad | null = null;
+  var tabTitles:          Record<string, string> = {};
   var searchQuery = '';
-
-  var sessSearchEl = document.getElementById('sess-search') as HTMLInputElement;
 
   var termOpts = {
     cursorBlink: true,
@@ -92,8 +92,8 @@ interface ClaudeCodeSession { sessionId: string; title: string; lastActive: stri
   }
 
   function getDateBucket(iso: string): string {
-    var d   = new Date(iso);
-    var now = new Date();
+    var d     = new Date(iso);
+    var now   = new Date();
     var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     var yest  = new Date(+today - 86400000);
     var week  = new Date(+today - 6 * 86400000);
@@ -134,12 +134,64 @@ interface ClaudeCodeSession { sessionId: string; title: string; lastActive: stri
     };
   }
 
-  // ── Search ─────────────────────────────────────────────────────────────────
+  // ── Agent type bar ─────────────────────────────────────────────────────────
 
-  sessSearchEl.addEventListener('input', function () {
-    searchQuery = sessSearchEl.value.trim().toLowerCase();
-    if (currentTermId) renderSessionsList(currentTermId);
-  });
+  function setAgentType(type: string): void {
+    currentAgentType = type;
+    document.querySelectorAll('.type-btn').forEach(function (b) {
+      (b as HTMLElement).classList.toggle('active', (b as HTMLElement).dataset['type'] === type);
+    });
+    renderTabList();
+    var matching = tabOrder.filter(function (id) { return getAgentType(id) === type; });
+    if (matching.length > 0) {
+      var target = (currentTermId && getAgentType(currentTermId) === type)
+        ? currentTermId
+        : matching[matching.length - 1];
+      if (historyVisible) {
+        renderSessionsList(type, target);
+      } else {
+        switchTo(target);
+      }
+    } else {
+      currentTermId = null;
+      setSessTitle('');
+      banner.style.display = 'none';
+      showHistoryView(true);
+    }
+  }
+
+  function renderTabList(): void {
+    tabOrder.forEach(function (id) {
+      var btn = document.getElementById('tab-btn-' + id) as HTMLElement | null;
+      if (btn) btn.style.display = getAgentType(id) === currentAgentType ? '' : 'none';
+    });
+  }
+
+  // ── Title bar ──────────────────────────────────────────────────────────────
+
+  function setSessTitle(title: string): void {
+    sessTitle.textContent = title || '';
+    if (currentTermId && title) tabTitles[currentTermId] = title;
+  }
+
+  // ── History view ───────────────────────────────────────────────────────────
+
+  function showHistoryView(show: boolean): void {
+    historyVisible = show;
+    historyView.style.display = show ? 'flex' : 'none';
+    wrap.style.display        = show ? 'none' : '';
+    banner.style.display      = 'none';
+    historyBtn.classList.toggle('active', show);
+    if (show) {
+      searchQuery = '';
+      sessSearchEl.value = '';
+      renderSessionsList(currentAgentType, currentTermId);
+    } else if (currentTermId && fitAddons[currentTermId]) {
+      requestAnimationFrame(function () {
+        if (currentTermId && fitAddons[currentTermId]) fitAddons[currentTermId].fit();
+      });
+    }
+  }
 
   // ── Sessions list ──────────────────────────────────────────────────────────
 
@@ -149,17 +201,17 @@ interface ClaudeCodeSession { sessionId: string; title: string; lastActive: stri
     var row1 = document.createElement('div');
     row1.className = 'sess-row1';
     var nameEl = document.createElement('span');
-    nameEl.className = 'sess-name';
+    nameEl.className   = 'sess-name';
     nameEl.textContent = name;
     var timeEl = document.createElement('span');
-    timeEl.className = 'sess-time';
+    timeEl.className   = 'sess-time';
     timeEl.textContent = time;
     row1.appendChild(nameEl);
     row1.appendChild(timeEl);
     item.appendChild(row1);
     if (preview) {
       var pre = document.createElement('div');
-      pre.className = 'sess-preview';
+      pre.className   = 'sess-preview';
       pre.textContent = preview;
       item.appendChild(pre);
     }
@@ -169,7 +221,7 @@ interface ClaudeCodeSession { sessionId: string; title: string; lastActive: stri
 
   function makeSectionHeader(label: string): HTMLElement {
     var h = document.createElement('div');
-    h.className = 'cc-section-header';
+    h.className   = 'cc-section-header';
     h.textContent = label;
     return h;
   }
@@ -179,14 +231,14 @@ interface ClaudeCodeSession { sessionId: string; title: string; lastActive: stri
     msgCount: number, model: string | undefined,
     onClick: () => void,
   ): HTMLElement {
-    var item = makeSessItem(title, time, '', onClick);
+    var item    = makeSessItem(title, time, '', onClick);
     var hasMeta = branch || msgCount > 0 || model;
     if (!hasMeta) return item;
     var meta = document.createElement('div');
     meta.className = 'sess-meta';
     if (branch) {
       var bs = document.createElement('span');
-      bs.className = 'sess-branch';
+      bs.className   = 'sess-branch';
       bs.textContent = branch;
       meta.appendChild(bs);
     }
@@ -201,9 +253,6 @@ interface ClaudeCodeSession { sessionId: string; title: string; lastActive: stri
     return item;
   }
 
-  // Append items from `entries` under date-group headers into `container`.
-  // Each entry: { el, iso } where iso is the timestamp for bucketing.
-  // When searchQuery is active, groups are skipped and items shown flat.
   function renderWithGroups(
     container: HTMLElement,
     entries: Array<{ el: HTMLElement; iso: string }>,
@@ -222,7 +271,7 @@ interface ClaudeCodeSession { sessionId: string; title: string; lastActive: stri
     bucketOrder.forEach(function (b) {
       if (!groups[b] || groups[b].length === 0) return;
       var gh = document.createElement('div');
-      gh.className = 'date-group-header';
+      gh.className   = 'date-group-header';
       gh.textContent = b;
       container.appendChild(gh);
       groups[b].forEach(function (el) { container.appendChild(el); });
@@ -232,79 +281,58 @@ interface ClaudeCodeSession { sessionId: string; title: string; lastActive: stri
   function matchesSearch(name: string, preview?: string, branch?: string): boolean {
     if (!searchQuery) return true;
     var q = searchQuery;
-    return (name && name.toLowerCase().indexOf(q) !== -1) ||
-           (preview && preview.toLowerCase().indexOf(q) !== -1) ||
-           (branch && branch.toLowerCase().indexOf(q) !== -1) ||
+    return (!!name    && name.toLowerCase().indexOf(q)    !== -1) ||
+           (!!preview && preview.toLowerCase().indexOf(q) !== -1) ||
+           (!!branch  && branch.toLowerCase().indexOf(q)  !== -1) ||
            false;
   }
 
-  function renderSessionsList(tabId: string): void {
-    var agentType = getAgentType(tabId);
+  function renderSessionsList(agentType: string, tabId: string | null): void {
     sessionsList.innerHTML = '';
 
-    // Running session indicator (all agent types)
-    if (running[tabId]) {
-      var resumeItem = document.createElement('div');
-      resumeItem.className = 'sess-item sess-running-item';
-      resumeItem.innerHTML =
-        '<div class="sess-row1">' +
-        '<span class="sess-name"><span class="sess-dot"></span>running session</span>' +
-        '</div>';
-      resumeItem.addEventListener('click', function () {
-        showTerminal(tabId, 'running session');
-        vscode.postMessage({
-          type: 'launch', termId: tabId, agentType: agentType,
-          cols: terminals[tabId] ? terminals[tabId].cols : 80,
-          rows: terminals[tabId] ? terminals[tabId].rows : 24,
-        });
-      });
-      sessionsList.appendChild(resumeItem);
-    }
-
     if (agentType === 'claude') {
-      // ── Claude Code sessions ───────────────────────────────────────────
+      // ── Claude Code sessions ───────────────────────────────────────────────
       var ccFiltered = claudeCodeSessions.filter(function (s) {
         return matchesSearch(s.title, undefined, s.branch);
       });
       sessionsList.appendChild(makeSectionHeader('claude code sessions'));
-
       if (ccFiltered.length === 0) {
         var ccEmpty = document.createElement('div');
-        ccEmpty.className = 'sess-item';
-        ccEmpty.style.color = '#3a3a3a';
+        ccEmpty.className      = 'sess-item';
+        ccEmpty.style.color    = '#3a3a3a';
         ccEmpty.style.fontSize = '10px';
-        ccEmpty.style.cursor = 'default';
-        ccEmpty.textContent = searchQuery ? 'no matching sessions' : 'no sessions yet';
+        ccEmpty.style.cursor   = 'default';
+        ccEmpty.textContent    = searchQuery ? 'no matching sessions' : 'no sessions yet';
         sessionsList.appendChild(ccEmpty);
       } else {
         var ccEntries: Array<{ el: HTMLElement; iso: string }> = [];
         ccFiltered.forEach(function (s) {
           (function (sid: string, stitle: string, sbranch: string | undefined, scount: number, smodel: string | undefined, siso: string) {
-            var el = makeClaudeSessItem(
-              stitle,
-              fmtTime(siso),
-              sbranch,
-              scount,
-              smodel,
-              function () {
-                pendingTabTitle = stitle;
-                showTerminal(tabId, stitle);
-                banner.style.display = 'none';
+            var el = makeClaudeSessItem(stitle, fmtTime(siso), sbranch, scount, smodel, function () {
+              pendingTabTitle = stitle;
+              setSessTitle(stitle);
+              showHistoryView(false);
+              banner.style.display = 'none';
+              if (tabId) {
                 vscode.postMessage({
                   type: 'resumeClaudeSession', sessionId: sid,
                   cols: terminals[tabId] ? terminals[tabId].cols : 80,
                   rows: terminals[tabId] ? terminals[tabId].rows : 24,
                 });
-              },
-            );
+              } else {
+                // resumeClaudeSession creates its own tab — no spawn needed
+                pendingTabTitle = stitle;
+                vscode.postMessage({ type: 'resumeClaudeSession', sessionId: sid, cols: 80, rows: 24 });
+              }
+            });
             ccEntries.push({ el: el, iso: siso });
           })(s.sessionId, s.title, s.branch, s.messageCount, s.model, s.lastActive);
         });
         renderWithGroups(sessionsList, ccEntries);
       }
 
-      // ── Terminal history (PTY scrollback) ─────────────────────────────
-      var ptyList = (sessionsByType[agentType] || []).slice().reverse();
+      // ── Terminal history ───────────────────────────────────────────────────
+      var ptyList     = (sessionsByType[agentType] || []).slice().reverse();
       var ptyFiltered = ptyList.filter(function (s) {
         return matchesSearch(s.name || agentType, s.preview);
       });
@@ -313,33 +341,33 @@ interface ClaudeCodeSession { sessionId: string; title: string; lastActive: stri
         var ptyEntries: Array<{ el: HTMLElement; iso: string }> = [];
         ptyFiltered.forEach(function (s) {
           (function (sid: string, sname: string, siso: string) {
-            var el = makeSessItem(
-              sname || agentType,
-              fmtTime(siso),
-              s.preview || '',
-              function () {
-                showTerminal(tabId, sname || agentType);
-                banner.style.display = 'none';
+            var el = makeSessItem(sname || agentType, fmtTime(siso), s.preview || '', function () {
+              setSessTitle(sname || agentType);
+              showHistoryView(false);
+              banner.style.display = 'none';
+              if (tabId) {
                 vscode.postMessage({ type: 'loadSession', termId: tabId, agentType: agentType, sessionId: sid });
-              },
-            );
+              } else {
+                pendingSessionLoad = { agentType: agentType, sessionId: sid };
+                vscode.postMessage({ type: 'spawn', agentType: agentType });
+              }
+            });
             ptyEntries.push({ el: el, iso: siso });
           })(s.id, s.name, s.savedAt);
         });
         renderWithGroups(sessionsList, ptyEntries);
       }
-
       return;
     }
 
-    // ── Non-claude agent types ─────────────────────────────────────────
-    var list = (sessionsByType[agentType] || []).slice().reverse();
+    // ── Non-claude agent types ─────────────────────────────────────────────
+    var list         = (sessionsByType[agentType] || []).slice().reverse();
     var listFiltered = list.filter(function (s) {
       return matchesSearch(s.name || agentType, s.preview);
     });
-    if (listFiltered.length === 0 && !running[tabId]) {
+    if (listFiltered.length === 0) {
       var empty = document.createElement('div');
-      empty.id = 'sessions-empty';
+      empty.id          = 'sessions-empty';
       empty.textContent = searchQuery ? 'no matching sessions' : 'no sessions yet';
       sessionsList.appendChild(empty);
       return;
@@ -347,47 +375,29 @@ interface ClaudeCodeSession { sessionId: string; title: string; lastActive: stri
     var listEntries: Array<{ el: HTMLElement; iso: string }> = [];
     listFiltered.forEach(function (s) {
       (function (sid: string, sname: string, siso: string) {
-        var el = makeSessItem(
-          sname || agentType,
-          fmtTime(siso),
-          s.preview || '',
-          function () {
-            showTerminal(tabId, sname || agentType);
-            banner.style.display = 'none';
+        var el = makeSessItem(sname || agentType, fmtTime(siso), s.preview || '', function () {
+          setSessTitle(sname || agentType);
+          showHistoryView(false);
+          banner.style.display = 'none';
+          if (tabId) {
             vscode.postMessage({ type: 'loadSession', termId: tabId, agentType: agentType, sessionId: sid });
-          },
-        );
+          } else {
+            pendingSessionLoad = { agentType: agentType, sessionId: sid };
+            vscode.postMessage({ type: 'spawn', agentType: agentType });
+          }
+        });
         listEntries.push({ el: el, iso: siso });
       })(s.id, s.name, s.savedAt);
     });
     renderWithGroups(sessionsList, listEntries);
   }
 
-  // ── View switching ─────────────────────────────────────────────────────────
-
-  function showSessions(tabId: string): void {
-    sessionsView.style.display = 'flex';
-    terminalView.style.display = 'none';
-    viewMode[tabId] = 'sessions';
-    renderSessionsList(tabId);
-  }
-
-  function showTerminal(tabId: string, title?: string): void {
-    sessionsView.style.display = 'none';
-    terminalView.style.display = 'flex';
-    viewMode[tabId] = 'terminal';
-    if (title !== undefined) termTitle.textContent = title;
-    requestAnimationFrame(function () {
-      if (fitAddons[tabId]) fitAddons[tabId].fit();
-    });
-  }
-
   // ── Tab lifecycle ──────────────────────────────────────────────────────────
 
   function createTab(id: string, agentType: string, label: string): void {
-    running[id]   = false;
-    exitMsgs[id]  = '';
-    viewMode[id]  = 'sessions';
+    running[id]  = false;
+    exitMsgs[id] = '';
+    tabTitles[id] = label;
 
     var t  = new Terminal(termOpts);
     var fa = new FitAddon.FitAddon();
@@ -399,7 +409,7 @@ interface ClaudeCodeSession { sessionId: string; title: string; lastActive: stri
     wrap.appendChild(pane);
     t.open(pane);
 
-    t.onData(function (d) { vscode.postMessage({ type: 'input', termId: id, data: d }); });
+    t.onData(function (d)    { vscode.postMessage({ type: 'input',  termId: id, data: d }); });
     t.onResize(function (sz) { vscode.postMessage({ type: 'resize', termId: id, cols: sz.cols, rows: sz.rows }); });
     t.attachCustomKeyEventHandler(makeKeyHandler(id));
 
@@ -408,10 +418,11 @@ interface ClaudeCodeSession { sessionId: string; title: string; lastActive: stri
     tabOrder.push(id);
 
     var btn = document.createElement('button');
-    btn.className        = 'tab';
-    btn.id               = 'tab-btn-' + id;
-    btn.dataset['id']    = id;
-    btn.dataset['type']  = agentType;
+    btn.className       = 'tab';
+    btn.id              = 'tab-btn-' + id;
+    btn.dataset['id']   = id;
+    btn.dataset['type'] = agentType;
+    btn.style.display   = agentType === currentAgentType ? '' : 'none';
 
     var labelSpan = document.createElement('span');
     labelSpan.className   = 'tab-label';
@@ -432,18 +443,20 @@ interface ClaudeCodeSession { sessionId: string; title: string; lastActive: stri
   }
 
   function closeTab(id: string): void {
-    var idx    = tabOrder.indexOf(id);
-    var nextId = tabOrder[idx + 1] || tabOrder[idx - 1] || null;
+    var tabType = getAgentType(id);
+    var nextId  = tabOrder.filter(function (tid) {
+      return tid !== id && getAgentType(tid) === tabType;
+    })[0] || null;
 
     if (terminals[id]) { terminals[id].dispose(); delete terminals[id]; }
     delete fitAddons[id];
     delete running[id];
     delete exitMsgs[id];
-    delete viewMode[id];
-    tabOrder.splice(idx, 1);
+    delete tabTitles[id];
+    tabOrder.splice(tabOrder.indexOf(id), 1);
 
-    var btn = document.getElementById('tab-btn-' + id);
-    if (btn) btn.remove();
+    var btn  = document.getElementById('tab-btn-' + id);
+    if (btn)  btn.remove();
     var pane = document.getElementById('term-' + id);
     if (pane) pane.remove();
 
@@ -451,13 +464,20 @@ interface ClaudeCodeSession { sessionId: string; title: string; lastActive: stri
 
     if (id === currentTermId) {
       currentTermId = null;
-      if (nextId) switchTo(nextId);
+      if (nextId) {
+        switchTo(nextId);
+      } else {
+        setSessTitle('');
+        banner.style.display = 'none';
+        showHistoryView(true);
+      }
     }
   }
 
   function switchTo(id: string): void {
-    searchQuery = '';
+    searchQuery        = '';
     sessSearchEl.value = '';
+
     document.querySelectorAll('.tab').forEach(function (b) { b.classList.remove('active'); });
     var btn = document.getElementById('tab-btn-' + id) as HTMLButtonElement | null;
     if (btn) btn.classList.add('active');
@@ -467,29 +487,46 @@ interface ClaudeCodeSession { sessionId: string; title: string; lastActive: stri
     if (pane) pane.classList.add('active');
 
     currentTermId = id;
+
+    // Sync type-bar to tab's agent type
+    var type = getAgentType(id);
+    if (type !== currentAgentType) {
+      currentAgentType = type;
+      document.querySelectorAll('.type-btn').forEach(function (b) {
+        (b as HTMLElement).classList.toggle('active', (b as HTMLElement).dataset['type'] === type);
+      });
+      renderTabList();
+    }
+
+    // Close history, show terminal
+    historyVisible            = false;
+    historyView.style.display = 'none';
+    wrap.style.display        = '';
+    historyBtn.classList.remove('active');
     banner.style.display = 'none';
 
-    if (viewMode[id] === 'terminal') {
-      showTerminal(id, running[id] ? getAgentType(id) : (exitMsgs[id] || getAgentType(id)));
-      if (running[id]) {
-        vscode.postMessage({
-          type: 'launch', termId: id,
-          agentType: btn ? btn.dataset['type'] : 'claude',
-          cols: terminals[id] ? terminals[id].cols : 80,
-          rows: terminals[id] ? terminals[id].rows : 24,
-        });
-      } else if (exitMsgs[id]) {
-        bannerMsg.textContent  = exitMsgs[id];
-        banner.style.display   = 'flex';
-      }
+    if (exitMsgs[id]) {
+      setSessTitle(exitMsgs[id]);
+      bannerMsg.textContent = exitMsgs[id];
+      banner.style.display  = 'flex';
     } else {
-      showSessions(id);
+      setSessTitle(pendingTabTitle || tabTitles[id] || getAgentType(id));
+      vscode.postMessage({
+        type: 'launch', termId: id, agentType: type,
+        cols: terminals[id] ? terminals[id].cols : 80,
+        rows: terminals[id] ? terminals[id].rows : 24,
+      });
     }
+
+    requestAnimationFrame(function () {
+      if (currentTermId && fitAddons[currentTermId]) fitAddons[currentTermId].fit();
+    });
   }
 
   function startNewSession(tabId: string): void {
     var agentType = getAgentType(tabId);
-    showTerminal(tabId, agentType);
+    showHistoryView(false);
+    setSessTitle(agentType);
     banner.style.display = 'none';
     if (terminals[tabId]) terminals[tabId].reset();
     vscode.postMessage({
@@ -501,19 +538,11 @@ interface ClaudeCodeSession { sessionId: string; title: string; lastActive: stri
 
   // ── Button handlers ────────────────────────────────────────────────────────
 
-  newBtn.addEventListener('click', function () {
-    if (currentTermId) startNewSession(currentTermId);
+  document.getElementById('type-bar')!.addEventListener('click', function (e) {
+    var btn = (e.target as Element).closest('.type-btn') as HTMLElement | null;
+    if (!btn) return;
+    setAgentType(btn.dataset['type']!);
   });
-
-  backBtn.addEventListener('click', function () {
-    if (currentTermId) showSessions(currentTermId);
-  });
-
-  newSessionBtn.addEventListener('click', function () {
-    if (currentTermId) startNewSession(currentTermId);
-  });
-
-  // ── Tab bar ────────────────────────────────────────────────────────────────
 
   tabListEl.addEventListener('click', function (e) {
     if ((e.target as Element).closest('.tab-close')) return;
@@ -522,26 +551,21 @@ interface ClaudeCodeSession { sessionId: string; title: string; lastActive: stri
     switchTo(btn.dataset['id']!);
   });
 
-  addBtn.addEventListener('click', function (e) {
-    e.stopPropagation();
-    if (picker.style.display === 'block') { picker.style.display = 'none'; return; }
-    var rect = addBtn.getBoundingClientRect();
-    picker.style.top     = rect.bottom + 'px';
-    picker.style.left    = 'auto';
-    picker.style.right   = (window.innerWidth - rect.right) + 'px';
-    picker.style.display = 'block';
+  historyBtn.addEventListener('click', function () {
+    showHistoryView(!historyVisible);
   });
 
-  picker.addEventListener('click', function (e) {
-    var btn = (e.target as Element).closest('[data-type]') as HTMLButtonElement | null;
-    if (!btn) return;
-    picker.style.display = 'none';
-    vscode.postMessage({ type: 'spawn', agentType: btn.dataset['type'] });
+  addBtn.addEventListener('click', function () {
+    vscode.postMessage({ type: 'spawn', agentType: currentAgentType });
   });
 
-  document.addEventListener('click', function (e) {
-    if (!(e.target as Element).closest('#add-btn') && !(e.target as Element).closest('#agent-picker'))
-      picker.style.display = 'none';
+  newSessionBtn.addEventListener('click', function () {
+    if (currentTermId) startNewSession(currentTermId);
+  });
+
+  sessSearchEl.addEventListener('input', function () {
+    searchQuery = sessSearchEl.value.trim().toLowerCase();
+    renderSessionsList(currentAgentType, currentTermId);
   });
 
   // ── Paste ──────────────────────────────────────────────────────────────────
@@ -550,7 +574,7 @@ interface ClaudeCodeSession { sessionId: string; title: string; lastActive: stri
     e.preventDefault();
     e.stopImmediatePropagation();
     if (keyHandledPaste) { keyHandledPaste = false; return; }
-    if (!currentTermId || viewMode[currentTermId] !== 'terminal') return;
+    if (!currentTermId || historyVisible) return;
     var text = e.clipboardData ? e.clipboardData.getData('text/plain') : '';
     if (text) {
       vscode.postMessage({ type: 'input', termId: currentTermId, data: text.replace(/[\r\n]+$/, '') });
@@ -562,17 +586,17 @@ interface ClaudeCodeSession { sessionId: string; title: string; lastActive: stri
   // ── Resize ─────────────────────────────────────────────────────────────────
 
   new ResizeObserver(function () {
-    if (currentTermId && fitAddons[currentTermId] && viewMode[currentTermId] === 'terminal') {
+    if (currentTermId && fitAddons[currentTermId] && !historyVisible) {
       requestAnimationFrame(function () {
         if (currentTermId && fitAddons[currentTermId]) fitAddons[currentTermId].fit();
       });
     }
-  }).observe(terminalView);
+  }).observe(wrap);
 
   // ── Messages from extension host ───────────────────────────────────────────
 
   type HostMessage =
-    | { type: 'initTabs'; tabs: AgentTab[]; activeId: string; sessionsByType: Record<string, SessionEntry[]>; runningTabs: string[] }
+    | { type: 'initTabs'; tabs: AgentTab[]; activeId: string; sessionsByType: Record<string, SessionEntry[]>; runningTabs: string[]; sessionNames?: Record<string, string> }
     | { type: 'tabCreated'; id: string; agentType: string; label: string }
     | { type: 'started'; termId: string; restore: string | null; sessions: SessionEntry[] }
     | { type: 'resumed' }
@@ -589,26 +613,51 @@ interface ClaudeCodeSession { sessionId: string; title: string; lastActive: stri
 
     if (msg.type === 'initTabs') {
       var sbt = msg.sessionsByType;
-      if (sbt) {
-        Object.keys(sbt).forEach(function (type) { sessionsByType[type] = sbt[type]; });
-      }
+      if (sbt) Object.keys(sbt).forEach(function (type) { sessionsByType[type] = sbt[type]; });
       var rt = msg.runningTabs;
       msg.tabs.forEach(function (t) { createTab(t.id, t.type, t.label); });
-      if (rt) { rt.forEach(function (id) { running[id] = true; }); }
+      if (rt) rt.forEach(function (id) { running[id] = true; });
+      // Overwrite tab titles with actual session names supplied by the extension host
+      var sn = msg.sessionNames || {};
+      Object.keys(sn).forEach(function (tabId) {
+        if (sn[tabId]) tabTitles[tabId] = sn[tabId];
+      });
       var activeId = msg.activeId || (msg.tabs.length > 0 ? msg.tabs[0].id : null);
-      if (activeId) switchTo(activeId);
+      if (activeId) {
+        var initType = getAgentType(activeId);
+        currentAgentType = initType;
+        document.querySelectorAll('.type-btn').forEach(function (b) {
+          (b as HTMLElement).classList.toggle('active', (b as HTMLElement).dataset['type'] === initType);
+        });
+        renderTabList();
+        switchTo(activeId);
+      }
 
     } else if (msg.type === 'tabCreated') {
-      createTab(msg.id, msg.agentType, msg.label);
+      var createdType = msg.agentType;
+      var createdId   = msg.id;
+      createTab(createdId, createdType, msg.label);
+      if (createdType !== currentAgentType) {
+        currentAgentType = createdType;
+        document.querySelectorAll('.type-btn').forEach(function (b) {
+          (b as HTMLElement).classList.toggle('active', (b as HTMLElement).dataset['type'] === createdType);
+        });
+        renderTabList();
+      }
       var savedTitle = pendingTabTitle;
       pendingTabTitle = null;
-      switchTo(msg.id);
-      if (savedTitle) termTitle.textContent = savedTitle;
+      switchTo(createdId);
+      if (savedTitle) setSessTitle(savedTitle);
+      if (pendingSessionLoad && pendingSessionLoad.agentType === createdType) {
+        var pending = pendingSessionLoad;
+        pendingSessionLoad = null;
+        vscode.postMessage({ type: 'loadSession', termId: createdId, agentType: pending.agentType, sessionId: pending.sessionId });
+      }
 
     } else if (msg.type === 'started') {
       running[msg.termId] = true;
       if (msg.sessions) {
-        var startBtn = document.getElementById('tab-btn-' + msg.termId) as HTMLButtonElement | null;
+        var startBtn  = document.getElementById('tab-btn-' + msg.termId) as HTMLButtonElement | null;
         var startType = (startBtn && startBtn.dataset['type']) || 'claude';
         sessionsByType[startType] = msg.sessions;
       }
@@ -616,17 +665,19 @@ interface ClaudeCodeSession { sessionId: string; title: string; lastActive: stri
         terminals[msg.termId].write('\x1b[?1049l\x1b[0m');
         terminals[msg.termId].write(msg.restore);
         var now = new Date();
-        var hh = String(now.getHours()).padStart(2, '0');
-        var mm = String(now.getMinutes()).padStart(2, '0');
+        var hh  = String(now.getHours()).padStart(2, '0');
+        var mm  = String(now.getMinutes()).padStart(2, '0');
         terminals[msg.termId].write('\r\n\x1b[38;5;240m── restored ' + hh + ':' + mm + ' ──\x1b[0m\r\n\r\n');
       }
       if (msg.termId === currentTermId) {
-        showTerminal(msg.termId, getAgentType(msg.termId));
+        showHistoryView(false);
+        setSessTitle(pendingTabTitle || tabTitles[msg.termId] || getAgentType(msg.termId));
+        pendingTabTitle = null;
         terminals[msg.termId].focus();
       }
 
     } else if (msg.type === 'resumed') {
-      // no-op — already in terminal view
+      // no-op
 
     } else if (msg.type === 'data') {
       if (terminals[msg.termId]) terminals[msg.termId].write(msg.text);
@@ -634,7 +685,7 @@ interface ClaudeCodeSession { sessionId: string; title: string; lastActive: stri
     } else if (msg.type === 'exit') {
       running[msg.termId] = false;
       exitMsgs[msg.termId] = msg.code === 0 ? 'session ended' : 'exited (' + msg.code + ')';
-      if (msg.termId === currentTermId && viewMode[msg.termId] === 'terminal') {
+      if (msg.termId === currentTermId && !historyVisible) {
         bannerMsg.textContent = exitMsgs[msg.termId];
         banner.style.display  = 'flex';
       }
@@ -642,21 +693,21 @@ interface ClaudeCodeSession { sessionId: string; title: string; lastActive: stri
     } else if (msg.type === 'error') {
       running[msg.termId] = false;
       exitMsgs[msg.termId] = 'error: ' + msg.message;
-      if (msg.termId === currentTermId && viewMode[msg.termId] === 'terminal') {
+      if (msg.termId === currentTermId && !historyVisible) {
         bannerMsg.textContent = exitMsgs[msg.termId];
         banner.style.display  = 'flex';
       }
 
     } else if (msg.type === 'sessionSaved') {
       if (msg.agentType) sessionsByType[msg.agentType] = msg.sessions;
-      if (currentTermId && viewMode[currentTermId] === 'sessions') {
-        renderSessionsList(currentTermId);
+      if (historyVisible && currentAgentType === msg.agentType) {
+        renderSessionsList(currentAgentType, currentTermId);
       }
 
     } else if (msg.type === 'claudeHistory') {
       claudeCodeSessions = msg.sessions;
-      if (currentTermId && viewMode[currentTermId] === 'sessions' && getAgentType(currentTermId) === 'claude') {
-        renderSessionsList(currentTermId);
+      if (historyVisible && currentAgentType === 'claude') {
+        renderSessionsList('claude', currentTermId);
       }
 
     } else if (msg.type === 'sessionContent') {

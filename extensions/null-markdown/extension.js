@@ -58,6 +58,40 @@ function createMd() {
 		}
 	});
 
+	// Wiki links: [[target]] or [[target|label]]
+	md.core.ruler.push('null-wiki-links', state => {
+		for (const token of state.tokens) {
+			if (token.type !== 'inline' || !token.children) continue;
+			const out = [];
+			for (const child of token.children) {
+				if (child.type !== 'text') { out.push(child); continue; }
+				const parts = child.content.split(/(\[\[[^\]]+\]\])/g);
+				if (parts.length === 1) { out.push(child); continue; }
+				for (const part of parts) {
+					const m = part.match(/^\[\[([^\]|]+)(?:\|([^\]]+))?\]\]$/);
+					if (!m) {
+						const t = new state.Token('text', '', 0);
+						t.content = part;
+						out.push(t);
+					} else {
+						const target = m[1].trim();
+						const label  = m[2] ? m[2].trim() : target;
+						const open   = new state.Token('html_inline', '', 0);
+						open.content = `<a class="wiki-link" data-wiki="${target.replace(/"/g, '&quot;')}" href="#">`;
+						out.push(open);
+						const text   = new state.Token('text', '', 0);
+						text.content = label;
+						out.push(text);
+						const close  = new state.Token('html_inline', '', 0);
+						close.content = '</a>';
+						out.push(close);
+					}
+				}
+			}
+			token.children = out;
+		}
+	});
+
 	// Mermaid fenced blocks → bare divs (client-side rendering)
 	const prevFence = md.renderer.rules.fence;
 	md.renderer.rules.fence = (tokens, idx, options, env, self) => {
@@ -166,6 +200,8 @@ class NullMarkdownPreview {
 	async _onMessage(msg) {
 		if (msg.type === 'checkboxToggle') {
 			await this._applyCheckboxToggle(msg.line, msg.checked);
+		} else if (msg.type === 'wikiLink') {
+			await this._openWikiLink(msg.target);
 		} else if (msg.type === 'scroll') {
 			// Webview scrolled → sync editor; suppress the echo it would fire back
 			this._suppressEditorScroll = true;
@@ -181,6 +217,23 @@ class NullMarkdownPreview {
 				);
 			}
 		}
+	}
+
+	async _openWikiLink(target) {
+		const name = target.replace(/\.md$/i, '');
+		const files = await vscode.workspace.findFiles(`**/${name}.md`, '**/node_modules/**', 10);
+		if (files.length === 0) {
+			vscode.window.showWarningMessage(`Wiki page not found: ${target}`);
+			return;
+		}
+		let uri = files[0];
+		if (files.length > 1) {
+			const picks = files.map(f => ({ label: vscode.workspace.asRelativePath(f), uri: f }));
+			const pick  = await vscode.window.showQuickPick(picks, { placeHolder: `Multiple matches for "${target}"` });
+			if (!pick) return;
+			uri = pick.uri;
+		}
+		await vscode.window.showTextDocument(uri, { preview: false });
 	}
 
 	async _applyCheckboxToggle(line, checked) {
@@ -245,6 +298,159 @@ class NullMarkdownPreview {
 	}
 }
 
+// ── NullMarkdownSlides ────────────────────────────────────────────────────────
+
+const openSlides = new Map(); // document URI string → NullMarkdownSlides
+
+class NullMarkdownSlides {
+	constructor(document, context, md) {
+		this._doc  = document;
+		this._ctx  = context;
+		this._md   = md;
+		this._subs = [];
+
+		this.panel = vscode.window.createWebviewPanel(
+			'null-markdown-slides',
+			path.basename(document.fileName) + ' — Slides',
+			vscode.ViewColumn.One,
+			{
+				enableScripts: true,
+				retainContextWhenHidden: true,
+				localResourceRoots: [vscode.Uri.file(context.extensionPath)]
+			}
+		);
+
+		this.panel.onDidDispose(() => {
+			this._subs.forEach(d => d.dispose());
+			openSlides.delete(document.uri.toString());
+		}, null, this._subs);
+
+		vscode.workspace.onDidChangeTextDocument(e => {
+			if (e.document.uri.toString() === this._doc.uri.toString()) this._render();
+		}, null, this._subs);
+
+		this._render();
+	}
+
+	reveal() { this.panel.reveal(vscode.ViewColumn.One); }
+
+	_splitSlides(fullHtml) {
+		// Split on <hr> tags produced by --- separators
+		return fullHtml.split(/<hr\s*\/?>/i).map(s => s.trim()).filter(Boolean);
+	}
+
+	_render() {
+		let html = this._md.render(this._doc.getText());
+		html = processAlerts(html);
+		const slides = this._splitSlides(html);
+		this.panel.webview.html = this._buildPage(slides);
+	}
+
+	_buildPage(slides) {
+		const wv  = this.panel.webview;
+		const ext = vscode.Uri.file(this._ctx.extensionPath);
+		const u   = (...p) => wv.asWebviewUri(vscode.Uri.joinPath(ext, ...p));
+
+		const cssUri        = u('preview', 'null-markdown.css');
+		const katexCssUri   = u('node_modules', 'katex', 'dist', 'katex.min.css');
+		const katexJsUri    = u('node_modules', 'katex', 'dist', 'katex.min.js');
+		const autoRenderUri = u('node_modules', 'katex', 'dist', 'contrib', 'auto-render.min.js');
+		const mermaidUri    = u('node_modules', 'mermaid', 'dist', 'mermaid.min.js');
+		const nonce         = crypto.randomBytes(16).toString('hex');
+		const slidesJson    = JSON.stringify(slides);
+
+		return /* html */`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${wv.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}' ${wv.cspSource}; img-src ${wv.cspSource} https: data:; font-src ${wv.cspSource};">
+<link rel="stylesheet" href="${katexCssUri}">
+<link rel="stylesheet" href="${cssUri}">
+<style nonce="${nonce}">
+html, body { height: 100%; margin: 0; padding: 0; background: #0d0d1a; overflow: hidden; }
+body { max-width: none; display: flex; flex-direction: column; align-items: stretch; }
+#slide-container {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  overflow: hidden; padding: 0 64px; box-sizing: border-box;
+}
+#slide {
+  max-width: 900px; width: 100%; max-height: 100vh;
+  overflow-y: auto; padding: 40px 48px; box-sizing: border-box;
+}
+#slide-nav {
+  display: flex; align-items: center; justify-content: center; gap: 20px;
+  padding: 12px; background: #111122; border-top: 1px solid #1e1e35;
+  flex-shrink: 0;
+}
+#slide-nav button {
+  background: #1e1e35; color: #e6e6f0; border: 1px solid #252550;
+  border-radius: 6px; padding: 6px 18px; cursor: pointer; font-size: 14px;
+}
+#slide-nav button:hover { background: #252550; }
+#slide-nav button:disabled { opacity: 0.3; cursor: default; }
+#slide-counter { color: #9898b8; font-size: 13px; min-width: 80px; text-align: center; }
+/* hide hr separators inside slide content if any leaked through */
+#slide hr { display: none; }
+</style>
+</head>
+<body>
+<div id="slide-container"><div id="slide"></div></div>
+<nav id="slide-nav">
+  <button id="btn-prev" disabled>&#8592; Prev</button>
+  <span id="slide-counter">1 / 1</span>
+  <button id="btn-next">Next &#8594;</button>
+</nav>
+<script nonce="${nonce}" src="${katexJsUri}"></script>
+<script nonce="${nonce}" src="${autoRenderUri}"></script>
+<script nonce="${nonce}" src="${mermaidUri}"></script>
+<script nonce="${nonce}">
+(function() {
+  const slides = ${slidesJson};
+  let idx = 0;
+
+  const slideEl   = document.getElementById('slide');
+  const counter   = document.getElementById('slide-counter');
+  const btnPrev   = document.getElementById('btn-prev');
+  const btnNext   = document.getElementById('btn-next');
+
+  if (typeof mermaid !== 'undefined') {
+    mermaid.initialize({ startOnLoad: false, theme: 'dark', securityLevel: 'loose', fontFamily: 'inherit' });
+  }
+
+  function show(n) {
+    idx = Math.max(0, Math.min(slides.length - 1, n));
+    slideEl.innerHTML = slides[idx] || '';
+    counter.textContent = (idx + 1) + ' / ' + slides.length;
+    btnPrev.disabled = idx === 0;
+    btnNext.disabled = idx === slides.length - 1;
+    if (typeof renderMathInElement !== 'undefined') {
+      renderMathInElement(slideEl, {
+        delimiters: [{ left: '$$', right: '$$', display: true }, { left: '$', right: '$', display: false }],
+        throwOnError: false, ignoredTags: ['script','noscript','style','textarea','pre','code']
+      });
+    }
+    if (typeof mermaid !== 'undefined') mermaid.run({ querySelector: '#slide .mermaid' });
+  }
+
+  btnPrev.addEventListener('click', () => show(idx - 1));
+  btnNext.addEventListener('click', () => show(idx + 1));
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') { e.preventDefault(); show(idx + 1); }
+    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')                    { e.preventDefault(); show(idx - 1); }
+    if (e.key === 'Home')                                                  { e.preventDefault(); show(0); }
+    if (e.key === 'End')                                                   { e.preventDefault(); show(slides.length - 1); }
+  });
+
+  show(0);
+})();
+</script>
+</body>
+</html>`;
+	}
+}
+
 // ── activation ────────────────────────────────────────────────────────────────
 
 function activate(context) {
@@ -266,8 +472,107 @@ function activate(context) {
 		preview.onDispose(() => openPanels.delete(key));
 	}
 
+	async function exportPdf() {
+		const os = require('os');
+		const fs = require('fs');
+
+		// Resolve the document — active editor wins, then any open preview panel
+		let doc = vscode.window.activeTextEditor?.document;
+		if (!doc || doc.languageId !== 'markdown') {
+			if (openPanels.size > 0) doc = openPanels.values().next().value._doc;
+		}
+		if (!doc || doc.languageId !== 'markdown') {
+			vscode.window.showWarningMessage('Open a Markdown file first.');
+			return;
+		}
+
+		let html = md.render(doc.getText());
+		html = processAlerts(html);
+
+		// KaTeX CSS with absolute font paths so fonts load from the temp directory
+		const extPath  = context.extensionPath;
+		const katexRaw = fs.readFileSync(path.join(extPath, 'node_modules', 'katex', 'dist', 'katex.min.css'), 'utf8');
+		const fontsAbs = path.join(extPath, 'node_modules', 'katex', 'dist', 'fonts').replace(/\\/g, '/');
+		const katexCss = katexRaw.replace(/url\(fonts\//g, `url(file:///${fontsAbs}/`);
+
+		// <base href> resolves relative images/links against the source file's directory
+		const srcDir   = path.dirname(doc.fileName).replace(/\\/g, '/');
+		const baseHref = `file:///${srcDir}/`;
+
+		const title   = path.basename(doc.fileName, '.md');
+		const tmpFile = path.join(os.tmpdir(), `${title}.html`);
+
+		const page = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<base href="${baseHref}">
+<title>${title.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</title>
+<style>
+${katexCss}
+*{box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:16px;line-height:1.65;color:#24292e;background:#fff;max-width:860px;margin:0 auto;padding:32px 48px}
+h1,h2,h3,h4,h5,h6{font-weight:600;margin-top:24px;margin-bottom:8px;color:#111}
+h1,h2{border-bottom:1px solid #e1e4e8;padding-bottom:6px}
+a{color:#0366d6;text-decoration:none}
+a:hover{text-decoration:underline}
+p{margin:12px 0}
+code{font-family:'Geist Mono','JetBrains Mono','Cascadia Code',monospace;background:#f6f8fa;color:#d73a49;padding:2px 5px;border-radius:4px;font-size:0.9em}
+pre{background:#f6f8fa;border:1px solid #e1e4e8;border-radius:6px;padding:16px;overflow-x:auto}
+pre code{background:transparent;color:#24292e;padding:0;font-size:0.875em}
+blockquote{border-left:4px solid #0366d6;margin:16px 0;padding:8px 16px;background:#f1f8ff;color:#555;border-radius:0 4px 4px 0}
+blockquote p{margin:0}
+table{border-collapse:collapse;width:100%;margin:16px 0}
+th{background:#f6f8fa;color:#111;padding:10px 14px;text-align:left;border:1px solid #e1e4e8;font-weight:600}
+td{padding:8px 14px;border:1px solid #e1e4e8}
+tr:nth-child(even) td{background:#f6f8fa}
+hr{border:none;border-top:1px solid #e1e4e8;margin:28px 0}
+img{max-width:100%;border-radius:4px}
+.task-list-item{list-style:none}
+.task-list-item-checkbox{margin-right:6px;margin-left:-20px;vertical-align:middle}
+.footnotes{margin-top:32px;padding-top:16px;border-top:1px solid #e1e4e8;font-size:0.875em;color:#666}
+.mermaid{text-align:center;margin:20px auto}
+.markdown-alert{border-left:4px solid;border-radius:0 4px 4px 0;padding:10px 16px;margin:16px 0}
+.markdown-alert .alert-title{display:block;margin-bottom:4px;font-size:0.9em;font-weight:600}
+.markdown-alert p{margin:0}
+.markdown-alert-note{border-color:#0366d6;background:#f1f8ff}
+.markdown-alert-tip{border-color:#22863a;background:#f0fff4}
+.markdown-alert-important{border-color:#6f42c1;background:#f5f0ff}
+.markdown-alert-warning{border-color:#e36209;background:#fff8f0}
+.markdown-alert-caution{border-color:#cb2431;background:#fff5f5}
+.katex-display{overflow-x:auto;padding:8px 0}
+@media print{
+  body{padding:0;max-width:none}
+  h1,h2,h3{page-break-after:avoid}
+  pre,blockquote,table{page-break-inside:avoid}
+}
+</style>
+</head>
+<body>
+<div id="content">${html}</div>
+</body>
+</html>`;
+
+		fs.writeFileSync(tmpFile, page, 'utf8');
+		await vscode.env.openExternal(vscode.Uri.file(tmpFile));
+	}
+
+	function openSlidesCmd() {
+		const editor = vscode.window.activeTextEditor;
+		if (!editor || editor.document.languageId !== 'markdown') {
+			vscode.window.showWarningMessage('Open a Markdown file first.');
+			return;
+		}
+		const key = editor.document.uri.toString();
+		if (openSlides.has(key)) { openSlides.get(key).reveal(); return; }
+		const slides = new NullMarkdownSlides(editor.document, context, md);
+		openSlides.set(key, slides);
+	}
+
 	context.subscriptions.push(
-		vscode.commands.registerCommand('null-markdown.openPreview', openPreview)
+		vscode.commands.registerCommand('null-markdown.openPreview', openPreview),
+		vscode.commands.registerCommand('null-markdown.exportPdf', exportPdf),
+		vscode.commands.registerCommand('null-markdown.openSlides', openSlidesCmd)
 	);
 
 	// Intercept the built-in preview commands so the existing editor-title icon
