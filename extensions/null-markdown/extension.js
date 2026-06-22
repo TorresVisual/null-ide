@@ -8,7 +8,18 @@ const crypto = require('crypto');
 
 function createMd() {
 	const MarkdownIt = require('./node_modules/markdown-it');
-	const md = new MarkdownIt({ html: true, linkify: true, typographer: true });
+	const hljs = require('./node_modules/highlight.js/lib/common');
+	const md = new MarkdownIt({
+		html: true,
+		linkify: true,
+		typographer: true,
+		highlight(code, lang) {
+			const highlighted = lang && hljs.getLanguage(lang)
+				? hljs.highlight(code, { language: lang, ignoreIllegals: true }).value
+				: hljs.highlightAuto(code).value;
+			return `<pre class="hljs"><code>${highlighted}</code></pre>`;
+		}
+	});
 
 	// Inject data-line attributes from source maps for scroll sync
 	md.core.ruler.push('null-source-map', state => {
@@ -274,6 +285,7 @@ class NullMarkdownPreview {
 		const katexCssUri   = u('node_modules', 'katex', 'dist', 'katex.min.css');
 		const katexJsUri    = u('node_modules', 'katex', 'dist', 'katex.min.js');
 		const autoRenderUri = u('node_modules', 'katex', 'dist', 'contrib', 'auto-render.min.js');
+		const hlCssUri      = u('node_modules', 'highlight.js', 'styles', 'vs2015.min.css');
 		const mermaidUri    = u('node_modules', 'mermaid', 'dist', 'mermaid.min.js');
 		const previewJsUri  = u('preview', 'preview.js');
 		const nonce         = crypto.randomBytes(16).toString('hex');
@@ -285,6 +297,7 @@ class NullMarkdownPreview {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${wv.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}' ${wv.cspSource}; img-src ${wv.cspSource} https: data:; font-src ${wv.cspSource};">
 <link rel="stylesheet" href="${katexCssUri}">
+<link rel="stylesheet" href="${hlCssUri}">
 <link rel="stylesheet" href="${cssUri}">
 </head>
 <body>
@@ -355,6 +368,7 @@ class NullMarkdownSlides {
 		const katexCssUri   = u('node_modules', 'katex', 'dist', 'katex.min.css');
 		const katexJsUri    = u('node_modules', 'katex', 'dist', 'katex.min.js');
 		const autoRenderUri = u('node_modules', 'katex', 'dist', 'contrib', 'auto-render.min.js');
+		const hlCssUri      = u('node_modules', 'highlight.js', 'styles', 'vs2015.min.css');
 		const mermaidUri    = u('node_modules', 'mermaid', 'dist', 'mermaid.min.js');
 		const nonce         = crypto.randomBytes(16).toString('hex');
 		const slidesJson    = JSON.stringify(slides);
@@ -366,9 +380,10 @@ class NullMarkdownSlides {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${wv.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}' ${wv.cspSource}; img-src ${wv.cspSource} https: data:; font-src ${wv.cspSource};">
 <link rel="stylesheet" href="${katexCssUri}">
+<link rel="stylesheet" href="${hlCssUri}">
 <link rel="stylesheet" href="${cssUri}">
 <style nonce="${nonce}">
-html, body { height: 100%; margin: 0; padding: 0; background: #0d0d1a; overflow: hidden; }
+html, body { height: 100%; margin: 0; padding: 0; background: #141414; overflow: hidden; }
 body { max-width: none; display: flex; flex-direction: column; align-items: stretch; }
 #slide-container {
   flex: 1; display: flex; align-items: center; justify-content: center;
@@ -380,14 +395,14 @@ body { max-width: none; display: flex; flex-direction: column; align-items: stre
 }
 #slide-nav {
   display: flex; align-items: center; justify-content: center; gap: 20px;
-  padding: 12px; background: #111122; border-top: 1px solid #1e1e35;
+  padding: 12px; background: #181818; border-top: 1px solid #2a2a2a;
   flex-shrink: 0;
 }
 #slide-nav button {
-  background: #1e1e35; color: #e6e6f0; border: 1px solid #252550;
+  background: #2a2a2a; color: #e6e6f0; border: 1px solid #333333;
   border-radius: 6px; padding: 6px 18px; cursor: pointer; font-size: 14px;
 }
-#slide-nav button:hover { background: #252550; }
+#slide-nav button:hover { background: #333333; }
 #slide-nav button:disabled { opacity: 0.3; cursor: default; }
 #slide-counter { color: #9898b8; font-size: 13px; min-width: 80px; text-align: center; }
 /* hide hr separators inside slide content if any leaked through */
