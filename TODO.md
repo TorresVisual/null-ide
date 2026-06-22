@@ -6,10 +6,13 @@
 * [x] AI chat history persistence
 * [x] Prompt templates
 * [x] AI context & workspace awareness
-* [ ] Inline AI edit suggestions
 * [x] AI quick-fix/code actions
 * [x] Local Ollama integration
-* [ ] Proper plan integration to Claude Code similar to Antigravity (Open plan after creating it and reviewing)
+* [X] Proper plan integration to Claude Code similar to Antigravity (Open plan after creating it and reviewing)
+* [ ] Open and approve changes on edits (terminal mode) (this open after i approve in terminal fix) (only works when edited file is open in editor)
+* [x] Show ai title
+* [ ] Copy from terminal not working
+* [x] Init new tabs not working anymore
 
 ---
 
@@ -30,6 +33,8 @@
 * [ ] Built-in quick notes panel
 * [ ] Floating terminal mode
 * [ ] Fix broken updater
+* [x] The command null . needs to have a open powershell if i close the shell the ide closes this is unconvenient
+
 
 ---
 
@@ -43,9 +48,9 @@
 
 ## Markdown System
 
-* [ ] Export to PDF
-* [ ] Wiki links
-* [ ] Presentation/slides mode
+* [x] Export to PDF
+* [x] Wiki links
+* [x] Presentation/slides mode
 
 ---
 

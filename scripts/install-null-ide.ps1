@@ -328,6 +328,21 @@ function Unregister-Path {
     [System.Environment]::SetEnvironmentVariable('PATH', ($parts -join ';'), 'User')
 }
 
+function Write-NullShim {
+    param([string]$InstallDir)
+    $binDir = Join-Path $InstallDir 'bin'
+    New-Item -ItemType Directory -Path $binDir -Force | Out-Null
+    $shimPath = Join-Path $binDir 'null.cmd'
+    # Use 'start' so null.exe is detached from the calling terminal session.
+    # Without this, closing the terminal window kills the editor process.
+    [System.IO.File]::WriteAllText(
+        $shimPath,
+        "@echo off`r`nstart `"`" `"%~dp0..\null.exe`" %*`r`n",
+        [System.Text.Encoding]::ASCII
+    )
+    return $binDir
+}
+
 function Set-DefaultSettings {
     $settingsDir = Join-Path $env:APPDATA "Null\User"
     $settingsPath = Join-Path $settingsDir "settings.json"
@@ -444,6 +459,8 @@ function Install-Zip {
         Rename-Item -LiteralPath $stageDir -NewName $installName
         $stageDir = $null
 
+        $binDir = Write-NullShim -InstallDir $destinationFullPath
+
         [ordered]@{
             repo        = $Repository
             version     = $InstalledVersion
@@ -479,7 +496,8 @@ function Install-Zip {
 
         if (-not $NoPath) {
             Write-Step "Adding to user PATH"
-            Register-Path -Dir $destinationFullPath
+            Unregister-Path -Dir $destinationFullPath  # remove old direct-exe entry from prior installs
+            Register-Path -Dir $binDir
         }
 
         Write-Step "Seeding default settings"
