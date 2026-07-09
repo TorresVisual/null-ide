@@ -4,7 +4,7 @@
 
 **Goal:** Right-clicking the Null IDE taskbar icon on Windows shows a "Recent Projects" jump list category (sourced from a list `null-tools` maintains) plus a "More Recent Projects..." task that opens a quick-pick of everything tracked beyond the jump list's visible cap.
 
-**Architecture:** `null-tools` (extension host) writes recently-opened folders/`.code-workspace` files to `%APPDATA%\Null\null-recent-projects.json` (up to 50 entries). A patch to VS Code's Electron main process (`patches/0001-jumplist-recent-projects.patch`) repoints the existing jump-list-building code in `workspacesHistoryMainService.ts` to read that file instead of VS Code's own built-in recently-opened-workspaces history, and adds a static "More Recent Projects..." task that launches `null.exe --open-url -- "null://null.null-tools/recent-projects"`, routed by VS Code's already-registered `null://` protocol to a `vscode.window.registerUriHandler` in `null-tools`.
+**Architecture:** `null-tools` (extension host) writes recently-opened folders/`.code-workspace` files to `%APPDATA%\Null\null-recent-projects.json` (up to 50 entries). A patch to VS Code's Electron main process (`patches/001-jumplist-recent-projects.patch`) repoints the existing jump-list-building code in `workspacesHistoryMainService.ts` to read that file instead of VS Code's own built-in recently-opened-workspaces history, and adds a static "More Recent Projects..." task that launches `null.exe --open-url -- "null://null.null-tools/recent-projects"`, routed by VS Code's already-registered `null://` protocol to a `vscode.window.registerUriHandler` in `null-tools`.
 
 **Tech Stack:** TypeScript (null-tools extension, `tsc`, CommonJS, target ES2022), Node's built-in `node:test` runner (no new devDependency), a git-format patch against VS Code's Electron main process (applied via `git apply --ignore-whitespace` in CI, per `.github/workflows/build.yml`).
 
@@ -338,7 +338,7 @@ git commit -m "feat(null-tools): track current project and handle More Recent Pr
 ### Task 3: VS Code core patch — source the jump list from null-tools' list
 
 **Files:**
-- Create: `patches/0001-jumplist-recent-projects.patch`
+- Create: `patches/001-jumplist-recent-projects.patch`
 - Modify: `TODO.md` (check off "Jump list recent projects")
 
 **Interfaces:**
@@ -346,11 +346,15 @@ git commit -m "feat(null-tools): track current project and handle More Recent Pr
 - Consumes the URI route from Task 2: `null://null.null-tools/recent-projects`.
 - Produces: a patched `src/vs/platform/workspaces/electron-main/workspacesHistoryMainService.ts` in the CI build's `vscode-src` checkout.
 
+**Corrections discovered during implementation:**
+- `patches/README.md` (not mentioned in `CLAUDE.md`, discovered while placing this file) documents the actual naming convention: a **three-digit** `NNN-short-description.patch` prefix, not `git format-patch`'s default four-digit `000N-`. The patch is named `001-jumplist-recent-projects.patch` (patches/ was otherwise empty, so this is patch 001).
+- The same README references a local verification helper, `build.sh --patches-only`, which applies everything in `patches/` against a `VSCODE_SRC` checkout. It currently has a pre-existing bash syntax bug unrelated to this feature (`patches=("$patch_dir"/*.patch 2>/dev/null || true)` on line 41 is invalid array-literal syntax) that prevents it from running at all. This is out of scope for this plan; verification instead uses the equivalent direct `git apply --check` shown in Step 2 below, which was actually run (not just described) against a scratch copy of the exact pinned upstream file and applied cleanly.
+
 This patch was authored and verified against the real upstream source before writing this plan: `VSCODIUM_TAG` (`1.121.03429`) pins VS Code `1.121.0`, whose `src/vs/platform/workspaces/electron-main/workspacesHistoryMainService.ts` was fetched from `https://raw.githubusercontent.com/microsoft/vscode/1.121.0/...` and used as the exact base for a real `git format-patch`. The patch was then test-applied with `git apply --check --ignore-whitespace` against a pristine copy of that same file in a scratch git repo, and applied cleanly. It also removes the `getWindowsJumpListLabel` method (and its now-solely-dependent `splitRecentLabel`/`WORKSPACE_EXTENSION` imports), since that method's only call site is removed and VS Code's `tsconfig.base.json` has `noUnusedLocals: true` — leaving it in would break the CI compile step.
 
 - [ ] **Step 1: Create the patch file**
 
-Create `patches/0001-jumplist-recent-projects.patch` with exactly this content:
+Create `patches/001-jumplist-recent-projects.patch` with exactly this content:
 
 ```
 From a0afa322acf92b5381975f5796a721d4c13a3236 Mon Sep 17 00:00:00 2001
@@ -565,7 +569,7 @@ curl -s "https://raw.githubusercontent.com/microsoft/vscode/1.121.0/src/vs/platf
   -o /tmp/verify-patch/src/vs/platform/workspaces/electron-main/workspacesHistoryMainService.ts
 cd /tmp/verify-patch && git init -q && git config core.autocrlf false \
   && git add -A && git -c user.email=a@a.com -c user.name=a commit -q -m baseline
-git apply --check --ignore-whitespace "$OLDPWD/patches/0001-jumplist-recent-projects.patch"
+git apply --check --ignore-whitespace "$OLDPWD/patches/001-jumplist-recent-projects.patch"
 ```
 
 Expected: no output from `git apply --check` (silent success means the patch applies cleanly).
@@ -584,7 +588,7 @@ to:
 - [ ] **Step 4: Commit**
 
 ```bash
-git add patches/0001-jumplist-recent-projects.patch TODO.md
+git add patches/001-jumplist-recent-projects.patch TODO.md
 git commit -m "feat: patch VS Code jump list to source Recent Projects from null-tools"
 ```
 
@@ -599,7 +603,7 @@ git commit -m "feat: patch VS Code jump list to source Recent Projects from null
 - [ ] **Step 1: Trigger a CI build**
 
 Run: `gh workflow run build.yml` (or trigger `workflow_dispatch` from the GitHub Actions UI for this repo).
-Expected: the workflow starts; in particular watch the "Apply overlay patches" step log for `Applying overlay patch: 0001-jumplist-recent-projects.patch` with no error, and the subsequent `npx gulp vscode-win32-x64` step compiling without TypeScript errors in `workspacesHistoryMainService.ts`.
+Expected: the workflow starts; in particular watch the "Apply overlay patches" step log for `Applying overlay patch: 001-jumplist-recent-projects.patch` with no error, and the subsequent `npx gulp vscode-win32-x64` step compiling without TypeScript errors in `workspacesHistoryMainService.ts`.
 
 - [ ] **Step 2: Install the built artifact**
 

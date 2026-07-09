@@ -1,0 +1,201 @@
+From a0afa322acf92b5381975f5796a721d4c13a3236 Mon Sep 17 00:00:00 2001
+From: Null IDE <dev@null-ide.local>
+Date: Thu, 9 Jul 2026 13:21:42 +0200
+Subject: [PATCH] feat(jumplist): source Windows jump list Recent category from
+ null-tools
+
+Adds a 'More Recent Projects...' task and repoints the jump list's
+'Recent' category to read from a JSON file maintained by the null-tools
+extension, instead of VS Code's built-in recently-opened-workspaces
+history. Bumps the visible cap from 7 to 10 entries. Removes the
+now-dead getWindowsJumpListLabel helper (and its now-unused
+splitRecentLabel/WORKSPACE_EXTENSION imports) since noUnusedLocals is
+enabled in VS Code's tsconfig.
+---
+ .../workspacesHistoryMainService.ts           | 122 ++++++++----------
+ 1 file changed, 57 insertions(+), 65 deletions(-)
+
+diff --git a/src/vs/platform/workspaces/electron-main/workspacesHistoryMainService.ts b/src/vs/platform/workspaces/electron-main/workspacesHistoryMainService.ts
+index 560f5ca..209a913 100644
+--- a/src/vs/platform/workspaces/electron-main/workspacesHistoryMainService.ts
++++ b/src/vs/platform/workspaces/electron-main/workspacesHistoryMainService.ts
+@@ -7,7 +7,7 @@ import { app, JumpListCategory, JumpListItem } from 'electron';
+ import { coalesce } from '../../../base/common/arrays.js';
+ import { ThrottledDelayer } from '../../../base/common/async.js';
+ import { Emitter, Event as CommonEvent } from '../../../base/common/event.js';
+-import { normalizeDriveLetter, splitRecentLabel } from '../../../base/common/labels.js';
++import { normalizeDriveLetter } from '../../../base/common/labels.js';
+ import { Disposable } from '../../../base/common/lifecycle.js';
+ import { Schemas } from '../../../base/common/network.js';
+ import { isMacintosh, isWindows } from '../../../base/common/platform.js';
+@@ -21,11 +21,12 @@ import { ILogService } from '../../log/common/log.js';
+ import { StorageScope, StorageTarget } from '../../storage/common/storage.js';
+ import { IApplicationStorageMainService } from '../../storage/electron-main/storageMainService.js';
+ import { IRecent, IRecentFile, IRecentFolder, IRecentlyOpened, IRecentWorkspace, isRecentFile, isRecentFolder, isRecentWorkspace, restoreRecentlyOpened, toStoreData } from '../common/workspaces.js';
+-import { IWorkspaceIdentifier, WORKSPACE_EXTENSION } from '../../workspace/common/workspace.js';
++import { IWorkspaceIdentifier } from '../../workspace/common/workspace.js';
+ import { IWorkspacesManagementMainService } from './workspacesManagementMainService.js';
+ import { ResourceMap } from '../../../base/common/map.js';
+ import { IDialogMainService } from '../../dialogs/electron-main/dialogMainService.js';
+ import { IEnvironmentMainService } from '../../environment/electron-main/environmentMainService.js';
++import { join } from '../../../base/common/path.js';
+ 
+ export const IWorkspacesHistoryMainService = createDecorator<IWorkspacesHistoryMainService>('workspacesHistoryMainService');
+ 
+@@ -305,7 +306,7 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
+ 	private static readonly MAX_MACOS_DOCK_RECENT_WORKSPACES = 7; 		// prefer higher number of workspaces...
+ 	private static readonly MAX_MACOS_DOCK_RECENT_ENTRIES_TOTAL = 10; 	// ...over number of files
+ 
+-	private static readonly MAX_WINDOWS_JUMP_LIST_ENTRIES = 7;
++	private static readonly MAX_WINDOWS_JUMP_LIST_ENTRIES = 10; // Null IDE: was 7 upstream
+ 
+ 	// Exclude some very common files from the dock/taskbar
+ 	private static readonly COMMON_FILES_FILTER = [
+@@ -349,58 +350,75 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
+ 					args: '-n', // force new window
+ 					iconPath: process.execPath,
+ 					iconIndex: 0
++				},
++				{
++					// Null IDE: opens a quick-pick of all tracked recent projects (beyond the
++					// MAX_WINDOWS_JUMP_LIST_ENTRIES cap below), handled by the null-tools extension's
++					// registered URI handler. 'null' below must match product.json's urlProtocol.
++					type: 'task',
++					title: localize('moreRecentProjects', "More Recent Projects..."),
++					description: localize('moreRecentProjectsDesc', "Shows all recently opened projects"),
++					program: process.execPath,
++					args: '--open-url -- "null://null.null-tools/recent-projects"',
++					iconPath: process.execPath,
++					iconIndex: 0
+ 				}
+ 			]
+ 		});
+ 
+-		// Recent Workspaces
+-		if ((await this.getRecentlyOpened()).workspaces.length > 0) {
++		// Recent Projects (Null IDE: sourced from null-tools' own tracked list, not
++		// VS Code's built-in recently-opened-workspaces history)
++		{
++			interface NullRecentProjectEntry { path: string; label: string; isWorkspaceFile: boolean }
++
++			const nullRecentProjectsPath = join(this.environmentMainService.userDataPath, 'null-recent-projects.json');
++			let nullRecentProjects: NullRecentProjectEntry[] = [];
++			try {
++				const raw = await Promises.readFile(nullRecentProjectsPath, 'utf8');
++				nullRecentProjects = JSON.parse(raw);
++			} catch {
++				nullRecentProjects = [];
++			}
++
++			const argsForEntry = (entry: NullRecentProjectEntry) => entry.isWorkspaceFile
++				? `--file-uri "${URI.file(entry.path).toString()}"`
++				: `--folder-uri "${URI.file(entry.path).toString()}"`;
+ 
+ 			// The user might have meanwhile removed items from the jump list and we have to respect that
+ 			// so we need to update our list of recent paths with the choice of the user to not add them again
+ 			// Also: Windows will not show our custom category at all if there is any entry which was removed
+ 			// by the user! See https://github.com/microsoft/vscode/issues/15052
+-			const toRemove: URI[] = [];
+-			for (const item of app.getJumpListSettings().removedItems) {
+-				const args = item.args;
+-				if (args) {
+-					const match = /^--(folder|file)-uri\s+"([^"]+)"$/.exec(args);
+-					if (match) {
+-						toRemove.push(URI.parse(match[2]));
++			const removedArgs = new Set(coalesce(app.getJumpListSettings().removedItems.map(item => item.args)));
++			if (removedArgs.size > 0) {
++				const filtered = nullRecentProjects.filter(entry => !removedArgs.has(argsForEntry(entry)));
++				if (filtered.length !== nullRecentProjects.length) {
++					nullRecentProjects = filtered;
++					try {
++						await Promises.writeFile(nullRecentProjectsPath, JSON.stringify(nullRecentProjects, undefined, '\t'));
++					} catch (error) {
++						this.logService.warn('updateWindowsJumpList#writeFile (null-recent-projects)', error);
+ 					}
+ 				}
+ 			}
+-			await this.removeRecentlyOpened(toRemove);
+-
+-			// Add entries
+-			let hasWorkspaces = false;
+-			const items: JumpListItem[] = coalesce((await this.getRecentlyOpened()).workspaces.slice(0, WorkspacesHistoryMainService.MAX_WINDOWS_JUMP_LIST_ENTRIES).map(recent => {
+-				const workspace = isRecentWorkspace(recent) ? recent.workspace : recent.folderUri;
+-
+-				const { title, description } = this.getWindowsJumpListLabel(workspace, recent.label);
+-				let args;
+-				if (URI.isUri(workspace)) {
+-					args = `--folder-uri "${workspace.toString()}"`;
+-				} else {
+-					hasWorkspaces = true;
+-					args = `--file-uri "${workspace.configPath.toString()}"`;
+-				}
+ 
+-				return {
+-					type: 'task',
+-					title: title.substr(0, 255), 				// Windows seems to be picky around the length of entries
+-					description: description.substr(0, 255),	// (see https://github.com/microsoft/vscode/issues/111177)
+-					program: process.execPath,
+-					args,
+-					iconPath: 'explorer.exe', // simulate folder icon
+-					iconIndex: 0
+-				};
+-			}));
++			if (nullRecentProjects.length > 0) {
++				const items: JumpListItem[] = nullRecentProjects.slice(0, WorkspacesHistoryMainService.MAX_WINDOWS_JUMP_LIST_ENTRIES).map(entry => {
++					const uri = URI.file(entry.path);
++
++					return {
++						type: 'task',
++						title: entry.label.substr(0, 255), 				// Windows seems to be picky around the length of entries
++						description: this.renderJumpListPathDescription(uri).substr(0, 255),	// (see https://github.com/microsoft/vscode/issues/111177)
++						program: process.execPath,
++						args: argsForEntry(entry),
++						iconPath: 'explorer.exe', // simulate folder icon
++						iconIndex: 0
++					};
++				});
+ 
+-			if (items.length > 0) {
+ 				jumpList.push({
+ 					type: 'custom',
+-					name: hasWorkspaces ? localize('recentFoldersAndWorkspaces', "Recent Folders & Workspaces") : localize('recentFolders', "Recent Folders"),
++					name: localize('recentProjects', "Recent Projects"),
+ 					items
+ 				});
+ 			}
+@@ -421,32 +439,6 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
+ 		}
+ 	}
+ 
+-	private getWindowsJumpListLabel(workspace: IWorkspaceIdentifier | URI, recentLabel: string | undefined): { title: string; description: string } {
+-
+-		// Prefer recent label
+-		if (recentLabel) {
+-			return { title: splitRecentLabel(recentLabel).name, description: recentLabel };
+-		}
+-
+-		// Single Folder
+-		if (URI.isUri(workspace)) {
+-			return { title: basename(workspace), description: this.renderJumpListPathDescription(workspace) };
+-		}
+-
+-		// Workspace: Untitled
+-		if (this.workspacesManagementMainService.isUntitledWorkspace(workspace)) {
+-			return { title: localize('untitledWorkspace', "Untitled (Workspace)"), description: '' };
+-		}
+-
+-		// Workspace: normal
+-		let filename = basename(workspace.configPath);
+-		if (filename.endsWith(WORKSPACE_EXTENSION)) {
+-			filename = filename.substr(0, filename.length - WORKSPACE_EXTENSION.length - 1);
+-		}
+-
+-		return { title: localize('workspaceName', "{0} (Workspace)", filename), description: this.renderJumpListPathDescription(workspace.configPath) };
+-	}
+-
+ 	private renderJumpListPathDescription(uri: URI) {
+ 		return uri.scheme === 'file' ? normalizeDriveLetter(uri.fsPath) : uri.toString();
+ 	}
+-- 
+2.55.0.windows.2
+
