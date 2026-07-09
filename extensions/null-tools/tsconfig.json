@@ -10,6 +10,6 @@
     "esModuleInterop": true,
     "skipLibCheck": true
   },
-  "include": ["src/extension.ts", "src/ollama.ts"],
+  "include": ["src/extension.ts", "src/ollama.ts", "src/recentProjects.test.ts"],
   "exclude": ["src/webview"]
 }

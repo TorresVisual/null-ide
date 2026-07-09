@@ -8,7 +8,8 @@
   "engines": { "vscode": "^1.85.0" },
   "main": "./out/extension.js",
   "scripts": {
-    "compile": "tsc -p tsconfig.json && tsc -p tsconfig.webview.json"
+    "compile": "tsc -p tsconfig.json && tsc -p tsconfig.webview.json",
+    "test": "tsc -p tsconfig.json && node --test out/recentProjects.test.js"
   },
   "devDependencies": {
     "typescript": "^5.8.0",

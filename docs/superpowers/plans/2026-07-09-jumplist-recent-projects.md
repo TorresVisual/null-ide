@@ -199,9 +199,11 @@ Modify `extensions/null-tools/package.json:10-12`:
 ```json
   "scripts": {
     "compile": "tsc -p tsconfig.json && tsc -p tsconfig.webview.json",
-    "test": "tsc -p tsconfig.json && node --test out"
+    "test": "tsc -p tsconfig.json && node --test out/recentProjects.test.js"
   },
 ```
+
+(Discovered during implementation: `node --test <directory>` does not reliably scan the directory on this Node version/platform — it errors with `Cannot find module`. An explicit file path avoids that, and avoids relying on shell glob expansion, which Windows' default `cmd.exe` npm script shell doesn't perform anyway.)
 
 Run: `cd extensions/null-tools && npm test`
 Expected: PASS — 6 tests, 0 failures (Node's built-in test runner reports a summary like `# pass 6`, `# fail 0`).
