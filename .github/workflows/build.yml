@@ -62,7 +62,7 @@ jobs:
   build-windows:
     name: Build Windows x64
     if: github.event_name != 'schedule'
-    runs-on: windows-latest
+    runs-on: windows-2022
     permissions:
       contents: write
     steps:

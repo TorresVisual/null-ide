@@ -10,7 +10,7 @@ Key characteristics:
 - Binary name: `null.exe` — accessible from the terminal as `null .`
 - Built on VSCodium, which strips Microsoft telemetry from VS Code
 - Four built-in extensions bundled at build time: `null-theme`, `null-icons`, `null-tools`, `null-markdown`
-- CI builds on `windows-latest`; the developer authors source changes locally
+- CI builds on `windows-2022`; the developer authors source changes locally
 - Releases publish a portable ZIP and an Inno Setup installer to GitHub Releases
 - The in-app updater (`null-tools`) checks GitHub Releases on startup and can self-update
 - Win11 Explorer context menu provided by a native IExplorerCommand DLL (`shell-ext/`) built with CMake + MSVC
@@ -62,7 +62,7 @@ Key characteristics:
 
 ## How the Build Works
 
-The entire build runs in GitHub Actions on a `windows-latest` runner — do **not** try to run it locally.
+The entire build runs in GitHub Actions on a `windows-2022` runner — do **not** try to run it locally.
 
 1. Clone VSCodium at `VSCODIUM_TAG` and VS Code at the matching `MS_TAG`.
 2. Apply VSCodium's own patches against the VS Code source tree.
