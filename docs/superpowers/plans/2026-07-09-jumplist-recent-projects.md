@@ -352,6 +352,7 @@ git commit -m "feat(null-tools): track current project and handle More Recent Pr
 - **A real CI run caught a genuine bug in the first version of this patch**, since `git apply --check` only verifies the diff applies — it can't catch TypeScript type errors. The original patch called `Promises.readFile(...)` (from `vs/base/node/pfs.js`), which doesn't exist: that class only exposes `read`, `readdir`, `writeFile`, `rm`, `rename`, `copy`, `realpath`, etc. — confirmed by fetching `pfs.ts` directly and checking its exported shape, and by checking that the *original* (pre-patch) file only ever called `Promises.exists`, never `readFile`. `npx gulp vscode-win32-x64`'s `compile-src` step failed with `error TS2339: Property 'readFile' does not exist on type '(Anonymous class)'` at the exact line. Fixed by importing Node's `fs/promises` directly (`import { promises as fsPromises } from 'fs';`) and using `fsPromises.readFile`/`fsPromises.writeFile` instead of guessing at VS Code's internal `Promises` API shape. Re-verified with `git apply --check` against both 1.121.0 and 1.126.0, and with a standalone TypeScript-parser syntax check (`ts.createProgram` with `noResolve: true`) against the patched file, since the full `vscode-src` tree isn't available locally to run a real `tsc` typecheck.
 - Separately, `VSCODIUM_TAG` was bumped to `1.126.04524` (VS Code `1.126.0`) mid-implementation by the scheduled upstream-check job — see the CI fix commit for `build.yml`'s Node version pin (unrelated to this patch; `workspacesHistoryMainService.ts` is byte-identical between 1.121.0 and 1.126.0, confirmed by diff).
 - Three unrelated compile errors also surfaced in the same CI run, in `src/vs/platform/agentHost/node/{claude,codex,copilot}/...` — none of those files are touched by this patch or by anything in this plan; they're a pre-existing issue with VS Code 1.126.0's agentHost source (likely interacting with the VSCodium copilot-removal patch/build step) and are out of scope here.
+- **A real-world usage bug surfaced after the build succeeded**: recent projects only accumulated when opened via the "More Recent Projects..." quick-pick (which calls `vscode.openFolder` with `forceNewWindow: true`), not via regular File > Open Folder reusing the current window. Root cause: tracking lived in the `null-tools` extension host, triggered once at `activate()` — which does not reliably re-fire when a window is reused for a different folder. The fix moves tracking into the main-process patch itself, directly inside `addRecentlyOpened()` (the one call site every folder/workspace-open path in `windowsMainService.ts` funnels through, confirmed by reading that file — new window or reused window, it doesn't matter). `null-tools` no longer writes `null-recent-projects.json` at all; `trackCurrentProject()`, `upsertEntry()`, and `writeRecentProjectsAtomic()` were removed from `recentProjects.ts`/`recentProjectsIntegration.ts` (and their tests) since the extension now only *reads* the file, for the "More Recent Projects..." quick-pick. Re-verified the redesigned patch against both 1.121.0 and 1.126.0 and with the standalone syntax check.
 
 This patch was authored and verified against the real upstream source before writing this plan: `VSCODIUM_TAG` (`1.121.03429`) pins VS Code `1.121.0`, whose `src/vs/platform/workspaces/electron-main/workspacesHistoryMainService.ts` was fetched from `https://raw.githubusercontent.com/microsoft/vscode/1.121.0/...` and used as the exact base for a real `git format-patch`. The patch was then test-applied with `git apply --check --ignore-whitespace` against a pristine copy of that same file in a scratch git repo, and applied cleanly. It also removes the `getWindowsJumpListLabel` method (and its now-solely-dependent `splitRecentLabel`/`WORKSPACE_EXTENSION` imports), since that method's only call site is removed and VS Code's `tsconfig.base.json` has `noUnusedLocals: true` — leaving it in would break the CI compile step.
 
@@ -360,27 +361,34 @@ This patch was authored and verified against the real upstream source before wri
 Create `patches/001-jumplist-recent-projects.patch` with exactly this content:
 
 ```
-From 093ec8f8ff7e57ff5d0da53739851ec1f4f8d99f Mon Sep 17 00:00:00 2001
+From 91f476fef33c78f06ab6ba1fcac0a0a2f983c388 Mon Sep 17 00:00:00 2001
 From: Null IDE <dev@null-ide.local>
-Date: Thu, 9 Jul 2026 15:57:16 +0200
+Date: Thu, 9 Jul 2026 21:39:43 +0200
 Subject: [PATCH] feat(jumplist): source Windows jump list Recent category from
  null-tools
 
 Adds a 'More Recent Projects...' task and repoints the jump list's
-'Recent' category to read from a JSON file maintained by the null-tools
-extension, instead of VS Code's built-in recently-opened-workspaces
-history. Bumps the visible cap from 7 to 10 entries. Removes the
-now-dead getWindowsJumpListLabel helper (and its now-unused
+'Recent' category to read from a JSON file maintained directly from
+addRecentlyOpened(), instead of VS Code's built-in recently-opened-
+workspaces history array. Bumps the visible cap from 7 to 10 entries.
+Removes the now-dead getWindowsJumpListLabel helper (and its now-unused
 splitRecentLabel/WORKSPACE_EXTENSION imports) since noUnusedLocals is
-enabled in VS Code's tsconfig. Uses Node's fs/promises directly for
-reading/writing the JSON file rather than VS Code's internal Promises
-helper from pfs.js, which has no readFile method.
+enabled in VS Code's tsconfig. Uses Node's fs/promises directly rather
+than VS Code's internal Promises helper from pfs.js, which has no
+readFile method.
+
+Tracks recent projects directly inside addRecentlyOpened() -- the one
+universal call site every folder/workspace-open path in
+windowsMainService.ts (new window or reused window) funnels through --
+rather than relying on the null-tools extension host to track on
+activation, which does not reliably re-fire when a window is reused
+for a different folder.
 ---
- .../workspacesHistoryMainService.ts           | 123 +++++++++---------
- 1 file changed, 58 insertions(+), 65 deletions(-)
+ .../workspacesHistoryMainService.ts           | 167 +++++++++++-------
+ 1 file changed, 102 insertions(+), 65 deletions(-)
 
 diff --git a/src/vs/platform/workspaces/electron-main/workspacesHistoryMainService.ts b/src/vs/platform/workspaces/electron-main/workspacesHistoryMainService.ts
-index 560f5ca..f753352 100644
+index 560f5ca..f1bf944 100644
 --- a/src/vs/platform/workspaces/electron-main/workspacesHistoryMainService.ts
 +++ b/src/vs/platform/workspaces/electron-main/workspacesHistoryMainService.ts
 @@ -7,7 +7,7 @@ import { app, JumpListCategory, JumpListItem } from 'electron';
@@ -407,7 +415,58 @@ index 560f5ca..f753352 100644
  
  export const IWorkspacesHistoryMainService = createDecorator<IWorkspacesHistoryMainService>('workspacesHistoryMainService');
  
-@@ -305,7 +307,7 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
+@@ -78,6 +80,50 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
+ 	//#region Workspaces History
+ 
+ 	async addRecentlyOpened(recentToAdd: IRecent[]): Promise<void> {
++
++		// Null IDE: update null-tools' own recent-projects list (see the
++		// "Recent Projects" jump list category built in updateWindowsJumpList).
++		{
++			interface NullRecentProjectEntry { path: string; label: string; isWorkspaceFile: boolean; timestamp: number }
++
++			const nullNewEntries: Omit<NullRecentProjectEntry, 'timestamp'>[] = [];
++			for (const recent of recentToAdd) {
++				if (isRecentWorkspace(recent) && !this.workspacesManagementMainService.isUntitledWorkspace(recent.workspace)) {
++					let label = basename(recent.workspace.configPath);
++					if (label.endsWith('.code-workspace')) {
++						label = `${label.slice(0, -'.code-workspace'.length)} (Workspace)`;
++					}
++					nullNewEntries.push({ path: recent.workspace.configPath.fsPath, label, isWorkspaceFile: true });
++				} else if (isRecentFolder(recent)) {
++					nullNewEntries.push({ path: recent.folderUri.fsPath, label: basename(recent.folderUri), isWorkspaceFile: false });
++				}
++			}
++
++			if (nullNewEntries.length > 0) {
++				const nullRecentProjectsPath = join(this.environmentMainService.userDataPath, 'null-recent-projects.json');
++				try {
++					let nullRecentProjects: NullRecentProjectEntry[] = [];
++					try {
++						const raw = await fsPromises.readFile(nullRecentProjectsPath, 'utf8');
++						nullRecentProjects = JSON.parse(raw);
++					} catch {
++						nullRecentProjects = [];
++					}
++
++					for (const entry of nullNewEntries) {
++						const normalized = entry.path.toLowerCase();
++						nullRecentProjects = nullRecentProjects.filter(existing => existing.path.toLowerCase() !== normalized);
++						nullRecentProjects.unshift({ ...entry, timestamp: Date.now() });
++					}
++					nullRecentProjects = nullRecentProjects.slice(0, 50);
++
++					await fsPromises.writeFile(nullRecentProjectsPath, JSON.stringify(nullRecentProjects, undefined, '\t'));
++				} catch (error) {
++					this.logService.warn('addRecentlyOpened#null-recent-projects', error);
++				}
++			}
++		}
++
+ 		let workspaces: Array<IRecentFolder | IRecentWorkspace> = [];
+ 		let files: IRecentFile[] = [];
+ 
+@@ -305,7 +351,7 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
  	private static readonly MAX_MACOS_DOCK_RECENT_WORKSPACES = 7; 		// prefer higher number of workspaces...
  	private static readonly MAX_MACOS_DOCK_RECENT_ENTRIES_TOTAL = 10; 	// ...over number of files
  
@@ -416,7 +475,7 @@ index 560f5ca..f753352 100644
  
  	// Exclude some very common files from the dock/taskbar
  	private static readonly COMMON_FILES_FILTER = [
-@@ -349,58 +351,75 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
+@@ -349,58 +395,75 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
  					args: '-n', // force new window
  					iconPath: process.execPath,
  					iconIndex: 0
@@ -528,7 +587,7 @@ index 560f5ca..f753352 100644
  					items
  				});
  			}
-@@ -421,32 +440,6 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
+@@ -421,32 +484,6 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
  		}
  	}
  

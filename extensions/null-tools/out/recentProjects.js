@@ -33,14 +33,10 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.MAX_TRACKED_ENTRIES = void 0;
 exports.getRecentProjectsFilePath = getRecentProjectsFilePath;
 exports.readRecentProjects = readRecentProjects;
-exports.writeRecentProjectsAtomic = writeRecentProjectsAtomic;
-exports.upsertEntry = upsertEntry;
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
-exports.MAX_TRACKED_ENTRIES = 50;
 function getRecentProjectsFilePath() {
     const appData = process.env.APPDATA;
     if (!appData) {
@@ -57,20 +53,5 @@ function readRecentProjects(filePath) {
     catch {
         return [];
     }
-}
-function writeRecentProjectsAtomic(filePath, entries) {
-    fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    const tmpPath = `${filePath}.tmp-${process.pid}`;
-    fs.writeFileSync(tmpPath, JSON.stringify(entries, null, '\t'));
-    fs.renameSync(tmpPath, filePath);
-}
-function upsertEntry(entries, entry, maxEntries = exports.MAX_TRACKED_ENTRIES) {
-    const normalizedTarget = entry.path.toLowerCase();
-    const withoutExisting = entries.filter(e => e.path.toLowerCase() !== normalizedTarget);
-    const updated = [
-        { path: entry.path, label: entry.label, isWorkspaceFile: entry.isWorkspaceFile, timestamp: Date.now() },
-        ...withoutExisting,
-    ];
-    return updated.slice(0, maxEntries);
 }
 //# sourceMappingURL=recentProjects.js.map

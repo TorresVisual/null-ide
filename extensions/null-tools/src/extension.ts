@@ -8,7 +8,7 @@ import * as https from 'https';
 import { execSync, spawn } from 'child_process';
 import * as ollama from './ollama';
 import { ClaudeHistoryIndex, ClaudeCodeSession } from './claudeHistory';
-import { trackCurrentProject, registerRecentProjectsUriHandler } from './recentProjectsIntegration';
+import { registerRecentProjectsUriHandler } from './recentProjectsIntegration';
 
 // Electron adds resourcesPath to the Node process object; @types/node doesn't know about it.
 declare global {
@@ -1302,7 +1302,6 @@ export function activate(context: vscode.ExtensionContext): void {
   bar.command = 'null.generateCommitMessage'; bar.show();
   context.subscriptions.push(bar);
 
-  trackCurrentProject();
   registerRecentProjectsUriHandler(context);
 
   const updateBar = vscode.window.createStatusBarItem('null.update', vscode.StatusBarAlignment.Right, 1);

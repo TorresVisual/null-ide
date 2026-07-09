@@ -1169,7 +1169,6 @@ function activate(context) {
     bar.command = 'null.generateCommitMessage';
     bar.show();
     context.subscriptions.push(bar);
-    (0, recentProjectsIntegration_1.trackCurrentProject)();
     (0, recentProjectsIntegration_1.registerRecentProjectsUriHandler)(context);
     const updateBar = vscode.window.createStatusBarItem('null.update', vscode.StatusBarAlignment.Right, 1);
     updateBar.text = '$(cloud-download) Update';

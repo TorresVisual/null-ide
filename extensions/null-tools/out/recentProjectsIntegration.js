@@ -33,40 +33,9 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.trackCurrentProject = trackCurrentProject;
 exports.registerRecentProjectsUriHandler = registerRecentProjectsUriHandler;
 const vscode = __importStar(require("vscode"));
-const path = __importStar(require("path"));
 const recentProjects_1 = require("./recentProjects");
-function trackCurrentProject() {
-    let root;
-    const workspaceFile = vscode.workspace.workspaceFile;
-    if (workspaceFile && workspaceFile.scheme === 'file') {
-        root = { path: workspaceFile.fsPath, isWorkspaceFile: true };
-    }
-    else {
-        const folders = vscode.workspace.workspaceFolders;
-        if (folders?.length) {
-            root = { path: folders[0].uri.fsPath, isWorkspaceFile: false };
-        }
-    }
-    if (!root) {
-        return;
-    }
-    let label = path.basename(root.path);
-    if (root.isWorkspaceFile && label.endsWith('.code-workspace')) {
-        label = `${label.slice(0, -'.code-workspace'.length)} (Workspace)`;
-    }
-    try {
-        const filePath = (0, recentProjects_1.getRecentProjectsFilePath)();
-        const entries = (0, recentProjects_1.readRecentProjects)(filePath);
-        const updated = (0, recentProjects_1.upsertEntry)(entries, { path: root.path, label, isWorkspaceFile: root.isWorkspaceFile });
-        (0, recentProjects_1.writeRecentProjectsAtomic)(filePath, updated);
-    }
-    catch (err) {
-        console.error('null-tools: failed to update recent projects list', err);
-    }
-}
 function registerRecentProjectsUriHandler(context) {
     context.subscriptions.push(vscode.window.registerUriHandler({
         async handleUri(uri) {
