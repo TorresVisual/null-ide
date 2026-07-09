@@ -8,6 +8,7 @@ import * as https from 'https';
 import { execSync, spawn } from 'child_process';
 import * as ollama from './ollama';
 import { ClaudeHistoryIndex, ClaudeCodeSession } from './claudeHistory';
+import { trackCurrentProject, registerRecentProjectsUriHandler } from './recentProjectsIntegration';
 
 // Electron adds resourcesPath to the Node process object; @types/node doesn't know about it.
 declare global {
@@ -1301,6 +1302,9 @@ export function activate(context: vscode.ExtensionContext): void {
   bar.command = 'null.generateCommitMessage'; bar.show();
   context.subscriptions.push(bar);
 
+  trackCurrentProject();
+  registerRecentProjectsUriHandler(context);
+
   const updateBar = vscode.window.createStatusBarItem('null.update', vscode.StatusBarAlignment.Right, 1);
   updateBar.text = '$(cloud-download) Update'; updateBar.tooltip = 'Null IDE update available';
   updateBar.command = 'null.installUpdate';
@@ -1407,19 +1411,6 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.workspace.registerTextDocumentContentProvider(beforeProvider.scheme, beforeProvider),
   );
-
-  const agentWsRoot = vscode.workspace.workspaceFolders?.[0]?.uri;
-  if (agentWsRoot) {
-    beforeProvider.setWsRoot(agentWsRoot.fsPath);
-    const fw = new AgentFileWatcher(agentWsRoot, beforeProvider);
-    agentsProvider.setFileWatcher(fw);
-    context.subscriptions.push(fw);
-    context.subscriptions.push(
-      vscode.workspace.onWillSaveTextDocument(e => {
-        agentsProvider._fileWatcher?.markUserSave(e.document.uri.fsPath);
-      }),
-    );
-  }
 
   // Track whether the active tab is one of our agent diffs and expose context.
   const updateDiffContext = () => {

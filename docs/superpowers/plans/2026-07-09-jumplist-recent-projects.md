@@ -220,7 +220,7 @@ git commit -m "feat(null-tools): add recent-projects tracking core logic"
 ### Task 2: Wire into `extension.ts` — track on activation, handle the "More Recent Projects..." URI
 
 **Files:**
-- Modify: `extensions/null-tools/src/recentProjects.ts` (append to the file created in Task 1)
+- Create: `extensions/null-tools/src/recentProjectsIntegration.ts` (not appended to `recentProjects.ts` — see note below)
 - Modify: `extensions/null-tools/src/extension.ts:1-10` (import) and `extensions/null-tools/src/extension.ts:1298-1302` (activate, call sites)
 
 **Interfaces:**
@@ -228,25 +228,27 @@ git commit -m "feat(null-tools): add recent-projects tracking core logic"
 - Produces (consumed by Task 4's manual verification): `trackCurrentProject(): void`, `registerRecentProjectsUriHandler(context: vscode.ExtensionContext): void`.
 - Depends on Task 3's patch reading the exact same file path and JSON shape — do not change the shape here without updating the patch.
 
+**Correction discovered during implementation:** the plan originally called for appending these functions directly to `recentProjects.ts`. That breaks Task 1's tests: `recentProjects.test.ts` imports `recentProjects.ts`, and TypeScript compiles `import * as vscode from 'vscode'` to a top-level (eagerly executed) `require('vscode')` under `module: commonjs` — which fails immediately under plain `node --test`, since `vscode` only resolves inside the extension host, not standalone Node. Splitting the `vscode`-touching glue into its own file (`recentProjectsIntegration.ts`, which imports the pure functions from `recentProjects.ts`) keeps `recentProjects.ts` itself free of any `vscode` import, so the Task 1 tests keep working. `extension.ts` now imports from `recentProjectsIntegration.ts` instead of `recentProjects.ts`.
+
 This task's logic touches the live `vscode` API surface (workspace state, URI handlers, quick-picks) and can't be meaningfully unit-tested without mocking the entire `vscode` module — out of proportion for this codebase, which has no such mocking setup anywhere. It's verified manually in Task 4 instead, alongside the jump list itself (which requires a real Windows shell regardless).
 
-- [ ] **Step 1: Append the VS Code integration functions to `recentProjects.ts`**
+- [ ] **Step 1: Create `recentProjectsIntegration.ts` with the VS Code integration functions**
 
-At the top of `extensions/null-tools/src/recentProjects.ts`, change:
+Create `extensions/null-tools/src/recentProjectsIntegration.ts`:
+
 ```ts
-import * as fs from 'fs';
-import * as path from 'path';
-```
-to:
-```ts
+'use strict';
+
 import * as vscode from 'vscode';
-import * as fs from 'fs';
 import * as path from 'path';
-```
+import {
+  RecentProjectEntry,
+  getRecentProjectsFilePath,
+  readRecentProjects,
+  writeRecentProjectsAtomic,
+  upsertEntry,
+} from './recentProjects';
 
-Then add to the end of the same file:
-
-```ts
 export function trackCurrentProject(): void {
   let root: { path: string; isWorkspaceFile: boolean } | undefined;
 
@@ -309,7 +311,7 @@ export function registerRecentProjectsUriHandler(context: vscode.ExtensionContex
 Modify `extensions/null-tools/src/extension.ts` — add the import near the top (after the existing `import { ClaudeHistoryIndex, ClaudeCodeSession } from './claudeHistory';` on line 10):
 
 ```ts
-import { trackCurrentProject, registerRecentProjectsUriHandler } from './recentProjects';
+import { trackCurrentProject, registerRecentProjectsUriHandler } from './recentProjectsIntegration';
 ```
 
 Then in `activate()` (`extension.ts:1298`), add these two calls right after the existing `context.subscriptions.push(bar);` block (after line 1302):
@@ -327,7 +329,7 @@ Expected: PASS — same 6 tests from Task 1 still pass (this task adds no new au
 - [ ] **Step 4: Commit**
 
 ```bash
-git add extensions/null-tools/src/recentProjects.ts extensions/null-tools/src/extension.ts
+git add extensions/null-tools/src/recentProjectsIntegration.ts extensions/null-tools/src/extension.ts
 git commit -m "feat(null-tools): track current project and handle More Recent Projects URI"
 ```
 

@@ -43,6 +43,7 @@ const https = __importStar(require("https"));
 const child_process_1 = require("child_process");
 const ollama = __importStar(require("./ollama"));
 const claudeHistory_1 = require("./claudeHistory");
+const recentProjectsIntegration_1 = require("./recentProjectsIntegration");
 const UPDATE_REPO = 'TorresVisual/null-ide';
 const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const output = vscode.window.createOutputChannel('Null IDE Updates');
@@ -1168,6 +1169,8 @@ function activate(context) {
     bar.command = 'null.generateCommitMessage';
     bar.show();
     context.subscriptions.push(bar);
+    (0, recentProjectsIntegration_1.trackCurrentProject)();
+    (0, recentProjectsIntegration_1.registerRecentProjectsUriHandler)(context);
     const updateBar = vscode.window.createStatusBarItem('null.update', vscode.StatusBarAlignment.Right, 1);
     updateBar.text = '$(cloud-download) Update';
     updateBar.tooltip = 'Null IDE update available';
@@ -1286,16 +1289,6 @@ function activate(context) {
     context.subscriptions.push({ dispose: () => agentsProvider._saveBuffers() });
     const beforeProvider = new AgentBeforeProvider();
     context.subscriptions.push(vscode.workspace.registerTextDocumentContentProvider(beforeProvider.scheme, beforeProvider));
-    const agentWsRoot = vscode.workspace.workspaceFolders?.[0]?.uri;
-    if (agentWsRoot) {
-        beforeProvider.setWsRoot(agentWsRoot.fsPath);
-        const fw = new AgentFileWatcher(agentWsRoot, beforeProvider);
-        agentsProvider.setFileWatcher(fw);
-        context.subscriptions.push(fw);
-        context.subscriptions.push(vscode.workspace.onWillSaveTextDocument(e => {
-            agentsProvider._fileWatcher?.markUserSave(e.document.uri.fsPath);
-        }));
-    }
     // Track whether the active tab is one of our agent diffs and expose context.
     const updateDiffContext = () => {
         const active = vscode.window.tabGroups.activeTabGroup.activeTab;
