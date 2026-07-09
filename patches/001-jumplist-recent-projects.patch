@@ -1,6 +1,6 @@
-From a0afa322acf92b5381975f5796a721d4c13a3236 Mon Sep 17 00:00:00 2001
+From 093ec8f8ff7e57ff5d0da53739851ec1f4f8d99f Mon Sep 17 00:00:00 2001
 From: Null IDE <dev@null-ide.local>
-Date: Thu, 9 Jul 2026 13:21:42 +0200
+Date: Thu, 9 Jul 2026 15:57:16 +0200
 Subject: [PATCH] feat(jumplist): source Windows jump list Recent category from
  null-tools
 
@@ -10,13 +10,15 @@ extension, instead of VS Code's built-in recently-opened-workspaces
 history. Bumps the visible cap from 7 to 10 entries. Removes the
 now-dead getWindowsJumpListLabel helper (and its now-unused
 splitRecentLabel/WORKSPACE_EXTENSION imports) since noUnusedLocals is
-enabled in VS Code's tsconfig.
+enabled in VS Code's tsconfig. Uses Node's fs/promises directly for
+reading/writing the JSON file rather than VS Code's internal Promises
+helper from pfs.js, which has no readFile method.
 ---
- .../workspacesHistoryMainService.ts           | 122 ++++++++----------
- 1 file changed, 57 insertions(+), 65 deletions(-)
+ .../workspacesHistoryMainService.ts           | 123 +++++++++---------
+ 1 file changed, 58 insertions(+), 65 deletions(-)
 
 diff --git a/src/vs/platform/workspaces/electron-main/workspacesHistoryMainService.ts b/src/vs/platform/workspaces/electron-main/workspacesHistoryMainService.ts
-index 560f5ca..209a913 100644
+index 560f5ca..f753352 100644
 --- a/src/vs/platform/workspaces/electron-main/workspacesHistoryMainService.ts
 +++ b/src/vs/platform/workspaces/electron-main/workspacesHistoryMainService.ts
 @@ -7,7 +7,7 @@ import { app, JumpListCategory, JumpListItem } from 'electron';
@@ -28,7 +30,7 @@ index 560f5ca..209a913 100644
  import { Disposable } from '../../../base/common/lifecycle.js';
  import { Schemas } from '../../../base/common/network.js';
  import { isMacintosh, isWindows } from '../../../base/common/platform.js';
-@@ -21,11 +21,12 @@ import { ILogService } from '../../log/common/log.js';
+@@ -21,11 +21,13 @@ import { ILogService } from '../../log/common/log.js';
  import { StorageScope, StorageTarget } from '../../storage/common/storage.js';
  import { IApplicationStorageMainService } from '../../storage/electron-main/storageMainService.js';
  import { IRecent, IRecentFile, IRecentFolder, IRecentlyOpened, IRecentWorkspace, isRecentFile, isRecentFolder, isRecentWorkspace, restoreRecentlyOpened, toStoreData } from '../common/workspaces.js';
@@ -39,10 +41,11 @@ index 560f5ca..209a913 100644
  import { IDialogMainService } from '../../dialogs/electron-main/dialogMainService.js';
  import { IEnvironmentMainService } from '../../environment/electron-main/environmentMainService.js';
 +import { join } from '../../../base/common/path.js';
++import { promises as fsPromises } from 'fs';
  
  export const IWorkspacesHistoryMainService = createDecorator<IWorkspacesHistoryMainService>('workspacesHistoryMainService');
  
-@@ -305,7 +306,7 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
+@@ -305,7 +307,7 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
  	private static readonly MAX_MACOS_DOCK_RECENT_WORKSPACES = 7; 		// prefer higher number of workspaces...
  	private static readonly MAX_MACOS_DOCK_RECENT_ENTRIES_TOTAL = 10; 	// ...over number of files
  
@@ -51,7 +54,7 @@ index 560f5ca..209a913 100644
  
  	// Exclude some very common files from the dock/taskbar
  	private static readonly COMMON_FILES_FILTER = [
-@@ -349,58 +350,75 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
+@@ -349,58 +351,75 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
  					args: '-n', // force new window
  					iconPath: process.execPath,
  					iconIndex: 0
@@ -81,7 +84,7 @@ index 560f5ca..209a913 100644
 +			const nullRecentProjectsPath = join(this.environmentMainService.userDataPath, 'null-recent-projects.json');
 +			let nullRecentProjects: NullRecentProjectEntry[] = [];
 +			try {
-+				const raw = await Promises.readFile(nullRecentProjectsPath, 'utf8');
++				const raw = await fsPromises.readFile(nullRecentProjectsPath, 'utf8');
 +				nullRecentProjects = JSON.parse(raw);
 +			} catch {
 +				nullRecentProjects = [];
@@ -108,7 +111,7 @@ index 560f5ca..209a913 100644
 +				if (filtered.length !== nullRecentProjects.length) {
 +					nullRecentProjects = filtered;
 +					try {
-+						await Promises.writeFile(nullRecentProjectsPath, JSON.stringify(nullRecentProjects, undefined, '\t'));
++						await fsPromises.writeFile(nullRecentProjectsPath, JSON.stringify(nullRecentProjects, undefined, '\t'));
 +					} catch (error) {
 +						this.logService.warn('updateWindowsJumpList#writeFile (null-recent-projects)', error);
  					}
@@ -163,7 +166,7 @@ index 560f5ca..209a913 100644
  					items
  				});
  			}
-@@ -421,32 +439,6 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
+@@ -421,32 +440,6 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
  		}
  	}
  

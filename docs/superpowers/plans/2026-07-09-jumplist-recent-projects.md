@@ -349,6 +349,9 @@ git commit -m "feat(null-tools): track current project and handle More Recent Pr
 **Corrections discovered during implementation:**
 - `patches/README.md` (not mentioned in `CLAUDE.md`, discovered while placing this file) documents the actual naming convention: a **three-digit** `NNN-short-description.patch` prefix, not `git format-patch`'s default four-digit `000N-`. The patch is named `001-jumplist-recent-projects.patch` (patches/ was otherwise empty, so this is patch 001).
 - The same README references a local verification helper, `build.sh --patches-only`, which applies everything in `patches/` against a `VSCODE_SRC` checkout. It currently has a pre-existing bash syntax bug unrelated to this feature (`patches=("$patch_dir"/*.patch 2>/dev/null || true)` on line 41 is invalid array-literal syntax) that prevents it from running at all. This is out of scope for this plan; verification instead uses the equivalent direct `git apply --check` shown in Step 2 below, which was actually run (not just described) against a scratch copy of the exact pinned upstream file and applied cleanly.
+- **A real CI run caught a genuine bug in the first version of this patch**, since `git apply --check` only verifies the diff applies — it can't catch TypeScript type errors. The original patch called `Promises.readFile(...)` (from `vs/base/node/pfs.js`), which doesn't exist: that class only exposes `read`, `readdir`, `writeFile`, `rm`, `rename`, `copy`, `realpath`, etc. — confirmed by fetching `pfs.ts` directly and checking its exported shape, and by checking that the *original* (pre-patch) file only ever called `Promises.exists`, never `readFile`. `npx gulp vscode-win32-x64`'s `compile-src` step failed with `error TS2339: Property 'readFile' does not exist on type '(Anonymous class)'` at the exact line. Fixed by importing Node's `fs/promises` directly (`import { promises as fsPromises } from 'fs';`) and using `fsPromises.readFile`/`fsPromises.writeFile` instead of guessing at VS Code's internal `Promises` API shape. Re-verified with `git apply --check` against both 1.121.0 and 1.126.0, and with a standalone TypeScript-parser syntax check (`ts.createProgram` with `noResolve: true`) against the patched file, since the full `vscode-src` tree isn't available locally to run a real `tsc` typecheck.
+- Separately, `VSCODIUM_TAG` was bumped to `1.126.04524` (VS Code `1.126.0`) mid-implementation by the scheduled upstream-check job — see the CI fix commit for `build.yml`'s Node version pin (unrelated to this patch; `workspacesHistoryMainService.ts` is byte-identical between 1.121.0 and 1.126.0, confirmed by diff).
+- Three unrelated compile errors also surfaced in the same CI run, in `src/vs/platform/agentHost/node/{claude,codex,copilot}/...` — none of those files are touched by this patch or by anything in this plan; they're a pre-existing issue with VS Code 1.126.0's agentHost source (likely interacting with the VSCodium copilot-removal patch/build step) and are out of scope here.
 
 This patch was authored and verified against the real upstream source before writing this plan: `VSCODIUM_TAG` (`1.121.03429`) pins VS Code `1.121.0`, whose `src/vs/platform/workspaces/electron-main/workspacesHistoryMainService.ts` was fetched from `https://raw.githubusercontent.com/microsoft/vscode/1.121.0/...` and used as the exact base for a real `git format-patch`. The patch was then test-applied with `git apply --check --ignore-whitespace` against a pristine copy of that same file in a scratch git repo, and applied cleanly. It also removes the `getWindowsJumpListLabel` method (and its now-solely-dependent `splitRecentLabel`/`WORKSPACE_EXTENSION` imports), since that method's only call site is removed and VS Code's `tsconfig.base.json` has `noUnusedLocals: true` — leaving it in would break the CI compile step.
 
@@ -357,9 +360,9 @@ This patch was authored and verified against the real upstream source before wri
 Create `patches/001-jumplist-recent-projects.patch` with exactly this content:
 
 ```
-From a0afa322acf92b5381975f5796a721d4c13a3236 Mon Sep 17 00:00:00 2001
+From 093ec8f8ff7e57ff5d0da53739851ec1f4f8d99f Mon Sep 17 00:00:00 2001
 From: Null IDE <dev@null-ide.local>
-Date: Thu, 9 Jul 2026 13:21:42 +0200
+Date: Thu, 9 Jul 2026 15:57:16 +0200
 Subject: [PATCH] feat(jumplist): source Windows jump list Recent category from
  null-tools
 
@@ -369,13 +372,15 @@ extension, instead of VS Code's built-in recently-opened-workspaces
 history. Bumps the visible cap from 7 to 10 entries. Removes the
 now-dead getWindowsJumpListLabel helper (and its now-unused
 splitRecentLabel/WORKSPACE_EXTENSION imports) since noUnusedLocals is
-enabled in VS Code's tsconfig.
+enabled in VS Code's tsconfig. Uses Node's fs/promises directly for
+reading/writing the JSON file rather than VS Code's internal Promises
+helper from pfs.js, which has no readFile method.
 ---
- .../workspacesHistoryMainService.ts           | 122 ++++++++----------
- 1 file changed, 57 insertions(+), 65 deletions(-)
+ .../workspacesHistoryMainService.ts           | 123 +++++++++---------
+ 1 file changed, 58 insertions(+), 65 deletions(-)
 
 diff --git a/src/vs/platform/workspaces/electron-main/workspacesHistoryMainService.ts b/src/vs/platform/workspaces/electron-main/workspacesHistoryMainService.ts
-index 560f5ca..209a913 100644
+index 560f5ca..f753352 100644
 --- a/src/vs/platform/workspaces/electron-main/workspacesHistoryMainService.ts
 +++ b/src/vs/platform/workspaces/electron-main/workspacesHistoryMainService.ts
 @@ -7,7 +7,7 @@ import { app, JumpListCategory, JumpListItem } from 'electron';
@@ -387,7 +392,7 @@ index 560f5ca..209a913 100644
  import { Disposable } from '../../../base/common/lifecycle.js';
  import { Schemas } from '../../../base/common/network.js';
  import { isMacintosh, isWindows } from '../../../base/common/platform.js';
-@@ -21,11 +21,12 @@ import { ILogService } from '../../log/common/log.js';
+@@ -21,11 +21,13 @@ import { ILogService } from '../../log/common/log.js';
  import { StorageScope, StorageTarget } from '../../storage/common/storage.js';
  import { IApplicationStorageMainService } from '../../storage/electron-main/storageMainService.js';
  import { IRecent, IRecentFile, IRecentFolder, IRecentlyOpened, IRecentWorkspace, isRecentFile, isRecentFolder, isRecentWorkspace, restoreRecentlyOpened, toStoreData } from '../common/workspaces.js';
@@ -398,10 +403,11 @@ index 560f5ca..209a913 100644
  import { IDialogMainService } from '../../dialogs/electron-main/dialogMainService.js';
  import { IEnvironmentMainService } from '../../environment/electron-main/environmentMainService.js';
 +import { join } from '../../../base/common/path.js';
++import { promises as fsPromises } from 'fs';
  
  export const IWorkspacesHistoryMainService = createDecorator<IWorkspacesHistoryMainService>('workspacesHistoryMainService');
  
-@@ -305,7 +306,7 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
+@@ -305,7 +307,7 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
  	private static readonly MAX_MACOS_DOCK_RECENT_WORKSPACES = 7; 		// prefer higher number of workspaces...
  	private static readonly MAX_MACOS_DOCK_RECENT_ENTRIES_TOTAL = 10; 	// ...over number of files
  
@@ -410,7 +416,7 @@ index 560f5ca..209a913 100644
  
  	// Exclude some very common files from the dock/taskbar
  	private static readonly COMMON_FILES_FILTER = [
-@@ -349,58 +350,75 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
+@@ -349,58 +351,75 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
  					args: '-n', // force new window
  					iconPath: process.execPath,
  					iconIndex: 0
@@ -440,7 +446,7 @@ index 560f5ca..209a913 100644
 +			const nullRecentProjectsPath = join(this.environmentMainService.userDataPath, 'null-recent-projects.json');
 +			let nullRecentProjects: NullRecentProjectEntry[] = [];
 +			try {
-+				const raw = await Promises.readFile(nullRecentProjectsPath, 'utf8');
++				const raw = await fsPromises.readFile(nullRecentProjectsPath, 'utf8');
 +				nullRecentProjects = JSON.parse(raw);
 +			} catch {
 +				nullRecentProjects = [];
@@ -467,7 +473,7 @@ index 560f5ca..209a913 100644
 +				if (filtered.length !== nullRecentProjects.length) {
 +					nullRecentProjects = filtered;
 +					try {
-+						await Promises.writeFile(nullRecentProjectsPath, JSON.stringify(nullRecentProjects, undefined, '\t'));
++						await fsPromises.writeFile(nullRecentProjectsPath, JSON.stringify(nullRecentProjects, undefined, '\t'));
 +					} catch (error) {
 +						this.logService.warn('updateWindowsJumpList#writeFile (null-recent-projects)', error);
  					}
@@ -522,7 +528,7 @@ index 560f5ca..209a913 100644
  					items
  				});
  			}
-@@ -421,32 +439,6 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
+@@ -421,32 +440,6 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
  		}
  	}
  
