@@ -242,9 +242,29 @@ jobs:
         shell: pwsh
         run: |
           Remove-Item -Recurse -Force "vscode-src/src/vs/platform/agentHost/test" -ErrorAction SilentlyContinue
+          $deletedBaseNames = @()
           Get-ChildItem "vscode-src/src/vs/platform/agentHost" -Recurse -Filter "*.ts" |
             Where-Object { (Get-Content $_.FullName -Raw) -match "'@github/copilot-sdk'" } |
-            ForEach-Object { Remove-Item $_.FullName -Force; Write-Host "Deleted (has @github/copilot-sdk import): $($_.Name)" }
+            ForEach-Object {
+              $deletedBaseNames += $_.BaseName
+              Remove-Item $_.FullName -Force
+              Write-Host "Deleted (has @github/copilot-sdk import): $($_.Name)"
+            }
+          # Some surviving files register the deleted modules via side-effect imports
+          # (e.g. allPrompts.ts's `import './anthropicPrompt.js';`). Strip those dangling
+          # references too, or the hub file fails with "cannot find module".
+          foreach ($baseName in $deletedBaseNames) {
+            Get-ChildItem "vscode-src/src/vs/platform/agentHost" -Recurse -Filter "*.ts" |
+              ForEach-Object {
+                $content = Get-Content $_.FullName -Raw
+                $pattern = "(?m)^\s*import\s+'\./$([regex]::Escape($baseName))\.js';\s*\r?\n"
+                if ($content -match $pattern) {
+                  $updated = $content -replace $pattern, ''
+                  [System.IO.File]::WriteAllText($_.FullName, $updated, [System.Text.UTF8Encoding]::new($false))
+                  Write-Host "Removed dangling side-effect import of $baseName.js from $($_.Name)"
+                }
+              }
+          }
           $f = "vscode-src/src/vs/platform/agentHost/node/agentHostServerMain.ts"
           if (Test-Path $f) {
             $c = [System.IO.File]::ReadAllText($f)
