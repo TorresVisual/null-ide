@@ -606,6 +606,12 @@ git commit -m "feat: patch VS Code jump list to source Recent Projects from null
 
 **Interfaces:** consumes the complete feature from Tasks 1-3.
 
+**Unrelated CI blockers found and fixed while getting a real build green** (all separate commits, not part of the jump-list feature itself):
+- `windows-latest` had drifted to a runner image whose Visual Studio generation broke `node-gyp` — pinned to `windows-2022`.
+- `VSCODIUM_TAG` was bumped mid-implementation to `1.126.04524` (VS Code `1.126.0`), which requires Node 24 — switched `setup-node` to read `node-version-file: vscode-src/.nvmrc` instead of a hardcoded pin.
+- VSCodium's own `53-ext-copilot-remove-it.patch` deletes `buildForwardedChatError` from `forwardedChatError.ts`, breaking `claudeProxyService.ts`/`codexProxyService.ts` which still depend on it (shared proxy-error plumbing, not Copilot-exclusive) — added `patches/002-restore-forwarded-chat-error.patch`.
+- The existing "Remove agentHost files that import @github/copilot-sdk" step deleted `anthropicPrompt.ts` but left a dangling `import './anthropicPrompt.js';` in `allPrompts.ts` — extended that step to strip dangling side-effect imports of anything it deletes.
+
 - [ ] **Step 1: Trigger a CI build**
 
 Run: `gh workflow run build.yml` (or trigger `workflow_dispatch` from the GitHub Actions UI for this repo).
