@@ -56,6 +56,23 @@ Flow:
 6. Clicking an entry launches `null.exe "<path>"`, opening that folder in a
    new or existing window (standard Electron jump-list task behavior).
 
+### "More Recent Projects..." entry
+
+The jump list's "Recent" category is capped at 10 (a Windows/Electron
+practical display limit), but `null-recent-projects.json` tracks up to 50
+entries so more history is available than the jump list itself can show.
+
+A separate, static "Tasks" entry titled "More Recent Projects..." is added
+to the jump list (alongside "Recent"). It launches `null.exe` with a
+`null://` URI (this repo's registered custom protocol, `product.json:33`),
+routed by VS Code core — already supported, no additional patch needed
+beyond adding this one static task — to a `vscode.window.registerUriHandler`
+registered by `null-tools`. That handler shows a `vscode.window.showQuickPick`
+listing all (up to 50) tracked entries; selecting one opens it via
+`vscode.commands.executeCommand('vscode.openFolder', uri, { forceNewWindow: true })`,
+always in a new window — consistent with clicking a jump list "Recent" entry
+directly.
+
 ## Components
 
 ### null-tools side (extension host, TypeScript)
@@ -72,9 +89,15 @@ New module `extensions/null-tools/src/recentProjects.ts`, invoked from
   - `label` = folder/workspace basename (jump list entry title).
   - `path` = full fs path (used for dedupe key, normalized lowercase on
     Windows, and as the jump list entry's tooltip/description).
-- Sort by `timestamp` descending, truncate to 10.
+- Sort by `timestamp` descending, truncate to **50** (the full tracked
+  history; the jump list patch further truncates to 10 for the "Recent"
+  category — see "More Recent Projects..." below).
 - Write atomically: write to a temp file in the same directory, then
   rename over the target, so a killed process never leaves a partial file.
+- Register a `vscode.window.registerUriHandler` for a `/recent-projects`
+  path. On invocation, read the full (up to 50) list and show a
+  `vscode.window.showQuickPick`; on selection, run
+  `vscode.commands.executeCommand('vscode.openFolder', uri, { forceNewWindow: true })`.
 
 ### VS Code core patch (`patches/0001-jumplist-from-null-tools.patch`)
 
@@ -82,11 +105,16 @@ New module `extensions/null-tools/src/recentProjects.ts`, invoked from
   category array passed to `app.setJumpList()` (upstream, in the
   workspaces-history / windows main service).
 - Replace that array's source with a read of
-  `null-recent-projects.json`, mapping each entry to the same
+  `null-recent-projects.json` (top 10 of the up-to-50 tracked entries),
+  mapping each entry to the same
   `{ type: 'task', program: process.execPath, args: '"<path>"', title,
   description: path, iconPath }` shape VS Code already produces — only the
   source list changes, not the entry-building logic or other categories
   (e.g. a "New Window" task, if present, is left as-is).
+- Add one additional static "Tasks" entry, "More Recent Projects...",
+  `{ type: 'task', program: process.execPath, args: '--open-url "null://<publisher>.null-tools/recent-projects"', title: 'More Recent Projects...' }`
+  (exact CLI flag for opening a URI to be confirmed against the pinned
+  VS Code version during implementation).
 - Hook the rebuild into existing app lifecycle events already present in
   Electron main (app ready/startup, `browser-window-focus`) instead of
   adding new file-watching machinery.
@@ -120,6 +148,9 @@ scripts locally"). Verification path:
 5. Click an entry; confirm it relaunches Null IDE on that folder.
 6. Re-open a folder already in the list; confirm it moves to the top
    rather than duplicating.
+7. Click "More Recent Projects..."; confirm the quick-pick lists all
+   tracked entries (beyond the 10 shown directly), and selecting one opens
+   it in a new window.
 
 The null-tools upsert/prune/dedupe logic (pure JSON manipulation, no VS
 Code API dependency) is straightforward to unit test if/when `null-tools`
