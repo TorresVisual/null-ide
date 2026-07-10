@@ -12,6 +12,8 @@ param(
     [switch]$NoPath,
     [switch]$RegisterContextMenu,
     [switch]$RegisterWin11ContextMenu,
+    [switch]$RegisterFileAssociations,
+    [switch]$UnregisterFileAssociations,
     [switch]$Launch
 )
 
@@ -307,6 +309,130 @@ function Unregister-Win11ContextMenu {
     }
 }
 
+$FileAssocMap = [ordered]@{
+    js       = @{ Description = 'JavaScript File';  Extensions = @('.js', '.jsx') }
+    ts       = @{ Description = 'TypeScript File';  Extensions = @('.ts', '.tsx') }
+    python   = @{ Description = 'Python File';       Extensions = @('.py') }
+    json     = @{ Description = 'JSON File';         Extensions = @('.json') }
+    markdown = @{ Description = 'Markdown File';     Extensions = @('.md') }
+    html     = @{ Description = 'HTML File';         Extensions = @('.html') }
+    css      = @{ Description = 'CSS File';          Extensions = @('.css') }
+    yaml     = @{ Description = 'YAML File';         Extensions = @('.yml', '.yaml') }
+    text     = @{ Description = 'Text File';         Extensions = @('.txt') }
+    xml      = @{ Description = 'XML File';          Extensions = @('.xml') }
+    c        = @{ Description = 'C Source File';     Extensions = @('.c') }
+    h        = @{ Description = 'C/C++ Header File'; Extensions = @('.h', '.hpp') }
+    cplus    = @{ Description = 'C++ Source File';   Extensions = @('.cpp', '.cc', '.cxx') }
+    csharp   = @{ Description = 'C# Source File';    Extensions = @('.cs') }
+    go       = @{ Description = 'Go Source File';    Extensions = @('.go') }
+    rust     = @{ Description = 'Rust Source File';  Extensions = @('.rs') }
+    php      = @{ Description = 'PHP File';          Extensions = @('.php') }
+    ruby     = @{ Description = 'Ruby File';         Extensions = @('.rb') }
+    shell    = @{ Description = 'Shell Script';      Extensions = @('.sh', '.bash', '.ps1') }
+    database = @{ Description = 'SQL File';          Extensions = @('.sql') }
+}
+
+function Send-ShellChangeNotification {
+    Add-Type -Namespace NullIDE -Name Shell32 -MemberDefinition @'
+[DllImport("shell32.dll")]
+public static extern void SHChangeNotify(int wEventId, int uFlags, IntPtr dwItem1, IntPtr dwItem2);
+'@ -ErrorAction SilentlyContinue
+    # SHCNE_ASSOCCHANGED = 0x08000000, SHCNF_IDLIST = 0x0000
+    [NullIDE.Shell32]::SHChangeNotify(0x08000000, 0, [IntPtr]::Zero, [IntPtr]::Zero)
+}
+
+function Register-FileAssociations {
+    param([string]$InstallDir)
+
+    $installDir = [System.IO.Path]::GetFullPath($InstallDir)
+    $exePath    = Join-Path $installDir 'null.exe'
+    $iconDir    = Join-Path $installDir 'resources\file-assoc-icons'
+
+    foreach ($key in $FileAssocMap.Keys) {
+        $info     = $FileAssocMap[$key]
+        $progId   = "NullIDE.AssocFile.$key"
+        $iconPath = Join-Path $iconDir "$key.ico"
+        $progKey  = "HKCU:\Software\Classes\$progId"
+
+        New-Item -Path $progKey -Force | Out-Null
+        Set-ItemProperty -Path $progKey -Name '(default)' -Value $info.Description
+        Set-ItemProperty -Path $progKey -Name 'FriendlyTypeName' -Value 'Null IDE'
+
+        New-Item -Path "$progKey\DefaultIcon" -Force | Out-Null
+        Set-ItemProperty -Path "$progKey\DefaultIcon" -Name '(default)' -Value "$iconPath,0"
+
+        New-Item -Path "$progKey\shell\open\command" -Force | Out-Null
+        Set-ItemProperty -Path "$progKey\shell\open\command" -Name '(default)' -Value "`"$exePath`" `"%1`""
+
+        foreach ($ext in $info.Extensions) {
+            $openWithKey = "HKCU:\Software\Classes\$ext\OpenWithProgids"
+            New-Item -Path $openWithKey -Force | Out-Null
+            Set-ItemProperty -Path $openWithKey -Name $progId -Value ''
+        }
+    }
+
+    $allExtensions = $FileAssocMap.Values | ForEach-Object { $_.Extensions } | Select-Object -Unique
+
+    $appKey = 'HKCU:\Software\Classes\Applications\null.exe'
+    New-Item -Path $appKey -Force | Out-Null
+    Set-ItemProperty -Path $appKey -Name 'FriendlyAppName' -Value 'Null IDE'
+    Set-ItemProperty -Path $appKey -Name 'SupportedTypes' -Value $allExtensions -Type MultiString
+    New-Item -Path "$appKey\shell\open\command" -Force | Out-Null
+    Set-ItemProperty -Path "$appKey\shell\open\command" -Name '(default)' -Value "`"$exePath`" `"%1`""
+
+    $capKey = 'HKCU:\Software\Classes\NullIDE\Capabilities'
+    New-Item -Path $capKey -Force | Out-Null
+    Set-ItemProperty -Path $capKey -Name 'ApplicationName' -Value 'Null IDE'
+    Set-ItemProperty -Path $capKey -Name 'ApplicationDescription' -Value 'A custom Windows code editor built on VSCodium.'
+
+    New-Item -Path "$capKey\FileAssociations" -Force | Out-Null
+    foreach ($key in $FileAssocMap.Keys) {
+        $progId = "NullIDE.AssocFile.$key"
+        foreach ($ext in $FileAssocMap[$key].Extensions) {
+            Set-ItemProperty -Path "$capKey\FileAssociations" -Name $ext -Value $progId
+        }
+    }
+
+    New-Item -Path 'HKCU:\Software\RegisteredApplications' -Force | Out-Null
+    Set-ItemProperty -Path 'HKCU:\Software\RegisteredApplications' -Name 'Null IDE' -Value 'Software\Classes\NullIDE\Capabilities'
+
+    Send-ShellChangeNotification
+    Write-Host "Registered file associations for $($allExtensions.Count) extensions."
+}
+
+function Unregister-FileAssociations {
+    foreach ($key in $FileAssocMap.Keys) {
+        $progId    = "NullIDE.AssocFile.$key"
+        $progIdKey = "HKCU:\Software\Classes\$progId"
+        if (Test-Path $progIdKey) {
+            Remove-Item -Path $progIdKey -Recurse -Force
+        }
+        foreach ($ext in $FileAssocMap[$key].Extensions) {
+            $openWithKey = "HKCU:\Software\Classes\$ext\OpenWithProgids"
+            if (Test-Path $openWithKey) {
+                Remove-ItemProperty -Path $openWithKey -Name $progId -ErrorAction SilentlyContinue
+            }
+        }
+    }
+
+    $appKey = 'HKCU:\Software\Classes\Applications\null.exe'
+    if (Test-Path $appKey) {
+        Remove-Item -Path $appKey -Recurse -Force
+    }
+
+    $nullIdeKey = 'HKCU:\Software\Classes\NullIDE'
+    if (Test-Path $nullIdeKey) {
+        Remove-Item -Path $nullIdeKey -Recurse -Force
+    }
+
+    if (Test-Path 'HKCU:\Software\RegisteredApplications') {
+        Remove-ItemProperty -Path 'HKCU:\Software\RegisteredApplications' -Name 'Null IDE' -ErrorAction SilentlyContinue
+    }
+
+    Send-ShellChangeNotification
+    Write-Host 'Unregistered file associations.'
+}
+
 function Register-Path {
     param([string]$Dir)
     $current = [System.Environment]::GetEnvironmentVariable('PATH', 'User')
@@ -553,6 +679,21 @@ if ($RegisterWin11ContextMenu) {
     $null = Get-NullIdeExecutable -Dir $dir
     Write-Step "Registering Win11 context menu"
     Register-Win11ContextMenu -InstallDir $dir
+    Write-Host "Done."
+    return
+}
+
+if ($RegisterFileAssociations) {
+    $dir = [System.IO.Path]::GetFullPath($InstallDir)
+    Write-Step "Registering file associations"
+    Register-FileAssociations -InstallDir $dir
+    Write-Host "Done."
+    return
+}
+
+if ($UnregisterFileAssociations) {
+    Write-Step "Unregistering file associations"
+    Unregister-FileAssociations
     Write-Host "Done."
     return
 }
