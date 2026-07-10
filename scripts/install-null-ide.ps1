@@ -9,6 +9,7 @@ param(
     [switch]$NoDesktopShortcut,
     [switch]$NoStartMenuShortcut,
     [switch]$NoContextMenu,
+    [switch]$NoFileAssoc,
     [switch]$NoPath,
     [switch]$RegisterContextMenu,
     [switch]$RegisterWin11ContextMenu,
@@ -618,6 +619,11 @@ function Install-Zip {
             Write-Step "Registering context menu entries"
             Register-ContextMenu -ExePath $target
             Register-Win11ContextMenu -InstallDir $destinationFullPath
+        }
+
+        if (-not $NoFileAssoc) {
+            Write-Step "Registering file associations"
+            Register-FileAssociations -InstallDir $destinationFullPath
         }
 
         if (-not $NoPath) {
