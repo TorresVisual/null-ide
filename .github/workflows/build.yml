@@ -339,6 +339,15 @@ jobs:
           }
           Write-Host "Fixed win32 icons, VisualElementsManifest, and letterpress SVGs"
 
+      - name: Copy file-association icons into build output
+        shell: pwsh
+        run: |
+          $destDir = "VSCode-win32-x64/resources/file-assoc-icons"
+          New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+          Copy-Item ide-overlay/icons/file-assoc/*.ico $destDir -Force
+          $count = (Get-ChildItem $destDir -Filter *.ico).Count
+          Write-Host "Copied $count file-association icons to $destDir"
+
       - name: Copy workbench overlay files into build output
         shell: pwsh
         run: |
