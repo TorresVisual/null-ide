@@ -30,7 +30,7 @@
 
 * [x] Jump list recent projects
 * [ ] Explorer preview integration
-* [ ] Better file association management
+* [x] Better file association management and icons
 * [ ] Distraction-free / minimal coding mode
 * [ ] Integrated scratchpad/temp files
 * [ ] Built-in quick notes panel
