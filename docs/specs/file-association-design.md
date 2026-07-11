@@ -21,7 +21,7 @@ This spec covers registering Null IDE as a discoverable, selectable app for a cu
 
 ## Scope: curated extension list
 
-20 unique icons covering ~26 extensions, each mapped to an existing `null-icons` source SVG (`extensions/null-icons/src/icons/files/`) — no new artwork required:
+32 icon keys covering 52 extensions, each mapped to an existing `null-icons` source SVG (`extensions/null-icons/src/icons/files/`) — no new artwork required:
 
 | Icon key | Source SVG | Extensions |
 |---|---|---|
@@ -30,14 +30,14 @@ This spec covers registering Null IDE as a discoverable, selectable app for a cu
 | `python` | python.svg | .py |
 | `json` | brackets-yellow.svg | .json |
 | `markdown` | markdown.svg | .md |
-| `html` | code-orange.svg | .html |
+| `html` | code-orange.svg | .html, .htm |
 | `css` | brackets-sky.svg | .css |
 | `yaml` | yaml.svg | .yml, .yaml |
 | `text` | text.svg | .txt |
 | `xml` | xml.svg | .xml |
 | `c` | c.svg | .c |
-| `h` | h.svg | .h, .hpp |
-| `cplus` | cplus.svg | .cpp, .cc, .cxx |
+| `h` | h.svg | .h, .hpp, .inl |
+| `cplus` | cplus.svg | .cpp, .cc, .cxx, .c++ |
 | `csharp` | csharp.svg | .cs |
 | `go` | go.svg | .go |
 | `rust` | rust.svg | .rs |
@@ -45,16 +45,29 @@ This spec covers registering Null IDE as a discoverable, selectable app for a cu
 | `ruby` | ruby.svg | .rb |
 | `shell` | shell.svg | .sh, .bash, .ps1 |
 | `database` | database.svg | .sql |
+| `git` | git.svg | .gitignore, .gitattributes, .gitconfig, .gitmodules |
+| `patch` | patch.svg | .patch |
+| `cmake` | cmake.svg | .cmake |
+| `dart` | dart.svg | .dart |
+| `docker` | docker.svg | .dockerfile |
+| `notebook` | notebook.svg | .ipynb |
+| `csproj` | visual-studio.svg | .csproj |
+| `hplus` | hplus.svg | .h++ |
+| `java` | java.svg | .java, .jar |
+| `lua` | lua.svg | .lua |
+| `tex` | tex.svg | .latex |
+| `document` (generic, shared by 4 icon keys below via `Icon` override — see Component 2) | document.svg | .cfg, .ini, .config, .code-workspace, .iss, .log |
 
-Not in scope: registering Null IDE for *every* file type (that's already covered by the existing "Open in Null" context menu, which is not being changed).
+Not in scope: registering Null IDE for *every* file type (that's already covered by the existing "Open in Null" context menu, which is not being changed). Also not in scope: extensionless filenames (bare `Makefile`, `CMakeLists.txt`) — the registration mechanism below is extension-keyed (`HKCU:\Software\Classes\.<ext>\OpenWithProgids`), which doesn't apply to files with no extension; that would need a different, filename-keyed mechanism and isn't implemented here.
 
 ## Component 1: Icon generation
 
-New script `scripts/generate-file-assoc-icons.js`, run manually by a developer (not part of CI, same as `scripts/convert-icons.js`), using the `sharp` / `to-ico` deps already declared in `scripts/package.json`.
+Script `scripts/generate-file-assoc-icons.js`, run manually by a developer (not part of CI, same as `scripts/convert-icons.js`), using the `sharp` / `to-ico` deps already declared in `scripts/package.json`.
 
-- Input: the 20 source SVGs listed above.
+- Input: the source SVGs listed above (one entry in the script's `ICONS` map per icon key).
 - Output: one multi-size ICO per icon key (16/32/48/256px, same sizing as `convert-icons.js`), written to `icons/file-assoc/<key>.ico`.
-- Output files are committed to the repo, like `icons/icon.ico`. Re-run the script by hand if `null-icons`' source SVGs change.
+- Output files are committed to the repo, like `icons/icon.ico`. Re-run the script by hand if `null-icons`' source SVGs change, or when adding a new icon key.
+- Several curated extensions (`.cfg`, `.ini`, `.config`, `.code-workspace`, `.iss`, `.log`) have no themed icon in `null-icons` (it falls back to the generic `document` icon too), so they share the single `document.ico` file rather than each generating a duplicate. `$FileAssocMap` entries for these set an `Icon` override key distinct from their map key — see Component 2.
 
 ## Component 2: Registration logic (`scripts/install-null-ide.ps1`)
 
@@ -65,8 +78,8 @@ Single source of truth for the extension → ProgID → icon mapping, expressed 
 For each **icon key**:
 - Create ProgID `HKCU:\Software\Classes\NullIDE.AssocFile.<key>`:
   - `(default)` = friendly description (e.g. "JavaScript File")
-  - `FriendlyTypeName` = "Null IDE"
-  - `DefaultIcon\(default)` = `<InstallDir>\resources\file-assoc-icons\<key>.ico,0`
+  - `FriendlyTypeName` = same friendly description (Explorer's Type column/Properties dialog reads `FriendlyTypeName` in preference to `(default)`; it must not be hardcoded to "Null IDE" or every associated file type would show "Null IDE" instead of its own type name)
+  - `DefaultIcon\(default)` = `<InstallDir>\resources\file-assoc-icons\<iconKey>.ico,0`, where `<iconKey>` is the map entry's `Icon` override if set, otherwise the icon key itself — this lets multiple icon keys (e.g. `config`, `workspace`, `iss`, `log`) share one underlying `.ico` file (`document.ico`) instead of duplicating identical artwork under different filenames.
   - `shell\open\command\(default)` = `"<InstallDir>\null.exe" "%1"`
 
 For each **extension**:
@@ -120,7 +133,8 @@ Because association registry entries embed the absolute install path and are wri
 
 ## Out of scope
 
-- Per-file-type icons or associations beyond the curated 20-icon/~26-extension list.
+- Per-file-type icons or associations beyond the curated 32-icon-key/52-extension list.
+- Extensionless filenames (bare `Makefile`, `CMakeLists.txt`, etc.) — see the note under "Scope: curated extension list".
 - Any attempt to silently set Null IDE as the default handler (blocked by Windows; not attempted).
 - Changes to the existing "Open in Null" context menu or Win11 `IExplorerCommand` shell extension — unrelated and untouched.
 - macOS/Linux file associations (Windows-only project per `CLAUDE.md`).

@@ -316,14 +316,14 @@ $FileAssocMap = [ordered]@{
     python   = @{ Description = 'Python File';       Extensions = @('.py') }
     json     = @{ Description = 'JSON File';         Extensions = @('.json') }
     markdown = @{ Description = 'Markdown File';     Extensions = @('.md') }
-    html     = @{ Description = 'HTML File';         Extensions = @('.html') }
+    html     = @{ Description = 'HTML File';         Extensions = @('.html', '.htm') }
     css      = @{ Description = 'CSS File';          Extensions = @('.css') }
     yaml     = @{ Description = 'YAML File';         Extensions = @('.yml', '.yaml') }
     text     = @{ Description = 'Text File';         Extensions = @('.txt') }
     xml      = @{ Description = 'XML File';          Extensions = @('.xml') }
     c        = @{ Description = 'C Source File';     Extensions = @('.c') }
-    h        = @{ Description = 'C/C++ Header File'; Extensions = @('.h', '.hpp') }
-    cplus    = @{ Description = 'C++ Source File';   Extensions = @('.cpp', '.cc', '.cxx') }
+    h        = @{ Description = 'C/C++ Header File'; Extensions = @('.h', '.hpp', '.inl') }
+    cplus    = @{ Description = 'C++ Source File';   Extensions = @('.cpp', '.cc', '.cxx', '.c++') }
     csharp   = @{ Description = 'C# Source File';    Extensions = @('.cs') }
     go       = @{ Description = 'Go Source File';    Extensions = @('.go') }
     rust     = @{ Description = 'Rust Source File';  Extensions = @('.rs') }
@@ -331,6 +331,21 @@ $FileAssocMap = [ordered]@{
     ruby     = @{ Description = 'Ruby File';         Extensions = @('.rb') }
     shell    = @{ Description = 'Shell Script';      Extensions = @('.sh', '.bash', '.ps1') }
     database = @{ Description = 'SQL File';          Extensions = @('.sql') }
+    git      = @{ Description = 'Git File';               Extensions = @('.gitignore', '.gitattributes', '.gitconfig', '.gitmodules') }
+    patch    = @{ Description = 'Patch File';              Extensions = @('.patch') }
+    cmake    = @{ Description = 'CMake File';              Extensions = @('.cmake') }
+    dart     = @{ Description = 'Dart File';               Extensions = @('.dart') }
+    docker   = @{ Description = 'Dockerfile';              Extensions = @('.dockerfile') }
+    notebook = @{ Description = 'Jupyter Notebook';        Extensions = @('.ipynb') }
+    csproj   = @{ Description = 'C# Project File';         Extensions = @('.csproj') }
+    hplus    = @{ Description = 'C/C++ Header File';       Extensions = @('.h++') }
+    java     = @{ Description = 'Java File';               Extensions = @('.java', '.jar') }
+    lua      = @{ Description = 'Lua File';                Extensions = @('.lua') }
+    tex      = @{ Description = 'LaTeX File';              Extensions = @('.latex') }
+    config   = @{ Description = 'Configuration File';      Extensions = @('.cfg', '.ini', '.config'); Icon = 'document' }
+    workspace = @{ Description = 'VS Code Workspace';      Extensions = @('.code-workspace'); Icon = 'document' }
+    iss      = @{ Description = 'Inno Setup Script';       Extensions = @('.iss'); Icon = 'document' }
+    log      = @{ Description = 'Log File';                Extensions = @('.log'); Icon = 'document' }
 }
 
 function Send-ShellChangeNotification {
@@ -352,12 +367,13 @@ function Register-FileAssociations {
     foreach ($key in $FileAssocMap.Keys) {
         $info     = $FileAssocMap[$key]
         $progId   = "NullIDE.AssocFile.$key"
-        $iconPath = Join-Path $iconDir "$key.ico"
+        $iconKey  = if ($info.Icon) { $info.Icon } else { $key }
+        $iconPath = Join-Path $iconDir "$iconKey.ico"
         $progKey  = "HKCU:\Software\Classes\$progId"
 
         New-Item -Path $progKey -Force | Out-Null
         Set-ItemProperty -Path $progKey -Name '(default)' -Value $info.Description
-        Set-ItemProperty -Path $progKey -Name 'FriendlyTypeName' -Value 'Null IDE'
+        Set-ItemProperty -Path $progKey -Name 'FriendlyTypeName' -Value $info.Description
 
         New-Item -Path "$progKey\DefaultIcon" -Force | Out-Null
         Set-ItemProperty -Path "$progKey\DefaultIcon" -Name '(default)' -Value "$iconPath,0"

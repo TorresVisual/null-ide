@@ -25,6 +25,18 @@ const ICONS = {
   ruby: 'ruby.svg',
   shell: 'shell.svg',
   database: 'database.svg',
+  git: 'git.svg',
+  patch: 'patch.svg',
+  cmake: 'cmake.svg',
+  dart: 'dart.svg',
+  docker: 'docker.svg',
+  notebook: 'notebook.svg',
+  csproj: 'visual-studio.svg',
+  hplus: 'hplus.svg',
+  java: 'java.svg',
+  lua: 'lua.svg',
+  tex: 'tex.svg',
+  document: 'document.svg',
 };
 
 const srcDir = path.resolve(__dirname, '../extensions/null-icons/src/icons/files');

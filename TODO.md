@@ -31,6 +31,9 @@
 * [x] Jump list recent projects
 * [ ] Explorer preview integration
 * [x] Better file association management and icons
+  Covers 52 extensions across 32 icon keys now (see docs/specs/file-association-design.md).
+  Known gap: extensionless filenames (bare Makefile, CMakeLists.txt) aren't
+  supported — the registration mechanism is extension-keyed, not filename-keyed.
 * [ ] Distraction-free / minimal coding mode
 * [ ] Integrated scratchpad/temp files
 * [ ] Built-in quick notes panel
