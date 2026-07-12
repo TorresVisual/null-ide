@@ -1,5 +1,7 @@
 # TODO List for NULL IDE
 
+* [ ] Restricted mode is annoying!!
+
 ## AI Features
 
 * [x] AI Agents panel fixes (History/Rendering (Width bug))
