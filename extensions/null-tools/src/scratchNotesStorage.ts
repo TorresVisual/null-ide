@@ -86,3 +86,21 @@ export function ensureGitignoreEntry(workspaceRoot: string): void {
   const needsLeadingNewline = content.length > 0 && !content.endsWith('\n');
   fs.writeFileSync(gitignorePath, `${content}${needsLeadingNewline ? '\n' : ''}.null/\n`);
 }
+
+export interface ScratchRunner {
+  command: string;
+  args: (filePath: string) => string[];
+}
+
+export const SCRATCH_RUNNERS: Record<string, ScratchRunner> = {
+  '.py': { command: 'python', args: filePath => [filePath] },
+  '.js': { command: 'node', args: filePath => [filePath] },
+  '.ts': { command: 'npx', args: filePath => ['ts-node', filePath] },
+};
+
+export function buildScratchRunCommand(filePath: string): string | undefined {
+  const runner = SCRATCH_RUNNERS[path.extname(filePath)];
+  if (!runner) { return undefined; }
+  const quotedArgs = runner.args(filePath).map(arg => `"${arg}"`);
+  return [runner.command, ...quotedArgs].join(' ');
+}

@@ -14,6 +14,7 @@ import {
   buildNoteFilename,
   deriveNoteLabel,
   ensureGitignoreEntry,
+  buildScratchRunCommand,
 } from './scratchNotesStorage';
 
 test('getScratchDir and getNotesDir nest under .null inside the workspace root', () => {
@@ -106,4 +107,32 @@ test('ensureGitignoreEntry is idempotent', () => {
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
+});
+
+test('buildScratchRunCommand maps .py to a quoted python invocation', () => {
+  assert.equal(
+    buildScratchRunCommand('C:\\ws\\.null\\scratch\\scratch-1.py'),
+    'python "C:\\ws\\.null\\scratch\\scratch-1.py"',
+  );
+});
+
+test('buildScratchRunCommand maps .js to a quoted node invocation', () => {
+  assert.equal(
+    buildScratchRunCommand('C:\\ws\\.null\\scratch\\scratch-1.js'),
+    'node "C:\\ws\\.null\\scratch\\scratch-1.js"',
+  );
+});
+
+test('buildScratchRunCommand maps .ts to a quoted npx ts-node invocation', () => {
+  assert.equal(
+    buildScratchRunCommand('C:\\ws\\.null\\scratch\\scratch-1.ts'),
+    'npx "ts-node" "C:\\ws\\.null\\scratch\\scratch-1.ts"',
+  );
+});
+
+test('buildScratchRunCommand returns undefined for non-runnable extensions', () => {
+  assert.equal(buildScratchRunCommand('C:\\ws\\.null\\scratch\\scratch-1.md'), undefined);
+  assert.equal(buildScratchRunCommand('C:\\ws\\.null\\scratch\\scratch-1.json'), undefined);
+  assert.equal(buildScratchRunCommand('C:\\ws\\.null\\scratch\\scratch-1.txt'), undefined);
+  assert.equal(buildScratchRunCommand('C:\\ws\\.null\\scratch\\scratch-1.unknown'), undefined);
 });
