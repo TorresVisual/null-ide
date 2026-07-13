@@ -9,7 +9,7 @@
   "main": "./out/extension.js",
   "scripts": {
     "compile": "tsc -p tsconfig.json && tsc -p tsconfig.webview.json",
-    "test": "tsc -p tsconfig.json && node --test out/recentProjects.test.js"
+    "test": "tsc -p tsconfig.json && node --test out/recentProjects.test.js out/scratchNotesStorage.test.js"
   },
   "devDependencies": {
     "typescript": "^5.8.0",
