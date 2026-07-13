@@ -32,7 +32,7 @@
 ## NULL-Specific Features
 
 * [x] Jump list recent projects
-* [ ] Explorer preview integration
+* [x] Explorer preview integration
 * [x] Better file association management and icons
   Covers 52 extensions across 32 icon keys now (see docs/specs/file-association-design.md).
   Known gap: extensionless filenames (bare Makefile, CMakeLists.txt) aren't

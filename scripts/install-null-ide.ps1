@@ -475,14 +475,25 @@ function Register-PreviewHandler {
     Set-ItemProperty -Path $approvedKey -Name $PreviewHandlerClsid -Value 'Null IDE Preview Handler'
 
     $allExtensions = $FileAssocMap.Values | ForEach-Object { $_.Extensions } | Select-Object -Unique
+    $claimed = 0
+    $skipped = 0
     foreach ($ext in $allExtensions) {
         $shellexKey = "HKCU:\Software\Classes\$ext\shellex\$PreviewHandlerShellexGuid"
+        $existing = Get-Item -Path $shellexKey -ErrorAction SilentlyContinue
+        $existingClsid = if ($existing) { $existing.GetValue('') } else { $null }
+        if ($existingClsid -and $existingClsid -ne $PreviewHandlerClsid) {
+            # Another app already owns the preview handler for this extension
+            # (e.g. PowerToys' Monaco/Markdown preview handlers) - don't hijack it.
+            $skipped++
+            continue
+        }
         New-Item -Path $shellexKey -Force | Out-Null
         Set-ItemProperty -Path $shellexKey -Name '(default)' -Value $PreviewHandlerClsid
+        $claimed++
     }
 
     Send-ShellChangeNotification
-    Write-Host "Registered preview handler for $($allExtensions.Count) extensions."
+    Write-Host "Registered preview handler for $claimed extensions ($skipped already handled by another app)."
 }
 
 function Unregister-PreviewHandler {
