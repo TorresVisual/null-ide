@@ -37,6 +37,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 Name: "contextmenu"; Description: "Add ""Open in Null"" context menu entries"; GroupDescription: "Shell integration:"
 Name: "fileassoc"; Description: "Register Null IDE as an available app for common code file types"; GroupDescription: "Shell integration:"
+Name: "previewhandler"; Description: "Show code file content in the Explorer Preview Pane (Alt+P)"; GroupDescription: "Shell integration:"
 Name: "addtopath"; Description: "Add to user PATH (enables ""null ."" in new terminals)"; GroupDescription: "Shell integration:"
 
 [Files]
@@ -66,6 +67,7 @@ Root: HKCU; Subkey: "Software\Classes\NullIDEContextMenu"; ValueType: string; Va
 [Run]
 Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\resources\app\null-updater\install-null-ide.ps1"" -RegisterWin11ContextMenu -InstallDir ""{app}"""; Flags: runhidden; Tasks: contextmenu; Description: "Registering Win11 context menu"
 Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\resources\app\null-updater\install-null-ide.ps1"" -RegisterFileAssociations -InstallDir ""{app}"""; Flags: runhidden; Tasks: fileassoc; Description: "Registering file associations"
+Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\resources\app\null-updater\install-null-ide.ps1"" -RegisterPreviewHandler -InstallDir ""{app}"""; Flags: runhidden; Tasks: previewhandler; Description: "Registering preview handler"
 Filename: "{app}\null.exe"; Description: "{cm:LaunchProgram,Null IDE}"; Flags: nowait postinstall skipifsilent
 
 [Code]
@@ -130,6 +132,9 @@ begin
          '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     Exec('powershell.exe',
          '-NoProfile -ExecutionPolicy Bypass -File "' + ExpandConstant('{app}\resources\app\null-updater\install-null-ide.ps1') + '" -UnregisterFileAssociations',
+         '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    Exec('powershell.exe',
+         '-NoProfile -ExecutionPolicy Bypass -File "' + ExpandConstant('{app}\resources\app\null-updater\install-null-ide.ps1') + '" -UnregisterPreviewHandler',
          '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   end;
 end;
