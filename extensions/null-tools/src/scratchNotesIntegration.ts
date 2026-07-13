@@ -12,6 +12,7 @@ import {
   buildScratchFilename,
   buildNoteFilename,
   deriveNoteLabel,
+  buildScratchRunCommand,
 } from './scratchNotesStorage';
 import { FolderTreeProvider } from './scratchNotesTreeView';
 
@@ -35,6 +36,13 @@ function readFileSafe(filePath: string): string {
   } catch {
     return '';
   }
+}
+
+function isRunnableScratchFile(filePath: string): boolean {
+  const root = getWorkspaceRoot();
+  if (!root) { return false; }
+  const scratchDir = getScratchDir(root);
+  return filePath.startsWith(scratchDir + path.sep) && buildScratchRunCommand(filePath) !== undefined;
 }
 
 async function renameItem(filePath: string): Promise<void> {
@@ -131,4 +139,25 @@ export function registerScratchAndNotesFeature(context: vscode.ExtensionContext)
     vscode.commands.registerCommand('null.deleteScratchOrNoteItem', deleteItem),
     output,
   );
+
+  const updateRunContext = () => {
+    const active = vscode.window.activeTextEditor;
+    const runnable = !!active && isRunnableScratchFile(active.document.uri.fsPath);
+    vscode.commands.executeCommand('setContext', 'null.canRunScratchFile', runnable);
+  };
+  updateRunContext();
+  context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(updateRunContext));
+
+  context.subscriptions.push(vscode.commands.registerCommand('null.runScratchFile', async () => {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) { return; }
+    const runCommand = buildScratchRunCommand(editor.document.uri.fsPath);
+    if (!runCommand) { return; }
+    if (editor.document.isDirty) {
+      await editor.document.save();
+    }
+    const terminal = vscode.window.terminals.find(t => t.name === 'Scratch') ?? vscode.window.createTerminal('Scratch');
+    terminal.show();
+    terminal.sendText(runCommand);
+  }));
 }
