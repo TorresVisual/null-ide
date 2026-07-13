@@ -1,6 +1,7 @@
 # TODO List for NULL IDE
 
 * [ ] Restricted mode is annoying!!
+* [ ] better window information need to see instantly which project
 
 ## AI Features
 
