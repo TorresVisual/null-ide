@@ -10,6 +10,7 @@ param(
     [switch]$NoStartMenuShortcut,
     [switch]$NoContextMenu,
     [switch]$NoFileAssoc,
+    [switch]$NoPreviewHandler,
     [switch]$NoPath,
     [switch]$RegisterContextMenu,
     [switch]$RegisterWin11ContextMenu,
@@ -698,6 +699,11 @@ function Install-Zip {
         if (-not $NoFileAssoc) {
             Write-Step "Registering file associations"
             Register-FileAssociations -InstallDir $destinationFullPath
+        }
+
+        if (-not $NoPreviewHandler) {
+            Write-Step "Registering preview handler"
+            Register-PreviewHandler -InstallDir $destinationFullPath
         }
 
         if (-not $NoPath) {
