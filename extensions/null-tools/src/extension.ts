@@ -9,6 +9,7 @@ import { execSync, spawn } from 'child_process';
 import * as ollama from './ollama';
 import { ClaudeHistoryIndex, ClaudeCodeSession } from './claudeHistory';
 import { registerRecentProjectsUriHandler } from './recentProjectsIntegration';
+import { registerScratchAndNotesFeature } from './scratchNotesIntegration';
 
 // Electron adds resourcesPath to the Node process object; @types/node doesn't know about it.
 declare global {
@@ -1303,6 +1304,7 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(bar);
 
   registerRecentProjectsUriHandler(context);
+  registerScratchAndNotesFeature(context);
 
   const updateBar = vscode.window.createStatusBarItem('null.update', vscode.StatusBarAlignment.Right, 1);
   updateBar.text = '$(cloud-download) Update'; updateBar.tooltip = 'Null IDE update available';
