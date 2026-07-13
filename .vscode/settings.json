@@ -1,3 +1,24 @@
 {
-    "markdown.validate.enabled": true
+    "markdown.validate.enabled": true,
+    "actionButtons": {
+        "commands": [
+            {
+                "cwd": "${workspaceFolder}",
+                "name": "Push Tag",
+                "color": "#00ff7f",
+                "singleInstance": true,
+                "command": "powershell.exe -ExecutionPolicy Bypass ${workspaceFolder}\\push-tag.ps1"
+            },
+            {
+                "cwd": "${workspaceFolder}",
+                "name": "Re-Push Tag",
+                "color": "#2bc7fb",
+                "singleInstance": true,
+                "command": "powershell.exe -ExecutionPolicy Bypass ${workspaceFolder}\\repush-tag.ps1"
+            }
+        ],
+        "defaultColor": "white",
+        "reloadButton": "↻",
+        "loadNpmCommands": false
+    }
 }
