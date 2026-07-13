@@ -425,16 +425,18 @@ param(
     [string]$DllPath = "d:\Coding\Apps\null-ide\shell-ext-build\Release\null_explorer_command.dll"
 )
 
-Add-Type -MemberDefinition @"
-[DllImport(`"$DllPath`", ExactSpelling = true)]
-public static extern int DllGetClassObject(ref Guid rclsid, ref Guid riid, out IntPtr ppv);
-"@ -Namespace NullIDE -Name ComProbeNative
+$DllPathForwardSlash = $DllPath.Replace('\', '/')
 
 Add-Type @"
 using System;
 using System.Runtime.InteropServices;
 
 namespace NullIDE {
+    public static class ComProbeNative {
+        [DllImport(`"$DllPathForwardSlash`", ExactSpelling = true)]
+        public static extern int DllGetClassObject(ref Guid rclsid, ref Guid riid, out IntPtr ppv);
+    }
+
     public static class ComProbe {
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
         public delegate int CreateInstanceDelegate(IntPtr self, IntPtr pUnkOuter, ref Guid riid, out IntPtr ppvObject);
@@ -483,19 +485,23 @@ function Assert-Ok($hr, $label) {
 }
 
 # Regression check: existing context-menu class factory still resolves.
-$hr = [NullIDE.ComProbe]::GetClassObject($explorerCommandClsid, [ref]$factoryPtr = [IntPtr]::Zero)
+$factoryPtr = [IntPtr]::Zero
+$hr = [NullIDE.ComProbe]::GetClassObject($explorerCommandClsid, [ref]$factoryPtr)
 Assert-Ok $hr "DllGetClassObject(ExplorerCommandHandler)"
 
 # New preview-handler class factory resolves.
-$hr = [NullIDE.ComProbe]::GetClassObject($previewHandlerClsid, [ref]$factoryPtr = [IntPtr]::Zero)
+$factoryPtr = [IntPtr]::Zero
+$hr = [NullIDE.ComProbe]::GetClassObject($previewHandlerClsid, [ref]$factoryPtr)
 Assert-Ok $hr "DllGetClassObject(PreviewHandler)"
 
 # Instantiate it as IPreviewHandler.
-$hr = [NullIDE.ComProbe]::CreateInstance($factoryPtr, $iidIPreviewHandler, [ref]$instPtr = [IntPtr]::Zero)
+$instPtr = [IntPtr]::Zero
+$hr = [NullIDE.ComProbe]::CreateInstance($factoryPtr, $iidIPreviewHandler, [ref]$instPtr)
 Assert-Ok $hr "CreateInstance(PreviewHandler) as IPreviewHandler"
 
 # QueryInterface for IPreviewHandlerVisuals from the same instance.
-$hr = [NullIDE.ComProbe]::QueryInterface($instPtr, $iidIPreviewHandlerVis, [ref]$visPtr = [IntPtr]::Zero)
+$visPtr = [IntPtr]::Zero
+$hr = [NullIDE.ComProbe]::QueryInterface($instPtr, $iidIPreviewHandlerVis, [ref]$visPtr)
 Assert-Ok $hr "QueryInterface(PreviewHandler) for IPreviewHandlerVisuals"
 
 Write-Host "`nAll COM smoke tests passed."
