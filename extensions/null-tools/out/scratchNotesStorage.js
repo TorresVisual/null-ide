@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.SCRATCH_LANGUAGES = void 0;
+exports.SCRATCH_RUNNERS = exports.SCRATCH_LANGUAGES = void 0;
 exports.getNullDir = getNullDir;
 exports.getScratchDir = getScratchDir;
 exports.getNotesDir = getNotesDir;
@@ -44,6 +44,7 @@ exports.slugify = slugify;
 exports.buildNoteFilename = buildNoteFilename;
 exports.deriveNoteLabel = deriveNoteLabel;
 exports.ensureGitignoreEntry = ensureGitignoreEntry;
+exports.buildScratchRunCommand = buildScratchRunCommand;
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 exports.SCRATCH_LANGUAGES = [
@@ -117,5 +118,18 @@ function ensureGitignoreEntry(workspaceRoot) {
     }
     const needsLeadingNewline = content.length > 0 && !content.endsWith('\n');
     fs.writeFileSync(gitignorePath, `${content}${needsLeadingNewline ? '\n' : ''}.null/\n`);
+}
+exports.SCRATCH_RUNNERS = {
+    '.py': { command: 'python', args: filePath => [filePath] },
+    '.js': { command: 'node', args: filePath => [filePath] },
+    '.ts': { command: 'npx', args: filePath => ['ts-node', filePath] },
+};
+function buildScratchRunCommand(filePath) {
+    const runner = exports.SCRATCH_RUNNERS[path.extname(filePath)];
+    if (!runner) {
+        return undefined;
+    }
+    const quotedArgs = runner.args(filePath).map(arg => `"${arg}"`);
+    return [runner.command, ...quotedArgs].join(' ');
 }
 //# sourceMappingURL=scratchNotesStorage.js.map

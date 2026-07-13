@@ -120,4 +120,19 @@ const scratchNotesStorage_1 = require("./scratchNotesStorage");
         fs.rmSync(root, { recursive: true, force: true });
     }
 });
+(0, node_test_1.test)('buildScratchRunCommand maps .py to a quoted python invocation', () => {
+    assert.equal((0, scratchNotesStorage_1.buildScratchRunCommand)('C:\\ws\\.null\\scratch\\scratch-1.py'), 'python "C:\\ws\\.null\\scratch\\scratch-1.py"');
+});
+(0, node_test_1.test)('buildScratchRunCommand maps .js to a quoted node invocation', () => {
+    assert.equal((0, scratchNotesStorage_1.buildScratchRunCommand)('C:\\ws\\.null\\scratch\\scratch-1.js'), 'node "C:\\ws\\.null\\scratch\\scratch-1.js"');
+});
+(0, node_test_1.test)('buildScratchRunCommand maps .ts to a quoted npx ts-node invocation', () => {
+    assert.equal((0, scratchNotesStorage_1.buildScratchRunCommand)('C:\\ws\\.null\\scratch\\scratch-1.ts'), 'npx "ts-node" "C:\\ws\\.null\\scratch\\scratch-1.ts"');
+});
+(0, node_test_1.test)('buildScratchRunCommand returns undefined for non-runnable extensions', () => {
+    assert.equal((0, scratchNotesStorage_1.buildScratchRunCommand)('C:\\ws\\.null\\scratch\\scratch-1.md'), undefined);
+    assert.equal((0, scratchNotesStorage_1.buildScratchRunCommand)('C:\\ws\\.null\\scratch\\scratch-1.json'), undefined);
+    assert.equal((0, scratchNotesStorage_1.buildScratchRunCommand)('C:\\ws\\.null\\scratch\\scratch-1.txt'), undefined);
+    assert.equal((0, scratchNotesStorage_1.buildScratchRunCommand)('C:\\ws\\.null\\scratch\\scratch-1.unknown'), undefined);
+});
 //# sourceMappingURL=scratchNotesStorage.test.js.map
