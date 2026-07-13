@@ -4,6 +4,9 @@
     <ClCompile Include="D:\Coding\Apps\null-ide\shell-ext\src\explorer_command.cc">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="D:\Coding\Apps\null-ide\shell-ext\src\preview_handler.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="D:\Coding\Apps\null-ide\shell-ext\CMakeLists.txt" />

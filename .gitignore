@@ -1,6 +1,7 @@
 # Build inputs cloned by CI — never commit
 vscode-src/
 vscodium-src/
+shell-ext-build/
 
 # Shell extension: wil headers fetched by CI
 shell-ext/deps/
