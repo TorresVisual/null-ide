@@ -44,6 +44,7 @@ const child_process_1 = require("child_process");
 const ollama = __importStar(require("./ollama"));
 const claudeHistory_1 = require("./claudeHistory");
 const recentProjectsIntegration_1 = require("./recentProjectsIntegration");
+const scratchNotesIntegration_1 = require("./scratchNotesIntegration");
 const UPDATE_REPO = 'TorresVisual/null-ide';
 const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const output = vscode.window.createOutputChannel('Null IDE Updates');
@@ -1170,6 +1171,7 @@ function activate(context) {
     bar.show();
     context.subscriptions.push(bar);
     (0, recentProjectsIntegration_1.registerRecentProjectsUriHandler)(context);
+    (0, scratchNotesIntegration_1.registerScratchAndNotesFeature)(context);
     const updateBar = vscode.window.createStatusBarItem('null.update', vscode.StatusBarAlignment.Right, 1);
     updateBar.text = '$(cloud-download) Update';
     updateBar.tooltip = 'Null IDE update available';
