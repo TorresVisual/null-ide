@@ -106,6 +106,11 @@
       {
         "command": "null.deleteScratchOrNoteItem",
         "title": "Null: Delete Item"
+      },
+      {
+        "command": "null.runScratchFile",
+        "title": "Null: Run Scratch File",
+        "icon": "$(play)"
       }
     ],
     "viewsContainers": {
@@ -154,6 +159,11 @@
         {
           "command": "null.rejectProposedDiff",
           "when": "null.viewingProposedDiff",
+          "group": "navigation"
+        },
+        {
+          "command": "null.runScratchFile",
+          "when": "null.canRunScratchFile",
           "group": "navigation"
         }
       ],
@@ -228,7 +238,8 @@
         { "command": "null.newScratchFile" },
         { "command": "null.newNote" },
         { "command": "null.renameScratchOrNoteItem", "when": "false" },
-        { "command": "null.deleteScratchOrNoteItem", "when": "false" }
+        { "command": "null.deleteScratchOrNoteItem", "when": "false" },
+        { "command": "null.runScratchFile", "when": "null.canRunScratchFile" }
       ]
     },
     "configuration": {
