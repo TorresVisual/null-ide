@@ -15,6 +15,8 @@ param(
     [switch]$RegisterWin11ContextMenu,
     [switch]$RegisterFileAssociations,
     [switch]$UnregisterFileAssociations,
+    [switch]$RegisterPreviewHandler,
+    [switch]$UnregisterPreviewHandler,
     [switch]$Launch
 )
 
@@ -450,6 +452,62 @@ function Unregister-FileAssociations {
     Write-Host 'Unregistered file associations.'
 }
 
+$PreviewHandlerClsid = '{58F3B583-5D67-489A-9069-97FD45B2569B}'
+$PreviewHandlerShellexGuid = '{8895b1c6-b41f-4c1c-a562-0d564250836f}'
+
+function Register-PreviewHandler {
+    param([string]$InstallDir)
+
+    $installDir = [System.IO.Path]::GetFullPath($InstallDir)
+    $dllPath    = Join-Path $installDir 'shell-ext\NullIDE.ExplorerCommand\x64\null_explorer_command.dll'
+
+    $clsidKey = "HKCU:\Software\Classes\CLSID\$PreviewHandlerClsid"
+    New-Item -Path $clsidKey -Force | Out-Null
+    Set-ItemProperty -Path $clsidKey -Name '(default)' -Value 'Null IDE Preview Handler'
+
+    New-Item -Path "$clsidKey\InprocServer32" -Force | Out-Null
+    Set-ItemProperty -Path "$clsidKey\InprocServer32" -Name '(default)' -Value $dllPath
+    Set-ItemProperty -Path "$clsidKey\InprocServer32" -Name 'ThreadingModel' -Value 'Apartment'
+
+    $approvedKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\PreviewHandlers'
+    New-Item -Path $approvedKey -Force | Out-Null
+    Set-ItemProperty -Path $approvedKey -Name $PreviewHandlerClsid -Value 'Null IDE Preview Handler'
+
+    $allExtensions = $FileAssocMap.Values | ForEach-Object { $_.Extensions } | Select-Object -Unique
+    foreach ($ext in $allExtensions) {
+        $shellexKey = "HKCU:\Software\Classes\$ext\shellex\$PreviewHandlerShellexGuid"
+        New-Item -Path $shellexKey -Force | Out-Null
+        Set-ItemProperty -Path $shellexKey -Name '(default)' -Value $PreviewHandlerClsid
+    }
+
+    Send-ShellChangeNotification
+    Write-Host "Registered preview handler for $($allExtensions.Count) extensions."
+}
+
+function Unregister-PreviewHandler {
+    $allExtensions = $FileAssocMap.Values | ForEach-Object { $_.Extensions } | Select-Object -Unique
+    foreach ($ext in $allExtensions) {
+        $shellexKey = "HKCU:\Software\Classes\$ext\shellex\$PreviewHandlerShellexGuid"
+        $existing = Get-Item -Path $shellexKey -ErrorAction SilentlyContinue
+        if ($existing -and $existing.GetValue('') -eq $PreviewHandlerClsid) {
+            Remove-Item -Path $shellexKey -Force
+        }
+    }
+
+    $clsidKey = "HKCU:\Software\Classes\CLSID\$PreviewHandlerClsid"
+    if (Test-Path $clsidKey) {
+        Remove-Item -Path $clsidKey -Recurse -Force
+    }
+
+    $approvedKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\PreviewHandlers'
+    if (Test-Path $approvedKey) {
+        Remove-ItemProperty -Path $approvedKey -Name $PreviewHandlerClsid -ErrorAction SilentlyContinue
+    }
+
+    Send-ShellChangeNotification
+    Write-Host 'Unregistered preview handler.'
+}
+
 function Register-Path {
     param([string]$Dir)
     $current = [System.Environment]::GetEnvironmentVariable('PATH', 'User')
@@ -716,6 +774,21 @@ if ($RegisterFileAssociations) {
 if ($UnregisterFileAssociations) {
     Write-Step "Unregistering file associations"
     Unregister-FileAssociations
+    Write-Host "Done."
+    return
+}
+
+if ($RegisterPreviewHandler) {
+    $dir = [System.IO.Path]::GetFullPath($InstallDir)
+    Write-Step "Registering preview handler"
+    Register-PreviewHandler -InstallDir $dir
+    Write-Host "Done."
+    return
+}
+
+if ($UnregisterPreviewHandler) {
+    Write-Step "Unregistering preview handler"
+    Unregister-PreviewHandler
     Write-Host "Done."
     return
 }
