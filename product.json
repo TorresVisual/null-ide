@@ -94,6 +94,7 @@
 		"security.workspace.trust.emptyWindow": false,
 		"workbench.enableExperiments": false,
 		"markdown.preview.scrollPreviewWithEditor": true,
-		"markdown.preview.scrollEditorWithPreview": false
+		"markdown.preview.scrollEditorWithPreview": false,
+		"cSpell.showStatus": true
 	}
 }
