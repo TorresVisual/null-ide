@@ -3,6 +3,20 @@
     "actionButtons": {
         "commands": [
             {
+                "name": "Sync Local",
+                "color": "#4CAF50",
+                "tooltip": "Run copy.ps1",
+                "singleInstance": true,
+                "command": "powershell -ExecutionPolicy Bypass ${workspaceFolder}\\copy.ps1",
+            },
+            {
+                "name": "Reload IDE",
+                "color": "#2196F3",
+                "tooltip": "Reload the VS Code window",
+                "singleInstance": true,
+                "command": "workbench.action.reloadWindow"
+            },
+            {
                 "cwd": "${workspaceFolder}",
                 "name": "Push Tag",
                 "color": "#00ff7f",
