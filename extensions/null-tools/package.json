@@ -9,7 +9,7 @@
   "main": "./out/extension.js",
   "scripts": {
     "compile": "tsc -p tsconfig.json && tsc -p tsconfig.webview.json",
-    "test": "tsc -p tsconfig.json && node --test out/recentProjects.test.js out/scratchNotesStorage.test.js"
+    "test": "tsc -p tsconfig.json && node --test out/recentProjects.test.js out/scratchNotesStorage.test.js out/autoGitignore.test.js"
   },
   "devDependencies": {
     "typescript": "^5.8.0",
@@ -98,6 +98,11 @@
         "command": "null.newNote",
         "title": "Null: New Note",
         "icon": "$(new-file)"
+      },
+      {
+        "command": "null.autoGitignore",
+        "title": "Null: Auto-Scan & Update .gitignore",
+        "icon": "$(eye-closed)"
       },
       {
         "command": "null.renameScratchOrNoteItem",
@@ -288,6 +293,22 @@
               "text":  { "type": "string" }
             }
           }
+        },
+        "null.gitignore.autoUpdate": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically scan workspace for build artifacts and add missing entries to .gitignore."
+        },
+        "null.gitignore.autoCommit": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically commit .gitignore to Git when new entries are added by Null Auto-Gitignore."
+        },
+        "null.gitignore.ignoredPatterns": {
+          "type": "array",
+          "default": [],
+          "description": "Additional custom file or directory patterns to automatically scan and add to .gitignore.",
+          "items": { "type": "string" }
         }
       }
     },
