@@ -96,7 +96,6 @@ exports.DEFAULT_ARTIFACT_PATTERNS = [
     '.codex-tmp/',
     '.superpowers/',
     '.playwright-mcp/',
-    '.vscode/',
 ];
 const SECTION_HEADER = '# Added by Null IDE Auto-Gitignore';
 function normalizePattern(pattern) {
