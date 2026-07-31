@@ -1,7 +1,9 @@
-$root    = "D:\Coding\Apps\null-ide"
+$root = if ($PSScriptRoot) { $PSScriptRoot } else { Get-Location }
 $targets = @(
-    "C:\Users\Moritz\AppData\Local\Programs\Null IDE\resources\app"
-)
+    "$env:LOCALAPPDATA\Programs\Null IDE\resources\app",
+    "C:\Users\Moritz\AppData\Local\Programs\Null IDE\resources\app",
+    "C:\Users\Torres\AppData\Local\Programs\Null IDE\resources\app"
+) | Select-Object -Unique
 
 # product.json fields stamped at build time or owned by upstream -- never overwrite these
 $preserve = [System.Collections.Generic.HashSet[string]]@(

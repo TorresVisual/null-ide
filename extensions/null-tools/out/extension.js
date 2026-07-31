@@ -45,6 +45,7 @@ const ollama = __importStar(require("./ollama"));
 const claudeHistory_1 = require("./claudeHistory");
 const recentProjectsIntegration_1 = require("./recentProjectsIntegration");
 const scratchNotesIntegration_1 = require("./scratchNotesIntegration");
+const projectInfo_1 = require("./projectInfo");
 const UPDATE_REPO = 'TorresVisual/null-ide';
 const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const output = vscode.window.createOutputChannel('Null IDE Updates');
@@ -1163,7 +1164,28 @@ function showWelcomePage(context) {
     }, undefined, context.subscriptions);
 }
 // ── Activation ─────────────────────────────────────────────────────────────
+async function disableRestrictedMode() {
+    try {
+        const config = vscode.workspace.getConfiguration('security.workspace.trust');
+        if (config.get('enabled') !== false) {
+            await config.update('enabled', false, vscode.ConfigurationTarget.Global);
+        }
+        if (config.get('startupPrompt') !== 'never') {
+            await config.update('startupPrompt', 'never', vscode.ConfigurationTarget.Global);
+        }
+        if (config.get('untrustedFiles') !== 'open') {
+            await config.update('untrustedFiles', 'open', vscode.ConfigurationTarget.Global);
+        }
+        if (config.get('emptyWindow') !== false) {
+            await config.update('emptyWindow', false, vscode.ConfigurationTarget.Global);
+        }
+    }
+    catch {
+        // Ignore error
+    }
+}
 function activate(context) {
+    disableRestrictedMode();
     const bar = vscode.window.createStatusBarItem('null.gen', vscode.StatusBarAlignment.Right, 0);
     bar.text = '$(sparkle)';
     bar.tooltip = 'Null: generate commit message';
@@ -1172,6 +1194,7 @@ function activate(context) {
     context.subscriptions.push(bar);
     (0, recentProjectsIntegration_1.registerRecentProjectsUriHandler)(context);
     (0, scratchNotesIntegration_1.registerScratchAndNotesFeature)(context);
+    (0, projectInfo_1.registerProjectInfoFeature)(context);
     const updateBar = vscode.window.createStatusBarItem('null.update', vscode.StatusBarAlignment.Right, 1);
     updateBar.text = '$(cloud-download) Update';
     updateBar.tooltip = 'Null IDE update available';
