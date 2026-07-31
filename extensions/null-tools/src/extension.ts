@@ -11,6 +11,7 @@ import { ClaudeHistoryIndex, ClaudeCodeSession } from './claudeHistory';
 import { registerRecentProjectsUriHandler } from './recentProjectsIntegration';
 import { registerScratchAndNotesFeature } from './scratchNotesIntegration';
 import { registerAutoGitignoreFeature } from './autoGitignore';
+import { registerPortsFeature } from './portsIntegration';
 
 // Electron adds resourcesPath to the Node process object; @types/node doesn't know about it.
 declare global {
@@ -1643,6 +1644,8 @@ export function activate(context: vscode.ExtensionContext): void {
     }, 500);
   });
   context.subscriptions.push(plansWatcher);
+
+  registerPortsFeature(context);
 }
 
 export function deactivate(): void {}

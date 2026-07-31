@@ -116,6 +116,26 @@
         "command": "null.runScratchFile",
         "title": "Null: Run Scratch File",
         "icon": "$(play)"
+      },
+      {
+        "command": "null.ports.refresh",
+        "title": "Null: Refresh Ports",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "null.ports.openInBrowser",
+        "title": "Open in Browser",
+        "icon": "$(globe)"
+      },
+      {
+        "command": "null.ports.killProcess",
+        "title": "Kill Process",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "null.ports.copyUrl",
+        "title": "Copy URL",
+        "icon": "$(copy)"
       }
     ],
     "viewsContainers": {
@@ -151,6 +171,10 @@
         {
           "id": "null.notesView",
           "name": "Notes"
+        },
+        {
+          "id": "null.portsView",
+          "name": "Null Ports"
         }
       ]
     },
@@ -204,6 +228,11 @@
           "command": "null.newNote",
           "when": "view == null.notesView",
           "group": "navigation"
+        },
+        {
+          "command": "null.ports.refresh",
+          "when": "view == null.portsView",
+          "group": "navigation"
         }
       ],
       "view/item/context": [
@@ -226,6 +255,21 @@
           "command": "null.deleteScratchOrNoteItem",
           "when": "view == null.notesView && viewItem == nullFolderItem",
           "group": "inline@2"
+        },
+        {
+          "command": "null.ports.openInBrowser",
+          "when": "view == null.portsView && viewItem == portEntry",
+          "group": "inline@1"
+        },
+        {
+          "command": "null.ports.copyUrl",
+          "when": "view == null.portsView && viewItem == portEntry",
+          "group": "inline@2"
+        },
+        {
+          "command": "null.ports.killProcess",
+          "when": "view == null.portsView && viewItem == portEntry",
+          "group": "inline@3"
         }
       ],
       "commandPalette": [
@@ -244,7 +288,11 @@
         { "command": "null.newNote" },
         { "command": "null.renameScratchOrNoteItem", "when": "false" },
         { "command": "null.deleteScratchOrNoteItem", "when": "false" },
-        { "command": "null.runScratchFile", "when": "null.canRunScratchFile" }
+        { "command": "null.runScratchFile", "when": "null.canRunScratchFile" },
+        { "command": "null.ports.refresh" },
+        { "command": "null.ports.openInBrowser" },
+        { "command": "null.ports.killProcess" },
+        { "command": "null.ports.copyUrl" }
       ]
     },
     "configuration": {
@@ -309,6 +357,17 @@
           "default": [],
           "description": "Additional custom file or directory patterns to automatically scan and add to .gitignore.",
           "items": { "type": "string" }
+        },
+        "null.ports.refreshInterval": {
+          "type": "number",
+          "default": 5,
+          "minimum": 0,
+          "description": "How often (in seconds) the Null Ports panel scans for active listening ports. Set to 0 to disable auto-refresh."
+        },
+        "null.ports.filterDevOnly": {
+          "type": "boolean",
+          "default": true,
+          "description": "When enabled, Null Ports only shows processes recognised as dev servers (node, python, ollama, etc.). Disable to show all listening ports."
         }
       }
     },
