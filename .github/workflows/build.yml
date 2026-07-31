@@ -175,34 +175,50 @@ jobs:
         env:
           CSPELL_TAG: ${{ env.CSPELL_TAG }}
         run: |
-          # Clone the repo at the pinned tag (shallow — we only need the metadata/sources)
+          # Clone the repo at the pinned tag (satisfies source tracking)
           $tag = $env:CSPELL_TAG
           Write-Host "Bundling Code Spell Checker at tag: $tag"
           git clone --depth 1 --branch $tag `
             https://github.com/streetsidesoftware/vscode-spell-checker.git `
             cspell-src
 
-          # Extract the semver portion (e.g. 'code-spell-checker-v4.5.6' -> '4.5.6')
+          # Extract the semver version (e.g. 'code-spell-checker-v4.5.6' -> '4.5.6')
           $version = $tag -replace '^code-spell-checker-v', ''
-          Write-Host "Semver: $version"
+          Write-Host "Semver version: $version"
 
-          # Download the pre-built VSIX attached to the same GitHub Release
-          $vsixName = "code-spell-checker-$version.vsix"
-          $vsixUrl  = "https://github.com/streetsidesoftware/vscode-spell-checker/releases/download/$tag/$vsixName"
-          Write-Host "Downloading VSIX from: $vsixUrl"
-          Invoke-WebRequest $vsixUrl -OutFile $vsixName -UseBasicParsing
+          # Download published VSIX from VS Marketplace (saved as .zip for Expand-Archive)
+          $vsixZip = "cspell.zip"
+          $vsixUrl = "https://marketplace.visualstudio.com/_apis/public/gallery/publishers/streetsidesoftware/vsextensions/code-spell-checker/$version/vspackage"
+          Write-Host "Downloading Marketplace VSIX from: $vsixUrl"
+          Invoke-WebRequest $vsixUrl -OutFile $vsixZip -UseBasicParsing
 
-          # Unpack the VSIX (it is a zip; the extension lives inside the 'extension/' folder)
-          Expand-Archive $vsixName -DestinationPath cspell-unpacked -Force
+          # Unpack VSIX (extension contents live under 'extension/')
+          Expand-Archive $vsixZip -DestinationPath cspell-unpacked -Force
 
-          # Drop the extension into vscode-src/extensions/ so it becomes a built-in
+          # Copy into vscode-src/extensions/
           $dest = 'vscode-src/extensions/code-spell-checker'
           if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
           Move-Item cspell-unpacked/extension $dest
 
-          # Cleanup
-          Remove-Item $vsixName, cspell-unpacked, cspell-src -Recurse -Force -ErrorAction SilentlyContinue
-          Write-Host "Bundled Code Spell Checker $version into vscode-src/extensions/code-spell-checker"
+          # Sanitize package.json: strip workspaces, dependencies, devDependencies, and scripts.
+          # The extension code is fully bundled into dist/ and node_modules; leaving monorepo
+          # workspace dependencies in package.json causes VS Code's build (npm list --production) to fail.
+          node -e "
+            const fs = require('fs');
+            const file = '$dest/package.json';
+            const pkg = JSON.parse(fs.readFileSync(file, 'utf8'));
+            delete pkg.workspaces;
+            delete pkg.dependencies;
+            delete pkg.devDependencies;
+            delete pkg.scripts;
+            delete pkg.private;
+            fs.writeFileSync(file, JSON.stringify(pkg, null, 2));
+            console.log('Sanitized package.json for built-in extension packaging');
+          "
+
+          # Cleanup temporary files
+          Remove-Item $vsixZip, cspell-unpacked, cspell-src -Recurse -Force -ErrorAction SilentlyContinue
+          Write-Host "Successfully bundled Code Spell Checker $version into $dest"
 
 
 
