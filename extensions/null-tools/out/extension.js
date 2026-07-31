@@ -46,6 +46,7 @@ const claudeHistory_1 = require("./claudeHistory");
 const recentProjectsIntegration_1 = require("./recentProjectsIntegration");
 const scratchNotesIntegration_1 = require("./scratchNotesIntegration");
 const autoGitignore_1 = require("./autoGitignore");
+const portsIntegration_1 = require("./portsIntegration");
 const UPDATE_REPO = 'TorresVisual/null-ide';
 const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const output = vscode.window.createOutputChannel('Null IDE Updates');
@@ -1504,6 +1505,7 @@ function activate(context) {
         }, 500);
     });
     context.subscriptions.push(plansWatcher);
+    (0, portsIntegration_1.registerPortsFeature)(context);
 }
 function deactivate() { }
 //# sourceMappingURL=extension.js.map
