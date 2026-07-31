@@ -1320,9 +1320,8 @@ async function disableRestrictedMode(): Promise<void> {
 async function ensureWindowTitleFormat(): Promise<void> {
   try {
     const config = vscode.workspace.getConfiguration('window');
-    const expected = '${dirty}${rootName}${separator}${activeEditorShort}${separator}${appName}';
-    const current = config.get<string>('title');
-    if (!current || !current.includes('${rootName}')) {
+    const expected = '${dirty}${activeEditorShort} - ${rootName}';
+    if (config.get<string>('title') !== expected) {
       await config.update('title', expected, vscode.ConfigurationTarget.Global);
     }
   } catch {
