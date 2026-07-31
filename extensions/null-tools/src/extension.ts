@@ -10,7 +10,6 @@ import * as ollama from './ollama';
 import { ClaudeHistoryIndex, ClaudeCodeSession } from './claudeHistory';
 import { registerRecentProjectsUriHandler } from './recentProjectsIntegration';
 import { registerScratchAndNotesFeature } from './scratchNotesIntegration';
-import { registerProjectInfoFeature } from './projectInfo';
 
 // Electron adds resourcesPath to the Node process object; @types/node doesn't know about it.
 declare global {
@@ -1318,8 +1317,22 @@ async function disableRestrictedMode(): Promise<void> {
   }
 }
 
+async function ensureWindowTitleFormat(): Promise<void> {
+  try {
+    const config = vscode.workspace.getConfiguration('window');
+    const expected = '${dirty}${rootName}${separator}${activeEditorShort}${separator}${appName}';
+    const current = config.get<string>('title');
+    if (!current || !current.includes('${rootName}')) {
+      await config.update('title', expected, vscode.ConfigurationTarget.Global);
+    }
+  } catch {
+    // Ignore error
+  }
+}
+
 export function activate(context: vscode.ExtensionContext): void {
   disableRestrictedMode();
+  ensureWindowTitleFormat();
 
   const bar = vscode.window.createStatusBarItem('null.gen', vscode.StatusBarAlignment.Right, 0);
   bar.text = '$(sparkle)'; bar.tooltip = 'Null: generate commit message';
@@ -1328,7 +1341,6 @@ export function activate(context: vscode.ExtensionContext): void {
 
   registerRecentProjectsUriHandler(context);
   registerScratchAndNotesFeature(context);
-  registerProjectInfoFeature(context);
 
   const updateBar = vscode.window.createStatusBarItem('null.update', vscode.StatusBarAlignment.Right, 1);
   updateBar.text = '$(cloud-download) Update'; updateBar.tooltip = 'Null IDE update available';

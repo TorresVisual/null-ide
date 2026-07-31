@@ -1,0 +1,14 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+    {
+        "label": "Reload IDE",
+        "type": "shell",
+        "command": "null",
+        "args": [
+        "--command",
+        "workbench.action.reloadWindow"
+        ]
+    }
+    ]
+}

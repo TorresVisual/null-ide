@@ -83,7 +83,7 @@
 		"workbench.iconTheme": "null-icons",
 		"window.titleBarStyle": "custom",
 		"window.menuBarVisibility": "compact",
-		"window.title": "${rootName}${dirty} ── ${activeEditorShort}${separator}${appName}",
+		"window.title": "${dirty}${rootName}${separator}${activeEditorShort}${separator}${appName}",
 		"telemetry.telemetryLevel": "off",
 		"update.mode": "none",
 		"update.showReleaseNotes": false,
