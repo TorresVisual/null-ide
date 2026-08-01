@@ -10,6 +10,7 @@ Key characteristics:
 - Binary name: `null.exe` — accessible from the terminal as `null .`
 - Built on VSCodium, which strips Microsoft telemetry from VS Code
 - Five built-in extensions bundled at build time: `null-theme`, `null-icons`, `null-tools`, `null-markdown`, `wooting-analog`
+- **Code Spell Checker** (`streetsidesoftware.code-spell-checker`) bundled as a fifth built-in extension; version pinned via `CSPELL_TAG` env var in `build.yml`
 - CI builds on `windows-2022`; the developer authors source changes locally
 - Releases publish a portable ZIP and an Inno Setup installer to GitHub Releases
 - The in-app updater (`null-tools`) checks GitHub Releases on startup and can self-update

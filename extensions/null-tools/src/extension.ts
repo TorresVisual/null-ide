@@ -10,6 +10,8 @@ import * as ollama from './ollama';
 import { ClaudeHistoryIndex, ClaudeCodeSession } from './claudeHistory';
 import { registerRecentProjectsUriHandler } from './recentProjectsIntegration';
 import { registerScratchAndNotesFeature } from './scratchNotesIntegration';
+import { registerAutoGitignoreFeature } from './autoGitignore';
+import { registerPortsFeature } from './portsIntegration';
 
 // Electron adds resourcesPath to the Node process object; @types/node doesn't know about it.
 declare global {
@@ -1297,7 +1299,42 @@ function showWelcomePage(context: vscode.ExtensionContext): void {
 
 // ── Activation ─────────────────────────────────────────────────────────────
 
+async function disableRestrictedMode(): Promise<void> {
+  try {
+    const config = vscode.workspace.getConfiguration('security.workspace.trust');
+    if (config.get('enabled') !== false) {
+      await config.update('enabled', false, vscode.ConfigurationTarget.Global);
+    }
+    if (config.get('startupPrompt') !== 'never') {
+      await config.update('startupPrompt', 'never', vscode.ConfigurationTarget.Global);
+    }
+    if (config.get('untrustedFiles') !== 'open') {
+      await config.update('untrustedFiles', 'open', vscode.ConfigurationTarget.Global);
+    }
+    if (config.get('emptyWindow') !== false) {
+      await config.update('emptyWindow', false, vscode.ConfigurationTarget.Global);
+    }
+  } catch {
+    // Ignore error
+  }
+}
+
+async function ensureWindowTitleFormat(): Promise<void> {
+  try {
+    const config = vscode.workspace.getConfiguration('window');
+    const expected = '${dirty}${rootName} - ${activeEditorShort}';
+    if (config.get<string>('title') !== expected) {
+      await config.update('title', expected, vscode.ConfigurationTarget.Global);
+    }
+  } catch {
+    // Ignore error
+  }
+}
+
 export function activate(context: vscode.ExtensionContext): void {
+  disableRestrictedMode();
+  ensureWindowTitleFormat();
+
   const bar = vscode.window.createStatusBarItem('null.gen', vscode.StatusBarAlignment.Right, 0);
   bar.text = '$(sparkle)'; bar.tooltip = 'Null: generate commit message';
   bar.command = 'null.generateCommitMessage'; bar.show();
@@ -1305,6 +1342,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   registerRecentProjectsUriHandler(context);
   registerScratchAndNotesFeature(context);
+  registerAutoGitignoreFeature(context);
 
   const updateBar = vscode.window.createStatusBarItem('null.update', vscode.StatusBarAlignment.Right, 1);
   updateBar.text = '$(cloud-download) Update'; updateBar.tooltip = 'Null IDE update available';
@@ -1606,6 +1644,8 @@ export function activate(context: vscode.ExtensionContext): void {
     }, 500);
   });
   context.subscriptions.push(plansWatcher);
+
+  registerPortsFeature(context);
 }
 
 export function deactivate(): void {}
