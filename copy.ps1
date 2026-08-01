@@ -80,6 +80,59 @@ foreach ($app in $targets) {
     }
     Write-Host "  [ok] extensions (null-theme, null-icons, null-tools, null-markdown)"
 
+    # wooting-analog: build the native (Rust/napi-rs) addon, then compile TypeScript,
+    # then sync file-by-file (like null-tools, not a wholesale remove+recreate).
+    # The native .node binary gets locked while Null IDE is running with the
+    # extension loaded -- a blind Remove-Item+Copy-Item silently NESTS the copy
+    # (wooting-analog\wooting-analog\...) when the delete partially fails, which
+    # leaves no package.json at the path VS Code actually reads. Copying file-by-file
+    # instead just skips locked files and reports them, so quitting Null IDE and
+    # re-running is all that's needed to pick up a changed native addon.
+    $wootingSrc  = "$root\extensions\wooting-analog"
+    $wootingDest = "$app\extensions\wooting-analog"
+
+    Push-Location "$wootingSrc\native"
+    if (-not (Test-Path node_modules)) { npm install 2>&1 | Out-Null }
+    npm run build 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) { Write-Warning "  [warn] wooting-analog native build failed" }
+    Pop-Location
+
+    Push-Location $wootingSrc
+    if (-not (Test-Path node_modules)) { npm install 2>&1 | Out-Null }
+    npm run build 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) { Write-Warning "  [warn] wooting-analog TypeScript compile failed -- out/ may be stale" }
+    Pop-Location
+
+    # Clean up a stale nested copy left by an older version of this script.
+    $nested = Join-Path $wootingDest "wooting-analog"
+    if (Test-Path $nested) { Remove-Item $nested -Recurse -Force -ErrorAction SilentlyContinue }
+
+    if (-not (Test-Path $wootingDest)) { New-Item -ItemType Directory -Path $wootingDest -Force | Out-Null }
+    $lockedFiles = @()
+    Get-ChildItem $wootingSrc -Recurse | Where-Object {
+        $_.FullName -notmatch '\\src(\\|$)' -and
+        $_.FullName -notmatch '\\node_modules(\\|$)' -and
+        $_.FullName -notmatch '\\native\\target(\\|$)' -and
+        $_.FullName -notmatch '\\native\\node_modules(\\|$)' -and
+        (-not $_.PSIsContainer)
+    } | ForEach-Object {
+        $rel    = $_.FullName.Substring($wootingSrc.Length + 1)
+        $target = Join-Path $wootingDest $rel
+        $dir    = Split-Path $target -Parent
+        if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+        try {
+            Copy-Item $_.FullName $target -Force -ErrorAction Stop
+        } catch {
+            $lockedFiles += $rel
+        }
+    }
+
+    if ($lockedFiles.Count -gt 0) {
+        Write-Warning "  [warn] wooting-analog: $($lockedFiles.Count) file(s) locked, not updated (quit Null IDE and re-run): $($lockedFiles -join ', ')"
+    } else {
+        Write-Host "  [ok] wooting-analog (native addon + TypeScript)"
+    }
+
     # --- 4. Win32 icons ---
     $win32 = "$app\resources\win32"
     if (Test-Path $win32) {

@@ -1,0 +1,60 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.AnalogKeyHandler = void 0;
+const wootingBridge_1 = require("./wootingBridge");
+// ─── Constants ───────────────────────────────────────────────────────────────
+/** Depth above which a key is considered physically pressed. */
+const PRESS_THRESHOLD = 0.08;
+/** Poll interval in ms. 8ms ≈ 120 Hz. */
+const POLL_MS = 8;
+// ─── Handler ─────────────────────────────────────────────────────────────────
+class AnalogKeyHandler {
+    constructor(bridge) {
+        this.bridge = bridge;
+        this.states = new Map(Object.keys(wootingBridge_1.HID).map(key => [key, { isDown: false, peakDepth: 0 }]));
+        this.timer = null;
+    }
+    start() {
+        if (this.timer !== null)
+            return;
+        this.timer = setInterval(() => this.poll(), POLL_MS);
+    }
+    stop() {
+        if (this.timer !== null) {
+            clearInterval(this.timer);
+            this.timer = null;
+        }
+    }
+    /**
+     * Peak depth (0–1) recorded since the last press of this key.
+     * Read this inside your VS Code command handler — by the time VS Code
+     * dispatches the command the key is at or past its peak.
+     */
+    peakDepth(key) {
+        return this.states.get(key)?.peakDepth ?? 0;
+    }
+    // ─── Private ─────────────────────────────────────────────────────────────
+    poll() {
+        // Single batch FFI call — one round-trip into Rust for all keys.
+        const depths = this.bridge.readAll();
+        for (const [key, state] of this.states) {
+            const depth = depths.get(key) ?? 0;
+            if (!state.isDown && depth > PRESS_THRESHOLD) {
+                // Rising edge
+                state.isDown = true;
+                state.peakDepth = depth;
+            }
+            else if (state.isDown && depth > PRESS_THRESHOLD) {
+                // Key held — track peak
+                if (depth > state.peakDepth)
+                    state.peakDepth = depth;
+            }
+            else if (state.isDown && depth <= PRESS_THRESHOLD) {
+                // Falling edge — leave peakDepth for command handler to read
+                state.isDown = false;
+            }
+        }
+    }
+}
+exports.AnalogKeyHandler = AnalogKeyHandler;
+//# sourceMappingURL=analogKeyHandler.js.map

@@ -38,8 +38,8 @@
   Known gap: extensionless filenames (bare Makefile, CMakeLists.txt) aren't
   supported — the registration mechanism is extension-keyed, not filename-keyed.
 * [ ] Distraction-free / minimal coding mode
-* [ ] Integrated scratchpad/temp files
-* [ ] Built-in quick notes panel
+* [X] Integrated scratchpad/temp files
+* [X] Built-in quick notes panel
 * [ ] Floating terminal mode
 * [ ] Fix broken updater
 * [x] The command null . needs to have a open powershell if i close the shell the ide closes this is unconvenient

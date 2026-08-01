@@ -108,6 +108,11 @@ jobs:
           cache: 'npm'
           cache-dependency-path: vscode-src/package-lock.json
 
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
       - name: Restore VS Code node_modules cache
         id: vscode-node-modules-cache
         uses: actions/cache@v4
@@ -161,13 +166,30 @@ jobs:
           npm ci --ignore-scripts
           npm run compile
 
+      - name: Build wooting-analog extension
+        shell: pwsh
+        run: |
+          # Native addon first — its generated index.d.ts is what the TypeScript
+          # compile step below resolves `../native/index` against.
+          Set-Location ide-overlay/extensions/wooting-analog/native
+          npm ci
+          npm run build
+          # Drop the Rust build cache and napi-rs/cli's own node_modules —
+          # neither is needed at runtime, and target/ can be hundreds of MB.
+          Remove-Item target, node_modules -Recurse -Force
+
+          Set-Location ../
+          npm ci
+          npm run build
+
       - name: Copy built-in extensions
         shell: pwsh
         run: |
-          Copy-Item -Recurse -Force ide-overlay/extensions/null-theme    vscode-src/extensions/
-          Copy-Item -Recurse -Force ide-overlay/extensions/null-tools    vscode-src/extensions/
-          Copy-Item -Recurse -Force ide-overlay/extensions/null-icons    vscode-src/extensions/
-          Copy-Item -Recurse -Force ide-overlay/extensions/null-markdown vscode-src/extensions/
+          Copy-Item -Recurse -Force ide-overlay/extensions/null-theme      vscode-src/extensions/
+          Copy-Item -Recurse -Force ide-overlay/extensions/null-tools      vscode-src/extensions/
+          Copy-Item -Recurse -Force ide-overlay/extensions/null-icons      vscode-src/extensions/
+          Copy-Item -Recurse -Force ide-overlay/extensions/null-markdown   vscode-src/extensions/
+          Copy-Item -Recurse -Force ide-overlay/extensions/wooting-analog  vscode-src/extensions/
 
 
 
