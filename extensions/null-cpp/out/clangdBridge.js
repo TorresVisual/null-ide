@@ -35,7 +35,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.switchSourceHeader = switchSourceHeader;
 const vscode = __importStar(require("vscode"));
-const CLANGD_EXTENSION_ID = 'llvm-vs-code-clangd.vscode-clangd';
+const CLANGD_EXTENSION_ID = 'llvm-vs-code-extensions.vscode-clangd';
 let cachedClient;
 let warnedMissingApi = false;
 async function switchSourceHeader(uri) {
