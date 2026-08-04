@@ -4,15 +4,12 @@ import { switchSourceHeader } from './clangdBridge';
 import { findEnclosing, findByQualifiedName, invalidate } from './symbolCache';
 import { PairRegistry } from './pairRegistry';
 import { isEnabled } from './projectDetection';
+import { findVisibleEditor } from './editorLookup';
 
 const SCROLL_SYNC_DEBOUNCE_MS = 120;
 
 function getConfig<T>(key: string, fallback: T): T {
   return vscode.workspace.getConfiguration('null-cpp').get<T>(key, fallback);
-}
-
-function findVisibleEditor(uriString: string): vscode.TextEditor | undefined {
-  return vscode.window.visibleTextEditors.find((e) => e.document.uri.toString() === uriString);
 }
 
 function closeTab(uriString: string): void {

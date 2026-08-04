@@ -24,6 +24,7 @@
     "src/symbolSwitch.ts",
     "src/pairedSplit.ts",
     "src/scaffold.ts",
-    "src/projectDetection.ts"
+    "src/projectDetection.ts",
+    "src/editorLookup.ts"
   ]
 }
