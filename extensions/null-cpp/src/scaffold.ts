@@ -64,8 +64,23 @@ export function registerNewClass(context: vscode.ExtensionContext): void {
       await vscode.workspace.fs.writeFile(headerUri, Buffer.from(headerContent(), 'utf8'));
       await vscode.workspace.fs.writeFile(sourceUri, Buffer.from(sourceContent(name), 'utf8'));
 
-      const headerDoc = await vscode.workspace.openTextDocument(headerUri);
-      await vscode.window.showTextDocument(headerDoc);
+      const autoPairSplit = vscode.workspace
+        .getConfiguration('null-cpp')
+        .get<boolean>('autoPairSplit.enabled', true);
+
+      if (autoPairSplit) {
+        const sourceDoc = await vscode.workspace.openTextDocument(sourceUri);
+        await vscode.window.showTextDocument(sourceDoc, {
+          viewColumn: vscode.ViewColumn.One,
+          preserveFocus: true,
+          preview: false,
+        });
+        const headerDoc = await vscode.workspace.openTextDocument(headerUri);
+        await vscode.window.showTextDocument(headerDoc, { viewColumn: vscode.ViewColumn.Two });
+      } else {
+        const headerDoc = await vscode.workspace.openTextDocument(headerUri);
+        await vscode.window.showTextDocument(headerDoc);
+      }
     })
   );
 }
