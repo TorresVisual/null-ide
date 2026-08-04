@@ -23,6 +23,11 @@
       {
         "command": "null-cpp.switchSourceHeader",
         "title": "Null C++: Switch Header/Source (Symbol-Aware)"
+      },
+      {
+        "command": "null-cpp.newClass",
+        "title": "New C++ Class...",
+        "icon": "$(new-file)"
       }
     ],
     "keybindings": [
@@ -58,9 +63,16 @@
       }
     },
     "menus": {
-      "explorer/context": [],
+      "explorer/context": [
+        {
+          "command": "null-cpp.newClass",
+          "when": "explorerResourceIsFolder && config.null-cpp.scaffold.showInExplorer",
+          "group": "navigation"
+        }
+      ],
       "commandPalette": [
-        { "command": "null-cpp.switchSourceHeader", "when": "editorLangId == cpp || editorLangId == c" }
+        { "command": "null-cpp.switchSourceHeader", "when": "editorLangId == cpp || editorLangId == c" },
+        { "command": "null-cpp.newClass" }
       ]
     }
   }

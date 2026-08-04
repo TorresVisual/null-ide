@@ -22,6 +22,7 @@
     "src/cppLanguage.ts",
     "src/symbolCache.ts",
     "src/symbolSwitch.ts",
-    "src/pairedSplit.ts"
+    "src/pairedSplit.ts",
+    "src/scaffold.ts"
   ]
 }
