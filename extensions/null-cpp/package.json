@@ -34,7 +34,7 @@
       {
         "command": "null-cpp.switchSourceHeader",
         "key": "alt+o",
-        "when": "editorTextFocus && (editorLangId == cpp || editorLangId == c)"
+        "when": "editorTextFocus && (editorLangId == cpp || editorLangId == c) && null-cpp.isCppProject"
       }
     ],
     "configuration": {
@@ -72,13 +72,16 @@
       "explorer/context": [
         {
           "command": "null-cpp.newClass",
-          "when": "explorerResourceIsFolder && config.null-cpp.scaffold.showInExplorer",
+          "when": "explorerResourceIsFolder && config.null-cpp.scaffold.showInExplorer && null-cpp.isCppProject",
           "group": "navigation"
         }
       ],
       "commandPalette": [
-        { "command": "null-cpp.switchSourceHeader", "when": "editorLangId == cpp || editorLangId == c" },
-        { "command": "null-cpp.newClass" }
+        {
+          "command": "null-cpp.switchSourceHeader",
+          "when": "(editorLangId == cpp || editorLangId == c) && null-cpp.isCppProject"
+        },
+        { "command": "null-cpp.newClass", "when": "null-cpp.isCppProject" }
       ]
     }
   }
