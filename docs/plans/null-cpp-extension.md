@@ -6,7 +6,7 @@
 
 **Architecture:** A new `extensions/null-cpp/` extension (mirroring `wooting-analog`'s layout) with a hard `extensionDependencies` entry on clangd. Each feature is built from a pure, unit-testable logic module (no `vscode` import) plus a thin `vscode`-touching wiring module that isn't unit-tested but is verified via `tsc` type-checking and a manual end-to-end pass. Shared infrastructure (the clangd LSP bridge, the document-symbol cache) is factored out so both the switch feature and the paired-split feature reuse it.
 
-**Tech Stack:** TypeScript (`strict`, ES2022, commonjs — matching `null-tools`/`wooting-analog`), `node --test` for pure-logic unit tests, VS Code Extension API (`vscode` module), clangd's exported extension API (`llvm-vs-code-clangd.vscode-clangd`).
+**Tech Stack:** TypeScript (`strict`, ES2022, commonjs — matching `null-tools`/`wooting-analog`), `node --test` for pure-logic unit tests, VS Code Extension API (`vscode` module), clangd's exported extension API (`llvm-vs-code-extensions.vscode-clangd`).
 
 ## Global Constraints
 
@@ -16,7 +16,7 @@
 - `tsconfig.json`: `target: ES2022`, `module: commonjs`, `strict: true`, `sourceMap: true`, `esModuleInterop: true`, `skipLibCheck: true` — matches `null-tools`/`wooting-analog`.
 - Compiled `out/*.js` is committed to the repo (not gitignored), matching `null-tools` and `wooting-analog` — never hand-edit those compiled files, only the `.ts` sources.
 - `publisher: "null"` — matches `null-tools` (not `wooting-analog`'s `"you"`, which is an outlier, not a convention to repeat).
-- `extensionDependencies: ["llvm-vs-code-clangd.vscode-clangd"]` — the exact clangd extension ID; this ordering guarantee (dependencies activate first) is what makes the `Alt+O` keybinding override deterministic — see the design spec's Architecture section.
+- `extensionDependencies: ["llvm-vs-code-extensions.vscode-clangd"]` — the exact clangd extension ID; this ordering guarantee (dependencies activate first) is what makes the `Alt+O` keybinding override deterministic — see the design spec's Architecture section.
 - Any file that has a unit test must not `import` the `vscode` module (even transitively) — `node --test` runs the compiled JS in plain Node, where `require('vscode')` throws. This is the existing convention behind `null-tools`'s `*Storage.ts` (pure, tested) vs `*Integration.ts` (vscode-touching, untested) split (e.g. `scratchNotesStorage.ts` / `scratchNotesIntegration.ts`).
 
 ---
@@ -75,7 +75,7 @@ Also modified: `.github/workflows/build.yml` (compile + copy steps for the sixth
   "engines": { "vscode": "^1.85.0" },
   "main": "./out/extension.js",
   "activationEvents": ["onStartupFinished"],
-  "extensionDependencies": ["llvm-vs-code-clangd.vscode-clangd"],
+  "extensionDependencies": ["llvm-vs-code-extensions.vscode-clangd"],
   "scripts": {
     "compile": "tsc -p tsconfig.json",
     "test": "tsc -p tsconfig.json && node --test out/symbolTree.test.js"
@@ -602,7 +602,7 @@ to:
 ```ts
 import * as vscode from 'vscode';
 
-const CLANGD_EXTENSION_ID = 'llvm-vs-code-clangd.vscode-clangd';
+const CLANGD_EXTENSION_ID = 'llvm-vs-code-extensions.vscode-clangd';
 
 interface ClangdLanguageClient {
   sendRequest<T>(method: string, param: unknown): Promise<T>;

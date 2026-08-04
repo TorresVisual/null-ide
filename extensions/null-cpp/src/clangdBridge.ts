@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 
-const CLANGD_EXTENSION_ID = 'llvm-vs-code-clangd.vscode-clangd';
+const CLANGD_EXTENSION_ID = 'llvm-vs-code-extensions.vscode-clangd';
 
 interface ClangdLanguageClient {
   sendRequest<T>(method: string, param: unknown): Promise<T>;

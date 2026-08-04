@@ -8,7 +8,7 @@
   "engines": { "vscode": "^1.85.0" },
   "main": "./out/extension.js",
   "activationEvents": ["onStartupFinished"],
-  "extensionDependencies": ["llvm-vs-code-clangd.vscode-clangd"],
+  "extensionDependencies": ["llvm-vs-code-extensions.vscode-clangd"],
   "scripts": {
     "compile": "tsc -p tsconfig.json",
     "test": "tsc -p tsconfig.json && node --test out/symbolTree.test.js out/pairRegistry.test.js out/scaffoldNaming.test.js"

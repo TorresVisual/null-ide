@@ -19,7 +19,7 @@ boilerplate (`#pragma once`, matching `#include`) filled in.
 
 ## Background
 
-clangd's extension (`llvm-vs-code-clangd.vscode-clangd`) contributes
+clangd's extension (`llvm-vs-code-extensions.vscode-clangd`) contributes
 `clangd.switchheadersource`. Its handler (verified against
 `clangd/vscode-clangd`'s source) sends the LSP `textDocument/switchSourceHeader`
 request itself, then opens the resulting URI directly via
@@ -80,7 +80,7 @@ extensions/null-cpp/
                              wooting-analog convention)
 ```
 
-`package.json` declares `"extensionDependencies": ["llvm-vs-code-clangd.vscode-clangd"]`.
+`package.json` declares `"extensionDependencies": ["llvm-vs-code-extensions.vscode-clangd"]`.
 This has two effects relied on by the design: VS Code auto-installs clangd
 alongside `null-cpp` if it's missing, and — the part that matters for
 keybindings — **dependencies activate before the dependent extension**. When
@@ -125,7 +125,7 @@ Shared by all three features.
 ### clangd bridge (`clangdBridge.ts`)
 
 - `getLanguageClient()`: resolves
-  `vscode.extensions.getExtension('llvm-vs-code-clangd.vscode-clangd')`,
+  `vscode.extensions.getExtension('llvm-vs-code-extensions.vscode-clangd')`,
   awaits its activation, and calls `exports.getApi(1).languageClient`.
   Caches the result for the extension host's lifetime.
 - `switchSourceHeader(uri)`: sends
