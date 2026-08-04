@@ -17,6 +17,7 @@
     "src/pairRegistry.ts",
     "src/pairRegistry.test.ts",
     "src/scaffoldNaming.ts",
-    "src/scaffoldNaming.test.ts"
+    "src/scaffoldNaming.test.ts",
+    "src/clangdBridge.ts"
   ]
 }
