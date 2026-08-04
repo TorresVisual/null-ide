@@ -59,6 +59,12 @@
           "type": "boolean",
           "default": true,
           "description": "Show 'New C++ Class...' in the Explorer context menu for folders."
+        },
+        "null-cpp.projectDetection.override": {
+          "type": "string",
+          "enum": ["auto", "always", "never"],
+          "default": "auto",
+          "description": "Controls whether null-cpp's features are active for this workspace. 'auto' detects a C/C++ project by scanning for CMakeLists.txt, compile_commands.json, .clangd, or C/C++ source files. 'always'/'never' force the result regardless of detection."
         }
       }
     },

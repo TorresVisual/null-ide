@@ -23,6 +23,7 @@
     "src/symbolCache.ts",
     "src/symbolSwitch.ts",
     "src/pairedSplit.ts",
-    "src/scaffold.ts"
+    "src/scaffold.ts",
+    "src/projectDetection.ts"
   ]
 }
