@@ -13,6 +13,8 @@
   "include": [
     "src/extension.ts",
     "src/symbolTree.ts",
-    "src/symbolTree.test.ts"
+    "src/symbolTree.test.ts",
+    "src/pairRegistry.ts",
+    "src/pairRegistry.test.ts"
   ]
 }
