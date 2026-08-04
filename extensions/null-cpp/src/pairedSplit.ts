@@ -3,6 +3,7 @@ import { isCppDocument } from './cppLanguage';
 import { switchSourceHeader } from './clangdBridge';
 import { findEnclosing, findByQualifiedName, invalidate } from './symbolCache';
 import { PairRegistry } from './pairRegistry';
+import { isEnabled } from './projectDetection';
 
 const SCROLL_SYNC_DEBOUNCE_MS = 120;
 
@@ -50,7 +51,7 @@ export function registerPairedSplit(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(
     vscode.workspace.onDidOpenTextDocument(async (doc) => {
-      if (!getConfig('autoPairSplit.enabled', true) || !isCppDocument(doc)) {
+      if (!isEnabled() || !getConfig('autoPairSplit.enabled', true) || !isCppDocument(doc)) {
         return;
       }
       const key = doc.uri.toString();
@@ -79,6 +80,9 @@ export function registerPairedSplit(context: vscode.ExtensionContext): void {
     }),
 
     vscode.workspace.onDidCloseTextDocument((doc) => {
+      if (!isEnabled()) {
+        return;
+      }
       const key = doc.uri.toString();
       const counterpart = registry.getCounterpart(key);
       registry.remove(key);
@@ -89,7 +93,7 @@ export function registerPairedSplit(context: vscode.ExtensionContext): void {
     }),
 
     vscode.window.onDidChangeTextEditorSelection((event) => {
-      if (!getConfig('scrollSync.enabled', true)) {
+      if (!isEnabled() || !getConfig('scrollSync.enabled', true)) {
         return;
       }
       const doc = event.textEditor.document;

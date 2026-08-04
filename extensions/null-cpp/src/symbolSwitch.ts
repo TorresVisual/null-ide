@@ -2,10 +2,14 @@ import * as vscode from 'vscode';
 import { isCppDocument } from './cppLanguage';
 import { switchSourceHeader } from './clangdBridge';
 import { findEnclosing, findByQualifiedName } from './symbolCache';
+import { isEnabled } from './projectDetection';
 
 export function registerSwitchSourceHeader(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand('null-cpp.switchSourceHeader', async () => {
+      if (!isEnabled()) {
+        return;
+      }
       const editor = vscode.window.activeTextEditor;
       if (!editor || !isCppDocument(editor.document)) {
         return;

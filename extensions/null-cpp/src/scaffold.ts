@@ -6,6 +6,7 @@ import {
   headerContent,
   sourceContent,
 } from './scaffoldNaming';
+import { isEnabled } from './projectDetection';
 
 async function fileExists(uri: vscode.Uri): Promise<boolean> {
   try {
@@ -32,6 +33,12 @@ async function resolveTargetFolder(target: vscode.Uri | undefined): Promise<vsco
 export function registerNewClass(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand('null-cpp.newClass', async (target?: vscode.Uri) => {
+      if (!isEnabled()) {
+        void vscode.window.showInformationMessage(
+          "Null C++ features are inactive for this workspace (no CMakeLists.txt, compile_commands.json, .clangd, or C/C++ source files found). Set null-cpp.projectDetection.override to \"always\" to force it on."
+        );
+        return;
+      }
       const folderUri = await resolveTargetFolder(target);
       if (!folderUri) {
         return;
