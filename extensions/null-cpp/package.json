@@ -1,0 +1,27 @@
+{
+  "name": "null-cpp",
+  "displayName": "Null C++",
+  "description": "Symbol-aware C++ header/source navigation, paired editors, and class scaffolding for Null IDE",
+  "version": "1.0.0",
+  "publisher": "null",
+  "license": "MIT",
+  "engines": { "vscode": "^1.85.0" },
+  "main": "./out/extension.js",
+  "activationEvents": ["onStartupFinished"],
+  "extensionDependencies": ["llvm-vs-code-clangd.vscode-clangd"],
+  "scripts": {
+    "compile": "tsc -p tsconfig.json",
+    "test": "tsc -p tsconfig.json && node --test out/symbolTree.test.js"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0",
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^22.0.0"
+  },
+  "contributes": {
+    "commands": [],
+    "keybindings": [],
+    "configuration": { "title": "Null C++", "properties": {} },
+    "menus": { "explorer/context": [], "commandPalette": [] }
+  }
+}
