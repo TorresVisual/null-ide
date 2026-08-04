@@ -32,7 +32,31 @@
         "when": "editorTextFocus && (editorLangId == cpp || editorLangId == c)"
       }
     ],
-    "configuration": { "title": "Null C++", "properties": {} },
+    "configuration": {
+      "title": "Null C++",
+      "properties": {
+        "null-cpp.autoPairSplit.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically open a C/C++ file's header/source counterpart beside it when opened."
+        },
+        "null-cpp.scrollSync.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Sync scroll position between paired header/source editors as the cursor moves."
+        },
+        "null-cpp.pairedSplit.autoCloseCounterpart": {
+          "type": "boolean",
+          "default": false,
+          "description": "Closing one half of a paired header/source split also closes the other half."
+        },
+        "null-cpp.scaffold.showInExplorer": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show 'New C++ Class...' in the Explorer context menu for folders."
+        }
+      }
+    },
     "menus": {
       "explorer/context": [],
       "commandPalette": [

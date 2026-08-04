@@ -21,6 +21,7 @@
     "src/clangdBridge.ts",
     "src/cppLanguage.ts",
     "src/symbolCache.ts",
-    "src/symbolSwitch.ts"
+    "src/symbolSwitch.ts",
+    "src/pairedSplit.ts"
   ]
 }
