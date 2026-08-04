@@ -82,6 +82,29 @@ foreach ($app in $targets) {
     }
     Write-Host "  [ok] extensions (null-theme, null-icons, null-tools, null-markdown)"
 
+    # null-cpp: compile TypeScript before syncing. No runtime npm dependencies
+    # (unlike null-tools' node-pty), so node_modules/src are just excluded, not preserved.
+    $cppSrc  = "$root\extensions\null-cpp"
+    $cppDest = "$app\extensions\null-cpp"
+    Push-Location $cppSrc
+    npm run compile 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) { Write-Warning "  [warn] null-cpp TypeScript compile failed -- out/ may be stale" }
+    Pop-Location
+
+    if (-not (Test-Path $cppDest)) { New-Item -ItemType Directory -Path $cppDest -Force | Out-Null }
+    Get-ChildItem $cppSrc -Recurse | Where-Object {
+        $_.FullName -notmatch '\\node_modules(\\|$)' -and
+        $_.FullName -notmatch '\\src(\\|$)' -and
+        (-not $_.PSIsContainer)
+    } | ForEach-Object {
+        $rel    = $_.FullName.Substring($cppSrc.Length + 1)
+        $target = Join-Path $cppDest $rel
+        $dir    = Split-Path $target -Parent
+        if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+        Copy-Item $_.FullName $target -Force
+    }
+    Write-Host "  [ok] null-cpp compiled"
+
     # wooting-analog: build the native (Rust/napi-rs) addon, then compile TypeScript,
     # then sync file-by-file (like null-tools, not a wholesale remove+recreate).
     # The native .node binary gets locked while Null IDE is running with the
