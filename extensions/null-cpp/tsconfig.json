@@ -18,6 +18,8 @@
     "src/pairRegistry.test.ts",
     "src/scaffoldNaming.ts",
     "src/scaffoldNaming.test.ts",
-    "src/clangdBridge.ts"
+    "src/clangdBridge.ts",
+    "src/cppLanguage.ts",
+    "src/symbolCache.ts"
   ]
 }
