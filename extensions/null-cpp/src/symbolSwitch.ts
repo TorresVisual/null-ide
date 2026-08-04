@@ -3,6 +3,7 @@ import { isCppDocument } from './cppLanguage';
 import { switchSourceHeader } from './clangdBridge';
 import { findEnclosing, findByQualifiedName } from './symbolCache';
 import { isEnabled } from './projectDetection';
+import { findVisibleEditor } from './editorLookup';
 
 export function registerSwitchSourceHeader(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
@@ -21,8 +22,11 @@ export function registerSwitchSourceHeader(context: vscode.ExtensionContext): vo
         return;
       }
 
+      const existingEditor = findVisibleEditor(result.uri.toString());
       const counterpartDoc = await vscode.workspace.openTextDocument(result.uri);
-      const counterpartEditor = await vscode.window.showTextDocument(counterpartDoc);
+      const counterpartEditor = await vscode.window.showTextDocument(counterpartDoc, {
+        viewColumn: existingEditor ? existingEditor.viewColumn : vscode.ViewColumn.Beside,
+      });
 
       if (!enclosing) {
         return;
