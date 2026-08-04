@@ -20,6 +20,7 @@
     "src/scaffoldNaming.test.ts",
     "src/clangdBridge.ts",
     "src/cppLanguage.ts",
-    "src/symbolCache.ts"
+    "src/symbolCache.ts",
+    "src/symbolSwitch.ts"
   ]
 }

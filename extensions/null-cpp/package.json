@@ -19,9 +19,25 @@
     "@types/node": "^22.0.0"
   },
   "contributes": {
-    "commands": [],
-    "keybindings": [],
+    "commands": [
+      {
+        "command": "null-cpp.switchSourceHeader",
+        "title": "Null C++: Switch Header/Source (Symbol-Aware)"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "null-cpp.switchSourceHeader",
+        "key": "alt+o",
+        "when": "editorTextFocus && (editorLangId == cpp || editorLangId == c)"
+      }
+    ],
     "configuration": { "title": "Null C++", "properties": {} },
-    "menus": { "explorer/context": [], "commandPalette": [] }
+    "menus": {
+      "explorer/context": [],
+      "commandPalette": [
+        { "command": "null-cpp.switchSourceHeader", "when": "editorLangId == cpp || editorLangId == c" }
+      ]
+    }
   }
 }
