@@ -36,6 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.registerNewClass = registerNewClass;
 const vscode = __importStar(require("vscode"));
 const scaffoldNaming_1 = require("./scaffoldNaming");
+const projectDetection_1 = require("./projectDetection");
 async function fileExists(uri) {
     try {
         await vscode.workspace.fs.stat(uri);
@@ -59,6 +60,10 @@ async function resolveTargetFolder(target) {
 }
 function registerNewClass(context) {
     context.subscriptions.push(vscode.commands.registerCommand('null-cpp.newClass', async (target) => {
+        if (!(0, projectDetection_1.isEnabled)()) {
+            void vscode.window.showInformationMessage("Null C++ features are inactive for this workspace (no CMakeLists.txt, compile_commands.json, .clangd, or C/C++ source files found). Set null-cpp.projectDetection.override to \"always\" to force it on.");
+            return;
+        }
         const folderUri = await resolveTargetFolder(target);
         if (!folderUri) {
             return;
@@ -78,8 +83,23 @@ function registerNewClass(context) {
         }
         await vscode.workspace.fs.writeFile(headerUri, Buffer.from((0, scaffoldNaming_1.headerContent)(), 'utf8'));
         await vscode.workspace.fs.writeFile(sourceUri, Buffer.from((0, scaffoldNaming_1.sourceContent)(name), 'utf8'));
-        const headerDoc = await vscode.workspace.openTextDocument(headerUri);
-        await vscode.window.showTextDocument(headerDoc);
+        const autoPairSplit = vscode.workspace
+            .getConfiguration('null-cpp')
+            .get('autoPairSplit.enabled', true);
+        if (autoPairSplit) {
+            const sourceDoc = await vscode.workspace.openTextDocument(sourceUri);
+            await vscode.window.showTextDocument(sourceDoc, {
+                viewColumn: vscode.ViewColumn.One,
+                preserveFocus: true,
+                preview: false,
+            });
+            const headerDoc = await vscode.workspace.openTextDocument(headerUri);
+            await vscode.window.showTextDocument(headerDoc, { viewColumn: vscode.ViewColumn.Two });
+        }
+        else {
+            const headerDoc = await vscode.workspace.openTextDocument(headerUri);
+            await vscode.window.showTextDocument(headerDoc);
+        }
     }));
 }
 //# sourceMappingURL=scaffold.js.map

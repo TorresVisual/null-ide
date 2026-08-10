@@ -1,0 +1,1 @@
+{"version":3,"file":"editorLookup.js","sourceRoot":"","sources":["../src/editorLookup.ts"],"names":[],"mappings":";;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;AAEA,8CAEC;AAJD,+CAAiC;AAEjC,SAAgB,iBAAiB,CAAC,SAAiB;IACjD,OAAO,MAAM,CAAC,MAAM,CAAC,kBAAkB,CAAC,IAAI,CAAC,CAAC,CAAC,EAAE,EAAE,CAAC,CAAC,CAAC,QAAQ,CAAC,GAAG,CAAC,QAAQ,EAAE,KAAK,SAAS,CAAC,CAAC;AAC/F,CAAC"}

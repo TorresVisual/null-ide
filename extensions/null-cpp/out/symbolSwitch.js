@@ -38,8 +38,13 @@ const vscode = __importStar(require("vscode"));
 const cppLanguage_1 = require("./cppLanguage");
 const clangdBridge_1 = require("./clangdBridge");
 const symbolCache_1 = require("./symbolCache");
+const projectDetection_1 = require("./projectDetection");
+const editorLookup_1 = require("./editorLookup");
 function registerSwitchSourceHeader(context) {
     context.subscriptions.push(vscode.commands.registerCommand('null-cpp.switchSourceHeader', async () => {
+        if (!(0, projectDetection_1.isEnabled)()) {
+            return;
+        }
         const editor = vscode.window.activeTextEditor;
         if (!editor || !(0, cppLanguage_1.isCppDocument)(editor.document)) {
             return;
@@ -49,8 +54,11 @@ function registerSwitchSourceHeader(context) {
         if (result.kind !== 'switched') {
             return;
         }
+        const existingEditor = (0, editorLookup_1.findVisibleEditor)(result.uri.toString());
         const counterpartDoc = await vscode.workspace.openTextDocument(result.uri);
-        const counterpartEditor = await vscode.window.showTextDocument(counterpartDoc);
+        const counterpartEditor = await vscode.window.showTextDocument(counterpartDoc, {
+            viewColumn: existingEditor ? existingEditor.viewColumn : vscode.ViewColumn.Beside,
+        });
         if (!enclosing) {
             return;
         }

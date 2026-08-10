@@ -39,12 +39,11 @@ const cppLanguage_1 = require("./cppLanguage");
 const clangdBridge_1 = require("./clangdBridge");
 const symbolCache_1 = require("./symbolCache");
 const pairRegistry_1 = require("./pairRegistry");
+const projectDetection_1 = require("./projectDetection");
+const editorLookup_1 = require("./editorLookup");
 const SCROLL_SYNC_DEBOUNCE_MS = 120;
 function getConfig(key, fallback) {
     return vscode.workspace.getConfiguration('null-cpp').get(key, fallback);
-}
-function findVisibleEditor(uriString) {
-    return vscode.window.visibleTextEditors.find((e) => e.document.uri.toString() === uriString);
 }
 function closeTab(uriString) {
     for (const group of vscode.window.tabGroups.all) {
@@ -71,7 +70,7 @@ function registerPairedSplit(context) {
     const registry = new pairRegistry_1.PairRegistry();
     let debounceTimer;
     context.subscriptions.push(vscode.workspace.onDidOpenTextDocument(async (doc) => {
-        if (!getConfig('autoPairSplit.enabled', true) || !(0, cppLanguage_1.isCppDocument)(doc)) {
+        if (!(0, projectDetection_1.isEnabled)() || !getConfig('autoPairSplit.enabled', true) || !(0, cppLanguage_1.isCppDocument)(doc)) {
             return;
         }
         const key = doc.uri.toString();
@@ -83,7 +82,7 @@ function registerPairedSplit(context) {
             return;
         }
         const counterpartKey = result.uri.toString();
-        const alreadyVisible = findVisibleEditor(counterpartKey) !== undefined;
+        const alreadyVisible = (0, editorLookup_1.findVisibleEditor)(counterpartKey) !== undefined;
         registry.record(key, counterpartKey);
         if (alreadyVisible) {
             return;
@@ -95,6 +94,9 @@ function registerPairedSplit(context) {
             preview: false,
         });
     }), vscode.workspace.onDidCloseTextDocument((doc) => {
+        if (!(0, projectDetection_1.isEnabled)()) {
+            return;
+        }
         const key = doc.uri.toString();
         const counterpart = registry.getCounterpart(key);
         registry.remove(key);
@@ -103,7 +105,7 @@ function registerPairedSplit(context) {
             closeTab(counterpart);
         }
     }), vscode.window.onDidChangeTextEditorSelection((event) => {
-        if (!getConfig('scrollSync.enabled', true)) {
+        if (!(0, projectDetection_1.isEnabled)() || !getConfig('scrollSync.enabled', true)) {
             return;
         }
         const doc = event.textEditor.document;
@@ -111,7 +113,7 @@ function registerPairedSplit(context) {
         if (!counterpartKey) {
             return;
         }
-        const counterpartEditor = findVisibleEditor(counterpartKey);
+        const counterpartEditor = (0, editorLookup_1.findVisibleEditor)(counterpartKey);
         if (!counterpartEditor) {
             return;
         }
