@@ -136,6 +136,11 @@
         "command": "null.ports.copyUrl",
         "title": "Copy URL",
         "icon": "$(copy)"
+      },
+      {
+        "command": "null.toggleDiscordPresence",
+        "title": "Null: Toggle Discord Rich Presence",
+        "icon": "$(broadcast)"
       }
     ],
     "viewsContainers": {
@@ -292,7 +297,8 @@
         { "command": "null.ports.refresh" },
         { "command": "null.ports.openInBrowser" },
         { "command": "null.ports.killProcess" },
-        { "command": "null.ports.copyUrl" }
+        { "command": "null.ports.copyUrl" },
+        { "command": "null.toggleDiscordPresence" }
       ]
     },
     "configuration": {
@@ -368,6 +374,47 @@
           "type": "boolean",
           "default": true,
           "description": "When enabled, Null Ports only shows processes recognised as dev servers (node, python, ollama, etc.). Disable to show all listening ports."
+        },
+        "null.discord.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show Null IDE activity in Discord Rich Presence. Requires null.discord.clientId and Discord desktop app running."
+        },
+        "null.discord.clientId": {
+          "type": "string",
+          "default": "",
+          "description": "Discord Application ID from the Discord Developer Portal (OAuth2 → Client ID). Upload Rich Presence assets named null, code, debug, and your language keys (typescript, python, etc.)."
+        },
+        "null.discord.showFileName": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the active file name in Discord Rich Presence."
+        },
+        "null.discord.showWorkspace": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the workspace or folder name in Discord Rich Presence."
+        },
+        "null.discord.privacyMode": {
+          "type": "boolean",
+          "default": false,
+          "description": "Hide file names and show a generic \"Editing code\" message instead."
+        },
+        "null.discord.idleTimeoutSec": {
+          "type": "number",
+          "default": 300,
+          "minimum": 0,
+          "description": "Seconds without editor activity before switching to an idle presence. Set to 0 to disable idle detection."
+        },
+        "null.discord.showDebug": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a debugging state when a debug session is active."
+        },
+        "null.discord.showRepositoryButton": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a View Repository button when a Git remote is available."
         }
       }
     },

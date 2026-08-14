@@ -12,6 +12,7 @@ import { registerRecentProjectsUriHandler } from './recentProjectsIntegration';
 import { registerScratchAndNotesFeature } from './scratchNotesIntegration';
 import { registerAutoGitignoreFeature } from './autoGitignore';
 import { registerPortsFeature } from './portsIntegration';
+import { registerDiscordPresenceFeature } from './discordPresenceIntegration';
 
 // Electron adds resourcesPath to the Node process object; @types/node doesn't know about it.
 declare global {
@@ -1646,6 +1647,7 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(plansWatcher);
 
   registerPortsFeature(context);
+  registerDiscordPresenceFeature(context);
 }
 
 export function deactivate(): void {}
