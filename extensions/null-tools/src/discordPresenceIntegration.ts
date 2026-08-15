@@ -4,12 +4,15 @@ import * as vscode from 'vscode';
 import { DiscordPresenceManager } from './discordPresence';
 
 export function registerDiscordPresenceFeature(context: vscode.ExtensionContext): void {
-  const manager = new DiscordPresenceManager();
+  // globalStorage is shared by every window of this installation, which is how
+  // sibling windows agree on who owns the presence.
+  const manager = new DiscordPresenceManager(context.globalStorageUri?.fsPath);
   manager.start();
 
   context.subscriptions.push(manager);
 
   context.subscriptions.push(
+    vscode.commands.registerCommand('null.discord.testConnection', () => manager.testConnection()),
     vscode.window.onDidChangeActiveTextEditor(() => manager.notifyActivity()),
     vscode.window.onDidChangeTextEditorSelection(() => manager.notifyActivity()),
     vscode.workspace.onDidChangeTextDocument(e => {
@@ -19,8 +22,16 @@ export function registerDiscordPresenceFeature(context: vscode.ExtensionContext)
     }),
     vscode.workspace.onDidOpenTextDocument(() => manager.notifyActivity()),
     vscode.workspace.onDidCloseTextDocument(() => manager.notifyActivity()),
-    vscode.workspace.onDidChangeWorkspaceFolders(() => manager.notifyActivity()),
     vscode.debug.onDidChangeActiveDebugSession(() => manager.notifyActivity()),
+    // Focusing a window makes it the presence owner, and counts as activity so
+    // alt-tabbing back from a long break clears the "Idle" state immediately.
+    vscode.window.onDidChangeWindowState(state => {
+      if (state.focused) {
+        manager.notifyFocus();
+      }
+    }),
+    // A different folder means a different repository button and label.
+    vscode.workspace.onDidChangeWorkspaceFolders(() => manager.notifyWorkspaceChange()),
     vscode.workspace.onDidChangeConfiguration(e => {
       if (e.affectsConfiguration('null.discord')) {
         manager.notifyConfigChange();

@@ -132,6 +132,7 @@ Written in TypeScript (`src/`), compiled to `out/` during CI. Activated on `onSt
 | **Scrollback persistence** | Terminal buffers (up to 300 KB each) saved to globalStorage, restored on reload |
 | **Context paste** | `null.agentsPaste` command and `Ctrl+V` keybinding inside the agents webview |
 | **Sound design** | Subtle UI sounds; toggle via `null.toggleSoundDesign`; configurable via `null.soundDesign.*` settings |
+| **Discord Rich Presence** | `discordRpcClient.ts` (IPC pipe / WebSocket transport), `discordPresence.ts` (activity building), `presenceOwnership.ts` (one window publishes), `discordAppInfo.ts` (Developer Portal diagnostics). Configured via `null.discord.*`; `null.discord.testConnection` reports setup problems |
 
 **node-pty note:** In CI, `node-pty` is bundled from `vscode-src/node_modules/node-pty` after the gulp build. For local development, run `setup.ps1` in `extensions/null-tools/` to rebuild for the installed Electron version.
 

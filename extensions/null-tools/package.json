@@ -11,10 +11,14 @@
     "compile": "tsc -p tsconfig.json && tsc -p tsconfig.webview.json",
     "test": "tsc -p tsconfig.json && node --test out/recentProjects.test.js out/scratchNotesStorage.test.js out/autoGitignore.test.js"
   },
+  "dependencies": {
+    "ws": "^8.18.3"
+  },
   "devDependencies": {
     "typescript": "^5.8.0",
     "@types/vscode": "^1.85.0",
-    "@types/node": "^22.0.0"
+    "@types/node": "^22.0.0",
+    "@types/ws": "^8.18.1"
   },
   "activationEvents": ["onStartupFinished"],
   "contributes": {
@@ -141,6 +145,11 @@
         "command": "null.toggleDiscordPresence",
         "title": "Null: Toggle Discord Rich Presence",
         "icon": "$(broadcast)"
+      },
+      {
+        "command": "null.discord.testConnection",
+        "title": "Null: Test Discord Rich Presence",
+        "icon": "$(debug-disconnect)"
       }
     ],
     "viewsContainers": {
@@ -298,7 +307,8 @@
         { "command": "null.ports.openInBrowser" },
         { "command": "null.ports.killProcess" },
         { "command": "null.ports.copyUrl" },
-        { "command": "null.toggleDiscordPresence" }
+        { "command": "null.toggleDiscordPresence" },
+        { "command": "null.discord.testConnection" }
       ]
     },
     "configuration": {
@@ -383,7 +393,13 @@
         "null.discord.clientId": {
           "type": "string",
           "default": "",
-          "description": "Discord Application ID from the Discord Developer Portal (OAuth2 → Client ID). Upload Rich Presence assets named null, code, debug, and your language keys (typescript, python, etc.)."
+          "description": "Discord Application ID from the Discord Developer Portal (OAuth2 → Client ID). Name the application \"Null IDE\" — Discord shows the application's own name as \"Playing …\". Upload Rich Presence art assets named null (the large app icon), code, debug, and your language keys (typescript, python, etc.). Run \"Null: Test Discord Rich Presence\" to check the setup."
+        },
+        "null.discord.transport": {
+          "type": "string",
+          "enum": ["auto", "ipc", "websocket"],
+          "default": "auto",
+          "description": "How Null IDE connects to Discord. Use auto (default), ipc, or websocket if Rich Presence fails to connect."
         },
         "null.discord.showFileName": {
           "type": "boolean",
@@ -414,7 +430,7 @@
         "null.discord.showRepositoryButton": {
           "type": "boolean",
           "default": true,
-          "description": "Show a View Repository button when a Git remote is available."
+          "description": "Show a repository link button (e.g. View on GitHub). Private GitHub repos fall back to linking Null IDE, since their URL would 404 for anyone viewing your profile. Note: Discord never renders Rich Presence buttons on your own profile — check from a friend’s account or the mobile app."
         }
       }
     },
