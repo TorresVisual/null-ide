@@ -21,6 +21,8 @@
     "src/terminalRegistry.ts",
     "src/terminalRegistry.test.ts",
     "src/projectDetector.ts",
-    "src/projectDetector.test.ts"
+    "src/projectDetector.test.ts",
+    "src/npmScriptsProvider.ts",
+    "src/npmScriptsProvider.test.ts"
   ]
 }
