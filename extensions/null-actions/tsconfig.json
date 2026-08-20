@@ -17,6 +17,8 @@
     "src/variableResolver.ts",
     "src/variableResolver.test.ts",
     "src/whenClause.ts",
-    "src/whenClause.test.ts"
+    "src/whenClause.test.ts",
+    "src/terminalRegistry.ts",
+    "src/terminalRegistry.test.ts"
   ]
 }
