@@ -23,6 +23,8 @@
     "src/projectDetector.ts",
     "src/projectDetector.test.ts",
     "src/npmScriptsProvider.ts",
-    "src/npmScriptsProvider.test.ts"
+    "src/npmScriptsProvider.test.ts",
+    "src/buttonConfigIntegration.ts",
+    "src/terminalHostIntegration.ts"
   ]
 }
