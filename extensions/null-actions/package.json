@@ -18,6 +18,17 @@
     "@types/node": "^22.0.0"
   },
   "contributes": {
+    "commands": [
+      {
+        "command": "null-actions.runButton",
+        "title": "Null Actions: Run Button"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        { "command": "null-actions.runButton", "when": "false" }
+      ]
+    },
     "configuration": {
       "title": "Null Actions",
       "properties": {
