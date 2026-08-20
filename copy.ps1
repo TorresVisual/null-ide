@@ -105,6 +105,29 @@ foreach ($app in $targets) {
     }
     Write-Host "  [ok] null-cpp compiled"
 
+    # null-actions: compile TypeScript before syncing. No runtime npm dependencies
+    # (unlike null-tools' node-pty), so node_modules/src are just excluded, not preserved.
+    $actionsSrc  = "$root\extensions\null-actions"
+    $actionsDest = "$app\extensions\null-actions"
+    Push-Location $actionsSrc
+    npm run compile 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) { Write-Warning "  [warn] null-actions TypeScript compile failed -- out/ may be stale" }
+    Pop-Location
+
+    if (-not (Test-Path $actionsDest)) { New-Item -ItemType Directory -Path $actionsDest -Force | Out-Null }
+    Get-ChildItem $actionsSrc -Recurse | Where-Object {
+        $_.FullName -notmatch '\\node_modules(\\|$)' -and
+        $_.FullName -notmatch '\\src(\\|$)' -and
+        (-not $_.PSIsContainer)
+    } | ForEach-Object {
+        $rel    = $_.FullName.Substring($actionsSrc.Length + 1)
+        $target = Join-Path $actionsDest $rel
+        $dir    = Split-Path $target -Parent
+        if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+        Copy-Item $_.FullName $target -Force
+    }
+    Write-Host "  [ok] null-actions compiled"
+
     # wooting-analog: build the native (Rust/napi-rs) addon, then compile TypeScript,
     # then sync file-by-file (like null-tools, not a wholesale remove+recreate).
     # The native .node binary gets locked while Null IDE is running with the
