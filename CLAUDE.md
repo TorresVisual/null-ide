@@ -9,8 +9,8 @@ This file provides guidance to Claude Code when working with code in this reposi
 Key characteristics:
 - Binary name: `null.exe` — accessible from the terminal as `null .`
 - Built on VSCodium, which strips Microsoft telemetry from VS Code
-- Five built-in extensions bundled at build time: `null-theme`, `null-icons`, `null-tools`, `null-markdown`, `wooting-analog`
-- **Code Spell Checker** (`streetsidesoftware.code-spell-checker`) bundled as a fifth built-in extension; version pinned via `CSPELL_TAG` env var in `build.yml`
+- Seven built-in extensions bundled at build time: `null-theme`, `null-icons`, `null-tools`, `null-markdown`, `null-cpp`, `wooting-analog`, `null-actions`
+- **Code Spell Checker** (`streetsidesoftware.code-spell-checker`) bundled as an eighth built-in extension; version pinned via `CSPELL_TAG` env var in `build.yml`
 - CI builds on `windows-2022`; the developer authors source changes locally
 - Releases publish a portable ZIP and an Inno Setup installer to GitHub Releases
 - The in-app updater (`null-tools`) checks GitHub Releases on startup and can self-update
@@ -31,6 +31,12 @@ Key characteristics:
 │   │   ├── package.json        # Contributes commands, views, keybindings, settings
 │   │   ├── setup.ps1           # Rebuilds node-pty for the installed Electron version (local dev)
 │   │   └── lib/                # xterm.js, xterm-addon-fit.js, agents.js (webview assets)
+│   ├── null-cpp/               # Symbol-aware C++ header/source navigation, paired editors, scaffolding
+│   │   ├── src/                # TypeScript source (extension.ts, symbolSwitch.ts, pairedSplit.ts, scaffold.ts)
+│   │   └── out/                # Compiled JS output (built during CI)
+│   ├── null-actions/           # Status bar action buttons (shell/vscode commands)
+│   │   ├── src/                # TypeScript source (buttonConfig.ts, terminalRegistry.ts, statusBarController.ts, settingsPanel.ts...)
+│   │   └── out/                # Compiled JS output (built during CI)
 │   └── wooting-analog/         # Depth-sensitive key actions for Wooting hall-effect keyboards
 │       ├── src/                # TypeScript source (extension.ts, wootingBridge.ts, analogKeyHandler.ts)
 │       ├── out/                # Compiled JS output (built during CI)
@@ -78,21 +84,23 @@ The entire build runs in GitHub Actions on a `windows-2022` runner — do **not*
 4. Deep-merge `product.json` overlay into `vscode-src/product.json`.
 5. Install `null-markdown` npm dependencies (`npm ci --prefix extensions/null-markdown`).
 6. Compile `null-tools` TypeScript (`npm ci && npm run compile` in `extensions/null-tools/`).
-7. Build `wooting-analog`'s native Rust addon (`napi build --platform --release` in `extensions/wooting-analog/native/`), then compile its TypeScript.
-8. Copy all five built-in extensions (`null-theme`, `null-icons`, `null-tools`, `null-markdown`, `wooting-analog`) into `vscode-src/extensions/`.
-9. Replace upstream icons with files from `icons/`.
-10. Copy `workbench/custom.css` → `null-custom.css` and `workbench/splash.js` → `null-splash.js` into the source tree.
-11. Inject `<link>` and `<script>` tags into `workbench.html` pointing at those files.
-12. `npm ci && npx gulp vscode-win32-x64` produces `VSCode-win32-x64/`.
-13. Bundle `node-pty` from `vscode-src/node_modules/node-pty` into the built `null-tools` output (bypasses VS Code native module checks).
-14. Build Win11 shell extension: fetch WIL headers, compile DLL with CMake + MSVC, pack and sign sparse APPX (`null-shell-ext.appx`).
-15. Stamp version, commit hash, and server URL into the build output's `product.json`.
-16. Replace letterpress SVGs in the build output with the null-symbol versions.
-17. Run `rcedit` to stamp the custom icon into `null.exe`.
-18. Bundle `install-null-ide.ps1` and `update-null-ide.ps1` into `resources/app/null-updater/`.
-19. `Compress-Archive` → `null-ide-win32-x64.zip`.
-20. Inno Setup → `NullIDESetup-<version>.exe`.
-21. Both artifacts are uploaded to the GitHub Release (tag builds) and as workflow artifacts.
+7. Compile `null-cpp` TypeScript (`npm ci && npm run compile` in `extensions/null-cpp/`).
+8. Compile `null-actions` TypeScript (`npm ci && npm run compile` in `extensions/null-actions/`).
+9. Build `wooting-analog`'s native Rust addon (`napi build --platform --release` in `extensions/wooting-analog/native/`), then compile its TypeScript.
+10. Copy all seven built-in extensions (`null-theme`, `null-icons`, `null-tools`, `null-markdown`, `null-cpp`, `null-actions`, `wooting-analog`) into `vscode-src/extensions/`.
+11. Replace upstream icons with files from `icons/`.
+12. Copy `workbench/custom.css` → `null-custom.css` and `workbench/splash.js` → `null-splash.js` into the source tree.
+13. Inject `<link>` and `<script>` tags into `workbench.html` pointing at those files.
+14. `npm ci && npx gulp vscode-win32-x64` produces `VSCode-win32-x64/`.
+15. Bundle `node-pty` from `vscode-src/node_modules/node-pty` into the built `null-tools` output (bypasses VS Code native module checks).
+16. Build Win11 shell extension: fetch WIL headers, compile DLL with CMake + MSVC, pack and sign sparse APPX (`null-shell-ext.appx`).
+17. Stamp version, commit hash, and server URL into the build output's `product.json`.
+18. Replace letterpress SVGs in the build output with the null-symbol versions.
+19. Run `rcedit` to stamp the custom icon into `null.exe`.
+20. Bundle `install-null-ide.ps1` and `update-null-ide.ps1` into `resources/app/null-updater/`.
+21. `Compress-Archive` → `null-ide-win32-x64.zip`.
+22. Inno Setup → `NullIDESetup-<version>.exe`.
+23. Both artifacts are uploaded to the GitHub Release (tag builds) and as workflow artifacts.
 
 ## Built-in Extensions
 
@@ -135,6 +143,12 @@ Written in TypeScript (`src/`), compiled to `out/` during CI. Activated on `onSt
 | **Discord Rich Presence** | `discordRpcClient.ts` (IPC pipe / WebSocket transport), `discordPresence.ts` (activity building), `presenceOwnership.ts` (one window publishes), `discordAppInfo.ts` (Developer Portal diagnostics). Configured via `null.discord.*`; `null.discord.testConnection` reports setup problems |
 
 **node-pty note:** In CI, `node-pty` is bundled from `vscode-src/node_modules/node-pty` after the gulp build. For local development, run `setup.ps1` in `extensions/null-tools/` to rebuild for the installed Electron version.
+
+### null-cpp (`extensions/null-cpp/`)
+Symbol-aware C/C++ header/source switching, auto-paired split editors with scroll sync, and `.hpp`/`.cpp` class scaffolding, layered on top of the (separately installed) `llvm-vs-code-extensions.vscode-clangd` extension. Activated on `onStartupFinished`; features gate on `null-cpp.isCppProject`, set by scanning for `CMakeLists.txt`, `compile_commands.json`, `.clangd`, or C/C++ source files (`null-cpp.projectDetection.override` can force this). `Alt+O` triggers symbol-aware header/source switching. See `docs/specs/null-cpp-extension-design.md`.
+
+### null-actions (`extensions/null-actions/`)
+Status-bar buttons that run shell commands (via a dedicated, deterministically-reused terminal per button — identity is keyed by button id, never by command text, so window reloads and folder reopens don't spawn duplicate terminals) or VS Code API commands. Configured through the "Action Buttons" webview panel (in the `null-workspace` view container, alongside Scratch Files/Notes/Null Ports) or directly via the `null-actions.buttons` setting. Supports variable substitution (`${workspaceFolder}`, `${file}`, `${selectedText}`, etc.), per-button visibility filters (`when.languages`, `when.filesExist`, `when.folder`), left/right status-bar alignment with priority ordering, project-type-detection suggestions (`Cargo.toml`, `CMakeLists.txt`, `*.csproj`), and optional npm-script auto-loading (`null-actions.npm.autoLoad`). See `docs/specs/null-actions-design.md`.
 
 ### wooting-analog (`extensions/wooting-analog/`)
 Depth-sensitive key actions for Wooting hall-effect keyboards. Activated on `onStartupFinished`. Polls raw analog key depth (0–1) via the Wooting Analog SDK and dispatches a different editor command depending on how far a key is pressed — e.g. a light tap on Backspace deletes one character, a deep press deletes a word.
