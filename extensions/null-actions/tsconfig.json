@@ -25,6 +25,7 @@
     "src/npmScriptsProvider.ts",
     "src/npmScriptsProvider.test.ts",
     "src/buttonConfigIntegration.ts",
-    "src/terminalHostIntegration.ts"
+    "src/terminalHostIntegration.ts",
+    "src/statusBarController.ts"
   ]
 }
