@@ -29,6 +29,15 @@
         { "command": "null-actions.runButton", "when": "false" }
       ]
     },
+    "views": {
+      "null-workspace": [
+        {
+          "type": "webview",
+          "id": "null-actions.buttonsView",
+          "name": "Action Buttons"
+        }
+      ]
+    },
     "configuration": {
       "title": "Null Actions",
       "properties": {

@@ -27,6 +27,7 @@
     "src/buttonConfigIntegration.ts",
     "src/terminalHostIntegration.ts",
     "src/statusBarController.ts",
-    "src/runButton.ts"
+    "src/runButton.ts",
+    "src/settingsPanel.ts"
   ]
 }
