@@ -13,6 +13,8 @@
   "include": [
     "src/extension.ts",
     "src/buttonConfig.ts",
-    "src/buttonConfig.test.ts"
+    "src/buttonConfig.test.ts",
+    "src/variableResolver.ts",
+    "src/variableResolver.test.ts"
   ]
 }

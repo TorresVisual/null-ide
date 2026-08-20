@@ -10,7 +10,7 @@
   "activationEvents": ["onStartupFinished"],
   "scripts": {
     "compile": "tsc -p tsconfig.json",
-    "test": "tsc -p tsconfig.json && node --test out/buttonConfig.test.js"
+    "test": "tsc -p tsconfig.json && node --test out/buttonConfig.test.js out/variableResolver.test.js"
   },
   "devDependencies": {
     "typescript": "^5.8.0",
