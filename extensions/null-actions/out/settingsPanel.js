@@ -146,9 +146,10 @@ class ActionButtonsViewProvider {
             '.card-title{font-weight:600;}' +
             '.card-summary{opacity:0.55;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}' +
             '.card-body{margin-top:6px;}' +
-            '.row{display:flex;gap:6px;margin-bottom:6px;align-items:center;}' +
+            '.row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;align-items:center;}' +
             '.row label{width:80px;flex-shrink:0;opacity:0.75;}' +
-            '.row input[type=text],.row input[type=number],.row select{flex:1;background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border,transparent);border-radius:2px;padding:3px 6px;}' +
+            '.row input[type=text],.row input[type=number],.row select{flex:1 1 100px;min-width:0;background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border,transparent);border-radius:2px;padding:3px 6px;}' +
+            '.row button{flex:0 0 auto;}' +
             '.row input[type=color]{width:28px;height:24px;flex:none;padding:0;border:1px solid var(--vscode-input-border,transparent);border-radius:2px;background:none;}' +
             '.card-footer{display:flex;gap:6px;justify-content:flex-end;}' +
             '#status{opacity:0.7;}' +
@@ -187,8 +188,7 @@ class ActionButtonsViewProvider {
             '' +
             '  const body =' +
             '    fieldRow("Label", "<input type=text data-field=label data-index=" + index + " value=\\"" + (btn.label || "").replace(/\\"/g, "&quot;") + "\\">") +' +
-            '    "<div class=row><label></label><button data-action=browse data-index=" + index + ">Browse a file...</button></div>" +' +
-            '    fieldRow("Command", "<input type=text data-field=command data-index=" + index + " value=\\"" + (btn.command || "").replace(/\\"/g, "&quot;") + "\\">") +' +
+            '    fieldRow("Command", "<input type=text data-field=command data-index=" + index + " value=\\"" + (btn.command || "").replace(/\\"/g, "&quot;") + "\\"><button data-action=browse data-index=" + index + ">Browse a file...</button>") +' +
             '    fieldRow("Type", "<select data-field=type data-index=" + index + "><option value=terminal" + (btn.type === "terminal" ? " selected" : "") + ">terminal</option><option value=vscode-command" + (btn.type === "vscode-command" ? " selected" : "") + ">vscode-command</option></select>") +' +
             '    fieldRow("Icon", "<input type=text data-field=icon data-index=" + index + " value=\\"" + (btn.icon || "") + "\\" placeholder=tools>") +' +
             '    fieldRow("Color", "<input type=color data-field=color data-index=" + index + " value=\\"" + colorSwatchValue(btn.color) + "\\"> <input type=text data-field=color data-index=" + index + " value=\\"" + (btn.color || "") + "\\" placeholder=#ffcc00>") +' +
