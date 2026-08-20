@@ -159,7 +159,8 @@ this.clientScript() +
       '' +
       '  const body =' +
       '    fieldRow("Label", "<input type=text data-field=label data-index=" + index + " value=\\"" + (btn.label || "").replace(/\\"/g, "&quot;") + "\\">") +' +
-      '    fieldRow("Command", "<input type=text data-field=command data-index=" + index + " value=\\"" + (btn.command || "").replace(/\\"/g, "&quot;") + "\\"> <button data-action=browse data-index=" + index + ">Browse...</button>") +' +
+      '    "<div class=row><label></label><button data-action=browse data-index=" + index + ">Browse a file...</button></div>" +' +
+      '    fieldRow("Command", "<input type=text data-field=command data-index=" + index + " value=\\"" + (btn.command || "").replace(/\\"/g, "&quot;") + "\\">") +' +
       '    fieldRow("Type", "<select data-field=type data-index=" + index + "><option value=terminal" + (btn.type === "terminal" ? " selected" : "") + ">terminal</option><option value=vscode-command" + (btn.type === "vscode-command" ? " selected" : "") + ">vscode-command</option></select>") +' +
       '    fieldRow("Icon", "<input type=text data-field=icon data-index=" + index + " value=\\"" + (btn.icon || "") + "\\" placeholder=tools>") +' +
       '    fieldRow("Color", "<input type=color data-field=color data-index=" + index + " value=\\"" + colorSwatchValue(btn.color) + "\\"> <input type=text data-field=color data-index=" + index + " value=\\"" + (btn.color || "") + "\\" placeholder=#ffcc00>") +' +
