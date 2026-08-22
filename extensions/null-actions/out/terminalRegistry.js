@@ -1,8 +1,8 @@
 'use strict';
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TerminalRegistry = void 0;
-function terminalNameForButton(buttonId) {
-    return `Action: ${buttonId}`;
+function terminalNameForLabel(label) {
+    return `Action: ${label}`;
 }
 class TerminalRegistry {
     host;
@@ -10,8 +10,8 @@ class TerminalRegistry {
     constructor(host) {
         this.host = host;
     }
-    dispatch(buttonId, command, options = {}) {
-        const terminal = this.resolve(buttonId, options.cwd);
+    dispatch(buttonId, label, command, options = {}) {
+        const terminal = this.resolve(buttonId, label, options.cwd);
         terminal.sendText(command);
         if (options.focus) {
             terminal.show(false);
@@ -20,22 +20,31 @@ class TerminalRegistry {
     forget(buttonId) {
         this.cache.delete(buttonId);
     }
-    resolve(buttonId, cwd) {
-        const name = terminalNameForButton(buttonId);
+    resolve(buttonId, label, cwd) {
+        const name = terminalNameForLabel(label);
         const live = this.host.listTerminals();
-        // Never trust the in-memory cache alone — it resets on extension-host
-        // restart, but VS Code frequently restores the actual terminal objects
-        // from the previous session (persistent sessions). Re-validate liveness
-        // against the host on every dispatch.
+        // The cache is keyed by the button's stable id, never by its (editable)
+        // label -- renaming a button must never look like "a different button"
+        // to a session that already has a terminal open for it. VS Code's
+        // Terminal.name is read-only after creation (no rename API for a
+        // shell-backed terminal), so a renamed button's terminal keeps showing
+        // its old label in the tab until it's closed and recreated -- a
+        // cosmetic lag, not a duplicate, since the cache hit below still
+        // reuses the exact same terminal regardless of what name it was
+        // created under.
         const cached = this.cache.get(buttonId);
         if (cached && live.includes(cached)) {
             return cached;
         }
-        // No live cached reference — look for a terminal VS Code already has
-        // open under this button's name (adopts a restored session terminal,
-        // or a leftover duplicate from before this fix) instead of creating a
-        // new one. `vscode.window.terminals` is ordered by creation, so the
-        // last match is the most recently created one.
+        // No live cached reference (e.g. after an extension-host restart) --
+        // look for a terminal VS Code already has open under the *current*
+        // label before creating a new one. This only matches when the label
+        // hasn't changed since that terminal was created; a rename followed by
+        // a restart (rather than just a restart, or just a rename) is the one
+        // case this can't fully cover, given the API has no way to rename a
+        // live terminal to keep its name in sync in the meantime.
+        // `vscode.window.terminals` is ordered by creation, so the last match
+        // is the most recently created one.
         const matches = live.filter(t => t.name === name);
         if (matches.length > 0) {
             const adopted = matches[matches.length - 1];

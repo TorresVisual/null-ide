@@ -161,19 +161,31 @@ substitution on `args`.
 **`type: "terminal"`** — dispatched through `terminalRegistry.ts`, which is
 the direct fix for the reported bug:
 
-1. Terminal name is deterministic and derived from the button `id`
-   (`Action: <id>`), never from the command text — editing what a button
-   runs never changes which terminal owns it; only closing the terminal
-   does.
+1. The terminal is *displayed* under the button's current `label`
+   (`Action: <label>`), but *reused* by the button's stable `id` — the
+   cache key and the display name are deliberately different things.
+   Editing the command text never changes which terminal owns it (only
+   closing the terminal does), and neither does renaming the button:
+   `vscode.Terminal.name` is read-only after creation (no rename API for a
+   shell-backed terminal), so a renamed button's terminal keeps showing its
+   old label in the tab until it's closed and a fresh one gets created —
+   cosmetic staleness, not a duplicate, since the id-keyed cache still
+   reuses the exact same terminal object regardless of what name it was
+   created under.
 2. Resolving "the terminal for this button" never trusts a stale in-memory
    reference alone. Lookup order on every dispatch:
    a. If a cached `vscode.Terminal` reference exists for this id **and**
-      it's still present in `vscode.window.terminals`, use it.
-   b. Otherwise, scan `vscode.window.terminals` for a name match (handles
-      the case where VS Code restored a persistent-session terminal after
-      an extension-host restart, or the extension itself just reactivated)
-      and adopt the most recently created match. This is what closes the
-      "reopen the folder → duplicate terminal" gap.
+      it's still present in `vscode.window.terminals`, use it — this is
+      what makes renames-mid-session safe, regardless of display name.
+   b. Otherwise (e.g. no cache — an extension-host restart), scan
+      `vscode.window.terminals` for a match on the name derived from the
+      *current* label and adopt the most recently created match. This is
+      what closes the "reopen the folder → duplicate terminal" gap — as
+      long as the label hasn't changed since that terminal was created. A
+      rename *followed by* a restart (not a rename alone, not a restart
+      alone) is the one case this can't fully cover, since there's no way
+      to keep the terminal's actual name in sync with a rename in the
+      meantime.
    c. Otherwise, `createTerminal({ name })`.
 3. Dispatch sends the resolved command via `sendText`. If a prior command
    is still running in that terminal, the new one queues normally — no
@@ -234,12 +246,15 @@ covering:
 - `buttonConfig.ts` — (de)serialization round-trip, validation of malformed
   entries, `focus`'s true-by-default behavior.
 - `terminalRegistry.ts` — the core regression test suite for the reported
-  bug: (a) fresh dispatch creates one terminal; (b) re-dispatch reuses the
-  cached reference; (c) simulated extension-host restart with a matching
-  terminal already present in `vscode.window.terminals` adopts it rather
-  than creating a duplicate; (d) editing a button's `command` while its
-  terminal is open does not create a new terminal, only changes what gets
-  sent.
+  bug: (a) fresh dispatch creates one terminal, displayed under the
+  button's label; (b) re-dispatch reuses the cached reference; (c)
+  simulated extension-host restart with a matching terminal already
+  present in `vscode.window.terminals` adopts it rather than creating a
+  duplicate; (d) editing a button's `command` while its terminal is open
+  does not create a new terminal, only changes what gets sent; (e)
+  renaming a button's `label` mid-session reuses the same terminal (cache
+  is keyed by `id`, not label) even though the tab keeps showing the old
+  name, since `Terminal.name` can't be changed after creation.
 
 Webview rendering, status bar visuals, and `webview/colorPicker.ts` (the
 canvas hue-ring/triangle picker — DOM/canvas/pointer-event code, same

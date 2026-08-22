@@ -64,6 +64,6 @@ async function runButton(button, registry) {
     }
     const cwd = button.cwd ? (0, variableResolver_1.resolveVariables)(button.cwd, ctx) : ctx.workspaceFolder;
     const command = (0, variableResolver_1.resolveVariables)(button.command, ctx);
-    registry.dispatch(button.id, command, { cwd, focus: button.focus });
+    registry.dispatch(button.id, button.label, command, { cwd, focus: button.focus });
 }
 //# sourceMappingURL=runButton.js.map

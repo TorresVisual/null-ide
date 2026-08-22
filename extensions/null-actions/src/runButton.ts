@@ -38,5 +38,5 @@ export async function runButton(button: ActionButtonConfig, registry: TerminalRe
 
   const cwd = button.cwd ? resolveVariables(button.cwd, ctx) : ctx.workspaceFolder;
   const command = resolveVariables(button.command, ctx);
-  registry.dispatch(button.id, command, { cwd, focus: button.focus });
+  registry.dispatch(button.id, button.label, command, { cwd, focus: button.focus });
 }
