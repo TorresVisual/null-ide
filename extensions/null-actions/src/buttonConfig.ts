@@ -3,12 +3,6 @@
 export type ButtonType = 'terminal' | 'vscode-command';
 export type ButtonBackground = 'none' | 'warning' | 'error';
 
-export interface WhenClauseConfig {
-  languages?: string[];
-  filesExist?: string[];
-  folder?: string;
-}
-
 export interface ActionButtonConfig {
   id: string;
   label: string;
@@ -23,7 +17,6 @@ export interface ActionButtonConfig {
   saveAll: boolean;
   focus: boolean;
   priority: number;
-  when?: WhenClauseConfig;
 }
 
 export interface ParseResult {
@@ -33,20 +26,6 @@ export interface ParseResult {
 
 const VALID_TYPES: ButtonType[] = ['terminal', 'vscode-command'];
 const VALID_BACKGROUNDS: ButtonBackground[] = ['none', 'warning', 'error'];
-
-function parseWhenClause(raw: unknown): WhenClauseConfig | undefined {
-  if (typeof raw !== 'object' || raw === null) { return undefined; }
-  const w = raw as Record<string, unknown>;
-  const languages = Array.isArray(w.languages)
-    ? w.languages.filter((x): x is string => typeof x === 'string')
-    : undefined;
-  const filesExist = Array.isArray(w.filesExist)
-    ? w.filesExist.filter((x): x is string => typeof x === 'string')
-    : undefined;
-  const folder = typeof w.folder === 'string' ? w.folder : undefined;
-  if (!languages && !filesExist && !folder) { return undefined; }
-  return { languages, filesExist, folder };
-}
 
 export function parseButtonConfigs(raw: unknown): ParseResult {
   const buttons: ActionButtonConfig[] = [];
@@ -101,9 +80,8 @@ export function parseButtonConfigs(raw: unknown): ParseResult {
       tooltip: typeof e.tooltip === 'string' ? e.tooltip : undefined,
       cwd: typeof e.cwd === 'string' ? e.cwd : undefined,
       saveAll: e.saveAll === true,
-      focus: e.focus === true,
+      focus: typeof e.focus === 'boolean' ? e.focus : true,
       priority: typeof e.priority === 'number' ? e.priority : 0,
-      when: parseWhenClause(e.when),
     });
   }
 

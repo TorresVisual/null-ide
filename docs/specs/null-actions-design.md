@@ -48,17 +48,21 @@ control either, despite users asking for it in issues. Text color
 In scope: status-bar buttons backed by per-button dedicated terminals or VS
 Code API command execution; a settings webview for CRUD instead of raw JSON
 editing; deterministic terminal identity that survives window
-reload/folder-reopen without duplicating terminals; priority ordering;
-all buttons render left-aligned (right-alignment was dropped as unneeded);
-context filters (`when.languages`, `when.filesExist`,
-`when.folder`); project-type-detection suggestions (opt-in, never
-auto-injected); npm-script auto-loading (kept from the original, since it
-was the one dynamic-discovery behavior worth preserving).
+reload/folder-reopen without duplicating terminals; priority ordering (all
+buttons render left-aligned — right-alignment was dropped as unneeded);
+project-type-detection suggestions (opt-in, never auto-injected) including
+a one-click "Load npm scripts" action that writes each `package.json`
+script in as a real persisted button.
 
 Out of scope: arbitrary status-bar background colors (platform doesn't
-allow it); auto-injecting suggested buttons into the bar without explicit
-user action; task-runner integration (`tasks.json`) — buttons are
-independent of VS Code's built-in task system, not a wrapper around it.
+allow it); auto-injecting suggested/npm-script buttons into the bar
+without explicit user action — everything a user sees in the status bar
+must exist as a real, persisted entry in `null-actions.buttons`, no live
+ephemeral buttons; per-button visibility filters (language/file-existence/
+folder conditions were built, then dropped — not worth the complexity for
+this extension's actual usage); task-runner integration (`tasks.json`) —
+buttons are independent of VS Code's built-in task system, not a wrapper
+around it.
 
 ## Architecture
 
@@ -76,30 +80,34 @@ extensions/null-actions/
 │   │                         (de)serialization, schema validation
 │   ├── variableResolver.ts — ${workspaceFolder}, ${file}, ${selectedText},
 │   │                         etc. substitution
-│   ├── whenClause.ts      — evaluates when.languages / when.filesExist /
-│   │                         when.folder against current editor/workspace
-│   │                         state
 │   ├── terminalRegistry.ts — deterministic per-button terminal identity
 │   │                         and reuse (the fix for the duplication bug)
 │   ├── statusBarController.ts — creates/updates/disposes StatusBarItems
-│   │                         from the resolved, filtered button list
+│   │                         from the current button list
 │   ├── projectDetector.ts — scans workspace root(s) for package.json /
 │   │                         Cargo.toml / *.csproj / CMakeLists.txt,
 │   │                         produces suggestion entries (not live buttons)
-│   ├── npmScriptsProvider.ts — optional auto-loaded buttons from
-│   │                         package.json scripts (not written to settings)
-│   └── settingsPanel.ts   — webview panel: add/edit/reorder/delete buttons,
-│                             "Suggested" tab from projectDetector
+│   ├── npmScriptsProvider.ts — parses package.json scripts; consumed by
+│   │                         settingsPanel's "Load npm scripts" action,
+│   │                         which writes them into null-actions.buttons
+│   │                         as real persisted entries (not live buttons)
+│   ├── settingsPanel.ts   — WebviewPanel: add/edit/reorder/delete buttons,
+│   │                         "Suggested" tab from projectDetector
+│   └── webview/colorPicker.ts — Affinity-style hue-ring + saturation/
+│                             lightness-triangle canvas picker for the
+│                             button text color; compiled separately (see
+│                             tsconfig.webview.json) since it runs in the
+│                             webview's browser context, not the extension
+│                             host
 └── out/                    — compiled JS, committed (matches null-tools /
                               null-cpp / wooting-analog convention)
 ```
 
-`extension.ts` wires a single reactive pipeline: config change
-(`workspace.onDidChangeConfiguration`) or editor/workspace-folder change
-(`window.onDidChangeActiveTextEditor`, `workspace.onDidChangeWorkspaceFolders`)
-→ re-resolve the filtered button list (`whenClause.ts`) → diff against the
-currently-rendered status bar items → `statusBarController.ts` creates,
-updates, or disposes only the items that changed.
+`extension.ts` wires a single reactive pipeline: on activation and on every
+config change (`workspace.onDidChangeConfiguration`), re-read
+`null-actions.buttons` and hand the list straight to
+`statusBarController.ts`, which creates, updates, or disposes only the
+status bar items that changed.
 
 ## Data Model
 
@@ -123,19 +131,19 @@ scope, same as any other VS Code setting — stays git-portable):
   "tooltip": "Run the production build",
   "cwd": "${workspaceFolder}",
   "saveAll": true,
-  "focus": false,
-  "priority": 100,                // status bar sort order (all buttons are left-aligned)
-  "when": {
-    "languages": ["cpp", "c"],       // optional
-    "filesExist": ["CMakeLists.txt"], // optional, relative to folder root
-    "folder": "backend"              // optional, multi-root scoping
-  }
+  "focus": true,                  // defaults to true — most buttons are
+                                   // things you want to watch run
+  "priority": 100                 // status bar sort order (all buttons are left-aligned)
 }
 ```
 
-Global settings: `null-actions.npm.autoLoad` (boolean, default `false`) and
-`null-actions.defaultColor` (string), mirroring the two global options from
-the original extension that were actually useful.
+No global settings remain in this extension's `contributes.configuration`
+besides `null-actions.buttons` itself — `null-actions.npm.autoLoad` (live,
+ephemeral npm-script buttons) and `null-actions.defaultColor` (declared but
+never actually wired up) were both removed. Per-button visibility filters
+(`when.languages`/`when.filesExist`/`when.folder`) were built and then
+dropped for the same reason: not worth the complexity for how this
+extension actually gets used.
 
 Variable substitution (`variableResolver.ts`) supports `${workspaceFolder}`,
 `${file}`, `${fileBasename}`, `${fileDirname}`, `${relativeFile}`,
@@ -178,48 +186,43 @@ the direct fix for the reported bug:
 5. `saveAll` (if set) runs `workspace.saveAll()` before dispatch; `focus`
    (if set) calls `.show()` on the terminal after dispatch.
 
-## Context-Adaptivity
+## Project-Type Detection
 
-- **Active-file language** (`when.languages`): re-evaluated on
-  `window.onDidChangeActiveTextEditor`. A button without this filter is
-  unaffected by editor focus changes.
-- **File existence** (`when.filesExist`): checked against the relevant
-  workspace folder root (or the folder named in `when.folder`, if set) on
-  workspace-folder change and on extension activation. Not re-checked on
-  every file save — only on folder add/remove — since manifest files
-  changing existence mid-session is rare and re-scanning per save would be
-  wasteful.
-- **Multi-root folder scoping** (`when.folder`): when set, the button's
-  `cwd`/variable resolution defaults to that folder, and the button is
-  hidden entirely if that named folder isn't part of the current workspace.
-- **Project-type detection** (`projectDetector.ts`): scans workspace
-  root(s) for `package.json`, `Cargo.toml`, `*.csproj`, `CMakeLists.txt`.
-  Matches populate the settings webview's "Suggested" tab (e.g. `cargo run`,
-  `cargo build`, `dotnet build`) as one-click-to-add entries. **Never**
-  auto-injected into the status bar — nothing appears without explicit user
-  action, so there's no surprise-button churn as projects are opened/closed.
-- **npm scripts** (`npmScriptsProvider.ts`): when `null-actions.npm.autoLoad`
-  is on, scripts from `package.json` become live status-bar buttons directly
-  (not written into `null-actions.buttons`), refreshed on `package.json`
-  save. This is the one auto-live (not suggestion-only) piece of
-  context-adaptivity, kept because it was the original extension's one
-  dynamic-discovery feature that wasn't a complaint in its issue tracker.
+- **`projectDetector.ts`**: scans workspace root(s) for `package.json`,
+  `Cargo.toml`, `*.csproj`, `CMakeLists.txt`. Matches populate the settings
+  panel's "Suggested" tab (e.g. `cargo run`, `cargo build`, `dotnet build`)
+  as one-click-to-add entries. **Never** auto-injected into the status bar —
+  nothing appears without explicit user action, so there's no
+  surprise-button churn as projects are opened/closed.
+- **npm scripts** (`npmScriptsProvider.ts`): a "Load npm scripts" button in
+  the settings panel reads `package.json`'s `scripts` and adds each one as
+  a regular button object to the in-panel list (skipping any id already
+  present), for the user to review, edit, or drop before hitting Save All.
+  This replaced an earlier live/ephemeral `null-actions.npm.autoLoad`
+  toggle — every button visible in the status bar is now a real, persisted
+  entry in `null-actions.buttons`, with no separate "auto-loaded but not
+  saved" category to reason about.
 
 ## Settings UI (Webview)
 
 A `WebviewPanel` opened in the main editor area (`vscode.ViewColumn.One`),
-triggered by a `$(gear) Actions` status bar item or the
-`null-actions.openSettings` command — not a sidebar view, which cramped the
-form too narrow to use comfortably. Singleton: reopening reveals the
-existing panel instead of creating a second one. Lists configured buttons
-with add/edit/reorder/delete, and a "Suggested" tab fed by
-`projectDetector.ts`. Form fields match the data model: text inputs for
-label/command/tooltip/cwd, a codicon-name picker for icon, a color swatch
-for text color, a `none`/`warning`/`error` selector for background (labeled
-clearly as a platform-limited option, not a free color picker), and a
-priority stepper. Saves write back to `null-actions.buttons` in
-workspace settings — plain JSON underneath, so it's still hand-editable if
-someone wants to skip the UI for a quick change.
+triggered by a `$(gear)` status bar item or the `null-actions.openSettings`
+command — not a sidebar view, which cramped the form too narrow to use
+comfortably. Singleton: reopening reveals the existing panel instead of
+creating a second one. Lists configured buttons as collapsible cards
+(chevron + label + command preview when collapsed; all start collapsed,
+new buttons start expanded), plus a "Suggested" tab fed by
+`projectDetector.ts` and a "Load npm scripts" toolbar action.
+
+Each card's fields are grouped under two headers, "Behavior" (Command +
+file-browse button, Type, Args — shown only when Type is `vscode-command`,
+Cwd, Save all, Focus) and "Appearance" (Icon — a text input with a curated
+`<datalist>` of common codicon names, still free-text for anything not
+listed; Color — a swatch button that opens the Affinity-style canvas picker
+plus a text input for typed hex/theme-color-id values; Background; Tooltip;
+Priority). Saves write back to `null-actions.buttons` in workspace
+settings — plain JSON underneath, so it's still hand-editable if someone
+wants to skip the UI for a quick change.
 
 ## Testing
 
@@ -228,10 +231,8 @@ covering:
 
 - `variableResolver.ts` — substitution correctness, unresolved-token
   passthrough.
-- `whenClause.ts` — language/file-existence/folder filter evaluation,
-  including the "no active editor" edge case for `when.languages`.
 - `buttonConfig.ts` — (de)serialization round-trip, validation of malformed
-  entries.
+  entries, `focus`'s true-by-default behavior.
 - `terminalRegistry.ts` — the core regression test suite for the reported
   bug: (a) fresh dispatch creates one terminal; (b) re-dispatch reuses the
   cached reference; (c) simulated extension-host restart with a matching
@@ -240,8 +241,10 @@ covering:
   terminal is open does not create a new terminal, only changes what gets
   sent.
 
-Webview rendering and status bar visuals are verified manually in a running
-dev build (no automated UI test harness in this repo for webviews).
+Webview rendering, status bar visuals, and `webview/colorPicker.ts` (the
+canvas hue-ring/triangle picker — DOM/canvas/pointer-event code, same
+"manual verification" bucket) are checked by hand in a running dev build
+(no automated UI test harness in this repo for webviews).
 
 ## Build Integration
 

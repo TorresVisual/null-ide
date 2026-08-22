@@ -39,9 +39,8 @@ function toActionButtonConfig(script, priority) {
         tooltip: undefined,
         cwd: undefined,
         saveAll: false,
-        focus: false,
+        focus: true,
         priority,
-        when: undefined,
     };
 }
 //# sourceMappingURL=npmScriptsProvider.js.map

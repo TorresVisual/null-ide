@@ -35,6 +35,6 @@ const npmScriptsProvider_1 = require("./npmScriptsProvider");
     node_assert_1.default.strictEqual(config.priority, 10);
     node_assert_1.default.strictEqual(config.background, 'none');
     node_assert_1.default.strictEqual(config.saveAll, false);
-    node_assert_1.default.strictEqual(config.focus, false);
+    node_assert_1.default.strictEqual(config.focus, true);
 });
 //# sourceMappingURL=npmScriptsProvider.test.js.map

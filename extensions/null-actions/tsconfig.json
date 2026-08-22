@@ -16,8 +16,6 @@
     "src/buttonConfig.test.ts",
     "src/variableResolver.ts",
     "src/variableResolver.test.ts",
-    "src/whenClause.ts",
-    "src/whenClause.test.ts",
     "src/terminalRegistry.ts",
     "src/terminalRegistry.test.ts",
     "src/projectDetector.ts",

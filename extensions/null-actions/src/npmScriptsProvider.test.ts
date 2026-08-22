@@ -37,5 +37,5 @@ test('toActionButtonConfig fills in full ActionButtonConfig defaults', () => {
   assert.strictEqual(config.priority, 10);
   assert.strictEqual(config.background, 'none');
   assert.strictEqual(config.saveAll, false);
-  assert.strictEqual(config.focus, false);
+  assert.strictEqual(config.focus, true);
 });

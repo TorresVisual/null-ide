@@ -40,12 +40,8 @@ const buttonConfigIntegration_1 = require("./buttonConfigIntegration");
 const terminalHostIntegration_1 = require("./terminalHostIntegration");
 const terminalRegistry_1 = require("./terminalRegistry");
 const statusBarController_1 = require("./statusBarController");
-const whenClause_1 = require("./whenClause");
 const runButton_1 = require("./runButton");
 const settingsPanel_1 = require("./settingsPanel");
-const npmScriptsProvider_1 = require("./npmScriptsProvider");
-const fs = __importStar(require("fs"));
-const path = __importStar(require("path"));
 function activate(context) {
     const terminalRegistry = new terminalRegistry_1.TerminalRegistry(new terminalHostIntegration_1.VscodeTerminalHost());
     const statusBar = new statusBarController_1.StatusBarController();
@@ -62,44 +58,13 @@ function activate(context) {
     context.subscriptions.push(vscode.commands.registerCommand('null-actions.openSettings', () => {
         settingsPanel_1.ActionButtonsPanel.createOrShow(context.extensionUri);
     }));
-    function loadNpmButtons() {
-        const auto = vscode.workspace.getConfiguration().get('null-actions.npm.autoLoad', false);
-        if (!auto) {
-            return [];
-        }
-        const folder = vscode.workspace.workspaceFolders?.[0];
-        if (!folder) {
-            return [];
-        }
-        const pkgPath = path.join(folder.uri.fsPath, 'package.json');
-        if (!fs.existsSync(pkgPath)) {
-            return [];
-        }
-        let content;
-        try {
-            content = fs.readFileSync(pkgPath, 'utf8');
-        }
-        catch {
-            return [];
-        }
-        return (0, npmScriptsProvider_1.parseNpmScripts)(content).map((s, i) => (0, npmScriptsProvider_1.toActionButtonConfig)(s, -i));
-    }
     function refresh() {
         const { buttons } = (0, buttonConfigIntegration_1.readButtonConfigs)();
-        const npmButtons = loadNpmButtons();
-        const folder = vscode.workspace.workspaceFolders?.[0];
-        const ctx = {
-            activeLanguageId: vscode.window.activeTextEditor?.document.languageId,
-            folderName: folder?.name,
-            folderPath: folder?.uri.fsPath,
-        };
-        const visible = [...buttons, ...npmButtons].filter(b => (0, whenClause_1.evaluateWhenClause)(b.when, ctx));
-        statusBar.update(visible);
+        statusBar.update(buttons);
     }
     context.subscriptions.push(vscode.commands.registerCommand('null-actions.runButton', async (buttonId) => {
         const { buttons } = (0, buttonConfigIntegration_1.readButtonConfigs)();
-        const npmButtons = loadNpmButtons();
-        const button = [...buttons, ...npmButtons].find(b => b.id === buttonId);
+        const button = buttons.find(b => b.id === buttonId);
         if (!button) {
             return;
         }
@@ -110,7 +75,7 @@ function activate(context) {
             refresh();
             settingsPanel_1.ActionButtonsPanel.refreshIfOpen();
         }
-    }), vscode.window.onDidChangeActiveTextEditor(() => refresh()), vscode.workspace.onDidChangeWorkspaceFolders(() => refresh()));
+    }));
     refresh();
 }
 function deactivate() { }

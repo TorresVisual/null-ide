@@ -10,7 +10,7 @@
   "activationEvents": ["onStartupFinished"],
   "scripts": {
     "compile": "tsc -p tsconfig.json && tsc -p tsconfig.webview.json",
-    "test": "tsc -p tsconfig.json && node --test out/buttonConfig.test.js out/variableResolver.test.js out/whenClause.test.js out/terminalRegistry.test.js out/projectDetector.test.js out/npmScriptsProvider.test.js"
+    "test": "tsc -p tsconfig.json && node --test out/buttonConfig.test.js out/variableResolver.test.js out/terminalRegistry.test.js out/projectDetector.test.js out/npmScriptsProvider.test.js"
   },
   "devDependencies": {
     "typescript": "^5.8.0",
@@ -59,28 +59,10 @@
               "tooltip": { "type": "string" },
               "cwd": { "type": "string" },
               "saveAll": { "type": "boolean", "default": false },
-              "focus": { "type": "boolean", "default": false },
-              "priority": { "type": "number", "default": 0 },
-              "when": {
-                "type": "object",
-                "properties": {
-                  "languages": { "type": "array", "items": { "type": "string" } },
-                  "filesExist": { "type": "array", "items": { "type": "string" } },
-                  "folder": { "type": "string" }
-                }
-              }
+              "focus": { "type": "boolean", "default": true },
+              "priority": { "type": "number", "default": 0 }
             }
           }
-        },
-        "null-actions.npm.autoLoad": {
-          "type": "boolean",
-          "default": false,
-          "description": "Automatically show a status bar button for every script in package.json."
-        },
-        "null-actions.defaultColor": {
-          "type": "string",
-          "default": "",
-          "description": "Default text color applied to buttons that don't set their own color."
         }
       }
     }

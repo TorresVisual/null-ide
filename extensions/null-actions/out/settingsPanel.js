@@ -35,9 +35,12 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ActionButtonsPanel = void 0;
 const vscode = __importStar(require("vscode"));
+const fs = __importStar(require("fs"));
+const path = __importStar(require("path"));
 const buttonConfig_1 = require("./buttonConfig");
 const buttonConfigIntegration_1 = require("./buttonConfigIntegration");
 const projectDetector_1 = require("./projectDetector");
+const npmScriptsProvider_1 = require("./npmScriptsProvider");
 function getNonce() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
     let text = '';
@@ -79,6 +82,9 @@ class ActionButtonsPanel {
             else if (msg.type === 'browseFile') {
                 this.handleBrowseFile(msg.index);
             }
+            else if (msg.type === 'loadNpmScripts') {
+                this.handleLoadNpmScripts();
+            }
         });
         this.panel.onDidDispose(() => {
             ActionButtonsPanel.current = undefined;
@@ -111,6 +117,29 @@ class ActionButtonsPanel {
         }
         this.panel.webview.postMessage({ type: 'fileSelected', index, path: uris[0].fsPath });
     }
+    handleLoadNpmScripts() {
+        const folder = vscode.workspace.workspaceFolders?.[0];
+        if (!folder) {
+            this.panel.webview.postMessage({ type: 'npmScriptsLoaded', buttons: [], errors: ['No workspace folder is open.'] });
+            return;
+        }
+        const pkgPath = path.join(folder.uri.fsPath, 'package.json');
+        if (!fs.existsSync(pkgPath)) {
+            this.panel.webview.postMessage({ type: 'npmScriptsLoaded', buttons: [], errors: ['No package.json found in the workspace root.'] });
+            return;
+        }
+        let content;
+        try {
+            content = fs.readFileSync(pkgPath, 'utf8');
+        }
+        catch {
+            this.panel.webview.postMessage({ type: 'npmScriptsLoaded', buttons: [], errors: ['Could not read package.json.'] });
+            return;
+        }
+        const scripts = (0, npmScriptsProvider_1.parseNpmScripts)(content);
+        const buttons = scripts.map((s, i) => (0, npmScriptsProvider_1.toActionButtonConfig)(s, -i));
+        this.panel.webview.postMessage({ type: 'npmScriptsLoaded', buttons, errors: [] });
+    }
     getHtml() {
         const nonce = getNonce();
         const cspSource = this.panel.webview.cspSource;
@@ -134,6 +163,7 @@ class ActionButtonsPanel {
             '</header>' +
             '<div id="toolbar">' +
             '  <button id="add-btn">+ Add Button</button>' +
+            '  <button id="load-npm-btn">Load npm scripts</button>' +
             '  <button id="save-btn" class="primary">Save All</button>' +
             '  <span id="status"></span>' +
             '</div>' +
@@ -193,6 +223,9 @@ class ActionButtonsPanel {
             '.card-body{max-height:960px;opacity:1;padding:2px 13px 13px;transition:max-height .22s ease,opacity .16s ease,padding .22s ease;}' +
             '.card.collapsed .card-body{max-height:0;opacity:0;padding-top:0;padding-bottom:0;pointer-events:none;}' +
             '' +
+            '.field-section{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--vscode-textLink-foreground);opacity:.85;margin:14px 0 6px;}' +
+            '.field-section:first-of-type{margin-top:2px;}' +
+            '' +
             '.row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:7px;align-items:center;}' +
             '.row label{width:82px;flex:0 0 82px;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--vscode-descriptionForeground);}' +
             '.row input[type=text],.row input[type=number],.row select{flex:1 1 110px;min-width:0;background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border,transparent);border-radius:4px;padding:4px 8px;font-size:12px;font-family:inherit;transition:border-color .12s ease;}' +
@@ -221,6 +254,13 @@ class ActionButtonsPanel {
             'let suggestions = [];' +
             'let collapsedIds = null;' +
             '' +
+            // Curated subset of codicon names -- not the full ~500-icon set, just
+            // ones plausibly useful on an action button. The Icon field stays a
+            // free-text input (any codicon name works), this only powers the
+            // dropdown suggestions via <datalist>.
+            'const ICON_OPTIONS = ["play","debug-start","stop-circle","refresh","sync","tools","gear","terminal","terminal-cmd","git-branch","git-commit","git-merge","cloud-upload","cloud-download","package","beaker","bug","rocket","database","server","server-process","globe","link","link-external","file-code","file-binary","folder","save","save-all","trash","search","filter","list-unordered","checklist","zap","flame","gift","star-full","heart","warning","error","info","question","arrow-up","arrow-down","arrow-right","arrow-left","chevron-right","debug-rerun","debug-restart","clear-all","export","desktop-download","key","lock","unlock","shield","pulse","graph-line","dashboard","tag","milestone","history","comment","mail","bell","wrench","combine","split-horizontal","notebook","code","symbol-method","circuit-board","layers","publish","repo-push","repo-pull","versions"];' +
+            'const ICON_OPTIONS_HTML = ICON_OPTIONS.map(function(name) { return "<option value=" + name + ">"; }).join("");' +
+            '' +
             'function escapeHtml(s) {' +
             '  return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");' +
             '}' +
@@ -246,21 +286,22 @@ class ActionButtonsPanel {
             '  div.className = collapsed ? "card collapsed" : "card";' +
             '  div.style.animationDelay = (index * 25) + "ms";' +
             '' +
+            '  const argsDisplay = btn.type === "vscode-command" ? "flex" : "none";' +
             '  const body =' +
             '    fieldRow("Label", "<input type=text data-field=label data-index=" + index + " value=\\"" + (btn.label || "").replace(/\\"/g, "&quot;") + "\\">") +' +
+            '    "<div class=field-section>Behavior</div>" +' +
             '    fieldRow("Command", "<input type=text data-field=command data-index=" + index + " value=\\"" + (btn.command || "").replace(/\\"/g, "&quot;") + "\\"><button data-action=browse data-index=" + index + ">Browse a file...</button>") +' +
             '    fieldRow("Type", "<select data-field=type data-index=" + index + "><option value=terminal" + (btn.type === "terminal" ? " selected" : "") + ">terminal</option><option value=vscode-command" + (btn.type === "vscode-command" ? " selected" : "") + ">vscode-command</option></select>") +' +
-            '    fieldRow("Icon", "<input type=text data-field=icon data-index=" + index + " value=\\"" + (btn.icon || "") + "\\" placeholder=tools>") +' +
+            '    "<div class=\\"row args-row\\" data-index=" + index + " style=\\"display:" + argsDisplay + "\\"><label>Args</label><input type=text data-field=args data-index=" + index + " value=\\"" + ((btn.args || []).join(",")) + "\\" placeholder=arg1,arg2></div>" +' +
+            '    fieldRow("Cwd", "<input type=text data-field=cwd data-index=" + index + " value=\\"" + (btn.cwd || "") + "\\" placeholder=${workspaceFolder}>") +' +
+            '    fieldRow("Save all", "<input type=checkbox data-field=saveAll data-index=" + index + (btn.saveAll ? " checked" : "") + ">") +' +
+            '    fieldRow("Focus", "<input type=checkbox data-field=focus data-index=" + index + (btn.focus !== false ? " checked" : "") + ">") +' +
+            '    "<div class=field-section>Appearance</div>" +' +
+            '    fieldRow("Icon", "<input type=text list=icon-list-" + index + " data-field=icon data-index=" + index + " value=\\"" + (btn.icon || "") + "\\" placeholder=tools><datalist id=icon-list-" + index + ">" + ICON_OPTIONS_HTML + "</datalist>") +' +
             '    fieldRow("Color", "<button type=button class=color-swatch data-action=swatch data-index=" + index + " style=\\"background:" + colorSwatchValue(btn.color) + "\\" title=\\"Open color picker\\"></button><input type=text data-field=color data-index=" + index + " value=\\"" + (btn.color || "") + "\\" placeholder=#ffcc00>") +' +
             '    fieldRow("Background", "<select data-field=background data-index=" + index + "><option value=none" + (btn.background === "none" ? " selected" : "") + ">none</option><option value=warning" + (btn.background === "warning" ? " selected" : "") + ">warning</option><option value=error" + (btn.background === "error" ? " selected" : "") + ">error</option></select>") +' +
             '    fieldRow("Tooltip", "<input type=text data-field=tooltip data-index=" + index + " value=\\"" + (btn.tooltip || "") + "\\">") +' +
-            '    fieldRow("Cwd", "<input type=text data-field=cwd data-index=" + index + " value=\\"" + (btn.cwd || "") + "\\" placeholder=${workspaceFolder}>") +' +
             '    fieldRow("Priority", "<input type=number data-field=priority data-index=" + index + " value=" + (btn.priority || 0) + ">") +' +
-            '    fieldRow("Save all", "<input type=checkbox data-field=saveAll data-index=" + index + (btn.saveAll ? " checked" : "") + ">") +' +
-            '    fieldRow("Focus", "<input type=checkbox data-field=focus data-index=" + index + (btn.focus ? " checked" : "") + ">") +' +
-            '    fieldRow("Languages", "<input type=text data-field=whenLanguages data-index=" + index + " value=\\"" + ((btn.when && btn.when.languages) || []).join(",") + "\\" placeholder=cpp,c>") +' +
-            '    fieldRow("Files exist", "<input type=text data-field=whenFilesExist data-index=" + index + " value=\\"" + ((btn.when && btn.when.filesExist) || []).join(",") + "\\" placeholder=CMakeLists.txt>") +' +
-            '    fieldRow("Folder", "<input type=text data-field=whenFolder data-index=" + index + " value=\\"" + ((btn.when && btn.when.folder) || "") + "\\">") +' +
             '    "<div class=card-footer>" +' +
             '    "<button data-action=up data-index=" + index + ">Up</button>" +' +
             '    "<button data-action=down data-index=" + index + ">Down</button>" +' +
@@ -290,13 +331,7 @@ class ActionButtonsPanel {
             '' +
             'function fieldToButtons(index, field, value) {' +
             '  const btn = buttons[index];' +
-            '  if (field === "whenLanguages" || field === "whenFilesExist" || field === "whenFolder") {' +
-            '    btn.when = btn.when || {};' +
-            '    if (field === "whenLanguages") { btn.when.languages = value ? value.split(",").map(function(s){return s.trim();}).filter(Boolean) : undefined; }' +
-            '    if (field === "whenFilesExist") { btn.when.filesExist = value ? value.split(",").map(function(s){return s.trim();}).filter(Boolean) : undefined; }' +
-            '    if (field === "whenFolder") { btn.when.folder = value || undefined; }' +
-            '    return;' +
-            '  }' +
+            '  if (field === "args") { btn.args = value ? value.split(",").map(function(s){return s.trim();}).filter(Boolean) : undefined; return; }' +
             '  btn[field] = value;' +
             '}' +
             '' +
@@ -311,6 +346,10 @@ class ActionButtonsPanel {
             '  if (field === "color" && /^#[0-9a-fA-F]{6}$/.test(value)) {' +
             '    const swatch = document.querySelector("[data-action=swatch][data-index=" + index + "]");' +
             '    if (swatch) { swatch.style.background = value; }' +
+            '  }' +
+            '  if (field === "type") {' +
+            '    const argsRow = document.querySelector(".args-row[data-index=" + index + "]");' +
+            '    if (argsRow) { argsRow.style.display = value === "vscode-command" ? "flex" : "none"; }' +
             '  }' +
             '});' +
             '' +
@@ -341,15 +380,19 @@ class ActionButtonsPanel {
             '    const id = t.getAttribute("data-id");' +
             '    const s = suggestions.find(function(x) { return x.id === id; });' +
             '    if (s) {' +
-            '      buttons.push({ id: s.id, label: s.label, command: s.command, icon: s.icon, type: "terminal", background: "none", priority: 0, saveAll: false, focus: false });' +
+            '      buttons.push({ id: s.id, label: s.label, command: s.command, icon: s.icon, type: "terminal", background: "none", priority: 0, saveAll: false, focus: true });' +
             '      render();' +
             '    }' +
             '  }' +
             '});' +
             '' +
             'document.getElementById("add-btn").addEventListener("click", function() {' +
-            '  buttons.push({ id: "button-" + Date.now(), label: "New Button", command: "", type: "terminal", background: "none", priority: 0, saveAll: false, focus: false });' +
+            '  buttons.push({ id: "button-" + Date.now(), label: "New Button", command: "", type: "terminal", background: "none", priority: 0, saveAll: false, focus: true });' +
             '  render();' +
+            '});' +
+            '' +
+            'document.getElementById("load-npm-btn").addEventListener("click", function() {' +
+            '  vscode.postMessage({ type: "loadNpmScripts" });' +
             '});' +
             '' +
             'document.getElementById("save-btn").addEventListener("click", function() {' +
@@ -375,6 +418,18 @@ class ActionButtonsPanel {
             '    const path = msg.path.indexOf(" ") >= 0 ? "\\"" + msg.path + "\\"" : msg.path;' +
             '    buttons[msg.index].command = path;' +
             '    render();' +
+            '  } else if (msg.type === "npmScriptsLoaded") {' +
+            '    if (msg.errors && msg.errors.length) {' +
+            '      const el = document.getElementById("status");' +
+            '      el.textContent = msg.errors.join("; ");' +
+            '      el.className = "visible err";' +
+            '    } else {' +
+            '      const existingIds = new Set(buttons.map(function(b) { return b.id; }));' +
+            '      msg.buttons.forEach(function(b) {' +
+            '        if (!existingIds.has(b.id)) { buttons.push(b); existingIds.add(b.id); }' +
+            '      });' +
+            '      render();' +
+            '    }' +
             '  }' +
             '});' +
             '' +

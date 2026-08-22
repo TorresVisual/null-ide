@@ -41,8 +41,7 @@ export function toActionButtonConfig(script: NpmScriptButton, priority: number):
     tooltip: undefined,
     cwd: undefined,
     saveAll: false,
-    focus: false,
+    focus: true,
     priority,
-    when: undefined,
   };
 }

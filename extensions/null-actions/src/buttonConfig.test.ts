@@ -22,9 +22,8 @@ test('parses a minimal valid button, applying defaults', () => {
     tooltip: undefined,
     cwd: undefined,
     saveAll: false,
-    focus: false,
+    focus: true,
     priority: 0,
-    when: undefined,
   });
 });
 
@@ -71,16 +70,11 @@ test('invalid enum values fall back to their defaults instead of erroring', () =
   assert.strictEqual(buttons[0].background, 'none');
 });
 
-test('parses a full when clause, filtering non-string array entries', () => {
+test('focus defaults to true when omitted, but an explicit false is honored', () => {
   const { buttons } = parseButtonConfigs([
-    {
-      id: 'x', label: 'X', command: 'echo x',
-      when: { languages: ['cpp', 42, 'c'], filesExist: ['CMakeLists.txt'], folder: 'backend' },
-    },
+    { id: 'a', label: 'A', command: 'echo a' },
+    { id: 'b', label: 'B', command: 'echo b', focus: false },
   ]);
-  assert.deepStrictEqual(buttons[0].when, {
-    languages: ['cpp', 'c'],
-    filesExist: ['CMakeLists.txt'],
-    folder: 'backend',
-  });
+  assert.strictEqual(buttons[0].focus, true);
+  assert.strictEqual(buttons[1].focus, false);
 });

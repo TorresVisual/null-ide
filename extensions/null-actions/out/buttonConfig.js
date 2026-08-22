@@ -3,23 +3,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.parseButtonConfigs = parseButtonConfigs;
 const VALID_TYPES = ['terminal', 'vscode-command'];
 const VALID_BACKGROUNDS = ['none', 'warning', 'error'];
-function parseWhenClause(raw) {
-    if (typeof raw !== 'object' || raw === null) {
-        return undefined;
-    }
-    const w = raw;
-    const languages = Array.isArray(w.languages)
-        ? w.languages.filter((x) => typeof x === 'string')
-        : undefined;
-    const filesExist = Array.isArray(w.filesExist)
-        ? w.filesExist.filter((x) => typeof x === 'string')
-        : undefined;
-    const folder = typeof w.folder === 'string' ? w.folder : undefined;
-    if (!languages && !filesExist && !folder) {
-        return undefined;
-    }
-    return { languages, filesExist, folder };
-}
 function parseButtonConfigs(raw) {
     const buttons = [];
     const errors = [];
@@ -67,9 +50,8 @@ function parseButtonConfigs(raw) {
             tooltip: typeof e.tooltip === 'string' ? e.tooltip : undefined,
             cwd: typeof e.cwd === 'string' ? e.cwd : undefined,
             saveAll: e.saveAll === true,
-            focus: e.focus === true,
+            focus: typeof e.focus === 'boolean' ? e.focus : true,
             priority: typeof e.priority === 'number' ? e.priority : 0,
-            when: parseWhenClause(e.when),
         });
     }
     return { buttons, errors };
