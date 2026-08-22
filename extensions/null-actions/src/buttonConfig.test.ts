@@ -23,7 +23,6 @@ test('parses a minimal valid button, applying defaults', () => {
     cwd: undefined,
     saveAll: false,
     focus: false,
-    alignment: 'left',
     priority: 0,
     when: undefined,
   });
@@ -65,11 +64,10 @@ test('duplicate ids: first wins, second is rejected as an error', () => {
 
 test('invalid enum values fall back to their defaults instead of erroring', () => {
   const { buttons, errors } = parseButtonConfigs([
-    { id: 'x', label: 'X', command: 'echo x', type: 'bogus', alignment: 'sideways', background: 'purple' },
+    { id: 'x', label: 'X', command: 'echo x', type: 'bogus', background: 'purple' },
   ]);
   assert.deepStrictEqual(errors, []);
   assert.strictEqual(buttons[0].type, 'terminal');
-  assert.strictEqual(buttons[0].alignment, 'left');
   assert.strictEqual(buttons[0].background, 'none');
 });
 

@@ -48,8 +48,9 @@ control either, despite users asking for it in issues. Text color
 In scope: status-bar buttons backed by per-button dedicated terminals or VS
 Code API command execution; a settings webview for CRUD instead of raw JSON
 editing; deterministic terminal identity that survives window
-reload/folder-reopen without duplicating terminals; alignment/priority
-ordering; context filters (`when.languages`, `when.filesExist`,
+reload/folder-reopen without duplicating terminals; priority ordering;
+all buttons render left-aligned (right-alignment was dropped as unneeded);
+context filters (`when.languages`, `when.filesExist`,
 `when.folder`); project-type-detection suggestions (opt-in, never
 auto-injected); npm-script auto-loading (kept from the original, since it
 was the one dynamic-discovery behavior worth preserving).
@@ -123,8 +124,7 @@ scope, same as any other VS Code setting — stays git-portable):
   "cwd": "${workspaceFolder}",
   "saveAll": true,
   "focus": false,
-  "alignment": "left",            // "left" | "right"
-  "priority": 100,                // sort order within alignment group
+  "priority": 100,                // status bar sort order (all buttons are left-aligned)
   "when": {
     "languages": ["cpp", "c"],       // optional
     "filesExist": ["CMakeLists.txt"], // optional, relative to folder root
@@ -216,8 +216,8 @@ with add/edit/reorder/delete, and a "Suggested" tab fed by
 `projectDetector.ts`. Form fields match the data model: text inputs for
 label/command/tooltip/cwd, a codicon-name picker for icon, a color swatch
 for text color, a `none`/`warning`/`error` selector for background (labeled
-clearly as a platform-limited option, not a free color picker), and
-alignment/priority steppers. Saves write back to `null-actions.buttons` in
+clearly as a platform-limited option, not a free color picker), and a
+priority stepper. Saves write back to `null-actions.buttons` in
 workspace settings — plain JSON underneath, so it's still hand-editable if
 someone wants to skip the UI for a quick change.
 

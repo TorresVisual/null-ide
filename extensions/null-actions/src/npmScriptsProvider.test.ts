@@ -34,7 +34,6 @@ test('toActionButtonConfig fills in full ActionButtonConfig defaults', () => {
   assert.strictEqual(config.label, 'npm run build');
   assert.strictEqual(config.command, 'npm run build');
   assert.strictEqual(config.type, 'terminal');
-  assert.strictEqual(config.alignment, 'left');
   assert.strictEqual(config.priority, 10);
   assert.strictEqual(config.background, 'none');
   assert.strictEqual(config.saveAll, false);

@@ -198,7 +198,6 @@ class ActionButtonsPanel {
             '    fieldRow("Background", "<select data-field=background data-index=" + index + "><option value=none" + (btn.background === "none" ? " selected" : "") + ">none</option><option value=warning" + (btn.background === "warning" ? " selected" : "") + ">warning</option><option value=error" + (btn.background === "error" ? " selected" : "") + ">error</option></select>") +' +
             '    fieldRow("Tooltip", "<input type=text data-field=tooltip data-index=" + index + " value=\\"" + (btn.tooltip || "") + "\\">") +' +
             '    fieldRow("Cwd", "<input type=text data-field=cwd data-index=" + index + " value=\\"" + (btn.cwd || "") + "\\" placeholder=${workspaceFolder}>") +' +
-            '    fieldRow("Alignment", "<select data-field=alignment data-index=" + index + "><option value=left" + (btn.alignment === "left" ? " selected" : "") + ">left</option><option value=right" + (btn.alignment === "right" ? " selected" : "") + ">right</option></select>") +' +
             '    fieldRow("Priority", "<input type=number data-field=priority data-index=" + index + " value=" + (btn.priority || 0) + ">") +' +
             '    fieldRow("Save all", "<input type=checkbox data-field=saveAll data-index=" + index + (btn.saveAll ? " checked" : "") + ">") +' +
             '    fieldRow("Focus", "<input type=checkbox data-field=focus data-index=" + index + (btn.focus ? " checked" : "") + ">") +' +
@@ -277,14 +276,14 @@ class ActionButtonsPanel {
             '    const id = t.getAttribute("data-id");' +
             '    const s = suggestions.find(function(x) { return x.id === id; });' +
             '    if (s) {' +
-            '      buttons.push({ id: s.id, label: s.label, command: s.command, icon: s.icon, type: "terminal", background: "none", alignment: "left", priority: 0, saveAll: false, focus: false });' +
+            '      buttons.push({ id: s.id, label: s.label, command: s.command, icon: s.icon, type: "terminal", background: "none", priority: 0, saveAll: false, focus: false });' +
             '      render();' +
             '    }' +
             '  }' +
             '});' +
             '' +
             'document.getElementById("add-btn").addEventListener("click", function() {' +
-            '  buttons.push({ id: "button-" + Date.now(), label: "New Button", command: "", type: "terminal", background: "none", alignment: "left", priority: 0, saveAll: false, focus: false });' +
+            '  buttons.push({ id: "button-" + Date.now(), label: "New Button", command: "", type: "terminal", background: "none", priority: 0, saveAll: false, focus: false });' +
             '  render();' +
             '});' +
             '' +

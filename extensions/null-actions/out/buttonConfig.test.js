@@ -25,7 +25,6 @@ const buttonConfig_1 = require("./buttonConfig");
         cwd: undefined,
         saveAll: false,
         focus: false,
-        alignment: 'left',
         priority: 0,
         when: undefined,
     });
@@ -62,11 +61,10 @@ const buttonConfig_1 = require("./buttonConfig");
 });
 (0, node_test_1.test)('invalid enum values fall back to their defaults instead of erroring', () => {
     const { buttons, errors } = (0, buttonConfig_1.parseButtonConfigs)([
-        { id: 'x', label: 'X', command: 'echo x', type: 'bogus', alignment: 'sideways', background: 'purple' },
+        { id: 'x', label: 'X', command: 'echo x', type: 'bogus', background: 'purple' },
     ]);
     node_assert_1.default.deepStrictEqual(errors, []);
     node_assert_1.default.strictEqual(buttons[0].type, 'terminal');
-    node_assert_1.default.strictEqual(buttons[0].alignment, 'left');
     node_assert_1.default.strictEqual(buttons[0].background, 'none');
 });
 (0, node_test_1.test)('parses a full when clause, filtering non-string array entries', () => {

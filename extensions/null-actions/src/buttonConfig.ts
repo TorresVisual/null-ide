@@ -1,7 +1,6 @@
 'use strict';
 
 export type ButtonType = 'terminal' | 'vscode-command';
-export type ButtonAlignment = 'left' | 'right';
 export type ButtonBackground = 'none' | 'warning' | 'error';
 
 export interface WhenClauseConfig {
@@ -23,7 +22,6 @@ export interface ActionButtonConfig {
   cwd?: string;
   saveAll: boolean;
   focus: boolean;
-  alignment: ButtonAlignment;
   priority: number;
   when?: WhenClauseConfig;
 }
@@ -34,7 +32,6 @@ export interface ParseResult {
 }
 
 const VALID_TYPES: ButtonType[] = ['terminal', 'vscode-command'];
-const VALID_ALIGNMENTS: ButtonAlignment[] = ['left', 'right'];
 const VALID_BACKGROUNDS: ButtonBackground[] = ['none', 'warning', 'error'];
 
 function parseWhenClause(raw: unknown): WhenClauseConfig | undefined {
@@ -105,7 +102,6 @@ export function parseButtonConfigs(raw: unknown): ParseResult {
       cwd: typeof e.cwd === 'string' ? e.cwd : undefined,
       saveAll: e.saveAll === true,
       focus: e.focus === true,
-      alignment: VALID_ALIGNMENTS.includes(e.alignment as ButtonAlignment) ? (e.alignment as ButtonAlignment) : 'left',
       priority: typeof e.priority === 'number' ? e.priority : 0,
       when: parseWhenClause(e.when),
     });

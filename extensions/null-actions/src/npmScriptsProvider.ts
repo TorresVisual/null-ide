@@ -42,7 +42,6 @@ export function toActionButtonConfig(script: NpmScriptButton, priority: number):
     cwd: undefined,
     saveAll: false,
     focus: false,
-    alignment: 'left',
     priority,
     when: undefined,
   };

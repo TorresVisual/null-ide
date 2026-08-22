@@ -50,7 +50,10 @@ function activate(context) {
     const terminalRegistry = new terminalRegistry_1.TerminalRegistry(new terminalHostIntegration_1.VscodeTerminalHost());
     const statusBar = new statusBarController_1.StatusBarController();
     context.subscriptions.push(statusBar);
-    const openSettingsItem = vscode.window.createStatusBarItem('null-actions.openSettings', vscode.StatusBarAlignment.Right, -1000);
+    // Highest possible priority so this always renders leftmost among
+    // null-actions' own status bar items, regardless of what priority the
+    // user's own buttons use.
+    const openSettingsItem = vscode.window.createStatusBarItem('null-actions.openSettings', vscode.StatusBarAlignment.Left, Number.MAX_SAFE_INTEGER);
     openSettingsItem.text = '$(gear) Actions';
     openSettingsItem.tooltip = 'Open Action Buttons Settings';
     openSettingsItem.command = 'null-actions.openSettings';

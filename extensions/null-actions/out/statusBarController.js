@@ -47,9 +47,9 @@ class StatusBarController {
         }
         for (const button of buttons) {
             const existing = this.items.get(button.id);
-            // Alignment and priority are fixed at creation time by the VS Code
-            // API (there's no setter) — recreate the item if either changed.
-            if (existing && (existing.alignment !== button.alignment || existing.priority !== button.priority)) {
+            // Priority is fixed at creation time by the VS Code API (there's no
+            // setter) — recreate the item if it changed.
+            if (existing && existing.priority !== button.priority) {
                 existing.item.dispose();
                 this.items.delete(button.id);
             }
@@ -65,9 +65,8 @@ class StatusBarController {
         this.items.clear();
     }
     create(button) {
-        const alignment = button.alignment === 'right' ? vscode.StatusBarAlignment.Right : vscode.StatusBarAlignment.Left;
-        const item = vscode.window.createStatusBarItem(`null-actions.${button.id}`, alignment, button.priority);
-        return { item, alignment: button.alignment, priority: button.priority };
+        const item = vscode.window.createStatusBarItem(`null-actions.${button.id}`, vscode.StatusBarAlignment.Left, button.priority);
+        return { item, priority: button.priority };
     }
     applyButton(item, button) {
         item.text = button.icon ? `$(${button.icon}) ${button.label}` : button.label;

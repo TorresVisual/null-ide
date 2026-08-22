@@ -2,7 +2,6 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.parseButtonConfigs = parseButtonConfigs;
 const VALID_TYPES = ['terminal', 'vscode-command'];
-const VALID_ALIGNMENTS = ['left', 'right'];
 const VALID_BACKGROUNDS = ['none', 'warning', 'error'];
 function parseWhenClause(raw) {
     if (typeof raw !== 'object' || raw === null) {
@@ -69,7 +68,6 @@ function parseButtonConfigs(raw) {
             cwd: typeof e.cwd === 'string' ? e.cwd : undefined,
             saveAll: e.saveAll === true,
             focus: e.focus === true,
-            alignment: VALID_ALIGNMENTS.includes(e.alignment) ? e.alignment : 'left',
             priority: typeof e.priority === 'number' ? e.priority : 0,
             when: parseWhenClause(e.when),
         });

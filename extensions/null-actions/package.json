@@ -60,7 +60,6 @@
               "cwd": { "type": "string" },
               "saveAll": { "type": "boolean", "default": false },
               "focus": { "type": "boolean", "default": false },
-              "alignment": { "type": "string", "enum": ["left", "right"], "default": "left" },
               "priority": { "type": "number", "default": 0 },
               "when": {
                 "type": "object",

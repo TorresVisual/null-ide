@@ -40,7 +40,6 @@ function toActionButtonConfig(script, priority) {
         cwd: undefined,
         saveAll: false,
         focus: false,
-        alignment: 'left',
         priority,
         when: undefined,
     };

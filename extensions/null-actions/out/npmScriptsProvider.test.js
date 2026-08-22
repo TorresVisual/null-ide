@@ -32,7 +32,6 @@ const npmScriptsProvider_1 = require("./npmScriptsProvider");
     node_assert_1.default.strictEqual(config.label, 'npm run build');
     node_assert_1.default.strictEqual(config.command, 'npm run build');
     node_assert_1.default.strictEqual(config.type, 'terminal');
-    node_assert_1.default.strictEqual(config.alignment, 'left');
     node_assert_1.default.strictEqual(config.priority, 10);
     node_assert_1.default.strictEqual(config.background, 'none');
     node_assert_1.default.strictEqual(config.saveAll, false);
