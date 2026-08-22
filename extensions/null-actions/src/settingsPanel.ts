@@ -104,14 +104,25 @@ this.css() +
 '</style>' +
 '</head>' +
 '<body>' +
+'<div id="page">' +
+'<header id="page-header">' +
+'  <h1><span class="dot"></span>Action Buttons</h1>' +
+'  <p class="subtitle">Status bar shortcuts for the commands you run most</p>' +
+'</header>' +
 '<div id="toolbar">' +
 '  <button id="add-btn">+ Add Button</button>' +
 '  <button id="save-btn" class="primary">Save All</button>' +
 '  <span id="status"></span>' +
 '</div>' +
+'<section>' +
 '<div id="buttons-list"></div>' +
-'<h3>Suggested</h3>' +
-'<div id="suggestions-list"></div>' +
+'<div id="empty-state">No buttons yet — add one above, or pick a suggestion below.</div>' +
+'</section>' +
+'<section id="suggestions-section">' +
+'  <h2>Suggested for this project</h2>' +
+'  <div id="suggestions-list"></div>' +
+'</section>' +
+'</div>' +
 '<script nonce="' + nonce + '">' +
 this.clientScript() +
 '</script>' +
@@ -121,27 +132,61 @@ this.clientScript() +
 
   private css(): string {
     return '*,*::before,*::after{box-sizing:border-box;}' +
-      'body{font-family:var(--vscode-font-family);font-size:12px;color:var(--vscode-foreground);padding:8px;}' +
-      '#toolbar{display:flex;gap:8px;align-items:center;margin-bottom:10px;}' +
-      'button{background:var(--vscode-button-secondaryBackground);color:var(--vscode-button-secondaryForeground);border:none;border-radius:3px;padding:4px 10px;cursor:pointer;}' +
+      ':root{--mono:var(--vscode-editor-font-family,"Geist Mono","JetBrains Mono","Cascadia Code",ui-monospace,monospace);}' +
+      'body{font-family:var(--vscode-font-family);font-size:12px;line-height:1.5;color:var(--vscode-foreground);background:var(--vscode-editor-background);margin:0;}' +
+      '#page{max-width:640px;margin:0 auto;padding:28px 26px 60px;}' +
+      '' +
+      '#page-header{margin-bottom:22px;}' +
+      '#page-header h1{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:19px;font-weight:600;letter-spacing:.01em;margin:0 0 5px;}' +
+      '#page-header .dot{width:8px;height:8px;flex-shrink:0;border-radius:50%;background:var(--vscode-textLink-foreground);box-shadow:0 0 10px var(--vscode-textLink-foreground);}' +
+      '#page-header .subtitle{margin:0;color:var(--vscode-descriptionForeground);font-size:12px;}' +
+      '' +
+      '#toolbar{display:flex;gap:8px;align-items:center;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--vscode-widget-border,rgba(255,255,255,.08));}' +
+      'button{background:var(--vscode-button-secondaryBackground);color:var(--vscode-button-secondaryForeground);border:none;border-radius:4px;padding:5px 12px;cursor:pointer;font-size:12px;font-family:inherit;transition:transform .12s ease,filter .12s ease;}' +
+      'button:hover{filter:brightness(1.12);transform:translateY(-1px);}' +
+      'button:active{transform:translateY(0);}' +
       'button.primary{background:var(--vscode-button-background);color:var(--vscode-button-foreground);}' +
-      'button:hover{opacity:0.85;}' +
-      '.card{border:1px solid var(--vscode-widget-border,rgba(255,255,255,0.1));border-radius:4px;padding:8px;margin-bottom:8px;}' +
-      '.card.collapsed{padding:0;}' +
-      '.card-header{display:flex;align-items:center;gap:6px;cursor:pointer;padding:6px 8px;}' +
-      '.card.collapsed .card-header{padding:8px;}' +
-      '.chevron{opacity:0.6;width:10px;flex-shrink:0;}' +
-      '.card-title{font-weight:600;}' +
-      '.card-summary{opacity:0.55;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}' +
-      '.card-body{margin-top:6px;}' +
-      '.row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;align-items:center;}' +
-      '.row label{width:80px;flex-shrink:0;opacity:0.75;}' +
-      '.row input[type=text],.row input[type=number],.row select{flex:1 1 100px;min-width:0;background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border,transparent);border-radius:2px;padding:3px 6px;}' +
+      '' +
+      '#status{font-size:11px;padding:3px 9px;border-radius:9px;opacity:0;transform:translateY(-2px);transition:opacity .18s ease,transform .18s ease;}' +
+      '#status.visible{opacity:1;transform:translateY(0);}' +
+      '#status.ok{color:#8fd19e;background:rgba(63,185,80,.15);}' +
+      '#status.err{color:#f2a3a3;background:rgba(224,90,90,.15);}' +
+      '' +
+      'section{margin-bottom:26px;}' +
+      '' +
+      '#empty-state{display:none;text-align:center;padding:30px 18px;color:var(--vscode-descriptionForeground);font-size:12px;border:1px dashed var(--vscode-widget-border,rgba(255,255,255,.14));border-radius:8px;}' +
+      '#empty-state.visible{display:block;}' +
+      '' +
+      '.card{background:var(--vscode-editorWidget-background,rgba(255,255,255,.02));border:1px solid var(--vscode-widget-border,rgba(255,255,255,.08));border-left:3px solid var(--vscode-textLink-foreground);border-radius:7px;margin-bottom:9px;overflow:hidden;animation:card-in .22s ease both;}' +
+      '@keyframes card-in{from{opacity:0;transform:translateY(3px);}to{opacity:1;transform:translateY(0);}}' +
+      '' +
+      '.card-header{display:flex;align-items:center;gap:9px;padding:9px 12px;cursor:pointer;user-select:none;}' +
+      '.card-header:hover{background:rgba(255,255,255,.03);}' +
+      '.chevron{display:inline-block;flex-shrink:0;width:9px;font-size:9px;opacity:.55;transition:transform .15s ease;}' +
+      '.card.collapsed .chevron{transform:rotate(-90deg);}' +
+      '.card-title{font-weight:600;flex-shrink:0;}' +
+      '.card-summary{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--mono);font-size:11px;color:var(--vscode-descriptionForeground);}' +
+      '' +
+      '.card-body{max-height:960px;opacity:1;padding:2px 13px 13px;transition:max-height .22s ease,opacity .16s ease,padding .22s ease;}' +
+      '.card.collapsed .card-body{max-height:0;opacity:0;padding-top:0;padding-bottom:0;pointer-events:none;}' +
+      '' +
+      '.row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:7px;align-items:center;}' +
+      '.row label{width:82px;flex:0 0 82px;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--vscode-descriptionForeground);}' +
+      '.row input[type=text],.row input[type=number],.row select{flex:1 1 110px;min-width:0;background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border,transparent);border-radius:4px;padding:4px 8px;font-size:12px;font-family:inherit;transition:border-color .12s ease;}' +
+      '.row input[data-field=command]{font-family:var(--mono);}' +
+      '.row input:focus,.row select:focus{outline:none;border-color:var(--vscode-focusBorder);}' +
       '.row button{flex:0 0 auto;}' +
-      '.row input[type=color]{width:28px;height:24px;flex:none;padding:0;border:1px solid var(--vscode-input-border,transparent);border-radius:2px;background:none;}' +
-      '.card-footer{display:flex;gap:6px;justify-content:flex-end;}' +
-      '#status{opacity:0.7;}' +
-      '.suggestion{display:flex;justify-content:space-between;align-items:center;padding:4px 0;}';
+      '.row input[type=color]{width:28px;height:26px;flex:none;padding:0;border:1px solid var(--vscode-input-border,transparent);border-radius:4px;background:none;cursor:pointer;}' +
+      '' +
+      '.card-footer{display:flex;gap:6px;justify-content:flex-end;margin-top:9px;padding-top:9px;border-top:1px solid var(--vscode-widget-border,rgba(255,255,255,.06));}' +
+      '.card-footer button[data-action=delete]{color:#f2a3a3;}' +
+      '' +
+      '#suggestions-section h2{font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--vscode-descriptionForeground);margin:0 0 8px;}' +
+      '#suggestions-list{border:1px dashed var(--vscode-widget-border,rgba(255,255,255,.14));border-radius:7px;padding:2px 12px;}' +
+      '#suggestions-list:empty{display:none;}' +
+      '.suggestion{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--vscode-widget-border,rgba(255,255,255,.05));}' +
+      '.suggestion:last-child{border-bottom:none;}' +
+      '.suggestion-label{font-family:var(--mono);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}';
   }
 
   private clientScript(): string {
@@ -166,14 +211,14 @@ this.clientScript() +
       '  const collapsed = collapsedIds.has(btn.id);' +
       '  const header =' +
       '    "<div class=card-header data-action=toggle data-index=" + index + ">" +' +
-      '    "<span class=chevron>" + (collapsed ? "\\u25B6" : "\\u25BC") + "</span>" +' +
+      '    "<span class=chevron>\\u25BC</span>" +' +
       '    "<span class=card-title>" + escapeHtml(btn.label || "(untitled)") + "</span>" +' +
-      '    (collapsed ? "<span class=card-summary>" + escapeHtml(btn.command || "") + "</span>" : "") +' +
+      '    "<span class=card-summary>" + escapeHtml(btn.command || "") + "</span>" +' +
       '    "</div>";' +
       '' +
       '  const div = document.createElement("div");' +
       '  div.className = collapsed ? "card collapsed" : "card";' +
-      '  if (collapsed) { div.innerHTML = header; return div; }' +
+      '  div.style.animationDelay = (index * 25) + "ms";' +
       '' +
       '  const body =' +
       '    fieldRow("Label", "<input type=text data-field=label data-index=" + index + " value=\\"" + (btn.label || "").replace(/\\"/g, "&quot;") + "\\">") +' +
@@ -204,15 +249,17 @@ this.clientScript() +
       '  const list = document.getElementById("buttons-list");' +
       '  list.innerHTML = "";' +
       '  buttons.forEach(function(btn, i) { list.appendChild(renderCard(btn, i)); });' +
+      '  document.getElementById("empty-state").classList.toggle("visible", buttons.length === 0);' +
       '' +
       '  const sList = document.getElementById("suggestions-list");' +
       '  sList.innerHTML = "";' +
       '  suggestions.forEach(function(s) {' +
       '    const row = document.createElement("div");' +
       '    row.className = "suggestion";' +
-      '    row.innerHTML = "<span>" + s.label + "</span><button data-action=add-suggestion data-id=" + s.id + ">+ Add</button>";' +
+      '    row.innerHTML = "<span class=suggestion-label>" + escapeHtml(s.label) + "</span><button data-action=add-suggestion data-id=" + s.id + ">+ Add</button>";' +
       '    sList.appendChild(row);' +
       '  });' +
+      '  document.getElementById("suggestions-section").style.display = suggestions.length ? "" : "none";' +
       '}' +
       '' +
       'function fieldToButtons(index, field, value) {' +
@@ -284,10 +331,14 @@ this.clientScript() +
       '    suggestions = msg.suggestions;' +
       '    render();' +
       '  } else if (msg.type === "saved") {' +
-      '    document.getElementById("status").textContent = "Saved";' +
-      '    setTimeout(function() { document.getElementById("status").textContent = ""; }, 1500);' +
+      '    const el = document.getElementById("status");' +
+      '    el.textContent = "\\u2713 Saved";' +
+      '    el.className = "visible ok";' +
+      '    setTimeout(function() { el.className = ""; }, 1600);' +
       '  } else if (msg.type === "error") {' +
-      '    document.getElementById("status").textContent = "Error: " + msg.errors.join("; ");' +
+      '    const el = document.getElementById("status");' +
+      '    el.textContent = "Error: " + msg.errors.join("; ");' +
+      '    el.className = "visible err";' +
       '  } else if (msg.type === "fileSelected") {' +
       '    const path = msg.path.indexOf(" ") >= 0 ? "\\"" + msg.path + "\\"" : msg.path;' +
       '    buttons[msg.index].command = path;' +
