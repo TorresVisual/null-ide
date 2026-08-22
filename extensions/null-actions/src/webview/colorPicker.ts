@@ -236,6 +236,16 @@ interface PickerState {
       const ctx = this.triCtx;
       ctx.clearRect(0, 0, SIZE, SIZE);
 
+      // Triangle first: it's painted via putImageData, which writes raw
+      // pixels (including fully-transparent ones outside the triangle)
+      // directly into its bounding box, clobbering anything drawn there
+      // beforehand instead of compositing over it. Drawing the ring
+      // afterward is safe the other way around -- a normal path fill only
+      // touches pixels inside the ring's own annulus shape, so it correctly
+      // repaints over whatever the triangle's bounding-box corners erased,
+      // without affecting the triangle's interior at all.
+      this.renderTriangle();
+
       // Hue ring: a true conic gradient (not a CSS approximation), smooth
       // across the full 360-degree spectrum with no banding.
       const grad = ctx.createConicGradient(-Math.PI / 2, cx, cy);
@@ -256,8 +266,6 @@ interface PickerState {
       ctx.lineWidth = 1;
       ctx.beginPath(); ctx.arc(cx, cy, RING_OUTER, 0, Math.PI * 2); ctx.stroke();
       ctx.beginPath(); ctx.arc(cx, cy, RING_INNER, 0, Math.PI * 2); ctx.stroke();
-
-      this.renderTriangle();
     }
 
     private renderTriangle(): void {
