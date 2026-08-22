@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ActionButtonsViewProvider = void 0;
+exports.ActionButtonsPanel = void 0;
 const vscode = __importStar(require("vscode"));
 const buttonConfig_1 = require("./buttonConfig");
 const buttonConfigIntegration_1 = require("./buttonConfigIntegration");
@@ -46,13 +46,25 @@ function getNonce() {
     }
     return text;
 }
-class ActionButtonsViewProvider {
-    view;
-    resolveWebviewView(webviewView) {
-        this.view = webviewView;
-        webviewView.webview.options = { enableScripts: true };
-        webviewView.webview.html = this.getHtml();
-        webviewView.webview.onDidReceiveMessage((msg) => {
+class ActionButtonsPanel {
+    static current;
+    panel;
+    static createOrShow() {
+        if (ActionButtonsPanel.current) {
+            ActionButtonsPanel.current.panel.reveal(vscode.ViewColumn.One);
+            return;
+        }
+        const panel = vscode.window.createWebviewPanel('null-actions.settings', 'Action Buttons', vscode.ViewColumn.One, { enableScripts: true, retainContextWhenHidden: true });
+        ActionButtonsPanel.current = new ActionButtonsPanel(panel);
+    }
+    static refreshIfOpen() {
+        ActionButtonsPanel.current?.postState();
+    }
+    constructor(panel) {
+        this.panel = panel;
+        this.panel.webview.options = { enableScripts: true };
+        this.panel.webview.html = this.getHtml();
+        this.panel.webview.onDidReceiveMessage((msg) => {
             if (msg.type === 'ready') {
                 this.postState();
             }
@@ -63,35 +75,26 @@ class ActionButtonsViewProvider {
                 this.handleBrowseFile(msg.index);
             }
         });
-    }
-    refresh() {
-        this.postState();
+        this.panel.onDidDispose(() => {
+            ActionButtonsPanel.current = undefined;
+        });
     }
     postState() {
-        if (!this.view) {
-            return;
-        }
         const { buttons } = (0, buttonConfigIntegration_1.readButtonConfigs)();
         const folder = vscode.workspace.workspaceFolders?.[0];
         const suggestions = folder ? (0, projectDetector_1.detectSuggestedButtons)(folder.uri.fsPath) : [];
-        this.view.webview.postMessage({ type: 'init', buttons, suggestions });
+        this.panel.webview.postMessage({ type: 'init', buttons, suggestions });
     }
     async handleSave(raw) {
-        if (!this.view) {
-            return;
-        }
         const { buttons, errors } = (0, buttonConfig_1.parseButtonConfigs)(raw);
         if (errors.length > 0) {
-            this.view.webview.postMessage({ type: 'error', errors });
+            this.panel.webview.postMessage({ type: 'error', errors });
             return;
         }
         await (0, buttonConfigIntegration_1.writeButtonConfigs)(buttons);
-        this.view.webview.postMessage({ type: 'saved' });
+        this.panel.webview.postMessage({ type: 'saved' });
     }
     async handleBrowseFile(index) {
-        if (!this.view) {
-            return;
-        }
         const uris = await vscode.window.showOpenDialog({
             canSelectFiles: true,
             canSelectFolders: false,
@@ -101,7 +104,7 @@ class ActionButtonsViewProvider {
         if (!uris || uris.length === 0) {
             return;
         }
-        this.view.webview.postMessage({ type: 'fileSelected', index, path: uris[0].fsPath });
+        this.panel.webview.postMessage({ type: 'fileSelected', index, path: uris[0].fsPath });
     }
     getHtml() {
         const nonce = getNonce();
@@ -310,5 +313,5 @@ class ActionButtonsViewProvider {
             'vscode.postMessage({ type: "ready" });';
     }
 }
-exports.ActionButtonsViewProvider = ActionButtonsViewProvider;
+exports.ActionButtonsPanel = ActionButtonsPanel;
 //# sourceMappingURL=settingsPanel.js.map

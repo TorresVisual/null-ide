@@ -22,20 +22,16 @@
       {
         "command": "null-actions.runButton",
         "title": "Null Actions: Run Button"
+      },
+      {
+        "command": "null-actions.openSettings",
+        "title": "Null Actions: Open Settings",
+        "icon": "$(gear)"
       }
     ],
     "menus": {
       "commandPalette": [
         { "command": "null-actions.runButton", "when": "false" }
-      ]
-    },
-    "views": {
-      "null-workspace": [
-        {
-          "type": "webview",
-          "id": "null-actions.buttonsView",
-          "name": "Action Buttons"
-        }
       ]
     },
     "configuration": {

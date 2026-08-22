@@ -49,9 +49,16 @@ const path = __importStar(require("path"));
 function activate(context) {
     const terminalRegistry = new terminalRegistry_1.TerminalRegistry(new terminalHostIntegration_1.VscodeTerminalHost());
     const statusBar = new statusBarController_1.StatusBarController();
-    const settingsProvider = new settingsPanel_1.ActionButtonsViewProvider();
     context.subscriptions.push(statusBar);
-    context.subscriptions.push(vscode.window.registerWebviewViewProvider('null-actions.buttonsView', settingsProvider));
+    const openSettingsItem = vscode.window.createStatusBarItem('null-actions.openSettings', vscode.StatusBarAlignment.Right, -1000);
+    openSettingsItem.text = '$(gear) Actions';
+    openSettingsItem.tooltip = 'Open Action Buttons Settings';
+    openSettingsItem.command = 'null-actions.openSettings';
+    openSettingsItem.show();
+    context.subscriptions.push(openSettingsItem);
+    context.subscriptions.push(vscode.commands.registerCommand('null-actions.openSettings', () => {
+        settingsPanel_1.ActionButtonsPanel.createOrShow();
+    }));
     function loadNpmButtons() {
         const auto = vscode.workspace.getConfiguration().get('null-actions.npm.autoLoad', false);
         if (!auto) {
@@ -98,7 +105,7 @@ function activate(context) {
     context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(e => {
         if (e.affectsConfiguration('null-actions')) {
             refresh();
-            settingsProvider.refresh();
+            settingsPanel_1.ActionButtonsPanel.refreshIfOpen();
         }
     }), vscode.window.onDidChangeActiveTextEditor(() => refresh()), vscode.workspace.onDidChangeWorkspaceFolders(() => refresh()));
     refresh();

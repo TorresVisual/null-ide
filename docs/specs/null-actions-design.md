@@ -207,8 +207,11 @@ the direct fix for the reported bug:
 
 ## Settings UI (Webview)
 
-A panel registered in the existing `null-workspace` view container
-(alongside Scratch Files / Notes / Null Ports), listing configured buttons
+A `WebviewPanel` opened in the main editor area (`vscode.ViewColumn.One`),
+triggered by a `$(gear) Actions` status bar item or the
+`null-actions.openSettings` command — not a sidebar view, which cramped the
+form too narrow to use comfortably. Singleton: reopening reveals the
+existing panel instead of creating a second one. Lists configured buttons
 with add/edit/reorder/delete, and a "Suggested" tab fed by
 `projectDetector.ts`. Form fields match the data model: text inputs for
 label/command/tooltip/cwd, a codicon-name picker for icon, a color swatch

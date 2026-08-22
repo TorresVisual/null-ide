@@ -19,15 +19,35 @@ type InboundMessage =
   | { type: 'save'; buttons: unknown }
   | { type: 'browseFile'; index: number };
 
-export class ActionButtonsViewProvider implements vscode.WebviewViewProvider {
-  private view: vscode.WebviewView | undefined;
+export class ActionButtonsPanel {
+  private static current: ActionButtonsPanel | undefined;
 
-  resolveWebviewView(webviewView: vscode.WebviewView): void {
-    this.view = webviewView;
-    webviewView.webview.options = { enableScripts: true };
-    webviewView.webview.html = this.getHtml();
+  private readonly panel: vscode.WebviewPanel;
 
-    webviewView.webview.onDidReceiveMessage((msg: InboundMessage) => {
+  static createOrShow(): void {
+    if (ActionButtonsPanel.current) {
+      ActionButtonsPanel.current.panel.reveal(vscode.ViewColumn.One);
+      return;
+    }
+    const panel = vscode.window.createWebviewPanel(
+      'null-actions.settings',
+      'Action Buttons',
+      vscode.ViewColumn.One,
+      { enableScripts: true, retainContextWhenHidden: true },
+    );
+    ActionButtonsPanel.current = new ActionButtonsPanel(panel);
+  }
+
+  static refreshIfOpen(): void {
+    ActionButtonsPanel.current?.postState();
+  }
+
+  private constructor(panel: vscode.WebviewPanel) {
+    this.panel = panel;
+    this.panel.webview.options = { enableScripts: true };
+    this.panel.webview.html = this.getHtml();
+
+    this.panel.webview.onDidReceiveMessage((msg: InboundMessage) => {
       if (msg.type === 'ready') {
         this.postState();
       } else if (msg.type === 'save') {
@@ -36,33 +56,30 @@ export class ActionButtonsViewProvider implements vscode.WebviewViewProvider {
         this.handleBrowseFile(msg.index);
       }
     });
-  }
 
-  refresh(): void {
-    this.postState();
+    this.panel.onDidDispose(() => {
+      ActionButtonsPanel.current = undefined;
+    });
   }
 
   private postState(): void {
-    if (!this.view) { return; }
     const { buttons } = readButtonConfigs();
     const folder = vscode.workspace.workspaceFolders?.[0];
     const suggestions: SuggestedButton[] = folder ? detectSuggestedButtons(folder.uri.fsPath) : [];
-    this.view.webview.postMessage({ type: 'init', buttons, suggestions });
+    this.panel.webview.postMessage({ type: 'init', buttons, suggestions });
   }
 
   private async handleSave(raw: unknown): Promise<void> {
-    if (!this.view) { return; }
     const { buttons, errors } = parseButtonConfigs(raw);
     if (errors.length > 0) {
-      this.view.webview.postMessage({ type: 'error', errors });
+      this.panel.webview.postMessage({ type: 'error', errors });
       return;
     }
     await writeButtonConfigs(buttons);
-    this.view.webview.postMessage({ type: 'saved' });
+    this.panel.webview.postMessage({ type: 'saved' });
   }
 
   private async handleBrowseFile(index: number): Promise<void> {
-    if (!this.view) { return; }
     const uris = await vscode.window.showOpenDialog({
       canSelectFiles: true,
       canSelectFolders: false,
@@ -70,7 +87,7 @@ export class ActionButtonsViewProvider implements vscode.WebviewViewProvider {
       openLabel: 'Select',
     });
     if (!uris || uris.length === 0) { return; }
-    this.view.webview.postMessage({ type: 'fileSelected', index, path: uris[0].fsPath });
+    this.panel.webview.postMessage({ type: 'fileSelected', index, path: uris[0].fsPath });
   }
 
   private getHtml(): string {

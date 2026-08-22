@@ -7,7 +7,7 @@ import { TerminalRegistry } from './terminalRegistry';
 import { StatusBarController } from './statusBarController';
 import { evaluateWhenClause, WhenClauseContext } from './whenClause';
 import { runButton } from './runButton';
-import { ActionButtonsViewProvider } from './settingsPanel';
+import { ActionButtonsPanel } from './settingsPanel';
 import { parseNpmScripts, toActionButtonConfig } from './npmScriptsProvider';
 import { ActionButtonConfig } from './buttonConfig';
 import * as fs from 'fs';
@@ -16,11 +16,24 @@ import * as path from 'path';
 export function activate(context: vscode.ExtensionContext): void {
   const terminalRegistry = new TerminalRegistry(new VscodeTerminalHost());
   const statusBar = new StatusBarController();
-  const settingsProvider = new ActionButtonsViewProvider();
 
   context.subscriptions.push(statusBar);
+
+  const openSettingsItem = vscode.window.createStatusBarItem(
+    'null-actions.openSettings',
+    vscode.StatusBarAlignment.Right,
+    -1000,
+  );
+  openSettingsItem.text = '$(gear) Actions';
+  openSettingsItem.tooltip = 'Open Action Buttons Settings';
+  openSettingsItem.command = 'null-actions.openSettings';
+  openSettingsItem.show();
+  context.subscriptions.push(openSettingsItem);
+
   context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider('null-actions.buttonsView', settingsProvider),
+    vscode.commands.registerCommand('null-actions.openSettings', () => {
+      ActionButtonsPanel.createOrShow();
+    }),
   );
 
   function loadNpmButtons(): ActionButtonConfig[] {
@@ -66,7 +79,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.workspace.onDidChangeConfiguration(e => {
       if (e.affectsConfiguration('null-actions')) {
         refresh();
-        settingsProvider.refresh();
+        ActionButtonsPanel.refreshIfOpen();
       }
     }),
     vscode.window.onDidChangeActiveTextEditor(() => refresh()),
