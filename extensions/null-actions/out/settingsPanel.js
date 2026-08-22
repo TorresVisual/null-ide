@@ -49,20 +49,25 @@ function getNonce() {
 class ActionButtonsPanel {
     static current;
     panel;
-    static createOrShow() {
+    extensionUri;
+    static createOrShow(extensionUri) {
         if (ActionButtonsPanel.current) {
             ActionButtonsPanel.current.panel.reveal(vscode.ViewColumn.One);
             return;
         }
-        const panel = vscode.window.createWebviewPanel('null-actions.settings', 'Action Buttons', vscode.ViewColumn.One, { enableScripts: true, retainContextWhenHidden: true });
-        ActionButtonsPanel.current = new ActionButtonsPanel(panel);
+        const panel = vscode.window.createWebviewPanel('null-actions.settings', 'Action Buttons', vscode.ViewColumn.One, {
+            enableScripts: true,
+            retainContextWhenHidden: true,
+            localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'lib')],
+        });
+        ActionButtonsPanel.current = new ActionButtonsPanel(panel, extensionUri);
     }
     static refreshIfOpen() {
         ActionButtonsPanel.current?.postState();
     }
-    constructor(panel) {
+    constructor(panel, extensionUri) {
         this.panel = panel;
-        this.panel.webview.options = { enableScripts: true };
+        this.extensionUri = extensionUri;
         this.panel.webview.html = this.getHtml();
         this.panel.webview.onDidReceiveMessage((msg) => {
             if (msg.type === 'ready') {
@@ -108,11 +113,13 @@ class ActionButtonsPanel {
     }
     getHtml() {
         const nonce = getNonce();
+        const cspSource = this.panel.webview.cspSource;
+        const colorPickerUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'lib', 'colorPicker.js'));
         return '<!DOCTYPE html>' +
             '<html lang="en">' +
             '<head>' +
             '<meta charset="UTF-8">' +
-            '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'nonce-' + nonce + '\'; script-src \'nonce-' + nonce + '\';">' +
+            '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'nonce-' + nonce + '\'; script-src ' + cspSource + ' \'nonce-' + nonce + '\';">' +
             '<meta name="viewport" content="width=device-width,initial-scale=1">' +
             '<title>Action Buttons</title>' +
             '<style nonce="' + nonce + '">' +
@@ -139,6 +146,7 @@ class ActionButtonsPanel {
             '  <div id="suggestions-list"></div>' +
             '</section>' +
             '</div>' +
+            '<script nonce="' + nonce + '" src="' + colorPickerUri.toString() + '"></script>' +
             '<script nonce="' + nonce + '">' +
             this.clientScript() +
             '</script>' +
@@ -191,7 +199,11 @@ class ActionButtonsPanel {
             '.row input[data-field=command]{font-family:var(--mono);}' +
             '.row input:focus,.row select:focus{outline:none;border-color:var(--vscode-focusBorder);}' +
             '.row button{flex:0 0 auto;}' +
-            '.row input[type=color]{width:28px;height:26px;flex:none;padding:0;border:1px solid var(--vscode-input-border,transparent);border-radius:4px;background:none;cursor:pointer;}' +
+            '.color-swatch{width:28px;height:26px;flex:0 0 28px;padding:0;border:1px solid var(--vscode-input-border,rgba(255,255,255,.2));border-radius:4px;cursor:pointer;transition:transform .12s ease,box-shadow .12s ease;}' +
+            '.color-swatch:hover{transform:translateY(0) scale(1.06);box-shadow:0 0 0 2px var(--vscode-focusBorder);}' +
+            '' +
+            '.null-color-popover{position:fixed;z-index:1000;background:#1c1c22;border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:14px;box-shadow:0 8px 28px rgba(0,0,0,.5);}' +
+            '.null-color-canvas{display:block;cursor:crosshair;touch-action:none;}' +
             '' +
             '.card-footer{display:flex;gap:6px;justify-content:flex-end;margin-top:9px;padding-top:9px;border-top:1px solid var(--vscode-widget-border,rgba(255,255,255,.06));}' +
             '.card-footer button[data-action=delete]{color:#f2a3a3;}' +
@@ -239,7 +251,7 @@ class ActionButtonsPanel {
             '    fieldRow("Command", "<input type=text data-field=command data-index=" + index + " value=\\"" + (btn.command || "").replace(/\\"/g, "&quot;") + "\\"><button data-action=browse data-index=" + index + ">Browse a file...</button>") +' +
             '    fieldRow("Type", "<select data-field=type data-index=" + index + "><option value=terminal" + (btn.type === "terminal" ? " selected" : "") + ">terminal</option><option value=vscode-command" + (btn.type === "vscode-command" ? " selected" : "") + ">vscode-command</option></select>") +' +
             '    fieldRow("Icon", "<input type=text data-field=icon data-index=" + index + " value=\\"" + (btn.icon || "") + "\\" placeholder=tools>") +' +
-            '    fieldRow("Color", "<input type=color data-field=color data-index=" + index + " value=\\"" + colorSwatchValue(btn.color) + "\\"> <input type=text data-field=color data-index=" + index + " value=\\"" + (btn.color || "") + "\\" placeholder=#ffcc00>") +' +
+            '    fieldRow("Color", "<button type=button class=color-swatch data-action=swatch data-index=" + index + " style=\\"background:" + colorSwatchValue(btn.color) + "\\" title=\\"Open color picker\\"></button><input type=text data-field=color data-index=" + index + " value=\\"" + (btn.color || "") + "\\" placeholder=#ffcc00>") +' +
             '    fieldRow("Background", "<select data-field=background data-index=" + index + "><option value=none" + (btn.background === "none" ? " selected" : "") + ">none</option><option value=warning" + (btn.background === "warning" ? " selected" : "") + ">warning</option><option value=error" + (btn.background === "error" ? " selected" : "") + ">error</option></select>") +' +
             '    fieldRow("Tooltip", "<input type=text data-field=tooltip data-index=" + index + " value=\\"" + (btn.tooltip || "") + "\\">") +' +
             '    fieldRow("Cwd", "<input type=text data-field=cwd data-index=" + index + " value=\\"" + (btn.cwd || "") + "\\" placeholder=${workspaceFolder}>") +' +
@@ -296,12 +308,9 @@ class ActionButtonsPanel {
             '  let value = t.type === "checkbox" ? t.checked : t.value;' +
             '  if (t.type === "number") { value = parseFloat(t.value) || 0; }' +
             '  fieldToButtons(index, field, value);' +
-            '  if (field === "color") {' +
-            '    document.querySelectorAll(\'[data-field=color][data-index="\' + index + \'"]\').forEach(function(el) {' +
-            '      if (el === t) { return; }' +
-            '      if (el.type === "color") { if (/^#[0-9a-fA-F]{6}$/.test(value)) { el.value = value; } }' +
-            '      else { el.value = value; }' +
-            '    });' +
+            '  if (field === "color" && /^#[0-9a-fA-F]{6}$/.test(value)) {' +
+            '    const swatch = document.querySelector("[data-action=swatch][data-index=" + index + "]");' +
+            '    if (swatch) { swatch.style.background = value; }' +
             '  }' +
             '});' +
             '' +
@@ -316,6 +325,15 @@ class ActionButtonsPanel {
             '    render();' +
             '  }' +
             '  if (action === "browse") { vscode.postMessage({ type: "browseFile", index: index }); }' +
+            '  if (action === "swatch") {' +
+            '    const btn = buttons[index];' +
+            '    NullColorPicker.toggle(t, btn.color || "#3fa9f5", function(hex) {' +
+            '      btn.color = hex;' +
+            '      t.style.background = hex;' +
+            '      const textInput = document.querySelector("input[data-field=color][data-index=" + index + "]");' +
+            '      if (textInput) { textInput.value = hex; }' +
+            '    });' +
+            '  }' +
             '  if (action === "delete") { buttons.splice(index, 1); render(); }' +
             '  if (action === "up" && index > 0) { const tmp = buttons[index - 1]; buttons[index - 1] = buttons[index]; buttons[index] = tmp; render(); }' +
             '  if (action === "down" && index < buttons.length - 1) { const tmp = buttons[index + 1]; buttons[index + 1] = buttons[index]; buttons[index] = tmp; render(); }' +

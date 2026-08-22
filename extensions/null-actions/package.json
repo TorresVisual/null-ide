@@ -9,7 +9,7 @@
   "main": "./out/extension.js",
   "activationEvents": ["onStartupFinished"],
   "scripts": {
-    "compile": "tsc -p tsconfig.json",
+    "compile": "tsc -p tsconfig.json && tsc -p tsconfig.webview.json",
     "test": "tsc -p tsconfig.json && node --test out/buttonConfig.test.js out/variableResolver.test.js out/whenClause.test.js out/terminalRegistry.test.js out/projectDetector.test.js out/npmScriptsProvider.test.js"
   },
   "devDependencies": {

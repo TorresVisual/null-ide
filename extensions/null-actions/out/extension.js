@@ -54,13 +54,13 @@ function activate(context) {
     // ahead of the user's own buttons -- not pushed to the front of the
     // whole status bar, just leftmost among null-actions' own items.
     const openSettingsItem = vscode.window.createStatusBarItem('null-actions.openSettings', vscode.StatusBarAlignment.Left, 1);
-    openSettingsItem.text = '$(gear) Actions';
+    openSettingsItem.text = '$(gear)';
     openSettingsItem.tooltip = 'Open Action Buttons Settings';
     openSettingsItem.command = 'null-actions.openSettings';
     openSettingsItem.show();
     context.subscriptions.push(openSettingsItem);
     context.subscriptions.push(vscode.commands.registerCommand('null-actions.openSettings', () => {
-        settingsPanel_1.ActionButtonsPanel.createOrShow();
+        settingsPanel_1.ActionButtonsPanel.createOrShow(context.extensionUri);
     }));
     function loadNpmButtons() {
         const auto = vscode.workspace.getConfiguration().get('null-actions.npm.autoLoad', false);

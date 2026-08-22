@@ -27,7 +27,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.StatusBarAlignment.Left,
     1,
   );
-  openSettingsItem.text = '$(gear) Actions';
+  openSettingsItem.text = '$(gear)';
   openSettingsItem.tooltip = 'Open Action Buttons Settings';
   openSettingsItem.command = 'null-actions.openSettings';
   openSettingsItem.show();
@@ -35,7 +35,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(
     vscode.commands.registerCommand('null-actions.openSettings', () => {
-      ActionButtonsPanel.createOrShow();
+      ActionButtonsPanel.createOrShow(context.extensionUri);
     }),
   );
 
