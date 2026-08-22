@@ -35,12 +35,6 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.StatusBarController = void 0;
 const vscode = __importStar(require("vscode"));
-// Pushes every null-actions button well above the priority range core VS
-// Code items (branch name, problems count, clock, etc.) and most other
-// extensions use, so the whole null-actions cluster — the $(gear) Actions
-// item plus every configured button — groups together at the front of the
-// status bar instead of interleaving with unrelated items.
-const PRIORITY_OFFSET = 1_000_000;
 class StatusBarController {
     items = new Map();
     update(buttons) {
@@ -71,7 +65,7 @@ class StatusBarController {
         this.items.clear();
     }
     create(button) {
-        const item = vscode.window.createStatusBarItem(`null-actions.${button.id}`, vscode.StatusBarAlignment.Left, PRIORITY_OFFSET + button.priority);
+        const item = vscode.window.createStatusBarItem(`null-actions.${button.id}`, vscode.StatusBarAlignment.Left, button.priority);
         return { item, priority: button.priority };
     }
     applyButton(item, button) {
