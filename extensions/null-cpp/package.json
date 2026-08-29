@@ -11,7 +11,7 @@
   "extensionDependencies": ["llvm-vs-code-extensions.vscode-clangd"],
   "scripts": {
     "compile": "tsc -p tsconfig.json",
-    "test": "tsc -p tsconfig.json && node --test out/symbolTree.test.js out/pairRegistry.test.js out/scaffoldNaming.test.js"
+    "test": "tsc -p tsconfig.json && node --test out/symbolTree.test.js out/pairRegistry.test.js out/scaffoldNaming.test.js out/wslPath.test.js out/toolchainRegistry.test.js out/presetsModel.test.js out/cmakeReply.test.js out/clangdConfigText.test.js"
   },
   "devDependencies": {
     "typescript": "^5.8.0",
@@ -28,6 +28,22 @@
         "command": "null-cpp.newClass",
         "title": "New C++ Class...",
         "icon": "$(new-file)"
+      },
+      {
+        "command": "null-cpp.cmake.refreshToolchains",
+        "title": "Null C++: Refresh Toolchains (MSVC/Clang/WSL)"
+      },
+      {
+        "command": "null-cpp.cmake.selectPreset",
+        "title": "Null C++: Select CMake Preset..."
+      },
+      {
+        "command": "null-cpp.cmake.configure",
+        "title": "Null C++: CMake Configure"
+      },
+      {
+        "command": "null-cpp.cmake.selectTarget",
+        "title": "Null C++: Select CMake Target..."
       }
     ],
     "keybindings": [
@@ -81,7 +97,11 @@
           "command": "null-cpp.switchSourceHeader",
           "when": "(editorLangId == cpp || editorLangId == c) && null-cpp.isCppProject"
         },
-        { "command": "null-cpp.newClass", "when": "null-cpp.isCppProject" }
+        { "command": "null-cpp.newClass", "when": "null-cpp.isCppProject" },
+        { "command": "null-cpp.cmake.refreshToolchains", "when": "null-cpp.isCppProject" },
+        { "command": "null-cpp.cmake.selectPreset", "when": "null-cpp.isCppProject && null-cpp.cmake.hasPresets" },
+        { "command": "null-cpp.cmake.configure", "when": "null-cpp.isCppProject && null-cpp.cmake.presetSelected" },
+        { "command": "null-cpp.cmake.selectTarget", "when": "null-cpp.isCppProject && null-cpp.cmake.configured" }
       ]
     }
   }

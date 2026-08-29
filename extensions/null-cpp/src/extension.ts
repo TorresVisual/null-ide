@@ -3,6 +3,7 @@ import { registerSwitchSourceHeader } from './symbolSwitch';
 import { registerPairedSplit } from './pairedSplit';
 import { registerNewClass } from './scaffold';
 import { initializeProjectDetection } from './projectDetection';
+import { registerCmakeToolbar } from './cmakeToolbar';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const enabled = await initializeProjectDetection();
@@ -11,6 +12,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   registerSwitchSourceHeader(context);
   registerPairedSplit(context);
   registerNewClass(context);
+  registerCmakeToolbar(context);
 }
 
 export function deactivate(): void {}

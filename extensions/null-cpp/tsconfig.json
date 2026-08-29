@@ -25,6 +25,20 @@
     "src/pairedSplit.ts",
     "src/scaffold.ts",
     "src/projectDetection.ts",
-    "src/editorLookup.ts"
+    "src/editorLookup.ts",
+    "src/wslPath.ts",
+    "src/wslPath.test.ts",
+    "src/toolchainRegistry.ts",
+    "src/toolchainRegistry.test.ts",
+    "src/presetsModel.ts",
+    "src/presetsModel.test.ts",
+    "src/cmakeReply.ts",
+    "src/cmakeReply.test.ts",
+    "src/cmakeModel.ts",
+    "src/cppConfigState.ts",
+    "src/clangdConfigText.ts",
+    "src/clangdConfigText.test.ts",
+    "src/clangdCompileDb.ts",
+    "src/cmakeToolbar.ts"
   ]
 }

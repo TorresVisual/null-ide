@@ -40,12 +40,14 @@ const symbolSwitch_1 = require("./symbolSwitch");
 const pairedSplit_1 = require("./pairedSplit");
 const scaffold_1 = require("./scaffold");
 const projectDetection_1 = require("./projectDetection");
+const cmakeToolbar_1 = require("./cmakeToolbar");
 async function activate(context) {
     const enabled = await (0, projectDetection_1.initializeProjectDetection)();
     await vscode.commands.executeCommand('setContext', 'null-cpp.isCppProject', enabled);
     (0, symbolSwitch_1.registerSwitchSourceHeader)(context);
     (0, pairedSplit_1.registerPairedSplit)(context);
     (0, scaffold_1.registerNewClass)(context);
+    (0, cmakeToolbar_1.registerCmakeToolbar)(context);
 }
 function deactivate() { }
 //# sourceMappingURL=extension.js.map

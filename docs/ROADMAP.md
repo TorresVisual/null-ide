@@ -183,29 +183,37 @@ State model growth by phase:
 ### Task Checklist
 
 #### Detection
-- [ ] `toolchainRegistry.ts`: MSVC detection via `vswhere`
-- [ ] `toolchainRegistry.ts`: Clang/clang-cl detection via PATH
-- [ ] `toolchainRegistry.ts`: WSL distro + toolchain detection
-- [ ] `wslPath.ts`: path translation helpers, unit-testable (pure string logic once the `wslpath` output is captured)
-- [ ] `null-cpp.cmake.refreshToolchains` command
+- [x] `toolchainRegistry.ts`: MSVC detection via `vswhere`
+- [x] `toolchainRegistry.ts`: Clang/clang-cl detection via PATH
+- [x] `toolchainRegistry.ts`: WSL distro + toolchain detection
+- [x] `wslPath.ts`: path translation helpers, unit-testable (pure string logic once the `wslpath` output is captured)
+- [x] `null-cpp.cmake.refreshToolchains` command
 
 #### Presets & Configure
-- [ ] `presetsModel.ts`: parse `CMakePresets.json`/`CMakeUserPresets.json`
-- [ ] `presetsModel.ts`: resolve each preset's toolchain, infer `isWsl`
-- [ ] `cmakeModel.ts`: write CMake File API query stub, run configure (native and WSL-wrapped), parse `codemodel-v2` reply into `CMakeTarget[]`
-- [ ] `null-cpp.cmake.selectPreset` command (QuickPick)
-- [ ] `null-cpp.cmake.configure` command
-- [ ] `null-cpp.cmake.selectTarget` command (QuickPick, populated post-configure)
-- [ ] `clangdCompileDb.ts`: write/update `.clangd` on configure and on preset switch
+- [x] `presetsModel.ts`: parse `CMakePresets.json`/`CMakeUserPresets.json`
+- [x] `presetsModel.ts`: resolve each preset's toolchain, infer `isWsl`
+- [x] `cmakeModel.ts`: write CMake File API query stub, run configure (native and WSL-wrapped), parse `codemodel-v2` reply into `CMakeTarget[]` (pure JSON parsing lives in the new `cmakeReply.ts` companion so it's unit-testable without the `vscode` module)
+- [x] `null-cpp.cmake.selectPreset` command (QuickPick)
+- [x] `null-cpp.cmake.configure` command
+- [x] `null-cpp.cmake.selectTarget` command (QuickPick, populated post-configure)
+- [x] `clangdCompileDb.ts`: write/update `.clangd` on configure and on preset switch (pure text-patching logic lives in the new `clangdConfigText.ts` companion)
 
 #### State & UI
-- [ ] `cppConfigState.ts`: persist/restore active preset + target across reloads
-- [ ] `cmakeToolbar.ts`: status bar items, gated on `null-cpp.isCppProject`
-- [ ] `null-cpp.cmake.hasPresets` / `null-cpp.cmake.configured` context keys for command/menu gating
+- [x] `cppConfigState.ts`: persist/restore active preset + target across reloads
+- [x] `cmakeToolbar.ts`: status bar items, gated on `null-cpp.isCppProject`
+- [x] `null-cpp.cmake.hasPresets` / `null-cpp.cmake.configured` context keys for command/menu gating (plus `null-cpp.cmake.presetSelected`, needed by the Configure command's own gate per §3's command table)
 
 #### Packaging
-- [ ] `package.json`: register the four new commands + `configuration` entries if any new settings are needed (none anticipated — presets are the config surface)
-- [ ] No `build.yml` changes expected (no new native binary to vendor — `vswhere.exe` and `wsl.exe` are assumed present on the host, same assumption clangd already makes about its own toolchain)
+- [x] `package.json`: register the four new commands + `configuration` entries if any new settings are needed (none needed — presets are the config surface, as anticipated)
+- [x] No `build.yml` changes needed (no new native binary to vendor — `vswhere.exe` and `wsl.exe` are assumed present on the host, same assumption clangd already makes about its own toolchain)
+
+**Status**: Task checklist complete and unit-tested (64 passing tests across the new pure-logic
+modules: `wslPath`, `toolchainRegistry`, `presetsModel`, `cmakeReply`, `clangdConfigText`).
+**Definition of Done is not yet verified** — that requires a CI build (`workflow_dispatch`) and
+manual testing against a real CMake project with MSVC, Clang, and WSL presets, which needs
+explicit confirmation before triggering (shared CI state) and hardware this agent doesn't have
+(a WSL distro, installed MSVC/Clang). Next step before calling Phase 1 done: get that CI build +
+manual verification from the maintainer.
 
 ### Definition of Done
 1. Trigger a `workflow_dispatch` CI build; install the resulting package (per existing `null-cpp-extension-design.md` convention).
