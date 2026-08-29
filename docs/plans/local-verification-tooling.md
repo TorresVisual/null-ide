@@ -41,7 +41,7 @@
 **Interfaces:**
 - Produces: a script invocable as `scripts/sync-local.ps1 [-InstallDir <path>]` (default `"$env:LOCALAPPDATA\Programs\Null IDE"`). Task 2's `runTest.ts` depends on this script having been run at least once so `resources\app\extensions\null-actions\out\extension.js` reflects current source.
 
-- [ ] **Step 1: Write the script**
+- [x] **Step 1: Write the script**
 
 Create `scripts/sync-local.ps1`:
 
@@ -267,7 +267,7 @@ Committed as `eb45e36`.
 - Consumes: Task 1's `scripts/sync-local.ps1` must have been run at least once, so `%LOCALAPPDATA%\Programs\Null IDE\resources\app\extensions\null-actions\out\extension.js` reflects current source.
 - Produces: `npm run test:integration` (run from `extensions/null-actions/`), which later feeds Task 3's skill.
 
-- [ ] **Step 1: Add devDependencies and scripts to `package.json`**
+- [x] **Step 1: Add devDependencies and scripts to `package.json`**
 
 In `extensions/null-actions/package.json`, change:
 
@@ -303,7 +303,7 @@ to:
   },
 ```
 
-- [ ] **Step 2: Install the new dependencies**
+- [x] **Step 2: Install the new dependencies**
 
 Run:
 ```powershell
@@ -312,7 +312,7 @@ npm install
 ```
 Expected: exits 0, `node_modules/@vscode/test-electron`, `node_modules/mocha`, and `node_modules/glob` now exist.
 
-- [ ] **Step 3: Add the three new files to `tsconfig.json`'s `include`**
+- [x] **Step 3: Add the three new files to `tsconfig.json`'s `include`**
 
 In `extensions/null-actions/tsconfig.json`, change:
 
@@ -339,7 +339,9 @@ to:
   ]
 ```
 
-- [ ] **Step 4: Write `src/test/runTest.ts`**
+- [x] **Step 4: Write `src/test/runTest.ts`**
+
+**Deviated significantly from the version below — see "What actually shipped" after the code block.**
 
 Create `extensions/null-actions/src/test/runTest.ts`:
 
@@ -396,7 +398,16 @@ main().catch(err => {
 });
 ```
 
-- [ ] **Step 5: Write `src/test/suite/index.ts`**
+**What actually shipped, and why:** launching the real `Null.exe` never worked. Two problems, found by actually running it:
+
+1. `ELECTRON_RUN_AS_NODE=1` was set in the invoking shell's environment (inherited from an Electron-based parent process). Any Electron binary launched with that set runs as plain Node instead of the GUI app, so `vscodeExecutablePath` immediately crashed trying to `require()` the workspace directory as a module. Fixed with `delete process.env.ELECTRON_RUN_AS_NODE;` before calling `runTests()`.
+2. Even after that fix, every run showed `Error: Error mutex already exists` in `main.log` and the spawned instance's extension host was killed almost exactly 50ms after the test suite started, every time — regardless of `--user-data-dir`, `--extensions-dir`, or `--new-window`. Root cause: `product.json`'s `win32MutexName` is the fixed string `"nullide"`, baked into every Null IDE build regardless of install path. This harness is normally invoked from *inside* a running Null IDE window (its own integrated agent terminal), so the OS-level single-instance mutex always collides with that host window — a cloned copy of the install would embed the identical `product.json` and hit the same collision, so that doesn't route around it either.
+
+   Fix: `vscodeExecutablePath` now comes from `downloadAndUnzipVSCode('stable')` (a separately cached, vanilla VS Code build with a different product identity, so no mutex collision) instead of `findExecutable(installDir)`. `extensionDevelopmentPath` still points at the real synced `null-actions` under `resources/app/extensions/null-actions` — the extension code under test is unaffected; only the *host shell* differs. `launchArgs` also gained `--user-data-dir`/`--extensions-dir` pointed at two more `fs.mkdtempSync()` disposable dirs (in addition to the workspace dir), for a clean, isolated run.
+
+The actual shipped file is `extensions/null-actions/src/test/runTest.ts` (committed in `c1759fe`) — read it directly rather than reconstructing it from this history.
+
+- [x] **Step 5: Write `src/test/suite/index.ts`**
 
 Create `extensions/null-actions/src/test/suite/index.ts`:
 
@@ -435,7 +446,9 @@ export function run(): Promise<void> {
 }
 ```
 
-- [ ] **Step 6: Write the first spec, `src/test/suite/activation.spec.ts`**
+**What actually shipped:** `@types/mocha` exports Mocha via `export =`, which needs a default import (`import Mocha from 'mocha';`) to be constructable under `esModuleInterop` — the namespace import (`import * as Mocha from 'mocha';`) above compiles but fails at `new Mocha(...)` with "This expression is not constructable." Also needed an explicit `(failures: number) =>` type annotation in the `mocha.run()` callback (`noImplicitAny` via `strict: true`). Both fixed in the committed file.
+
+- [x] **Step 6: Write the first spec, `src/test/suite/activation.spec.ts`**
 
 Create `extensions/null-actions/src/test/suite/activation.spec.ts`:
 
@@ -462,7 +475,7 @@ suite('null-actions activation', () => {
 
 This asserts against the two commands actually registered in `extensions/null-actions/src/extension.ts:32` and `extensions/null-actions/src/extension.ts:43`.
 
-- [ ] **Step 7: Sync, then run the integration spec and confirm it passes**
+- [x] **Step 7: Sync, then run the integration spec and confirm it passes**
 
 Run:
 ```powershell
@@ -472,7 +485,9 @@ npm run test:integration
 ```
 Expected: a real Null IDE window briefly opens and closes, and the command exits 0 with Mocha output showing `null-actions activation` → `activates and registers its commands` passing (1 passing).
 
-- [ ] **Step 8: Confirm the spec actually catches a real regression**
+**Actual result:** as documented under Step 4 above, this didn't work as originally written — `vscodeExecutablePath` pointing at the real `Null.exe` hit an `ELECTRON_RUN_AS_NODE` crash, then (after fixing that) a `win32MutexName` single-instance collision every time, since this harness runs from inside a live Null IDE window. After switching to `downloadAndUnzipVSCode('stable')`: **confirmed** — `1 passing (12-20ms)`, exit code 0, run repeated successfully multiple times.
+
+- [x] **Step 8: Confirm the spec actually catches a real regression**
 
 Temporarily comment out the `openSettings` command registration to prove the spec isn't a stub:
 
@@ -491,12 +506,15 @@ Expected: FAILS with `1 failing` and the assertion message `null-actions.openSet
 
 Revert the comment-out (restore `src/extension.ts` to its original content), then re-run both commands again and confirm it's back to `1 passing`.
 
-- [ ] **Step 9: Commit**
+**Confirmed** — commented-out version failed with `Error: 1 spec(s) failed.` and an assertion diff (`-false`/`+true`) on the `openSettings not registered` check; reverted and re-ran, back to `1 passing`.
+
+- [x] **Step 9: Commit**
 
 ```bash
 git add extensions/null-actions/package.json extensions/null-actions/package-lock.json extensions/null-actions/tsconfig.json extensions/null-actions/src/test/
 git commit -m "feat(null-actions): add @vscode/test-electron integration spec harness"
 ```
+Committed as `c1759fe` (also included `out/test/*.js` compiled output, `.gitignore` entry for the downloaded `.vscode-test/` cache dir, and `package-lock.json`).
 
 ---
 

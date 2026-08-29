@@ -12,7 +12,7 @@ CLAUDE.md forbids running the full VSCodium build locally (it's CI-only), which 
 
 - Not a replacement for the CI build — `shell-ext/` (native C++ DLL), `product.json`/icon stamping, and the installer itself are untouched by this tooling and still require a real release build.
 - Not a watch-mode / hot-reload system. Sync is a manual, one-shot command; the developer reloads the window themselves.
-- Not sandboxed. Specs run against the developer's real `%APPDATA%\Null` profile and real installed extensions, not a disposable user-data-dir. A spec that corrupts settings or crashes hard can affect the daily-driver install — an accepted tradeoff for now.
+- ~~Not sandboxed. Specs run against the developer's real `%APPDATA%\Null` profile...~~ **Superseded during implementation** — see Component 2. The real `Null.exe` turned out to be impossible to launch a second time while this harness is invoked from inside a running Null IDE window (see below), so specs run against a separately downloaded vanilla VS Code build with disposable `--user-data-dir`/`--extensions-dir` instead. The extension code under test is still the real synced build.
 - Only `null-actions` gets integration specs in this pass. The other six built-in extensions keep only their existing `node --test` unit tests (or none) until the pattern is proven and rolled out separately.
 - No CI wiring. This is local-only tooling; whether `npm test` / `npm run test:integration` ever gate the GitHub Actions build is a separate decision.
 
@@ -49,17 +49,19 @@ Rules:
 
 ## Component 2: Integration-spec harness (`extensions/null-actions/`)
 
-New devDependencies: `@vscode/test-electron`, `mocha`, `@types/mocha`.
+New devDependencies: `@vscode/test-electron`, `mocha`, `@types/mocha`, `glob`.
 
 Confirmed against current `@vscode/test-electron` docs: `runTests({ vscodeExecutablePath, extensionDevelopmentPath, extensionTestsPath, launchArgs })` accepts an existing executable path instead of downloading one, and the Mocha loader pattern uses `ui: 'tdd'` with glob-based test discovery.
 
+**Host process, as actually implemented (revised from the original plan below the code):** `vscodeExecutablePath` comes from `downloadAndUnzipVSCode('stable')` — a separately cached, vanilla VS Code build — not the real `Null.exe`. Found by actually running this: launching the real install always collided with `product.json`'s fixed `win32MutexName` ("nullide", identical for every build regardless of install path) once it was clear this harness is normally invoked from *inside* a running Null IDE window (its own integrated agent terminal). A cloned copy of the install would embed the same `product.json` and hit the same collision, so that isn't a workaround. `extensionDevelopmentPath` still points at the real synced `null-actions` under `resources/app/extensions/`, so the extension code under test is unaffected — only the host shell differs.
+
 **New files:**
-- `src/test/runTest.ts` — plain Node entry point (never bundled as part of the extension; nothing references it as `main`). Resolves the install dir from `NULL_IDE_INSTALL_DIR` env var, defaulting to `%LOCALAPPDATA%\Programs\Null IDE`. Calls `runTests()` with:
-  - `vscodeExecutablePath` = the install's `*.exe` (found by globbing for an `.exe` that isn't `unins*`, same approach as `Get-NullIdeExecutable` in `install-null-ide.ps1` — avoids hardcoding `Null.exe`'s exact case).
+- `src/test/runTest.ts` — plain Node entry point (never bundled as part of the extension; nothing references it as `main`). Resolves the install dir from `NULL_IDE_INSTALL_DIR` env var, defaulting to `%LOCALAPPDATA%\Programs\Null IDE`, to compute `extensionDevelopmentPath`. Also clears `process.env.ELECTRON_RUN_AS_NODE` before spawning — if inherited from an Electron-based parent process, it forces any Electron binary (including the downloaded VS Code) to run as plain Node instead of launching the GUI app, which was the first failure found while getting this working. Calls `runTests()` with:
+  - `vscodeExecutablePath` = `await downloadAndUnzipVSCode('stable')`.
   - `extensionDevelopmentPath` = `<installDir>\resources\app\extensions\null-actions` — the **synced copy**, so specs verify exactly what `sync-local.ps1` just wrote, not the repo source.
   - `extensionTestsPath` = the repo's own compiled `out/test/suite/index.js`. Test code stays in the repo and is never synced into the real install.
-  - `launchArgs` = `[tempWorkspaceDir]`, a disposable folder created under `%TEMP%` per run and removed in a `finally` block after `runTests()` settles, so specs have a workspace to operate in without touching a real project or leaking temp dirs. (User-data-dir and installed-extensions are intentionally left as the real profile, per the non-goals above.)
-- `src/test/suite/index.ts` — Mocha `tdd`-UI loader; globs `**/*.spec.js` under the compiled `out/test/suite/` directory and runs them.
+  - `launchArgs` = `[tempWorkspaceDir, '--user-data-dir', tempUserDataDir, '--extensions-dir', tempExtensionsDir]` — three disposable folders created under `%TEMP%` per run and removed in a `finally` block after `runTests()` settles, so each run is clean and isolated regardless of what's cached in the downloaded VS Code build's default profile.
+- `src/test/suite/index.ts` — Mocha `tdd`-UI loader; globs `**/*.spec.js` under the compiled `out/test/suite/` directory and runs them. Imports Mocha as `import Mocha from 'mocha';` (default import, not `import * as Mocha`) — `@types/mocha` exports via `export =`, which needs the default-import form to be constructable under `esModuleInterop`.
 - `src/test/suite/activation.spec.ts` — first spec: asserts the extension activates and that `null-actions.runButton` and `null-actions.openSettings` are present in `vscode.commands.getCommands(true)`.
 
 **Naming convention:** `.spec.ts` = integration spec, running inside the real Extension Development Host via the harness above. `.test.ts` = the existing pure-logic unit tests, running via plain `node --test`. The two never collide — `package.json`'s `"test"` script explicitly lists `.test.js` files by name, so it's unaffected by new `.spec.ts` files.
@@ -84,7 +86,7 @@ Body instructs Claude to:
 3. Check `extensions/<name>/package.json` for a `test:integration` script. If absent, tell the user this extension has no integration specs yet (only `null-actions` does today) and offer to run its `npm test` unit tests instead, or stop.
 4. Run `npm --prefix extensions/<name> run test:integration`.
 5. Report results: on success, name what was verified (which specs, which assertions); on failure, surface the Mocha failure output directly rather than summarizing it away.
-6. Remind the user that `Developer: Reload Window` is still the way to eyeball the change manually, and that this tooling runs against their real profile (per the non-goals above).
+6. Remind the user that `Developer: Reload Window` is still the way to eyeball the change manually. Integration specs run against a downloaded vanilla VS Code build hosting the real synced extension code (see Component 2) — not the real profile.
 
 ## Testing
 
