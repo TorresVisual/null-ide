@@ -26,6 +26,9 @@
     "src/terminalHostIntegration.ts",
     "src/statusBarController.ts",
     "src/runButton.ts",
-    "src/settingsPanel.ts"
+    "src/settingsPanel.ts",
+    "src/test/runTest.ts",
+    "src/test/suite/index.ts",
+    "src/test/suite/activation.spec.ts"
   ]
 }

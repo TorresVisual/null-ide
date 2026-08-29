@@ -24,6 +24,9 @@ tmp/
 # Node
 node_modules/
 
+# null-actions: downloaded VS Code build used to host integration specs
+extensions/null-actions/.vscode-test/
+
 # Claude Code internals
 .claude/
 .antigravitycli/
