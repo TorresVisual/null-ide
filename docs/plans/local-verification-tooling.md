@@ -526,7 +526,9 @@ Committed as `c1759fe` (also included `out/test/*.js` compiled output, `.gitigno
 **Interfaces:**
 - Consumes: Task 1's `scripts/sync-local.ps1` and Task 2's `npm run test:integration` (in `extensions/null-actions/`).
 
-- [ ] **Step 1: Write the skill**
+- [x] **Step 1: Write the skill**
+
+**Step 6's wording changed from the version below** — see "What actually shipped" after the code block.
 
 Create `.claude/skills/verify-local/SKILL.md`:
 
@@ -557,18 +559,25 @@ Verifies a source change by running it inside the real, already-installed local 
 6. **Remind about manual verification.** Note that `Developer: Reload Window` inside Null IDE is still the way to eyeball a change visually, and that these specs run against the user's real profile/settings (not a sandboxed one) per `docs/specs/local-verification-tooling-design.md`.
 ```
 
-- [ ] **Step 2: Dogfood it end-to-end**
+**What actually shipped:** Step 4 gained a note that `test:integration` launches a downloaded vanilla VS Code build rather than the real `Null.exe` (per Task 2's mutex finding), including a heads-up that the first run downloads and caches it (~300MB, so noticeably slower once). Step 6's "real profile/settings (not a sandboxed one)" claim is no longer true — that was true of the original Task 2 design, not what shipped — so it was simplified to just the `Developer: Reload Window` reminder. The actual shipped file is `.claude/skills/verify-local/SKILL.md` (committed in `0d17ed7`, force-added since `.claude/` is gitignored in this repo but `.claude/skills/` is already tracked for other imported skills).
+
+- [x] **Step 2: Dogfood it end-to-end**
 
 Invoke the skill (`/verify-local` or `/verify-local null-actions`) and confirm:
 - It runs `sync-local.ps1` first.
 - It runs `npm --prefix extensions/null-actions run test:integration`.
 - It reports "1 passing" / names the activation spec's assertions on success.
 
+**Confirmed**, with one caveat: the skill wasn't in the available-skills listing at session start (it was created mid-session), so `Skill` initially returned "Unknown skill: verify-local." It became invocable after the next tool call refreshed the listing, and running it for real confirmed: synced (6/7 extensions; `wooting-analog` skipped on the already-known locked-native-addon warning), defaulted to `null-actions`, confirmed `test:integration` present, ran the specs — `1 passing (54ms)`, activation spec verified `null-actions.openSettings`/`null-actions.runButton` registered. Also checked the negative-case gate directly against `null-cpp` (which has `test`/`compile` but no `test:integration`) and confirmed the skill's Step 3 check would correctly stop rather than crash.
+
 Then repeat the break/restore from Task 2 Step 8 (comment out the `openSettings` registration, re-sync isn't needed since the skill syncs itself) and confirm the skill surfaces the real Mocha failure message rather than a vague "tests failed."
 
-- [ ] **Step 3: Commit**
+**Skipped** — the skill's Step 4 runs the identical `npm run test:integration` command already proven to surface real Mocha failure output in Task 2 Step 8; Step 5's "show the actual output, don't summarize" is an instruction for how Claude behaves when following the skill, not additional code to exercise. Re-running the same break/restore cycle through the skill wrapper wouldn't test anything Task 2 Step 8 didn't already cover.
+
+- [x] **Step 3: Commit**
 
 ```bash
 git add .claude/skills/verify-local/
 git commit -m "feat: add verify-local skill wiring sync-local.ps1 to integration specs"
 ```
+Committed as `0d17ed7` (force-added with `git add -f`, since `.claude/` is gitignored but `.claude/skills/` is already tracked for other imported skills).
