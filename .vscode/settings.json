@@ -5,7 +5,7 @@
             "id": "button-1787264500854",
             "label": "Sync Local",
             "type": "terminal",
-            "command": "powershell -ExecutionPolicy Bypass ${workspaceFolder}\\\\copy.ps1",
+            "command": "powershell -ExecutionPolicy Bypass ${workspaceFolder}\\scripts\\sync-local.ps1",
             "color": "#12c448",
             "background": "none",
             "saveAll": false,
