@@ -352,26 +352,18 @@ An ASan preset appears in the picker and Configure/Build/Run all work against it
 
 ## Execution Notes (how this roadmap gets built)
 
-This project has no deploy target and CI cannot run locally, so the
-standard roadmap-skill execution loop is adapted:
+This project has no deploy target and CI cannot run locally (a full CI build takes roughly 30 minutes), so the
+standard roadmap-skill execution loop is adapted to use the existing local synchronization workflow:
 
-- **Verify, don't deploy.** After each phase's task checklist is complete,
-  run the phase's Definition of Done via a CI build
-  (`workflow_dispatch`) + manual install, per existing repo convention.
-  **Triggering a CI build/dispatch is a shared-state action — confirm with
-  the user before doing it**, same as any other CI/CD-affecting action.
-- **Commit at phase boundaries** — `git commit -m "Phase N complete: <goal>"`
-  once the Definition of Done passes, same as any other roadmap.
-- **No ux-audit/onboarding-ux passes** — those target web apps. The
-  equivalent here is the manual verification checklist already established
-  in `null-cpp-extension-design.md`'s "Testing / Verification" section;
-  each phase's Definition of Done follows that same shape.
-- **Progress tracking lives in this file** — check off tasks as they land;
-  the first unchecked task in the first incomplete phase is always the next
-  thing to work on. No separate `SESSION.md`.
-- **Stop only when**: a task fails for an unfamiliar reason, a design
-  decision needs human input (e.g. "is the CMake sidebar TreeView actually
-  worth building"), or a credential/tool isn't available (e.g. no WSL
-  distro installed to test against). Otherwise, keep going through the
-  checklist without pausing to ask permission — the checked/unchecked state
-  in this file is the permission.
+* **Verify locally first.** After each phase's task checklist is complete, use `scripts/sync-local.ps1` to synchronize the local files. Most changes do not require a full CI build, so a local sync is the default verification method.
+
+* **Use CI only when necessary.** Trigger a CI build (`workflow_dispatch`) only when the Definition of Done requires validation that cannot reasonably be performed through the local sync workflow, such as CI-specific build behavior, packaging, platform-specific behavior, or other changes where local verification is insufficient. Triggering a CI build/dispatch is a shared-state action — confirm with the user before doing it, same as any other CI/CD-affecting action.
+
+* **Commit at phase boundaries** — `git commit -m "Phase N complete: <goal>"` once the phase's Definition of Done passes. A phase does not require a CI build to be considered complete when local synchronization and verification are sufficient.
+
+* **Progress tracking lives in this file** — check off tasks as they land; the first unchecked task in the first incomplete phase is always the next thing to work on. No separate `SESSION.md`.
+
+* **Stop only when**: a task fails for an unfamiliar reason, a design decision needs human input (e.g. "is the CMake sidebar TreeView actually worth building"), or a credential/tool isn't available (e.g. no WSL distro installed to test against). Otherwise, keep going through the checklist without pausing to ask permission — the checked/unchecked state in this file is the permission.
+
+* **Prefer the cheapest sufficient verification.** Do not run a 30-minute CI build when `scripts/sync-local.ps1` and the established local verification checklist are sufficient to prove the change works. Escalate to CI only when local verification cannot adequately validate the change.
+
