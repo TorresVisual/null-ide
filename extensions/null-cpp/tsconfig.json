@@ -43,6 +43,8 @@
     "src/clangdCompileDb.ts",
     "src/cmakeToolbar.ts",
     "src/buildDiagnostics.ts",
-    "src/buildDiagnostics.test.ts"
+    "src/buildDiagnostics.test.ts",
+    "src/debugConfigSynth.ts",
+    "src/debugConfigSynth.test.ts"
   ]
 }

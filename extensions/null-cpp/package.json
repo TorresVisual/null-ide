@@ -8,10 +8,10 @@
   "engines": { "vscode": "^1.85.0" },
   "main": "./out/extension.js",
   "activationEvents": ["onStartupFinished"],
-  "extensionDependencies": ["llvm-vs-code-extensions.vscode-clangd"],
+  "extensionDependencies": ["llvm-vs-code-extensions.vscode-clangd", "ms-vscode.cpptools"],
   "scripts": {
     "compile": "tsc -p tsconfig.json",
-    "test": "tsc -p tsconfig.json && node --test out/symbolTree.test.js out/pairRegistry.test.js out/scaffoldNaming.test.js out/wslPath.test.js out/toolchainRegistry.test.js out/presetsModel.test.js out/cmakeReply.test.js out/clangdConfigText.test.js out/buildDiagnostics.test.js out/projectDetection.test.js"
+    "test": "tsc -p tsconfig.json && node --test out/symbolTree.test.js out/pairRegistry.test.js out/scaffoldNaming.test.js out/wslPath.test.js out/toolchainRegistry.test.js out/presetsModel.test.js out/cmakeReply.test.js out/clangdConfigText.test.js out/buildDiagnostics.test.js out/projectDetection.test.js out/debugConfigSynth.test.js"
   },
   "devDependencies": {
     "typescript": "^5.8.0",
@@ -64,6 +64,14 @@
       {
         "command": "null-cpp.cmake.buildAndRun",
         "title": "Null C++: Build and Run Target"
+      },
+      {
+        "command": "null-cpp.debug.start",
+        "title": "Null C++: Debug Target"
+      },
+      {
+        "command": "null-cpp.debug.buildAndDebug",
+        "title": "Null C++: Build and Debug Target"
       }
     ],
     "keybindings": [
@@ -126,7 +134,9 @@
         { "command": "null-cpp.cmake.rebuild", "when": "null-cpp.isCppProject && null-cpp.cmake.configured" },
         { "command": "null-cpp.cmake.clean", "when": "null-cpp.isCppProject && null-cpp.cmake.configured" },
         { "command": "null-cpp.cmake.run", "when": "null-cpp.isCppProject && null-cpp.cmake.configured" },
-        { "command": "null-cpp.cmake.buildAndRun", "when": "null-cpp.isCppProject && null-cpp.cmake.configured" }
+        { "command": "null-cpp.cmake.buildAndRun", "when": "null-cpp.isCppProject && null-cpp.cmake.configured" },
+        { "command": "null-cpp.debug.start", "when": "null-cpp.isCppProject && null-cpp.cmake.configured" },
+        { "command": "null-cpp.debug.buildAndDebug", "when": "null-cpp.isCppProject && null-cpp.cmake.configured" }
       ]
     }
   }

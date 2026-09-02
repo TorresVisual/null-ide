@@ -3,6 +3,7 @@ import * as toolchainRegistry from './toolchainRegistry';
 import { loadPresets, type CMakePreset } from './presetsModel';
 import { configure, readCodemodelTargets, build, cleanTarget, run as runTarget, cancelActive, type CMakeTarget } from './cmakeModel';
 import { resolveBuildDiagnostics, type ResolvedBuildDiagnostic } from './buildDiagnostics';
+import { synthDebugConfig, resolveNativeMIMode } from './debugConfigSynth';
 import { writeClangdConfig } from './clangdCompileDb';
 import * as cppConfigState from './cppConfigState';
 import { isEnabled } from './projectDetection';
@@ -64,6 +65,7 @@ let configureItem: vscode.StatusBarItem;
 let refreshItem: vscode.StatusBarItem;
 let buildItem: vscode.StatusBarItem;
 let runItem: vscode.StatusBarItem;
+let debugItem: vscode.StatusBarItem;
 let buildDiagnostics: vscode.DiagnosticCollection;
 let building = false;
 
@@ -80,8 +82,10 @@ function updateStatusBar(context: vscode.ExtensionContext): void {
     buildItem.text = '$(play) Build';
   }
   runItem.text = target?.type === 'EXECUTABLE' ? '$(run) Run' : '$(run) Run (no executable target selected)';
+  debugItem.text =
+    target?.type === 'EXECUTABLE' ? '$(debug-alt) Debug' : '$(debug-alt) Debug (no executable target selected)';
 
-  for (const item of [presetItem, targetItem, configureItem, refreshItem, buildItem, runItem]) {
+  for (const item of [presetItem, targetItem, configureItem, refreshItem, buildItem, runItem, debugItem]) {
     if (enabled) {
       item.show();
     } else {
@@ -257,6 +261,42 @@ async function cmdBuildAndRun(context: vscode.ExtensionContext): Promise<void> {
   }
 }
 
+async function cmdDebug(context: vscode.ExtensionContext): Promise<void> {
+  const root = workspaceRoot();
+  const preset = activePreset(context);
+  const target = activeTarget(context);
+  if (!root || !preset || !target) {
+    void vscode.window.showErrorMessage('Select a CMake target before debugging.');
+    return;
+  }
+  if (target.type !== 'EXECUTABLE') {
+    void vscode.window.showInformationMessage(`"${target.name}" is not an executable target.`);
+    return;
+  }
+  const toolchain = toolchainRegistry.list().find((t) => t.id === preset.toolchainId);
+  if (!toolchain) {
+    void vscode.window.showErrorMessage(`No detected toolchain for preset "${preset.displayName}".`);
+    return;
+  }
+  const nativeMIMode =
+    !preset.isWsl && toolchain.kind !== 'msvc' ? await resolveNativeMIMode() : undefined;
+  const config = synthDebugConfig({
+    targetName: target.name,
+    artifactPath: target.artifactPath,
+    sourceDir: root.fsPath,
+    toolchainKind: toolchain.kind,
+    wslDistro: toolchain.wslDistro,
+    nativeMIMode,
+  });
+  await vscode.debug.startDebugging(vscode.workspace.workspaceFolders?.[0], config);
+}
+
+async function cmdBuildAndDebug(context: vscode.ExtensionContext): Promise<void> {
+  if (await cmdBuild(context)) {
+    await cmdDebug(context);
+  }
+}
+
 export function registerCmakeToolbar(context: vscode.ExtensionContext): void {
   presetItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
   targetItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 99);
@@ -264,13 +304,15 @@ export function registerCmakeToolbar(context: vscode.ExtensionContext): void {
   refreshItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 97);
   buildItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 96);
   runItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 95);
+  debugItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 94);
   presetItem.command = 'null-cpp.cmake.selectPreset';
   targetItem.command = 'null-cpp.cmake.selectTarget';
   configureItem.command = 'null-cpp.cmake.configure';
   refreshItem.command = 'null-cpp.cmake.refreshToolchains';
   buildItem.command = 'null-cpp.cmake.build';
   runItem.command = 'null-cpp.cmake.run';
-  context.subscriptions.push(presetItem, targetItem, configureItem, refreshItem, buildItem, runItem);
+  debugItem.command = 'null-cpp.debug.start';
+  context.subscriptions.push(presetItem, targetItem, configureItem, refreshItem, buildItem, runItem, debugItem);
 
   buildDiagnostics = vscode.languages.createDiagnosticCollection('null-cpp-build');
   context.subscriptions.push(buildDiagnostics);
@@ -284,7 +326,9 @@ export function registerCmakeToolbar(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('null-cpp.cmake.rebuild', () => cmdBuild(context, { clean: true })),
     vscode.commands.registerCommand('null-cpp.cmake.clean', () => cmdClean(context)),
     vscode.commands.registerCommand('null-cpp.cmake.run', () => cmdRun(context)),
-    vscode.commands.registerCommand('null-cpp.cmake.buildAndRun', () => cmdBuildAndRun(context))
+    vscode.commands.registerCommand('null-cpp.cmake.buildAndRun', () => cmdBuildAndRun(context)),
+    vscode.commands.registerCommand('null-cpp.debug.start', () => cmdDebug(context)),
+    vscode.commands.registerCommand('null-cpp.debug.buildAndDebug', () => cmdBuildAndDebug(context))
   );
 
   void (async () => {

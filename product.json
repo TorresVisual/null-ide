@@ -95,6 +95,7 @@
 		"workbench.enableExperiments": false,
 		"markdown.preview.scrollPreviewWithEditor": true,
 		"markdown.preview.scrollEditorWithPreview": false,
-		"cSpell.showStatus": true
+		"cSpell.showStatus": true,
+		"C_Cpp.intelliSenseEngine": "disabled"
 	}
 }
