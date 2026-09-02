@@ -257,19 +257,20 @@ Ninja generator doesn't inherit those the way the Visual Studio generator does.
 
 ---
 
-## Phase 3 — clangd Integration Hardening
+## Phase 3 — clangd Integration Hardening ✅
 *Goal: Configuration switches never leave clangd stale, and call hierarchy/symbol browsing feel native to C++.*
 *Depends on: Phase 1 (basic wiring already ships there)*
 *Estimated effort: 1 session*
+*Completed: 2026-09-02*
 
 ### Task Checklist
-- [ ] Audit the §8 six-step switch sequence end to end: reconfigure → regenerate `compile_commands.json` → update `.clangd` → (nothing needed for build commands/env — already re-derived per-command from `CppConfigState`, not cached)
-- [ ] `null-cpp.cmake.showCallHierarchy` — wraps clangd's existing call-hierarchy provider in a view, reusing `symbolTree.ts`'s existing qualified-name logic where useful
+- [x] Audit the §8 six-step switch sequence end to end: reconfigure → regenerate `compile_commands.json` → update `.clangd` → (nothing needed for build commands/env — already re-derived per-command from `CppConfigState`, not cached)
+- [x] ~~`null-cpp.cmake.showCallHierarchy`~~ — **cut, zero code needed.** VS Code's built-in Call Hierarchy view (`Shift+Alt+H` / right-click → *Show Call Hierarchy*) already renders callers/callees for any LSP server advertising `callHierarchyProvider`, which clangd does out of the box. A wrapper command would just be a redundant pass-through to the same feature — same reasoning as the build-diagnostics UI cut in §7.
 - [ ] (Stretch) CMake sidebar `TreeView` if the toolbar dropdowns prove cramped in daily use — build only if actually needed
 
 ### Definition of Done
-1. With a project configured on preset A, switch to preset B via the toolbar. Within one Configure cycle, go-to-definition/diagnostics reflect preset B's compilation database — no window reload required.
-2. Call hierarchy view shows callers/callees for a real symbol, matching clangd's own `Show Call Hierarchy` output.
+1. With a project configured on preset A, switch to preset B via the toolbar. Within one Configure cycle, go-to-definition/diagnostics reflect preset B's compilation database — no window reload required. **Verified by code audit**: `cmdConfigure` (`cmakeToolbar.ts`) calls `writeClangdConfig(root, preset.binaryDir)` on every configure regardless of preset, and `activePreset()`/`activeTarget()` read live from `workspaceState` on every command — nothing about the active preset/toolchain is cached stale. Also exercised live during Phase 2 testing switching between `clang-debug` and `wsl-debug`.
+2. Call hierarchy view shows callers/callees for a real symbol, matching clangd's own `Show Call Hierarchy` output. **N/A — no wrapper built**; this is VS Code's own native feature working directly against clangd, not something this extension owns.
 
 ---
 
@@ -347,6 +348,7 @@ An ASan preset appears in the picker and Configure/Build/Run all work against it
 - **Remote/SSH CMake targets** — not mentioned in the source doc; excluded to prevent scope creep beyond the confirmed native+WSL matrix.
 - **A bespoke build-diagnostics UI** (the source doc's §11 "BUILD FAILED / ❌ 3 errors" tree) — VS Code's native Problems panel already does file-grouped, click-to-source diagnostics for free.
 - **A custom CMake sidebar TreeView** — deferred to a Phase 3 stretch; the toolbar dropdowns are the default UI unless they prove insufficient in real use.
+- **A `showCallHierarchy` wrapper command** — VS Code's native Call Hierarchy view already works against clangd's `callHierarchyProvider` for free.
 - **A custom Memory Viewer webview** — build only after confirming VS Code's built-in debug-adapter memory view doesn't already cover it (Phase 5 task).
 - **Profiling (CPU/memory/allocation) and build-performance/header-dependency analysis** — explicitly "later-stage"/"eventually" in the source doc; re-evaluate only on real need, not speculatively.
 - **Full §12 C++ code-action list in one pass** — ship the 3-4 highest-value actions first (Phase 5), grow the set later based on actual use.
