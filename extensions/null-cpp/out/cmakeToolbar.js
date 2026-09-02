@@ -279,14 +279,19 @@ async function cmdDebug(context) {
         void vscode.window.showErrorMessage(`No detected toolchain for preset "${preset.displayName}".`);
         return;
     }
-    const nativeMIMode = !preset.isWsl && toolchain.kind !== 'msvc' ? await (0, debugConfigSynth_1.resolveNativeMIMode)() : undefined;
+    const isNative = !preset.isWsl && toolchain.kind !== 'msvc';
+    const nativeDebugger = isNative ? await (0, debugConfigSynth_1.resolveNativeDebugger)() : undefined;
+    if (isNative && !nativeDebugger) {
+        void vscode.window.showErrorMessage('No gdb.exe or lldb.exe found on PATH — install one to debug this preset.');
+        return;
+    }
     const config = (0, debugConfigSynth_1.synthDebugConfig)({
         targetName: target.name,
         artifactPath: target.artifactPath,
         sourceDir: root.fsPath,
         toolchainKind: toolchain.kind,
         wslDistro: toolchain.wslDistro,
-        nativeMIMode,
+        nativeDebugger,
     });
     await vscode.debug.startDebugging(vscode.workspace.workspaceFolders?.[0], config);
 }

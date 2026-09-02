@@ -34,13 +34,19 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.synthDebugConfig = synthDebugConfig;
-exports.resolveNativeMIMode = resolveNativeMIMode;
+exports.resolveNativeDebugger = resolveNativeDebugger;
 const fs = __importStar(require("node:fs/promises"));
 const path = __importStar(require("node:path"));
 const wslPath_1 = require("./wslPath");
-/** Builds a `vscode.DebugConfiguration`-shaped object for the active toolchain — MSVC, native Clang/GCC, or WSL. */
+/**
+ * Builds a `vscode.DebugConfiguration`-shaped object for the active toolchain — MSVC, native
+ * Clang/GCC, or WSL. MIEngine (the `cppdbg` debug adapter) doesn't auto-discover gdb/lldb from
+ * PATH the way its default-value docs imply — omitting `miDebuggerPath` fails at launch with
+ * "Unable to determine path to debugger", so it must always be resolved and passed explicitly
+ * for the native path (the WSL path already pins one via `pipeTransport.debuggerPath`).
+ */
 function synthDebugConfig(params) {
-    const { targetName, artifactPath, sourceDir, toolchainKind, wslDistro, nativeMIMode } = params;
+    const { targetName, artifactPath, sourceDir, toolchainKind, wslDistro, nativeDebugger } = params;
     const name = `Debug ${targetName}`;
     if (toolchainKind === 'msvc') {
         return { type: 'cppvsdbg', name, request: 'launch', program: artifactPath, args: [], cwd: sourceDir };
@@ -64,6 +70,9 @@ function synthDebugConfig(params) {
             },
         };
     }
+    if (!nativeDebugger) {
+        throw new Error(`Cannot synthesize a debug config for "${targetName}": no gdb or lldb found on PATH.`);
+    }
     return {
         type: 'cppdbg',
         name,
@@ -71,7 +80,8 @@ function synthDebugConfig(params) {
         program: artifactPath,
         args: [],
         cwd: sourceDir,
-        MIMode: nativeMIMode ?? 'gdb',
+        MIMode: nativeDebugger.mode,
+        miDebuggerPath: nativeDebugger.path,
     };
 }
 async function pathExists(candidate) {
@@ -83,14 +93,21 @@ async function pathExists(candidate) {
         return false;
     }
 }
-/** Prefers LLDB when it's on PATH (typical alongside a native Clang install), else falls back to GDB. */
-async function resolveNativeMIMode() {
+/** Prefers LLDB when it's on PATH (typical alongside a native Clang install), else falls back to GDB. Undefined if neither is found. */
+async function resolveNativeDebugger() {
     const dirs = (process.env.PATH ?? process.env.Path ?? '').split(path.delimiter).filter(Boolean);
     for (const dir of dirs) {
-        if (await pathExists(path.join(dir, 'lldb.exe'))) {
-            return 'lldb';
+        const candidate = path.join(dir, 'lldb.exe');
+        if (await pathExists(candidate)) {
+            return { mode: 'lldb', path: candidate };
         }
     }
-    return 'gdb';
+    for (const dir of dirs) {
+        const candidate = path.join(dir, 'gdb.exe');
+        if (await pathExists(candidate)) {
+            return { mode: 'gdb', path: candidate };
+        }
+    }
+    return undefined;
 }
 //# sourceMappingURL=debugConfigSynth.js.map

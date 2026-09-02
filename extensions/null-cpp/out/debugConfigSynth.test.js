@@ -22,26 +22,26 @@ const debugConfigSynth_1 = require("./debugConfigSynth");
         cwd: 'D:\\proj',
     });
 });
-(0, node_test_1.default)('synthDebugConfig builds a cppdbg/lldb config for native Clang', () => {
+(0, node_test_1.default)('synthDebugConfig builds a cppdbg/lldb config for native Clang, with an explicit miDebuggerPath', () => {
     const config = (0, debugConfigSynth_1.synthDebugConfig)({
         targetName: 'app',
         artifactPath: 'D:\\proj\\build\\clang-debug\\app.exe',
         sourceDir: 'D:\\proj',
         toolchainKind: 'clang',
-        nativeMIMode: 'lldb',
+        nativeDebugger: { mode: 'lldb', path: 'C:\\LLVM\\bin\\lldb.exe' },
     });
     strict_1.default.equal(config.type, 'cppdbg');
     strict_1.default.equal(config.MIMode, 'lldb');
+    strict_1.default.equal(config.miDebuggerPath, 'C:\\LLVM\\bin\\lldb.exe');
     strict_1.default.equal(config.pipeTransport, undefined);
 });
-(0, node_test_1.default)('synthDebugConfig defaults native MIMode to gdb when nothing was resolved', () => {
-    const config = (0, debugConfigSynth_1.synthDebugConfig)({
+(0, node_test_1.default)('synthDebugConfig throws for a native toolchain with no gdb/lldb resolved on PATH', () => {
+    strict_1.default.throws(() => (0, debugConfigSynth_1.synthDebugConfig)({
         targetName: 'app',
         artifactPath: 'D:\\proj\\build\\clang-debug\\app.exe',
         sourceDir: 'D:\\proj',
         toolchainKind: 'clang',
-    });
-    strict_1.default.equal(config.MIMode, 'gdb');
+    }));
 });
 (0, node_test_1.default)('synthDebugConfig builds a cppdbg/gdb pipeTransport config for WSL, translating paths to POSIX', () => {
     const config = (0, debugConfigSynth_1.synthDebugConfig)({

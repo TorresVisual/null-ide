@@ -11,11 +11,17 @@ export interface DebugConfig {
   args: string[];
   cwd: string;
   MIMode?: 'gdb' | 'lldb';
+  miDebuggerPath?: string;
   pipeTransport?: {
     pipeProgram: string;
     pipeArgs: string[];
     debuggerPath: string;
   };
+}
+
+export interface NativeDebugger {
+  mode: 'gdb' | 'lldb';
+  path: string;
 }
 
 export interface DebugConfigParams {
@@ -25,13 +31,19 @@ export interface DebugConfigParams {
   sourceDir: string;
   toolchainKind: ToolchainKind;
   wslDistro?: string;
-  /** Which debugger is on PATH for a native (non-MSVC, non-WSL) toolchain. Ignored otherwise. */
-  nativeMIMode?: 'gdb' | 'lldb';
+  /** Resolved gdb/lldb executable for a native (non-MSVC, non-WSL) toolchain. Ignored otherwise. */
+  nativeDebugger?: NativeDebugger;
 }
 
-/** Builds a `vscode.DebugConfiguration`-shaped object for the active toolchain — MSVC, native Clang/GCC, or WSL. */
+/**
+ * Builds a `vscode.DebugConfiguration`-shaped object for the active toolchain — MSVC, native
+ * Clang/GCC, or WSL. MIEngine (the `cppdbg` debug adapter) doesn't auto-discover gdb/lldb from
+ * PATH the way its default-value docs imply — omitting `miDebuggerPath` fails at launch with
+ * "Unable to determine path to debugger", so it must always be resolved and passed explicitly
+ * for the native path (the WSL path already pins one via `pipeTransport.debuggerPath`).
+ */
 export function synthDebugConfig(params: DebugConfigParams): DebugConfig {
-  const { targetName, artifactPath, sourceDir, toolchainKind, wslDistro, nativeMIMode } = params;
+  const { targetName, artifactPath, sourceDir, toolchainKind, wslDistro, nativeDebugger } = params;
   const name = `Debug ${targetName}`;
 
   if (toolchainKind === 'msvc') {
@@ -58,6 +70,11 @@ export function synthDebugConfig(params: DebugConfigParams): DebugConfig {
     };
   }
 
+  if (!nativeDebugger) {
+    throw new Error(
+      `Cannot synthesize a debug config for "${targetName}": no gdb or lldb found on PATH.`
+    );
+  }
   return {
     type: 'cppdbg',
     name,
@@ -65,7 +82,8 @@ export function synthDebugConfig(params: DebugConfigParams): DebugConfig {
     program: artifactPath,
     args: [],
     cwd: sourceDir,
-    MIMode: nativeMIMode ?? 'gdb',
+    MIMode: nativeDebugger.mode,
+    miDebuggerPath: nativeDebugger.path,
   };
 }
 
@@ -78,13 +96,20 @@ async function pathExists(candidate: string): Promise<boolean> {
   }
 }
 
-/** Prefers LLDB when it's on PATH (typical alongside a native Clang install), else falls back to GDB. */
-export async function resolveNativeMIMode(): Promise<'gdb' | 'lldb'> {
+/** Prefers LLDB when it's on PATH (typical alongside a native Clang install), else falls back to GDB. Undefined if neither is found. */
+export async function resolveNativeDebugger(): Promise<NativeDebugger | undefined> {
   const dirs = (process.env.PATH ?? process.env.Path ?? '').split(path.delimiter).filter(Boolean);
   for (const dir of dirs) {
-    if (await pathExists(path.join(dir, 'lldb.exe'))) {
-      return 'lldb';
+    const candidate = path.join(dir, 'lldb.exe');
+    if (await pathExists(candidate)) {
+      return { mode: 'lldb', path: candidate };
     }
   }
-  return 'gdb';
+  for (const dir of dirs) {
+    const candidate = path.join(dir, 'gdb.exe');
+    if (await pathExists(candidate)) {
+      return { mode: 'gdb', path: candidate };
+    }
+  }
+  return undefined;
 }

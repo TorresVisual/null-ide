@@ -19,27 +19,29 @@ test('synthDebugConfig builds a cppvsdbg config for MSVC', () => {
   });
 });
 
-test('synthDebugConfig builds a cppdbg/lldb config for native Clang', () => {
+test('synthDebugConfig builds a cppdbg/lldb config for native Clang, with an explicit miDebuggerPath', () => {
   const config = synthDebugConfig({
     targetName: 'app',
     artifactPath: 'D:\\proj\\build\\clang-debug\\app.exe',
     sourceDir: 'D:\\proj',
     toolchainKind: 'clang',
-    nativeMIMode: 'lldb',
+    nativeDebugger: { mode: 'lldb', path: 'C:\\LLVM\\bin\\lldb.exe' },
   });
   assert.equal(config.type, 'cppdbg');
   assert.equal(config.MIMode, 'lldb');
+  assert.equal(config.miDebuggerPath, 'C:\\LLVM\\bin\\lldb.exe');
   assert.equal(config.pipeTransport, undefined);
 });
 
-test('synthDebugConfig defaults native MIMode to gdb when nothing was resolved', () => {
-  const config = synthDebugConfig({
-    targetName: 'app',
-    artifactPath: 'D:\\proj\\build\\clang-debug\\app.exe',
-    sourceDir: 'D:\\proj',
-    toolchainKind: 'clang',
-  });
-  assert.equal(config.MIMode, 'gdb');
+test('synthDebugConfig throws for a native toolchain with no gdb/lldb resolved on PATH', () => {
+  assert.throws(() =>
+    synthDebugConfig({
+      targetName: 'app',
+      artifactPath: 'D:\\proj\\build\\clang-debug\\app.exe',
+      sourceDir: 'D:\\proj',
+      toolchainKind: 'clang',
+    })
+  );
 });
 
 test('synthDebugConfig builds a cppdbg/gdb pipeTransport config for WSL, translating paths to POSIX', () => {

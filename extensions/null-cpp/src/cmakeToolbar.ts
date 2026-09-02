@@ -3,7 +3,7 @@ import * as toolchainRegistry from './toolchainRegistry';
 import { loadPresets, type CMakePreset } from './presetsModel';
 import { configure, readCodemodelTargets, build, cleanTarget, run as runTarget, cancelActive, type CMakeTarget } from './cmakeModel';
 import { resolveBuildDiagnostics, type ResolvedBuildDiagnostic } from './buildDiagnostics';
-import { synthDebugConfig, resolveNativeMIMode } from './debugConfigSynth';
+import { synthDebugConfig, resolveNativeDebugger } from './debugConfigSynth';
 import { writeClangdConfig } from './clangdCompileDb';
 import * as cppConfigState from './cppConfigState';
 import { isEnabled } from './projectDetection';
@@ -278,15 +278,21 @@ async function cmdDebug(context: vscode.ExtensionContext): Promise<void> {
     void vscode.window.showErrorMessage(`No detected toolchain for preset "${preset.displayName}".`);
     return;
   }
-  const nativeMIMode =
-    !preset.isWsl && toolchain.kind !== 'msvc' ? await resolveNativeMIMode() : undefined;
+  const isNative = !preset.isWsl && toolchain.kind !== 'msvc';
+  const nativeDebugger = isNative ? await resolveNativeDebugger() : undefined;
+  if (isNative && !nativeDebugger) {
+    void vscode.window.showErrorMessage(
+      'No gdb.exe or lldb.exe found on PATH — install one to debug this preset.'
+    );
+    return;
+  }
   const config = synthDebugConfig({
     targetName: target.name,
     artifactPath: target.artifactPath,
     sourceDir: root.fsPath,
     toolchainKind: toolchain.kind,
     wslDistro: toolchain.wslDistro,
-    nativeMIMode,
+    nativeDebugger,
   });
   await vscode.debug.startDebugging(vscode.workspace.workspaceFolders?.[0], config);
 }
