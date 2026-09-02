@@ -135,6 +135,14 @@ export interface BuildOptions {
   clean?: boolean;
 }
 
+/** Guards against a `binaryDir` that would be parsed as a flag instead of the target directory. */
+function assertNotFlag(binaryDir: string): string {
+  if (binaryDir.startsWith('-')) {
+    throw new Error(`Refusing to build: resolved binary directory looks like a CLI flag: "${binaryDir}"`);
+  }
+  return binaryDir;
+}
+
 /**
  * Runs `cmake --build <binaryDir>` (optionally scoped to `target`), streamed into the shared
  * terminal. Builds against the resolved binary directory rather than `--preset <name>` —
@@ -150,7 +158,7 @@ export async function build(
   options: BuildOptions = {}
 ): Promise<CommandResult> {
   const msvcEnv = toolchain ? await getMsvcDevEnvironment(toolchain) : undefined;
-  const binaryDir = preset.isWsl ? toWslPath(preset.binaryDir) : preset.binaryDir;
+  const binaryDir = assertNotFlag(preset.isWsl ? toWslPath(preset.binaryDir) : preset.binaryDir);
   const args = ['--build', binaryDir];
   if (target) {
     args.push('--target', target.name);
@@ -168,7 +176,7 @@ export async function build(
 
 export async function cleanTarget(preset: CMakePreset, sourceDir: string, toolchain: Toolchain | undefined): Promise<number> {
   const msvcEnv = toolchain ? await getMsvcDevEnvironment(toolchain) : undefined;
-  const binaryDir = preset.isWsl ? toWslPath(preset.binaryDir) : preset.binaryDir;
+  const binaryDir = assertNotFlag(preset.isWsl ? toWslPath(preset.binaryDir) : preset.binaryDir);
   const { exitCode } = await runCommand('cmake', ['--build', binaryDir, '--target', 'clean'], {
     cwd: sourceDir,
     isWsl: preset.isWsl,
