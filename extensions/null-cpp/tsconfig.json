@@ -39,6 +39,8 @@
     "src/clangdConfigText.ts",
     "src/clangdConfigText.test.ts",
     "src/clangdCompileDb.ts",
-    "src/cmakeToolbar.ts"
+    "src/cmakeToolbar.ts",
+    "src/buildDiagnostics.ts",
+    "src/buildDiagnostics.test.ts"
   ]
 }

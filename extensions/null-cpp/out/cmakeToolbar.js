@@ -38,6 +38,7 @@ const vscode = __importStar(require("vscode"));
 const toolchainRegistry = __importStar(require("./toolchainRegistry"));
 const presetsModel_1 = require("./presetsModel");
 const cmakeModel_1 = require("./cmakeModel");
+const buildDiagnostics_1 = require("./buildDiagnostics");
 const clangdCompileDb_1 = require("./clangdCompileDb");
 const cppConfigState = __importStar(require("./cppConfigState"));
 const projectDetection_1 = require("./projectDetection");
@@ -84,6 +85,10 @@ let presetItem;
 let targetItem;
 let configureItem;
 let refreshItem;
+let buildItem;
+let runItem;
+let buildDiagnostics;
+let building = false;
 function updateStatusBar(context) {
     const enabled = (0, projectDetection_1.isEnabled)();
     const preset = activePreset(context);
@@ -92,13 +97,33 @@ function updateStatusBar(context) {
     targetItem.text = `$(target) ${target?.name ?? 'Select Target'}`;
     configureItem.text = '$(tools) Configure';
     refreshItem.text = '$(refresh) Refresh Toolchains';
-    for (const item of [presetItem, targetItem, configureItem, refreshItem]) {
+    if (!building) {
+        buildItem.text = '$(play) Build';
+    }
+    runItem.text = target?.type === 'EXECUTABLE' ? '$(run) Run' : '$(run) Run (no executable target selected)';
+    for (const item of [presetItem, targetItem, configureItem, refreshItem, buildItem, runItem]) {
         if (enabled) {
             item.show();
         }
         else {
             item.hide();
         }
+    }
+}
+function applyBuildDiagnostics(diagnostics) {
+    buildDiagnostics.clear();
+    const byFile = new Map();
+    for (const d of diagnostics) {
+        const line = Math.max(0, d.line - 1);
+        const column = Math.max(0, d.column - 1);
+        const range = new vscode.Range(line, column, line, column + 1);
+        const severity = d.severity === 'error' ? vscode.DiagnosticSeverity.Error : vscode.DiagnosticSeverity.Warning;
+        const list = byFile.get(d.absolutePath) ?? [];
+        list.push(new vscode.Diagnostic(range, d.message, severity));
+        byFile.set(d.absolutePath, list);
+    }
+    for (const [file, diags] of byFile) {
+        buildDiagnostics.set(vscode.Uri.file(file), diags);
     }
 }
 // ---- Commands ----
@@ -174,17 +199,82 @@ async function cmdSelectTarget(context) {
     await cppConfigState.setActiveTarget(context, picked.target.name);
     updateStatusBar(context);
 }
+/** Runs `cmake --build`. Returns whether it succeeded. A second click while running cancels instead. */
+async function cmdBuild(context, options = {}) {
+    if (building) {
+        (0, cmakeModel_1.cancelActive)();
+        return false;
+    }
+    const root = workspaceRoot();
+    const preset = activePreset(context);
+    if (!root || !preset) {
+        void vscode.window.showErrorMessage('Configure a CMake preset before building.');
+        return false;
+    }
+    const toolchain = toolchainRegistry.list().find((t) => t.id === preset.toolchainId);
+    const target = activeTarget(context);
+    building = true;
+    buildItem.text = '$(sync~spin) Building... (click to cancel)';
+    try {
+        const { exitCode, output } = await (0, cmakeModel_1.build)(preset, root.fsPath, toolchain, target, options);
+        applyBuildDiagnostics((0, buildDiagnostics_1.resolveBuildDiagnostics)(output, root.fsPath, preset.isWsl, toolchain?.wslDistro));
+        if (exitCode !== 0) {
+            void vscode.window.showErrorMessage(`Build failed for "${preset.displayName}" (exit code ${exitCode}).`);
+            return false;
+        }
+        return true;
+    }
+    finally {
+        building = false;
+        updateStatusBar(context);
+    }
+}
+async function cmdClean(context) {
+    const root = workspaceRoot();
+    const preset = activePreset(context);
+    if (!root || !preset) {
+        void vscode.window.showErrorMessage('Configure a CMake preset before cleaning.');
+        return;
+    }
+    const toolchain = toolchainRegistry.list().find((t) => t.id === preset.toolchainId);
+    await (0, cmakeModel_1.cleanTarget)(preset, root.fsPath, toolchain);
+}
+async function cmdRun(context) {
+    const preset = activePreset(context);
+    const target = activeTarget(context);
+    if (!preset || !target) {
+        void vscode.window.showErrorMessage('Select a CMake target before running.');
+        return;
+    }
+    if (target.type !== 'EXECUTABLE') {
+        void vscode.window.showInformationMessage(`"${target.name}" is not an executable target.`);
+        return;
+    }
+    const toolchain = toolchainRegistry.list().find((t) => t.id === preset.toolchainId);
+    await (0, cmakeModel_1.run)(target, preset.isWsl, toolchain?.wslDistro);
+}
+async function cmdBuildAndRun(context) {
+    if (await cmdBuild(context)) {
+        await cmdRun(context);
+    }
+}
 function registerCmakeToolbar(context) {
     presetItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
     targetItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 99);
     configureItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 98);
     refreshItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 97);
+    buildItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 96);
+    runItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 95);
     presetItem.command = 'null-cpp.cmake.selectPreset';
     targetItem.command = 'null-cpp.cmake.selectTarget';
     configureItem.command = 'null-cpp.cmake.configure';
     refreshItem.command = 'null-cpp.cmake.refreshToolchains';
-    context.subscriptions.push(presetItem, targetItem, configureItem, refreshItem);
-    context.subscriptions.push(vscode.commands.registerCommand('null-cpp.cmake.refreshToolchains', () => cmdRefreshToolchains(context)), vscode.commands.registerCommand('null-cpp.cmake.selectPreset', () => cmdSelectPreset(context)), vscode.commands.registerCommand('null-cpp.cmake.configure', () => cmdConfigure(context)), vscode.commands.registerCommand('null-cpp.cmake.selectTarget', () => cmdSelectTarget(context)));
+    buildItem.command = 'null-cpp.cmake.build';
+    runItem.command = 'null-cpp.cmake.run';
+    context.subscriptions.push(presetItem, targetItem, configureItem, refreshItem, buildItem, runItem);
+    buildDiagnostics = vscode.languages.createDiagnosticCollection('null-cpp-build');
+    context.subscriptions.push(buildDiagnostics);
+    context.subscriptions.push(vscode.commands.registerCommand('null-cpp.cmake.refreshToolchains', () => cmdRefreshToolchains(context)), vscode.commands.registerCommand('null-cpp.cmake.selectPreset', () => cmdSelectPreset(context)), vscode.commands.registerCommand('null-cpp.cmake.configure', () => cmdConfigure(context)), vscode.commands.registerCommand('null-cpp.cmake.selectTarget', () => cmdSelectTarget(context)), vscode.commands.registerCommand('null-cpp.cmake.build', () => cmdBuild(context)), vscode.commands.registerCommand('null-cpp.cmake.rebuild', () => cmdBuild(context, { clean: true })), vscode.commands.registerCommand('null-cpp.cmake.clean', () => cmdClean(context)), vscode.commands.registerCommand('null-cpp.cmake.run', () => cmdRun(context)), vscode.commands.registerCommand('null-cpp.cmake.buildAndRun', () => cmdBuildAndRun(context)));
     void (async () => {
         uiState.presets = [];
         if ((0, projectDetection_1.isEnabled)()) {

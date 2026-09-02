@@ -4,6 +4,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import type { CMakePreset } from './presetsModel';
 import { wrapWslCommand, pickLatestIndexFile, parseReplyIndex, parseCodemodelTargets, parseTargetDetail } from './cmakeReply';
 import { getMsvcDevEnvironment, type Toolchain } from './toolchainRegistry';
+import { toWslPath } from './wslPath';
 
 export type { CMakeTarget } from './cmakeReply';
 import type { CMakeTarget } from './cmakeReply';
@@ -62,8 +63,14 @@ export interface RunCommandOptions {
   env?: NodeJS.ProcessEnv;
 }
 
-/** Spawns `command` (optionally WSL-wrapped), streaming output into the shared terminal. Resolves with the exit code. */
-export async function runCommand(command: string, args: string[], options: RunCommandOptions): Promise<number> {
+export interface CommandResult {
+  exitCode: number;
+  /** Combined stdout+stderr text, for diagnostic parsing. */
+  output: string;
+}
+
+/** Spawns `command` (optionally WSL-wrapped), streaming output into the shared terminal. */
+export async function runCommand(command: string, args: string[], options: RunCommandOptions): Promise<CommandResult> {
   const terminal = ensureTerminal();
   if (options.show !== false) {
     terminal.show(true);
@@ -76,23 +83,29 @@ export async function runCommand(command: string, args: string[], options: RunCo
 
   writeLine(`> ${resolved.command} ${resolved.args.join(' ')}`);
 
-  return new Promise<number>((resolve) => {
+  return new Promise<CommandResult>((resolve) => {
     const child = spawn(resolved.command, resolved.args, { cwd: options.cwd, shell: false, env: options.env });
     activeProcess = child;
+    let output = '';
 
-    child.stdout?.on('data', (chunk: Buffer) => writeEmitter?.fire(chunk.toString().replace(/\r?\n/g, '\r\n')));
-    child.stderr?.on('data', (chunk: Buffer) => writeEmitter?.fire(chunk.toString().replace(/\r?\n/g, '\r\n')));
+    const onData = (chunk: Buffer) => {
+      const text = chunk.toString();
+      output += text;
+      writeEmitter?.fire(text.replace(/\r?\n/g, '\r\n'));
+    };
+    child.stdout?.on('data', onData);
+    child.stderr?.on('data', onData);
 
     child.on('error', (err) => {
       writeLine(`Failed to start "${resolved.command}": ${err.message}`);
       activeProcess = undefined;
-      resolve(-1);
+      resolve({ exitCode: -1, output });
     });
 
     child.on('close', (code) => {
       writeLine(`[exit code ${code ?? -1}]`);
       activeProcess = undefined;
-      resolve(code ?? -1);
+      resolve({ exitCode: code ?? -1, output });
     });
   });
 }
@@ -109,12 +122,63 @@ export async function writeCodemodelQuery(binaryDir: string): Promise<void> {
 export async function configure(preset: CMakePreset, sourceDir: string, toolchain?: Toolchain): Promise<number> {
   await writeCodemodelQuery(preset.binaryDir);
   const msvcEnv = toolchain ? await getMsvcDevEnvironment(toolchain) : undefined;
-  return runCommand('cmake', ['--preset', preset.name], {
+  const { exitCode } = await runCommand('cmake', ['--preset', preset.name], {
     cwd: sourceDir,
     isWsl: preset.isWsl,
     wslDistro: toolchain?.wslDistro,
     env: msvcEnv ? { ...process.env, ...msvcEnv } : undefined,
   });
+  return exitCode;
+}
+
+export interface BuildOptions {
+  clean?: boolean;
+}
+
+/** Runs `cmake --build --preset <p>` (optionally scoped to `target`), streamed into the shared terminal. */
+export async function build(
+  preset: CMakePreset,
+  sourceDir: string,
+  toolchain: Toolchain | undefined,
+  target?: CMakeTarget,
+  options: BuildOptions = {}
+): Promise<CommandResult> {
+  const msvcEnv = toolchain ? await getMsvcDevEnvironment(toolchain) : undefined;
+  const args = ['--build', '--preset', preset.name];
+  if (target) {
+    args.push('--target', target.name);
+  }
+  if (options.clean) {
+    args.push('--clean-first');
+  }
+  return runCommand('cmake', args, {
+    cwd: sourceDir,
+    isWsl: preset.isWsl,
+    wslDistro: toolchain?.wslDistro,
+    env: msvcEnv ? { ...process.env, ...msvcEnv } : undefined,
+  });
+}
+
+export async function cleanTarget(preset: CMakePreset, sourceDir: string, toolchain: Toolchain | undefined): Promise<number> {
+  const msvcEnv = toolchain ? await getMsvcDevEnvironment(toolchain) : undefined;
+  const { exitCode } = await runCommand('cmake', ['--build', '--preset', preset.name, '--target', 'clean'], {
+    cwd: sourceDir,
+    isWsl: preset.isWsl,
+    wslDistro: toolchain?.wslDistro,
+    env: msvcEnv ? { ...process.env, ...msvcEnv } : undefined,
+  });
+  return exitCode;
+}
+
+/** Launches `target`'s artifact in the shared terminal — via `wsl.exe` for WSL presets. */
+export async function run(target: CMakeTarget, isWsl: boolean, wslDistro?: string): Promise<number> {
+  const command = isWsl ? toWslPath(target.artifactPath) : target.artifactPath;
+  const { exitCode } = await runCommand(command, [], {
+    cwd: path.dirname(target.artifactPath),
+    isWsl,
+    wslDistro,
+  });
+  return exitCode;
 }
 
 async function readJson(uri: vscode.Uri): Promise<unknown> {

@@ -236,16 +236,16 @@ Ninja generator doesn't inherit those the way the Visual Studio generator does.
 ### Task Checklist
 
 #### Build
-- [ ] `cmakeModel.ts`: `build(preset, target, { clean })` — spawns `cmake --build --preset <p> --target <t>` (native) or `wsl.exe`-wrapped equivalent, streamed into a dedicated `Terminal`
-- [ ] Compiler-output → `vscode.DiagnosticCollection` parser (MSVC `cl.exe` and Clang/GCC diagnostic line formats — two parsers, shared `Diagnostic[]` shape)
-- [ ] `null-cpp.cmake.build`, `.rebuild`, `.clean` commands
-- [ ] Toolbar: `▶ Build` button, busy/cancel state while a build is running
+- [x] `cmakeModel.ts`: `build(preset, sourceDir, toolchain, target, { clean })` — spawns `cmake --build --preset <p> --target <t>` (native) or `wsl.exe`-wrapped equivalent, streamed into the shared `Terminal`
+- [x] Compiler-output → `vscode.DiagnosticCollection` parser (MSVC `cl.exe` and Clang/GCC diagnostic line formats, shared `BuildDiagnostic[]` shape — pure parsing lives in the new `buildDiagnostics.ts` companion so it's unit-testable without the `vscode` module)
+- [x] `null-cpp.cmake.build`, `.rebuild`, `.clean` commands
+- [x] Toolbar: `▶ Build` button, busy/cancel state while a build is running (clicking again cancels the active process)
 
 #### Run
-- [ ] `cmakeModel.ts`: resolve the active target's `artifactPath` (post-build)
-- [ ] `null-cpp.cmake.run` — launches the artifact in a terminal (native) or via `wsl.exe -d <distro> -- <path>` (WSL), gated on target type `EXECUTABLE`
-- [ ] `null-cpp.cmake.buildAndRun`
-- [ ] Toolbar: `▶ Run` button, disabled (not hidden) when the active target isn't executable
+- [x] `cmakeModel.ts`: resolve the active target's `artifactPath` (post-build)
+- [x] `null-cpp.cmake.run` — launches the artifact in the shared terminal (native) or via `wsl.exe -d <distro> -- <path>` (WSL), gated on target type `EXECUTABLE`
+- [x] `null-cpp.cmake.buildAndRun`
+- [x] Toolbar: `▶ Run` button, disabled (not hidden) when the active target isn't executable
 
 ### Definition of Done
 1. CI-built install, real project from Phase 1.

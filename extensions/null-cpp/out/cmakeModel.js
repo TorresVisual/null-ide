@@ -37,12 +37,16 @@ exports.cancelActive = cancelActive;
 exports.runCommand = runCommand;
 exports.writeCodemodelQuery = writeCodemodelQuery;
 exports.configure = configure;
+exports.build = build;
+exports.cleanTarget = cleanTarget;
+exports.run = run;
 exports.readCodemodelTargets = readCodemodelTargets;
 const vscode = __importStar(require("vscode"));
 const path = __importStar(require("node:path"));
 const node_child_process_1 = require("node:child_process");
 const cmakeReply_1 = require("./cmakeReply");
 const toolchainRegistry_1 = require("./toolchainRegistry");
+const wslPath_1 = require("./wslPath");
 // ---- Process execution, streamed into a dedicated, reused terminal ----
 const TERMINAL_NAME = 'Null C++: CMake';
 let writeEmitter;
@@ -83,7 +87,7 @@ function writeLine(text) {
 function cancelActive() {
     activeProcess?.kill();
 }
-/** Spawns `command` (optionally WSL-wrapped), streaming output into the shared terminal. Resolves with the exit code. */
+/** Spawns `command` (optionally WSL-wrapped), streaming output into the shared terminal. */
 async function runCommand(command, args, options) {
     const terminal = ensureTerminal();
     if (options.show !== false) {
@@ -96,17 +100,23 @@ async function runCommand(command, args, options) {
     return new Promise((resolve) => {
         const child = (0, node_child_process_1.spawn)(resolved.command, resolved.args, { cwd: options.cwd, shell: false, env: options.env });
         activeProcess = child;
-        child.stdout?.on('data', (chunk) => writeEmitter?.fire(chunk.toString().replace(/\r?\n/g, '\r\n')));
-        child.stderr?.on('data', (chunk) => writeEmitter?.fire(chunk.toString().replace(/\r?\n/g, '\r\n')));
+        let output = '';
+        const onData = (chunk) => {
+            const text = chunk.toString();
+            output += text;
+            writeEmitter?.fire(text.replace(/\r?\n/g, '\r\n'));
+        };
+        child.stdout?.on('data', onData);
+        child.stderr?.on('data', onData);
         child.on('error', (err) => {
             writeLine(`Failed to start "${resolved.command}": ${err.message}`);
             activeProcess = undefined;
-            resolve(-1);
+            resolve({ exitCode: -1, output });
         });
         child.on('close', (code) => {
             writeLine(`[exit code ${code ?? -1}]`);
             activeProcess = undefined;
-            resolve(code ?? -1);
+            resolve({ exitCode: code ?? -1, output });
         });
     });
 }
@@ -120,12 +130,50 @@ async function writeCodemodelQuery(binaryDir) {
 async function configure(preset, sourceDir, toolchain) {
     await writeCodemodelQuery(preset.binaryDir);
     const msvcEnv = toolchain ? await (0, toolchainRegistry_1.getMsvcDevEnvironment)(toolchain) : undefined;
-    return runCommand('cmake', ['--preset', preset.name], {
+    const { exitCode } = await runCommand('cmake', ['--preset', preset.name], {
         cwd: sourceDir,
         isWsl: preset.isWsl,
         wslDistro: toolchain?.wslDistro,
         env: msvcEnv ? { ...process.env, ...msvcEnv } : undefined,
     });
+    return exitCode;
+}
+/** Runs `cmake --build --preset <p>` (optionally scoped to `target`), streamed into the shared terminal. */
+async function build(preset, sourceDir, toolchain, target, options = {}) {
+    const msvcEnv = toolchain ? await (0, toolchainRegistry_1.getMsvcDevEnvironment)(toolchain) : undefined;
+    const args = ['--build', '--preset', preset.name];
+    if (target) {
+        args.push('--target', target.name);
+    }
+    if (options.clean) {
+        args.push('--clean-first');
+    }
+    return runCommand('cmake', args, {
+        cwd: sourceDir,
+        isWsl: preset.isWsl,
+        wslDistro: toolchain?.wslDistro,
+        env: msvcEnv ? { ...process.env, ...msvcEnv } : undefined,
+    });
+}
+async function cleanTarget(preset, sourceDir, toolchain) {
+    const msvcEnv = toolchain ? await (0, toolchainRegistry_1.getMsvcDevEnvironment)(toolchain) : undefined;
+    const { exitCode } = await runCommand('cmake', ['--build', '--preset', preset.name, '--target', 'clean'], {
+        cwd: sourceDir,
+        isWsl: preset.isWsl,
+        wslDistro: toolchain?.wslDistro,
+        env: msvcEnv ? { ...process.env, ...msvcEnv } : undefined,
+    });
+    return exitCode;
+}
+/** Launches `target`'s artifact in the shared terminal — via `wsl.exe` for WSL presets. */
+async function run(target, isWsl, wslDistro) {
+    const command = isWsl ? (0, wslPath_1.toWslPath)(target.artifactPath) : target.artifactPath;
+    const { exitCode } = await runCommand(command, [], {
+        cwd: path.dirname(target.artifactPath),
+        isWsl,
+        wslDistro,
+    });
+    return exitCode;
 }
 async function readJson(uri) {
     const bytes = await vscode.workspace.fs.readFile(uri);

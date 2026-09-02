@@ -11,7 +11,7 @@
   "extensionDependencies": ["llvm-vs-code-extensions.vscode-clangd"],
   "scripts": {
     "compile": "tsc -p tsconfig.json",
-    "test": "tsc -p tsconfig.json && node --test out/symbolTree.test.js out/pairRegistry.test.js out/scaffoldNaming.test.js out/wslPath.test.js out/toolchainRegistry.test.js out/presetsModel.test.js out/cmakeReply.test.js out/clangdConfigText.test.js"
+    "test": "tsc -p tsconfig.json && node --test out/symbolTree.test.js out/pairRegistry.test.js out/scaffoldNaming.test.js out/wslPath.test.js out/toolchainRegistry.test.js out/presetsModel.test.js out/cmakeReply.test.js out/clangdConfigText.test.js out/buildDiagnostics.test.js"
   },
   "devDependencies": {
     "typescript": "^5.8.0",
@@ -44,6 +44,26 @@
       {
         "command": "null-cpp.cmake.selectTarget",
         "title": "Null C++: Select CMake Target..."
+      },
+      {
+        "command": "null-cpp.cmake.build",
+        "title": "Null C++: CMake Build"
+      },
+      {
+        "command": "null-cpp.cmake.rebuild",
+        "title": "Null C++: CMake Rebuild (Clean First)"
+      },
+      {
+        "command": "null-cpp.cmake.clean",
+        "title": "Null C++: CMake Clean"
+      },
+      {
+        "command": "null-cpp.cmake.run",
+        "title": "Null C++: Run Target"
+      },
+      {
+        "command": "null-cpp.cmake.buildAndRun",
+        "title": "Null C++: Build and Run Target"
       }
     ],
     "keybindings": [
@@ -101,7 +121,12 @@
         { "command": "null-cpp.cmake.refreshToolchains", "when": "null-cpp.isCppProject" },
         { "command": "null-cpp.cmake.selectPreset", "when": "null-cpp.isCppProject && null-cpp.cmake.hasPresets" },
         { "command": "null-cpp.cmake.configure", "when": "null-cpp.isCppProject && null-cpp.cmake.presetSelected" },
-        { "command": "null-cpp.cmake.selectTarget", "when": "null-cpp.isCppProject && null-cpp.cmake.configured" }
+        { "command": "null-cpp.cmake.selectTarget", "when": "null-cpp.isCppProject && null-cpp.cmake.configured" },
+        { "command": "null-cpp.cmake.build", "when": "null-cpp.isCppProject && null-cpp.cmake.configured" },
+        { "command": "null-cpp.cmake.rebuild", "when": "null-cpp.isCppProject && null-cpp.cmake.configured" },
+        { "command": "null-cpp.cmake.clean", "when": "null-cpp.isCppProject && null-cpp.cmake.configured" },
+        { "command": "null-cpp.cmake.run", "when": "null-cpp.isCppProject && null-cpp.cmake.configured" },
+        { "command": "null-cpp.cmake.buildAndRun", "when": "null-cpp.isCppProject && null-cpp.cmake.configured" }
       ]
     }
   }
