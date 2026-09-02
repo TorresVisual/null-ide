@@ -11,7 +11,7 @@
   "extensionDependencies": ["llvm-vs-code-extensions.vscode-clangd"],
   "scripts": {
     "compile": "tsc -p tsconfig.json",
-    "test": "tsc -p tsconfig.json && node --test out/symbolTree.test.js out/pairRegistry.test.js out/scaffoldNaming.test.js out/wslPath.test.js out/toolchainRegistry.test.js out/presetsModel.test.js out/cmakeReply.test.js out/clangdConfigText.test.js out/buildDiagnostics.test.js"
+    "test": "tsc -p tsconfig.json && node --test out/symbolTree.test.js out/pairRegistry.test.js out/scaffoldNaming.test.js out/wslPath.test.js out/toolchainRegistry.test.js out/presetsModel.test.js out/cmakeReply.test.js out/clangdConfigText.test.js out/buildDiagnostics.test.js out/projectDetection.test.js"
   },
   "devDependencies": {
     "typescript": "^5.8.0",
@@ -100,7 +100,7 @@
           "type": "string",
           "enum": ["auto", "always", "never"],
           "default": "auto",
-          "description": "Controls whether null-cpp's features are active for this workspace. 'auto' detects a C/C++ project by scanning for CMakeLists.txt, compile_commands.json, .clangd, or C/C++ source files. 'always'/'never' force the result regardless of detection."
+          "description": "Controls whether null-cpp's features are active for this workspace. 'auto' detects a C/C++ project by scanning for build system files (CMake, Meson, Makefiles, Bazel, .vcxproj, .clangd, compile_commands.json) or, failing that, C/C++ source/header files outside dependency and build directories. 'always'/'never' force the result regardless of detection."
         }
       }
     },

@@ -1,8 +1,5 @@
 import * as vscode from 'vscode';
-
-const BUILD_CONFIG_GLOB = '**/{CMakeLists.txt,compile_commands.json,.clangd}';
-const SOURCE_FILE_GLOB = '**/*.{c,cpp,cc,cxx,h,hpp,hh,hxx}';
-const EXCLUDE_GLOB = '**/node_modules/**';
+import { scanDirectoryForCppProject } from './projectDetectionScan';
 
 let enabled = false;
 
@@ -13,19 +10,12 @@ function getOverride(): 'auto' | 'always' | 'never' {
   );
 }
 
-async function hasAnyMatch(glob: string): Promise<boolean> {
-  const matches = await vscode.workspace.findFiles(glob, EXCLUDE_GLOB, 1);
-  return matches.length > 0;
-}
-
-async function scanWorkspace(): Promise<boolean> {
-  if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0) {
+function scanWorkspace(): boolean {
+  const folders = vscode.workspace.workspaceFolders;
+  if (!folders || folders.length === 0) {
     return false;
   }
-  if (await hasAnyMatch(BUILD_CONFIG_GLOB)) {
-    return true;
-  }
-  return hasAnyMatch(SOURCE_FILE_GLOB);
+  return folders.some(folder => scanDirectoryForCppProject(folder.uri.fsPath));
 }
 
 export async function initializeProjectDetection(): Promise<boolean> {
@@ -35,7 +25,7 @@ export async function initializeProjectDetection(): Promise<boolean> {
   } else if (override === 'never') {
     enabled = false;
   } else {
-    enabled = await scanWorkspace();
+    enabled = scanWorkspace();
   }
   return enabled;
 }

@@ -25,6 +25,8 @@
     "src/pairedSplit.ts",
     "src/scaffold.ts",
     "src/projectDetection.ts",
+    "src/projectDetectionScan.ts",
+    "src/projectDetection.test.ts",
     "src/editorLookup.ts",
     "src/wslPath.ts",
     "src/wslPath.test.ts",
