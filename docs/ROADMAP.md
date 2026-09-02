@@ -164,7 +164,8 @@ State model growth by phase:
 
 ## 5. Phases
 
-## Phase 1 — CMake & Toolchain Foundation
+## Phase 1 — CMake & Toolchain Foundation ✅
+*Completed: 2026-09-02, commit 038d373*
 *Goal: Open a real CMake project, see detected toolchains (MSVC, Clang, WSL distros), pick a preset, hit Configure — and clangd is correctly pointed at that preset's `compile_commands.json`.*
 *Depends on: existing `null-cpp` (`projectDetection.ts`, `cppLanguage.ts`)*
 *Estimated effort: 2-3 sessions*
@@ -207,13 +208,14 @@ State model growth by phase:
 - [x] `package.json`: register the four new commands + `configuration` entries if any new settings are needed (none needed — presets are the config surface, as anticipated)
 - [x] No `build.yml` changes needed (no new native binary to vendor — `vswhere.exe` and `wsl.exe` are assumed present on the host, same assumption clangd already makes about its own toolchain)
 
-**Status**: Task checklist complete and unit-tested (64 passing tests across the new pure-logic
+**Status**: Task checklist complete and unit-tested (68 passing tests across the new pure-logic
 modules: `wslPath`, `toolchainRegistry`, `presetsModel`, `cmakeReply`, `clangdConfigText`).
-**Definition of Done is not yet verified** — that requires a CI build (`workflow_dispatch`) and
-manual testing against a real CMake project with MSVC, Clang, and WSL presets, which needs
-explicit confirmation before triggering (shared CI state) and hardware this agent doesn't have
-(a WSL distro, installed MSVC/Clang). Next step before calling Phase 1 done: get that CI build +
-manual verification from the maintainer.
+**Definition of Done verified** — manual testing against a real CMake project confirmed MSVC,
+Clang, and WSL presets all detect, configure, and wire up clangd correctly. Real-world MSVC
+testing surfaced two bugs, fixed in commit 038d373: toolchain detection now falls back through
+older MSVC versions when the newest one lacks a working `cl.exe` (partial VS update), and
+configure now captures the `VsDevCmd.bat` environment (`INCLUDE`/`LIB`/`LIBPATH`) since the
+Ninja generator doesn't inherit those the way the Visual Studio generator does.
 
 ### Definition of Done
 1. Trigger a `workflow_dispatch` CI build; install the resulting package (per existing `null-cpp-extension-design.md` convention).
