@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { spawn, type ChildProcess } from 'node:child_process';
 import type { CMakePreset } from './presetsModel';
 import { wrapWslCommand, pickLatestIndexFile, parseReplyIndex, parseCodemodelTargets, parseTargetDetail } from './cmakeReply';
+import { getMsvcDevEnvironment, type Toolchain } from './toolchainRegistry';
 
 export type { CMakeTarget } from './cmakeReply';
 import type { CMakeTarget } from './cmakeReply';
@@ -58,6 +59,7 @@ export interface RunCommandOptions {
   isWsl: boolean;
   wslDistro?: string;
   show?: boolean;
+  env?: NodeJS.ProcessEnv;
 }
 
 /** Spawns `command` (optionally WSL-wrapped), streaming output into the shared terminal. Resolves with the exit code. */
@@ -75,7 +77,7 @@ export async function runCommand(command: string, args: string[], options: RunCo
   writeLine(`> ${resolved.command} ${resolved.args.join(' ')}`);
 
   return new Promise<number>((resolve) => {
-    const child = spawn(resolved.command, resolved.args, { cwd: options.cwd, shell: false });
+    const child = spawn(resolved.command, resolved.args, { cwd: options.cwd, shell: false, env: options.env });
     activeProcess = child;
 
     child.stdout?.on('data', (chunk: Buffer) => writeEmitter?.fire(chunk.toString().replace(/\r?\n/g, '\r\n')));
@@ -104,12 +106,14 @@ export async function writeCodemodelQuery(binaryDir: string): Promise<void> {
   await vscode.workspace.fs.writeFile(vscode.Uri.joinPath(queryDir, 'codemodel-v2'), new Uint8Array());
 }
 
-export async function configure(preset: CMakePreset, sourceDir: string, wslDistro?: string): Promise<number> {
+export async function configure(preset: CMakePreset, sourceDir: string, toolchain?: Toolchain): Promise<number> {
   await writeCodemodelQuery(preset.binaryDir);
+  const msvcEnv = toolchain ? await getMsvcDevEnvironment(toolchain) : undefined;
   return runCommand('cmake', ['--preset', preset.name], {
     cwd: sourceDir,
     isWsl: preset.isWsl,
-    wslDistro,
+    wslDistro: toolchain?.wslDistro,
+    env: msvcEnv ? { ...process.env, ...msvcEnv } : undefined,
   });
 }
 

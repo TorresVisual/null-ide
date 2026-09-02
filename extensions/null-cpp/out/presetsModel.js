@@ -112,14 +112,28 @@ function cacheVarString(raw, key) {
 function basename(p) {
     return p.replace(/\\/g, '/').split('/').pop() ?? p;
 }
+/**
+ * Maps a C++-driver executable name (what presets set for CMAKE_CXX_COMPILER)
+ * to the executable name toolchain detection actually probes for. `g++` isn't
+ * `gcc` with a suffix stripped — it's a distinct binary — so this needs an
+ * explicit alias rather than a string transform.
+ */
+const COMPILER_FAMILY_ALIASES = {
+    'g++': 'gcc',
+    'clang++': 'clang',
+};
+function normalizeCompilerFamily(name) {
+    return COMPILER_FAMILY_ALIASES[name] ?? name;
+}
 /** Matches a preset's configured compiler against a detected toolchain by executable basename. */
 function resolveToolchainId(raw, toolchains) {
     const compiler = cacheVarString(raw, 'CMAKE_CXX_COMPILER') ?? cacheVarString(raw, 'CMAKE_C_COMPILER');
     if (!compiler) {
         return '';
     }
-    const compilerBase = basename(compiler).toLowerCase();
-    return toolchains.find((t) => basename(t.compilerPath).toLowerCase() === compilerBase)?.id ?? '';
+    const compilerBase = normalizeCompilerFamily(basename(compiler).toLowerCase());
+    return (toolchains.find((t) => normalizeCompilerFamily(basename(t.compilerPath).toLowerCase()) === compilerBase)?.id ??
+        '');
 }
 function looksLikePosixPath(value) {
     return typeof value === 'string' && value.startsWith('/');

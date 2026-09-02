@@ -1,6 +1,12 @@
 import { test } from 'node:test';
 import * as assert from 'node:assert/strict';
-import { parseVswhereInstallPaths, pickLatestMsvcVersion, parseClangVersion, parseWslDistroList } from './toolchainRegistry';
+import {
+  parseVswhereInstallPaths,
+  pickLatestMsvcVersion,
+  parseClangVersion,
+  parseWslDistroList,
+  parseSetOutput,
+} from './toolchainRegistry';
 
 test('parseVswhereInstallPaths splits one path per line and drops blanks', () => {
   const stdout = 'C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\r\n\r\n';
@@ -44,4 +50,18 @@ test('parseWslDistroList strips stray null bytes and blank lines', () => {
 test('parseWslDistroList drops the non-quiet header line if one is present', () => {
   const raw = 'Windows Subsystem for Linux Distributions:\r\nUbuntu-22.04\r\n';
   assert.deepEqual(parseWslDistroList(raw), ['Ubuntu-22.04']);
+});
+
+test('parseSetOutput parses KEY=VALUE lines from `set` output', () => {
+  const raw = 'PATH=C:\\a;C:\\b\r\nLIB=C:\\VS\\lib\r\nLIBPATH=C:\\VS\\libpath\r\n';
+  assert.deepEqual(parseSetOutput(raw), {
+    PATH: 'C:\\a;C:\\b',
+    LIB: 'C:\\VS\\lib',
+    LIBPATH: 'C:\\VS\\libpath',
+  });
+});
+
+test('parseSetOutput skips blank lines and lines without an "="', () => {
+  const raw = 'PATH=C:\\a\r\n\r\nnot a var line\r\n=leading-equals-ignored\r\n';
+  assert.deepEqual(parseSetOutput(raw), { PATH: 'C:\\a' });
 });

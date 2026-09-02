@@ -152,3 +152,39 @@ test('loadPresets merges main + user presets and drops hidden ones', () => {
   const msvcPreset = presets.find((p) => p.name === 'msvc-debug');
   assert.equal(msvcPreset?.toolchainId, msvc.id);
 });
+
+test('resolveToolchainId matches a CXX "g++" preset against a detected "gcc" toolchain', () => {
+  const wslGcc: Toolchain = {
+    id: 'wsl-Ubuntu-gcc',
+    kind: 'wsl-gcc',
+    displayName: 'WSL: Ubuntu (gcc)',
+    compilerPath: '/usr/bin/gcc',
+    arch: 'x64',
+    wslDistro: 'Ubuntu',
+    detectedAt: 0,
+  };
+  const raw: RawCMakePreset = {
+    name: 'wsl-debug',
+    generator: 'Unix Makefiles',
+    cacheVariables: { CMAKE_C_COMPILER: '/usr/bin/gcc', CMAKE_CXX_COMPILER: '/usr/bin/g++' },
+  };
+  assert.equal(resolveToolchainId(raw, [wslGcc]), wslGcc.id);
+});
+
+test('resolveToolchainId matches a CXX "clang++" preset against a detected "clang" toolchain', () => {
+  const wslClang: Toolchain = {
+    id: 'wsl-Ubuntu-clang',
+    kind: 'wsl-clang',
+    displayName: 'WSL: Ubuntu (clang)',
+    compilerPath: '/usr/bin/clang',
+    arch: 'x64',
+    wslDistro: 'Ubuntu',
+    detectedAt: 0,
+  };
+  const raw: RawCMakePreset = {
+    name: 'wsl-clang-debug',
+    generator: 'Unix Makefiles',
+    cacheVariables: { CMAKE_CXX_COMPILER: '/usr/bin/clang++' },
+  };
+  assert.equal(resolveToolchainId(raw, [wslClang]), wslClang.id);
+});

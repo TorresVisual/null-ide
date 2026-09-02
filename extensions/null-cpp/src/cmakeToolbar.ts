@@ -127,9 +127,16 @@ async function cmdConfigure(context: vscode.ExtensionContext): Promise<void> {
   }
 
   const toolchain = toolchainRegistry.list().find((t) => t.id === preset.toolchainId);
+  if (preset.isWsl && !toolchain?.wslDistro) {
+    void vscode.window.showErrorMessage(
+      `No WSL toolchain detected for preset "${preset.displayName}". Ensure cmake and a compiler are installed ` +
+        'in the target WSL distro, then run "Null C++: Refresh Toolchains" and try again.'
+    );
+    return;
+  }
   configureItem.text = '$(sync~spin) Configuring...';
   try {
-    const exitCode = await configure(preset, root.fsPath, toolchain?.wslDistro);
+    const exitCode = await configure(preset, root.fsPath, toolchain);
     if (exitCode !== 0) {
       void vscode.window.showErrorMessage(`CMake configure failed for preset "${preset.displayName}" (exit code ${exitCode}).`);
       await setContext('configured', false);

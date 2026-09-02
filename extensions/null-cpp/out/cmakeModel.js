@@ -42,6 +42,7 @@ const vscode = __importStar(require("vscode"));
 const path = __importStar(require("node:path"));
 const node_child_process_1 = require("node:child_process");
 const cmakeReply_1 = require("./cmakeReply");
+const toolchainRegistry_1 = require("./toolchainRegistry");
 // ---- Process execution, streamed into a dedicated, reused terminal ----
 const TERMINAL_NAME = 'Null C++: CMake';
 let writeEmitter;
@@ -93,7 +94,7 @@ async function runCommand(command, args, options) {
     const resolved = options.isWsl && options.wslDistro ? (0, cmakeReply_1.wrapWslCommand)(command, args, options.wslDistro) : { command, args };
     writeLine(`> ${resolved.command} ${resolved.args.join(' ')}`);
     return new Promise((resolve) => {
-        const child = (0, node_child_process_1.spawn)(resolved.command, resolved.args, { cwd: options.cwd, shell: false });
+        const child = (0, node_child_process_1.spawn)(resolved.command, resolved.args, { cwd: options.cwd, shell: false, env: options.env });
         activeProcess = child;
         child.stdout?.on('data', (chunk) => writeEmitter?.fire(chunk.toString().replace(/\r?\n/g, '\r\n')));
         child.stderr?.on('data', (chunk) => writeEmitter?.fire(chunk.toString().replace(/\r?\n/g, '\r\n')));
@@ -116,12 +117,14 @@ async function writeCodemodelQuery(binaryDir) {
     await vscode.workspace.fs.createDirectory(queryDir);
     await vscode.workspace.fs.writeFile(vscode.Uri.joinPath(queryDir, 'codemodel-v2'), new Uint8Array());
 }
-async function configure(preset, sourceDir, wslDistro) {
+async function configure(preset, sourceDir, toolchain) {
     await writeCodemodelQuery(preset.binaryDir);
+    const msvcEnv = toolchain ? await (0, toolchainRegistry_1.getMsvcDevEnvironment)(toolchain) : undefined;
     return runCommand('cmake', ['--preset', preset.name], {
         cwd: sourceDir,
         isWsl: preset.isWsl,
-        wslDistro,
+        wslDistro: toolchain?.wslDistro,
+        env: msvcEnv ? { ...process.env, ...msvcEnv } : undefined,
     });
 }
 async function readJson(uri) {

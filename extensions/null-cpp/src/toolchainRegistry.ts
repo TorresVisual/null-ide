@@ -14,6 +14,8 @@ export interface Toolchain {
   compilerPath: string;
   arch: string;
   wslDistro?: string;
+  /** VS install root (e.g. `...\2022\Community`), only set for `kind: 'msvc'` — used to locate VsDevCmd.bat. */
+  installPath?: string;
   detectedAt: number;
 }
 
@@ -98,12 +100,26 @@ async function detectMsvc(): Promise<Toolchain[]> {
     } catch {
       continue;
     }
-    const latest = pickLatestMsvcVersion(versions);
-    if (!latest) {
-      continue;
+    // The numerically newest MSVC toolset directory isn't always a complete install (e.g. a
+    // partially-applied VS update can leave a newer version directory with no x64 host
+    // compiler) - fall back through older versions until one actually has a working cl.exe.
+    let remaining = versions;
+    let latest: string | undefined;
+    let compilerPath: string | undefined;
+    while (remaining.length > 0) {
+      const candidate = pickLatestMsvcVersion(remaining);
+      if (!candidate) {
+        break;
+      }
+      const candidatePath = path.join(msvcToolsDir, candidate, 'bin', 'Hostx64', 'x64', 'cl.exe');
+      if (await pathExists(candidatePath)) {
+        latest = candidate;
+        compilerPath = candidatePath;
+        break;
+      }
+      remaining = remaining.filter((v) => v !== candidate);
     }
-    const compilerPath = path.join(msvcToolsDir, latest, 'bin', 'Hostx64', 'x64', 'cl.exe');
-    if (!(await pathExists(compilerPath))) {
+    if (!latest || !compilerPath) {
       continue;
     }
     toolchains.push({
@@ -112,6 +128,7 @@ async function detectMsvc(): Promise<Toolchain[]> {
       displayName: `MSVC ${latest} (x64)`,
       compilerPath,
       arch: 'x64',
+      installPath,
       detectedAt: Date.now(),
     });
   }
@@ -249,4 +266,58 @@ async function detectWsl(): Promise<Toolchain[]> {
   const distros = parseWslDistroList(stdout);
   const results = await Promise.all(distros.map((distro) => detectWslDistro(distro)));
   return results.flat();
+}
+
+// ---- MSVC dev environment (INCLUDE/LIB/LIBPATH/PATH) ----
+//
+// cl.exe/link.exe don't work with a bare PATH entry — they need the environment
+// VsDevCmd.bat sets up (LIB/LIBPATH point at the CRT and Windows SDK import libs
+// like kernel32.lib). Presets using the Ninja generator get none of that for free
+// the way the Visual Studio generator would, so it has to be captured and merged
+// into the spawn env before running cmake/ninja against an MSVC toolchain.
+
+/** Parses `cmd /c "... && set"` output into a plain env map. */
+export function parseSetOutput(raw: string): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const line of raw.split(/\r?\n/)) {
+    const idx = line.indexOf('=');
+    if (idx <= 0) {
+      continue;
+    }
+    env[line.slice(0, idx)] = line.slice(idx + 1);
+  }
+  return env;
+}
+
+const msvcEnvCache = new Map<string, Record<string, string>>();
+
+/** Runs VsDevCmd.bat for `toolchain` and returns the resulting environment, cached per toolchain id. */
+export async function getMsvcDevEnvironment(toolchain: Toolchain): Promise<Record<string, string> | undefined> {
+  if (toolchain.kind !== 'msvc' || !toolchain.installPath) {
+    return undefined;
+  }
+  const cached = msvcEnvCache.get(toolchain.id);
+  if (cached) {
+    return cached;
+  }
+  const vsDevCmd = path.join(toolchain.installPath, 'Common7', 'Tools', 'VsDevCmd.bat');
+  if (!(await pathExists(vsDevCmd))) {
+    return undefined;
+  }
+  try {
+    // The extra outer quote pair is required: cmd.exe's /c only strips a wrapping quote pair
+    // when the *entire* remaining command line is one quoted span, not just the .bat path.
+    // Without it, cmd.exe misparses "C:\Program Files\..." as the program name at the first
+    // space (`'C:\Program' is not recognized...`) despite the path's own quotes.
+    const { stdout } = await execFileAsync(
+      'cmd.exe',
+      ['/d', '/s', '/c', `""${vsDevCmd}" -arch=${toolchain.arch} -host_arch=${toolchain.arch} >NUL && set"`],
+      { windowsVerbatimArguments: true }
+    );
+    const env = parseSetOutput(stdout);
+    msvcEnvCache.set(toolchain.id, env);
+    return env;
+  } catch {
+    return undefined;
+  }
 }

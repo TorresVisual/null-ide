@@ -71,4 +71,16 @@ const toolchainRegistry_1 = require("./toolchainRegistry");
     const raw = 'Windows Subsystem for Linux Distributions:\r\nUbuntu-22.04\r\n';
     assert.deepEqual((0, toolchainRegistry_1.parseWslDistroList)(raw), ['Ubuntu-22.04']);
 });
+(0, node_test_1.test)('parseSetOutput parses KEY=VALUE lines from `set` output', () => {
+    const raw = 'PATH=C:\\a;C:\\b\r\nLIB=C:\\VS\\lib\r\nLIBPATH=C:\\VS\\libpath\r\n';
+    assert.deepEqual((0, toolchainRegistry_1.parseSetOutput)(raw), {
+        PATH: 'C:\\a;C:\\b',
+        LIB: 'C:\\VS\\lib',
+        LIBPATH: 'C:\\VS\\libpath',
+    });
+});
+(0, node_test_1.test)('parseSetOutput skips blank lines and lines without an "="', () => {
+    const raw = 'PATH=C:\\a\r\n\r\nnot a var line\r\n=leading-equals-ignored\r\n';
+    assert.deepEqual((0, toolchainRegistry_1.parseSetOutput)(raw), { PATH: 'C:\\a' });
+});
 //# sourceMappingURL=toolchainRegistry.test.js.map
