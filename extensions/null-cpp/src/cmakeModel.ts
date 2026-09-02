@@ -135,7 +135,13 @@ export interface BuildOptions {
   clean?: boolean;
 }
 
-/** Runs `cmake --build --preset <p>` (optionally scoped to `target`), streamed into the shared terminal. */
+/**
+ * Runs `cmake --build <binaryDir>` (optionally scoped to `target`), streamed into the shared
+ * terminal. Builds against the resolved binary directory rather than `--preset <name>` —
+ * `--build --preset` resolves against `buildPresets`, a separate array from the
+ * `configurePresets` this extension reads, and most `CMakePresets.json` files never define
+ * one. Building against the directory works regardless of whether build presets exist.
+ */
 export async function build(
   preset: CMakePreset,
   sourceDir: string,
@@ -144,7 +150,8 @@ export async function build(
   options: BuildOptions = {}
 ): Promise<CommandResult> {
   const msvcEnv = toolchain ? await getMsvcDevEnvironment(toolchain) : undefined;
-  const args = ['--build', '--preset', preset.name];
+  const binaryDir = preset.isWsl ? toWslPath(preset.binaryDir) : preset.binaryDir;
+  const args = ['--build', binaryDir];
   if (target) {
     args.push('--target', target.name);
   }
@@ -161,7 +168,8 @@ export async function build(
 
 export async function cleanTarget(preset: CMakePreset, sourceDir: string, toolchain: Toolchain | undefined): Promise<number> {
   const msvcEnv = toolchain ? await getMsvcDevEnvironment(toolchain) : undefined;
-  const { exitCode } = await runCommand('cmake', ['--build', '--preset', preset.name, '--target', 'clean'], {
+  const binaryDir = preset.isWsl ? toWslPath(preset.binaryDir) : preset.binaryDir;
+  const { exitCode } = await runCommand('cmake', ['--build', binaryDir, '--target', 'clean'], {
     cwd: sourceDir,
     isWsl: preset.isWsl,
     wslDistro: toolchain?.wslDistro,
