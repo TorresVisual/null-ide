@@ -30,6 +30,19 @@ test('parseBuildDiagnosticLine parses an MSVC warning with no column', () => {
   });
 });
 
+test('parseBuildDiagnosticLine parses a clang-cl error (MSVC-style position, no error code)', () => {
+  const d = parseBuildDiagnosticLine(
+    "D:\\proj\\src\\main.cpp(7,8): error: no member named 'println' in namespace 'std'"
+  );
+  assert.deepEqual(d, {
+    file: 'D:\\proj\\src\\main.cpp',
+    line: 7,
+    column: 8,
+    severity: 'error',
+    message: "no member named 'println' in namespace 'std'",
+  });
+});
+
 test('parseBuildDiagnosticLine parses a Clang/GCC error', () => {
   const d = parseBuildDiagnosticLine("/mnt/d/proj/src/main.cpp:10:5: error: use of undeclared identifier 'x'");
   assert.deepEqual(d, {

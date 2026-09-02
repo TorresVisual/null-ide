@@ -39,8 +39,9 @@ exports.resolveDiagnosticPath = resolveDiagnosticPath;
 exports.resolveBuildDiagnostics = resolveBuildDiagnostics;
 const path = __importStar(require("node:path"));
 const wslPath_1 = require("./wslPath");
-// MSVC: `path(line,col): error C2065: message` (column is optional)
-const MSVC_RE = /^(.+?)\((\d+)(?:,(\d+))?\)\s*:\s*(fatal error|error|warning)\s+([A-Za-z]+\d+)\s*:\s*(.*)$/;
+// MSVC-style: `path(line,col): error C2065: message` — cl.exe always has an error code, but
+// clang-cl (MSVC-compatible diagnostics, e.g. `clang-cl.exe` builds) omits it, so it's optional.
+const MSVC_RE = /^(.+?)\((\d+)(?:,(\d+))?\)\s*:\s*(fatal error|error|warning)(?:\s+([A-Za-z]+\d+))?\s*:\s*(.*)$/;
 // Clang/GCC: `path:line:col: error: message`
 const GCC_CLANG_RE = /^(.+?):(\d+):(\d+):\s*(fatal error|error|warning):\s*(.*)$/;
 function severityOf(raw) {
@@ -50,12 +51,13 @@ function severityOf(raw) {
 function parseBuildDiagnosticLine(line) {
     const msvc = MSVC_RE.exec(line);
     if (msvc) {
+        const code = msvc[5];
         return {
             file: msvc[1],
             line: Number(msvc[2]),
             column: msvc[3] ? Number(msvc[3]) : 1,
             severity: severityOf(msvc[4]),
-            message: `${msvc[5]}: ${msvc[6]}`,
+            message: code ? `${code}: ${msvc[6]}` : msvc[6],
         };
     }
     const gccClang = GCC_CLANG_RE.exec(line);

@@ -60,6 +60,16 @@ const buildDiagnostics_1 = require("./buildDiagnostics");
         message: "C4101: 'y': unreferenced local variable",
     });
 });
+(0, node_test_1.default)('parseBuildDiagnosticLine parses a clang-cl error (MSVC-style position, no error code)', () => {
+    const d = (0, buildDiagnostics_1.parseBuildDiagnosticLine)("D:\\proj\\src\\main.cpp(7,8): error: no member named 'println' in namespace 'std'");
+    strict_1.default.deepEqual(d, {
+        file: 'D:\\proj\\src\\main.cpp',
+        line: 7,
+        column: 8,
+        severity: 'error',
+        message: "no member named 'println' in namespace 'std'",
+    });
+});
 (0, node_test_1.default)('parseBuildDiagnosticLine parses a Clang/GCC error', () => {
     const d = (0, buildDiagnostics_1.parseBuildDiagnosticLine)("/mnt/d/proj/src/main.cpp:10:5: error: use of undeclared identifier 'x'");
     strict_1.default.deepEqual(d, {
