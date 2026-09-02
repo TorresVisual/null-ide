@@ -7,12 +7,21 @@ export interface CMakeTarget {
   sourceFiles: string[];
 }
 
+/**
+ * `posixCwd` is passed through `wsl.exe --cd` rather than relying on `wsl.exe`'s own
+ * translation of the spawning Windows process's cwd — that auto-translation proved
+ * unreliable in practice (a WSL preset's CMake cache ended up recorded with a Windows-style
+ * source directory, `d:/...` instead of `/mnt/d/...`, causing later reconfigures to fail with
+ * a "binary dir moved" error) so the working directory is resolved to POSIX form up front.
+ */
 export function wrapWslCommand(
   command: string,
   args: string[],
-  distro: string
+  distro: string,
+  posixCwd?: string
 ): { command: string; args: string[] } {
-  return { command: 'wsl.exe', args: ['-d', distro, '--', command, ...args] };
+  const cdArgs = posixCwd ? ['--cd', posixCwd] : [];
+  return { command: 'wsl.exe', args: ['-d', distro, ...cdArgs, '--', command, ...args] };
 }
 
 interface ReplyIndexJson {

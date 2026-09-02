@@ -95,7 +95,9 @@ async function runCommand(command, args, options) {
     }
     activeProcess?.kill();
     activeProcess = undefined;
-    const resolved = options.isWsl && options.wslDistro ? (0, cmakeReply_1.wrapWslCommand)(command, args, options.wslDistro) : { command, args };
+    const resolved = options.isWsl && options.wslDistro
+        ? (0, cmakeReply_1.wrapWslCommand)(command, args, options.wslDistro, (0, wslPath_1.toWslPath)(options.cwd))
+        : { command, args };
     writeLine(`> ${resolved.command} ${resolved.args.join(' ')}`);
     return new Promise((resolve) => {
         const child = (0, node_child_process_1.spawn)(resolved.command, resolved.args, { cwd: options.cwd, shell: false, env: options.env });

@@ -79,7 +79,9 @@ export async function runCommand(command: string, args: string[], options: RunCo
   activeProcess = undefined;
 
   const resolved =
-    options.isWsl && options.wslDistro ? wrapWslCommand(command, args, options.wslDistro) : { command, args };
+    options.isWsl && options.wslDistro
+      ? wrapWslCommand(command, args, options.wslDistro, toWslPath(options.cwd))
+      : { command, args };
 
   writeLine(`> ${resolved.command} ${resolved.args.join(' ')}`);
 

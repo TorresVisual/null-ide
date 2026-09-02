@@ -14,6 +14,11 @@ test('wrapWslCommand wraps the command through wsl.exe -d <distro> --', () => {
   assert.deepEqual(wrapped.args, ['-d', 'Ubuntu', '--', 'cmake', '--build', '.']);
 });
 
+test('wrapWslCommand sets an explicit --cd when a posix cwd is given', () => {
+  const wrapped = wrapWslCommand('cmake', ['--build', '.'], 'Ubuntu', '/mnt/d/proj');
+  assert.deepEqual(wrapped.args, ['-d', 'Ubuntu', '--cd', '/mnt/d/proj', '--', 'cmake', '--build', '.']);
+});
+
 test('pickLatestIndexFile picks the lexicographically-last index-*.json', () => {
   const files = [
     'index-2024-01-01T00-00-00-0000.json',

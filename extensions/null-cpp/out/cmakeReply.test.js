@@ -41,6 +41,10 @@ const cmakeReply_1 = require("./cmakeReply");
     assert.equal(wrapped.command, 'wsl.exe');
     assert.deepEqual(wrapped.args, ['-d', 'Ubuntu', '--', 'cmake', '--build', '.']);
 });
+(0, node_test_1.test)('wrapWslCommand sets an explicit --cd when a posix cwd is given', () => {
+    const wrapped = (0, cmakeReply_1.wrapWslCommand)('cmake', ['--build', '.'], 'Ubuntu', '/mnt/d/proj');
+    assert.deepEqual(wrapped.args, ['-d', 'Ubuntu', '--cd', '/mnt/d/proj', '--', 'cmake', '--build', '.']);
+});
 (0, node_test_1.test)('pickLatestIndexFile picks the lexicographically-last index-*.json', () => {
     const files = [
         'index-2024-01-01T00-00-00-0000.json',
