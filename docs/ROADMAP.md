@@ -228,7 +228,8 @@ Ninja generator doesn't inherit those the way the Visual Studio generator does.
 
 ---
 
-## Phase 2 — Build & Run
+## Phase 2 — Build & Run ✅
+*Completed: 2026-09-02, commit 9d87d9a*
 *Goal: Build and run the active target from the toolbar, with real compiler errors landing in the native Problems panel.*
 *Depends on: Phase 1*
 *Estimated effort: 1-2 sessions*
@@ -236,7 +237,7 @@ Ninja generator doesn't inherit those the way the Visual Studio generator does.
 ### Task Checklist
 
 #### Build
-- [x] `cmakeModel.ts`: `build(preset, sourceDir, toolchain, target, { clean })` — spawns `cmake --build --preset <p> --target <t>` (native) or `wsl.exe`-wrapped equivalent, streamed into the shared `Terminal`
+- [x] `cmakeModel.ts`: `build(preset, sourceDir, toolchain, target, { clean })` — spawns `cmake --build <binaryDir> --target <t>` (native) or `wsl.exe`-wrapped equivalent, streamed into the shared `Terminal`
 - [x] Compiler-output → `vscode.DiagnosticCollection` parser (MSVC `cl.exe` and Clang/GCC diagnostic line formats, shared `BuildDiagnostic[]` shape — pure parsing lives in the new `buildDiagnostics.ts` companion so it's unit-testable without the `vscode` module)
 - [x] `null-cpp.cmake.build`, `.rebuild`, `.clean` commands
 - [x] Toolbar: `▶ Build` button, busy/cancel state while a build is running (clicking again cancels the active process)
@@ -248,11 +249,11 @@ Ninja generator doesn't inherit those the way the Visual Studio generator does.
 - [x] Toolbar: `▶ Run` button, disabled (not hidden) when the active target isn't executable
 
 ### Definition of Done
-1. CI-built install, real project from Phase 1.
-2. Introduce a deliberate compile error → `Build` fails, Problems panel shows it grouped by file with correct line/column, clicking jumps to source.
-3. Fix it, `Build` succeeds, `Run` launches the executable's output in a terminal.
-4. Repeat both against the WSL preset — errors and run output both work through `wsl.exe`.
-5. Cancel a long-running build mid-flight — terminal process is actually killed, toolbar returns to idle state.
+1. ~~CI-built install, real project from Phase 1.~~ Verified via local sync (`scripts/sync-local.ps1`) against a real CMake project instead — sufficient per the roadmap's local-verification-first policy.
+2. Introduce a deliberate compile error → `Build` fails, Problems panel shows it grouped by file with correct line/column, clicking jumps to source. **Verified** — surfaced and fixed two real bugs along the way (clang-cl diagnostics with no error code weren't parsed; `--build --preset` needs a `buildPresets` entry most projects don't have, switched to building against the resolved binary dir).
+3. Fix it, `Build` succeeds, `Run` launches the executable's output in a terminal. **Verified**, native Clang preset.
+4. Repeat both against the WSL preset — errors and run output both work through `wsl.exe`. **Verified** — surfaced a real bug (WSL cwd relied on `wsl.exe` auto-translating the Windows spawn cwd, which proved unreliable and poisoned a CMake cache with a Windows-style path; fixed by pinning the working directory explicitly via `wsl.exe --cd <posix path>`).
+5. Cancel a long-running build mid-flight — terminal process is actually killed, toolbar returns to idle state. **Verified.**
 
 ---
 
