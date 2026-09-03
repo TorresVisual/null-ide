@@ -3,7 +3,7 @@ import * as toolchainRegistry from './toolchainRegistry';
 import { loadPresets, type CMakePreset } from './presetsModel';
 import { configure, readCodemodelTargets, build, cleanTarget, run as runTarget, cancelActive, type CMakeTarget } from './cmakeModel';
 import { resolveBuildDiagnostics, type ResolvedBuildDiagnostic } from './buildDiagnostics';
-import { synthDebugConfig, resolveNativeDebugger } from './debugConfigSynth';
+import { synthDebugConfig, resolveNativeDebugger, usesPdbDebugInfo } from './debugConfigSynth';
 import { writeClangdConfig } from './clangdCompileDb';
 import * as cppConfigState from './cppConfigState';
 import { isEnabled } from './projectDetection';
@@ -278,11 +278,13 @@ async function cmdDebug(context: vscode.ExtensionContext): Promise<void> {
     void vscode.window.showErrorMessage(`No detected toolchain for preset "${preset.displayName}".`);
     return;
   }
-  const isNative = !preset.isWsl && toolchain.kind !== 'msvc';
+  const isNative = !preset.isWsl && !usesPdbDebugInfo(toolchain.kind, toolchain.compilerPath);
   const nativeDebugger = isNative ? await resolveNativeDebugger() : undefined;
   if (isNative && !nativeDebugger) {
     void vscode.window.showErrorMessage(
-      'No gdb.exe or lldb.exe found on PATH — install one to debug this preset.'
+      'No gdb.exe found on PATH — install GDB (e.g. via MSYS2 or w64devkit) to debug this preset. ' +
+        'Plain lldb.exe from the LLVM Windows installer cannot be used here: it doesn\'t implement ' +
+        'the MI protocol the debugger requires.'
     );
     return;
   }
@@ -291,6 +293,7 @@ async function cmdDebug(context: vscode.ExtensionContext): Promise<void> {
     artifactPath: target.artifactPath,
     sourceDir: root.fsPath,
     toolchainKind: toolchain.kind,
+    compilerPath: toolchain.compilerPath,
     wslDistro: toolchain.wslDistro,
     nativeDebugger,
   });

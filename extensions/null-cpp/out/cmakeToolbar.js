@@ -279,10 +279,12 @@ async function cmdDebug(context) {
         void vscode.window.showErrorMessage(`No detected toolchain for preset "${preset.displayName}".`);
         return;
     }
-    const isNative = !preset.isWsl && toolchain.kind !== 'msvc';
+    const isNative = !preset.isWsl && !(0, debugConfigSynth_1.usesPdbDebugInfo)(toolchain.kind, toolchain.compilerPath);
     const nativeDebugger = isNative ? await (0, debugConfigSynth_1.resolveNativeDebugger)() : undefined;
     if (isNative && !nativeDebugger) {
-        void vscode.window.showErrorMessage('No gdb.exe or lldb.exe found on PATH — install one to debug this preset.');
+        void vscode.window.showErrorMessage('No gdb.exe found on PATH — install GDB (e.g. via MSYS2 or w64devkit) to debug this preset. ' +
+            'Plain lldb.exe from the LLVM Windows installer cannot be used here: it doesn\'t implement ' +
+            'the MI protocol the debugger requires.');
         return;
     }
     const config = (0, debugConfigSynth_1.synthDebugConfig)({
@@ -290,6 +292,7 @@ async function cmdDebug(context) {
         artifactPath: target.artifactPath,
         sourceDir: root.fsPath,
         toolchainKind: toolchain.kind,
+        compilerPath: toolchain.compilerPath,
         wslDistro: toolchain.wslDistro,
         nativeDebugger,
     });
