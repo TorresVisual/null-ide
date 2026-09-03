@@ -291,8 +291,8 @@ Ninja generator doesn't inherit those the way the Visual Studio generator does.
 - [x] Toolbar: `🐞 Debug` button
 
 ### Definition of Done
-1. `Debug` on the MSVC preset stops at a breakpoint, Locals/Call Stack/Watch all populate — via CodeLLDB, no hand-written `launch.json`. **Pending user verification** after the CodeLLDB pivot.
-2. Same for the Clang preset — clang-cl via CodeLLDB, or plain Clang via `cppdbg`/GDB if a DWARF-targeting Clang preset is added later. **Pending user verification.**
+1. `Debug` on the MSVC preset stops at a breakpoint, Locals/Call Stack/Watch all populate — via CodeLLDB, no hand-written `launch.json`. **Verified** against the real MSVC preset in `cpp-test`.
+2. Same for the Clang preset via CodeLLDB (clang-cl, PDB debug info). **Verified.**
 3. Same for the WSL preset via `cppdbg`/GDB through `pipeTransport` — confirms the path-translation plumbing actually works under a real debugger, not just build/run. **Not yet tested.**
 4. `Build and Debug` rebuilds stale binaries before launching.
 
