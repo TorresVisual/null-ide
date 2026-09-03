@@ -77,7 +77,7 @@ test('synthDebugConfig builds a cppdbg/gdb pipeTransport config for WSL, transla
     MIMode: 'gdb',
     pipeTransport: {
       pipeProgram: 'wsl.exe',
-      pipeArgs: ['-d', 'Ubuntu'],
+      pipeArgs: ['-d', 'Ubuntu', 'bash', '-c'],
       debuggerPath: '/usr/bin/gdb',
     },
   });

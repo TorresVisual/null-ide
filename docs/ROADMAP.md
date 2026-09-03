@@ -274,7 +274,8 @@ Ninja generator doesn't inherit those the way the Visual Studio generator does.
 
 ---
 
-## Phase 4 — Debugging
+## Phase 4 — Debugging ✅
+*Completed: 2026-09-03*
 *Goal: `🐞 Debug` builds (if needed) and launches the correct debugger for the active toolchain — MSVC, Clang, GCC, or WSL — with zero manual `launch.json` authoring.*
 *Depends on: Phase 2 (build), Phase 1 (toolchain/target state)*
 *Estimated effort: 2 sessions*
@@ -293,8 +294,8 @@ Ninja generator doesn't inherit those the way the Visual Studio generator does.
 ### Definition of Done
 1. `Debug` on the MSVC preset stops at a breakpoint, Locals/Call Stack/Watch all populate — via CodeLLDB, no hand-written `launch.json`. **Verified** against the real MSVC preset in `cpp-test`.
 2. Same for the Clang preset via CodeLLDB (clang-cl, PDB debug info). **Verified.**
-3. Same for the WSL preset via `cppdbg`/GDB through `pipeTransport` — confirms the path-translation plumbing actually works under a real debugger, not just build/run. **Not yet tested.**
-4. `Build and Debug` rebuilds stale binaries before launching.
+3. Same for the WSL preset via `cppdbg`/GDB through `pipeTransport` — confirms the path-translation plumbing actually works under a real debugger, not just build/run. **Verified** against the `wsl-debug` preset in `cpp-test`. Surfaced a real bug along the way: MIEngine hands `<debuggerPath> <MI args>` to `pipeProgram` as a single quoted argv token rather than separate arguments, so `wsl.exe`'s default shell tried to exec `/usr/bin/gdb --interpreter=mi` as one literal filename ("No such file or directory"). Fixed by routing through `pipeArgs: ['-d', distro, 'bash', '-c']` so `bash -c` re-tokenizes the string itself.
+4. `Build and Debug` rebuilds stale binaries before launching. **Verified by code audit**: `cmdBuildAndDebug` (`cmakeToolbar.ts`) always calls `cmdBuild()` first and only proceeds to `cmdDebug()` if it succeeds — same pattern as Phase 3's audit-based verification.
 
 ---
 

@@ -81,7 +81,12 @@ export function synthDebugConfig(params: DebugConfigParams): DebugConfig {
       MIMode: 'gdb',
       pipeTransport: {
         pipeProgram: 'wsl.exe',
-        pipeArgs: ['-d', wslDistro],
+        // MIEngine hands `${debuggerPath} ${miArgs...}` to pipeProgram as a single quoted argv
+        // token, not split into separate arguments. wsl.exe's default shell then tries to exec
+        // that whole string as one literal filename ("/usr/bin/gdb --interpreter=mi: No such
+        // file or directory") unless it's routed through a shell that re-splits it — hence the
+        // trailing `bash -c`.
+        pipeArgs: ['-d', wslDistro, 'bash', '-c'],
         debuggerPath: '/usr/bin/gdb',
       },
     };

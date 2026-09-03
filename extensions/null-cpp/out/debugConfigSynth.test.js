@@ -75,7 +75,7 @@ const debugConfigSynth_1 = require("./debugConfigSynth");
         MIMode: 'gdb',
         pipeTransport: {
             pipeProgram: 'wsl.exe',
-            pipeArgs: ['-d', 'Ubuntu'],
+            pipeArgs: ['-d', 'Ubuntu', 'bash', '-c'],
             debuggerPath: '/usr/bin/gdb',
         },
     });
