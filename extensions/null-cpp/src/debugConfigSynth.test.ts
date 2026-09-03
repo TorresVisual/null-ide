@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { synthDebugConfig, usesPdbDebugInfo } from './debugConfigSynth';
 
-test('synthDebugConfig builds a cppvsdbg config for MSVC', () => {
+test('synthDebugConfig builds a CodeLLDB (type: lldb) config for MSVC', () => {
   const config = synthDebugConfig({
     targetName: 'app',
     artifactPath: 'D:\\proj\\build\\msvc-debug\\Debug\\app.exe',
@@ -11,7 +11,7 @@ test('synthDebugConfig builds a cppvsdbg config for MSVC', () => {
     compilerPath: 'C:\\...\\cl.exe',
   });
   assert.deepEqual(config, {
-    type: 'cppvsdbg',
+    type: 'lldb',
     name: 'Debug app',
     request: 'launch',
     program: 'D:\\proj\\build\\msvc-debug\\Debug\\app.exe',
@@ -20,7 +20,7 @@ test('synthDebugConfig builds a cppvsdbg config for MSVC', () => {
   });
 });
 
-test('synthDebugConfig builds a cppvsdbg config for clang-cl (PDB debug info, same as MSVC)', () => {
+test('synthDebugConfig builds a CodeLLDB config for clang-cl (PDB debug info, same as MSVC)', () => {
   const config = synthDebugConfig({
     targetName: 'app',
     artifactPath: 'D:\\proj\\build\\clang-debug\\app.exe',
@@ -28,7 +28,7 @@ test('synthDebugConfig builds a cppvsdbg config for clang-cl (PDB debug info, sa
     toolchainKind: 'clang',
     compilerPath: 'C:\\Program Files\\LLVM\\bin\\clang-cl.exe',
   });
-  assert.equal(config.type, 'cppvsdbg');
+  assert.equal(config.type, 'lldb');
 });
 
 test('synthDebugConfig builds a cppdbg/lldb config for plain native Clang, with an explicit miDebuggerPath', () => {

@@ -52,19 +52,19 @@ analysis.
 | WSL toolchain discovery | `wsl.exe --list --quiet` to enumerate distros, then `wsl.exe -d <distro> -- which cmake gcc make` | WSL distros bring their own gcc/make/cmake; null-cpp only shells out |
 | Build execution (native) | `child_process.spawn` into a dedicated VS Code `Terminal` | Visible, cancellable — matches how `null-actions` already runs shell commands per button |
 | Build execution (WSL) | Same, prefixed through `wsl.exe -d <distro> --` with paths translated via `wslpath` | Keeps one command-execution code path, just with a translation shim |
-| Debugger (MSVC) | `cppvsdbg` (`ms-vscode.cpptools`) | Only adapter that understands MSVC PDBs and `.natvis` |
-| Debugger (Clang/GCC, native or WSL) | `cppdbg` (`ms-vscode.cpptools`) with `MIMode: lldb` or `gdb`; WSL via `pipeTransport` (`pipeProgram: wsl.exe`) | Standard, documented cpptools pattern for LLDB/GDB, including through WSL |
+| Debugger (MSVC, clang-cl) | CodeLLDB (`vadimcn.vscode-lldb`), `type: "lldb"` | `cppvsdbg` (Microsoft's PDB-capable engine) actively refuses to run on non-Microsoft-branded VS Code builds as of cpptools 1.24.5 — confirmed live against Null IDE, no code-side fix. CodeLLDB's bundled LLDB has grown functional Windows PDB support and isn't license-gated. |
+| Debugger (plain Clang/GCC, native or WSL) | `cppdbg` (`ms-vscode.cpptools`) with `MIMode: gdb` preferred (plain `lldb.exe` from the LLVM Windows installer doesn't speak the MI protocol at all); WSL via `pipeTransport` (`pipeProgram: wsl.exe`) | Standard, documented cpptools pattern for LLDB/GDB, including through WSL — unaffected by the license check since MIEngine is open source |
 | UI | VS Code status bar items + `QuickPick`; `TreeView` (CMake sidebar, phase 3) | Matches `null-actions`' existing status-bar-button conventions |
 
-**Key decision — new dependency**: Phase 4 (Debugging) requires adding
-`ms-vscode.cpptools` as a second `extensionDependencies` entry. Its
-IntelliSense engine must be explicitly disabled
-(`"C_Cpp.intelliSenseEngine": "disabled"` in `configurationDefaults`, same
-mechanism `product.json`'s overlay already uses) so it never competes with
-clangd — it contributes debug adapters only. This is a well-established
-pattern (clangd for language service, cpptools for `cppvsdbg`/`cppdbg`
-only), but it's a real new dependency and worth flagging before Phase 4
-starts.
+**Key decision — new dependencies**: Phase 4 (Debugging) requires two new
+`extensionDependencies`: `ms-vscode.cpptools` (WSL/native Clang/GCC
+debugging via `cppdbg`) and `vadimcn.vscode-lldb` (MSVC/clang-cl debugging
+via CodeLLDB, since `cppvsdbg` is license-blocked on this fork — see the
+Phase 4 section for the full story). cpptools' IntelliSense engine must be
+explicitly disabled (`"C_Cpp.intelliSenseEngine": "disabled"` in
+`configurationDefaults`, same mechanism `product.json`'s overlay already
+uses) so it never competes with clangd — it contributes debug adapters
+only.
 
 ---
 
@@ -279,19 +279,21 @@ Ninja generator doesn't inherit those the way the Visual Studio generator does.
 *Depends on: Phase 2 (build), Phase 1 (toolchain/target state)*
 *Estimated effort: 2 sessions*
 
+**Real-world finding (2026-09-03):** Microsoft's cpptools 1.24.5+ added a binary-level check to `cppvsdbg` (its proprietary `vsdbg.exe` wrapper) that refuses to run on any non-Microsoft-branded VS Code build — confirmed live against Null IDE ("C/C++ Debugging is supported only in Microsoft versions of VS Code"). No code-side fix exists; `cppdbg` (MIEngine, open source) is unaffected. Since MSVC and clang-cl both emit PDB debug info that only `cppvsdbg`-class engines can read, both now route through **CodeLLDB** (`vadimcn.vscode-lldb`, `type: "lldb"`) instead — its bundled LLDB has grown functional (if less polished than vsdbg) Windows PDB support and isn't license-gated.
+
 ### Task Checklist
-- [ ] Add `ms-vscode.cpptools` to `extensionDependencies`; set `C_Cpp.intelliSenseEngine: "disabled"` in `product.json`'s `configurationDefaults`
-- [ ] `debugConfigSynth.ts`: build a `vscode.DebugConfiguration` from `CppConfigState` + `Toolchain`:
-  - MSVC → `type: "cppvsdbg"`, `program: artifactPath`
-  - Clang/GCC (native) → `type: "cppdbg"`, `MIMode: "lldb"` or `"gdb"` based on what's on PATH
+- [x] Add `ms-vscode.cpptools` (WSL/native Clang/GCC via `cppdbg`) and `vadimcn.vscode-lldb` (MSVC/clang-cl via `type: "lldb"`) to `extensionDependencies`; set `C_Cpp.intelliSenseEngine: "disabled"` in `product.json`'s `configurationDefaults`
+- [x] `debugConfigSynth.ts`: build a debug config from the active toolchain + resolved `CMakeTarget`:
+  - MSVC or clang-cl (PDB debug info, told apart from plain clang by compiler basename) → `type: "lldb"` (CodeLLDB), `program: artifactPath`
+  - Plain native Clang/GCC (DWARF) → `type: "cppdbg"`, `MIMode`/`miDebuggerPath` resolved from PATH — **gdb preferred over lldb**: plain `lldb.exe` from the LLVM Windows installer doesn't implement the MI protocol at all (confirmed live — a real "nothing happens" hang), only the deprecated `lldb-mi.exe` did
   - WSL → `type: "cppdbg"`, `MIMode: "gdb"`, `pipeTransport: { pipeProgram: "wsl.exe", pipeArgs: ["-d", distro], debuggerPath: "/usr/bin/gdb" }`, paths translated via `wslPath.ts`
-- [ ] `null-cpp.debug.start`, `null-cpp.debug.buildAndDebug` commands
-- [ ] Toolbar: `🐞 Debug` button
+- [x] `null-cpp.debug.start`, `null-cpp.debug.buildAndDebug` commands
+- [x] Toolbar: `🐞 Debug` button
 
 ### Definition of Done
-1. CI-built install. `Debug` on the MSVC preset stops at a breakpoint, Locals/Call Stack/Watch all populate — using `cppvsdbg`, no hand-written `launch.json`.
-2. Same for the Clang preset via `cppdbg`/LLDB.
-3. Same for the WSL preset via `cppdbg`/GDB through `pipeTransport` — confirms the path-translation plumbing actually works under a real debugger, not just build/run.
+1. `Debug` on the MSVC preset stops at a breakpoint, Locals/Call Stack/Watch all populate — via CodeLLDB, no hand-written `launch.json`. **Pending user verification** after the CodeLLDB pivot.
+2. Same for the Clang preset — clang-cl via CodeLLDB, or plain Clang via `cppdbg`/GDB if a DWARF-targeting Clang preset is added later. **Pending user verification.**
+3. Same for the WSL preset via `cppdbg`/GDB through `pipeTransport` — confirms the path-translation plumbing actually works under a real debugger, not just build/run. **Not yet tested.**
 4. `Build and Debug` rebuilds stale binaries before launching.
 
 ---

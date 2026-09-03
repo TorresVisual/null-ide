@@ -4,7 +4,7 @@ import { toWslPath } from './wslPath';
 import type { ToolchainKind } from './toolchainRegistry';
 
 export interface DebugConfig {
-  type: 'cppvsdbg' | 'cppdbg';
+  type: 'lldb' | 'cppdbg';
   name: string;
   request: 'launch';
   program: string;
@@ -38,28 +38,33 @@ export interface DebugConfigParams {
 }
 
 /**
- * clang-cl targets MSVC ABI parity, including PDB (CodeView) debug info instead of DWARF, so
- * it needs the same `cppvsdbg` engine as real MSVC — GDB/LLDB can't read PDB at all. Plain
- * `clang.exe` doesn't have this distinction in `ToolchainKind` (both share `kind: 'clang'`),
- * so it's told apart by the compiler executable's basename instead.
+ * clang-cl targets MSVC ABI parity, including PDB (CodeView) debug info instead of DWARF — GDB
+ * can't read that at all, and neither can `cppvsdbg`, Microsoft's own PDB-capable engine: it
+ * wraps a proprietary `vsdbg.exe` that actively refuses to run on any non-Microsoft-branded VS
+ * Code build (added in cpptools 1.24.5, no way around it from the extension side). CodeLLDB's
+ * bundled LLDB has grown enough Windows PDB support to stand in for both. Plain `clang.exe`
+ * doesn't have the PDB-vs-DWARF distinction in `ToolchainKind` (both share `kind: 'clang'`), so
+ * it's told apart by the compiler executable's basename instead.
  */
 export function usesPdbDebugInfo(toolchainKind: ToolchainKind, compilerPath: string): boolean {
   return toolchainKind === 'msvc' || path.basename(compilerPath).toLowerCase() === 'clang-cl.exe';
 }
 
 /**
- * Builds a `vscode.DebugConfiguration`-shaped object for the active toolchain — MSVC/clang-cl,
- * native Clang/GCC, or WSL. MIEngine (the `cppdbg` debug adapter) doesn't auto-discover gdb/lldb
- * from PATH the way its default-value docs imply — omitting `miDebuggerPath` fails at launch
- * with "Unable to determine path to debugger", so it must always be resolved and passed
- * explicitly for the native path (the WSL path already pins one via `pipeTransport.debuggerPath`).
+ * Builds a `vscode.DebugConfiguration`-shaped object for the active toolchain — MSVC/clang-cl
+ * (via CodeLLDB, `type: 'lldb'`), native Clang/GCC, or WSL (both via `cppdbg`). MIEngine (the
+ * `cppdbg` debug adapter) doesn't auto-discover gdb/lldb from PATH the way its default-value
+ * docs imply — omitting `miDebuggerPath` fails at launch with "Unable to determine path to
+ * debugger", so it must always be resolved and passed explicitly for the native path (the WSL
+ * path already pins one via `pipeTransport.debuggerPath`; CodeLLDB bundles its own LLDB, so the
+ * PDB path needs neither).
  */
 export function synthDebugConfig(params: DebugConfigParams): DebugConfig {
   const { targetName, artifactPath, sourceDir, toolchainKind, compilerPath, wslDistro, nativeDebugger } = params;
   const name = `Debug ${targetName}`;
 
   if (usesPdbDebugInfo(toolchainKind, compilerPath)) {
-    return { type: 'cppvsdbg', name, request: 'launch', program: artifactPath, args: [], cwd: sourceDir };
+    return { type: 'lldb', name, request: 'launch', program: artifactPath, args: [], cwd: sourceDir };
   }
 
   if (toolchainKind === 'wsl-gcc' || toolchainKind === 'wsl-clang') {

@@ -8,7 +8,7 @@
   "engines": { "vscode": "^1.85.0" },
   "main": "./out/extension.js",
   "activationEvents": ["onStartupFinished"],
-  "extensionDependencies": ["llvm-vs-code-extensions.vscode-clangd", "ms-vscode.cpptools"],
+  "extensionDependencies": ["llvm-vs-code-extensions.vscode-clangd", "ms-vscode.cpptools", "vadimcn.vscode-lldb"],
   "scripts": {
     "compile": "tsc -p tsconfig.json",
     "test": "tsc -p tsconfig.json && node --test out/symbolTree.test.js out/pairRegistry.test.js out/scaffoldNaming.test.js out/wslPath.test.js out/toolchainRegistry.test.js out/presetsModel.test.js out/cmakeReply.test.js out/clangdConfigText.test.js out/buildDiagnostics.test.js out/projectDetection.test.js out/debugConfigSynth.test.js"

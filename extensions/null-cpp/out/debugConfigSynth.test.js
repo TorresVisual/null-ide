@@ -6,7 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const node_test_1 = __importDefault(require("node:test"));
 const strict_1 = __importDefault(require("node:assert/strict"));
 const debugConfigSynth_1 = require("./debugConfigSynth");
-(0, node_test_1.default)('synthDebugConfig builds a cppvsdbg config for MSVC', () => {
+(0, node_test_1.default)('synthDebugConfig builds a CodeLLDB (type: lldb) config for MSVC', () => {
     const config = (0, debugConfigSynth_1.synthDebugConfig)({
         targetName: 'app',
         artifactPath: 'D:\\proj\\build\\msvc-debug\\Debug\\app.exe',
@@ -15,7 +15,7 @@ const debugConfigSynth_1 = require("./debugConfigSynth");
         compilerPath: 'C:\\...\\cl.exe',
     });
     strict_1.default.deepEqual(config, {
-        type: 'cppvsdbg',
+        type: 'lldb',
         name: 'Debug app',
         request: 'launch',
         program: 'D:\\proj\\build\\msvc-debug\\Debug\\app.exe',
@@ -23,7 +23,7 @@ const debugConfigSynth_1 = require("./debugConfigSynth");
         cwd: 'D:\\proj',
     });
 });
-(0, node_test_1.default)('synthDebugConfig builds a cppvsdbg config for clang-cl (PDB debug info, same as MSVC)', () => {
+(0, node_test_1.default)('synthDebugConfig builds a CodeLLDB config for clang-cl (PDB debug info, same as MSVC)', () => {
     const config = (0, debugConfigSynth_1.synthDebugConfig)({
         targetName: 'app',
         artifactPath: 'D:\\proj\\build\\clang-debug\\app.exe',
@@ -31,7 +31,7 @@ const debugConfigSynth_1 = require("./debugConfigSynth");
         toolchainKind: 'clang',
         compilerPath: 'C:\\Program Files\\LLVM\\bin\\clang-cl.exe',
     });
-    strict_1.default.equal(config.type, 'cppvsdbg');
+    strict_1.default.equal(config.type, 'lldb');
 });
 (0, node_test_1.default)('synthDebugConfig builds a cppdbg/lldb config for plain native Clang, with an explicit miDebuggerPath', () => {
     const config = (0, debugConfigSynth_1.synthDebugConfig)({
