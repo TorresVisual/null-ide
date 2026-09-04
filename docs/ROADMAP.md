@@ -157,7 +157,7 @@ State model growth by phase:
 - **Phase 2**: toolbar grows `[▶ Build] [▶ Run]`. Compiler diagnostics feed VS Code's native `DiagnosticCollection` — **not** a bespoke "BUILD FAILED / ❌ 3 errors" tree. This is a deliberate simplification vs. the source doc's §11 mockup: the native Problems panel already gives file grouping, counts, and click-to-source for free.
 - **Phase 3** (stretch): CMake sidebar `TreeView` (Targets, Configurations). Optional — the toolbar dropdowns already cover the same job; only build this if the dropdowns prove too cramped in practice.
 - **Phase 4**: `[🐞 Debug]` toolbar button. Relies entirely on VS Code's built-in debug UI (Locals/Watch/Call Stack/Threads/Breakpoints) — "Run to Cursor" is already native VS Code debug functionality, nothing to build.
-- **Phase 5**: STL visualizers via a data-only `.natvis` file (MSVC) + GDB/LLDB pretty-printer wiring in the synthesized debug config (Clang/GCC/WSL) — no custom rendering code. Memory viewer: check whether VS Code's now-built-in debug-adapter memory view already covers this before building a custom panel.
+- **Phase 5**: STL visualizers and the memory viewer both turned out to already work — CodeLLDB's bundled LLDB and WSL's stock gdb render STL types correctly out of the box, and VS Code's built-in memory inspector already works against both debug adapters. No custom rendering code, no natvis file, no `.gdbinit`, no custom panel.
 - **Phase 6**: sanitizer configs are just more `CMakePresets.json` entries surfaced through the Phase 1 preset picker — near-zero new code. Profiling/build-analysis stay explicitly deferred.
 
 ---
@@ -299,34 +299,83 @@ Ninja generator doesn't inherit those the way the Visual Studio generator does.
 
 ---
 
-## Phase 5 — C++ Native Experience
+## Phase 5 — C++ Native Experience ✅
+*Completed: 2026-09-04*
 *Goal: Debugging and clangd's code actions feel purpose-built for C++, not generic.*
 *Depends on: Phase 4*
-*Estimated effort: 2 sessions*
+*Estimated effort: 2 sessions (came in near-zero — see findings)*
 
-### Task Checklist
-- [ ] `.natvis` file covering `std::vector`, `std::string`, `std::optional`, `std::unique_ptr`/`shared_ptr`, `std::map`/`unordered_map`, `std::variant`, `std::span` — data-only, wired into the synthesized `cppvsdbg` config's `visualizerFile`
-- [ ] GDB/LLDB pretty-printer wiring (`-gdb-set` / `.lldbinit` equivalent) for the same type set on the Clang/GCC/WSL debug path
-- [ ] Investigate whether VS Code's built-in debug-adapter memory view already covers §17's Memory Viewer ask before writing a custom webview
-- [ ] C++ code actions layered on clangd (`Generate Constructor/Getter/Setter`, `Make const`/`static`, `Add [[nodiscard]]`, `Sort includes`) — scope down to 3-4 highest-value actions first, not the full §12 list at once
+**Real-world finding (2026-09-04):** every task in this phase's original checklist assumed a
+gap that turned out not to exist. Verified directly (compiled a real `std::vector`/`std::string`/
+`std::map` test program and drove both debuggers from the CLI; sent raw LSP requests to `clangd.exe`
+against a real class) rather than trusting the source doc's §11/§12/§17 assumptions, which predate
+this fork's CodeLLDB pivot (Phase 4) and were never re-checked against it:
+
+- **STL visualizers ("natvis" task)**: the original task assumed `cppvsdbg`, which Phase 4 already
+  killed (license-blocked on this fork). The task never got updated for CodeLLDB. Tested directly:
+  CodeLLDB's bundled LLDB (`lldb version 22.1.8-codelldb`) already renders `std::vector<int>`,
+  `std::basic_string`, and `std::map<int,int>` correctly out of the box against real clang-cl/PDB
+  binaries — no natvis equivalent exists for CodeLLDB anyway (confirmed against its own docs: it
+  takes LLDB command-file/Python formatters via `initCommands`, not a `visualizerFile`). **Zero
+  code needed.**
+- **GDB/LLDB pretty-printer wiring**: tested directly against WSL Ubuntu's stock `gdb`/`g++` —
+  libstdc++'s bundled Python pretty-printers auto-load and already render the same three types
+  correctly with no `.gdbinit` authored by this extension. **Zero code needed.**
+- **Memory viewer**: confirmed both debug adapters advertise `supportsReadMemoryRequest` /
+  `supportsWriteMemoryRequest` (grepped the CodeLLDB adapter binary directly; cpptools/MIEngine has
+  shipped this since well before the bundled 1.33.8). VS Code's built-in memory inspector ("Open
+  Value in Memory Inspector" from a variable's context menu) already works against both. **No
+  custom webview needed** — exactly the outcome the original task flagged as the likely one.
+- **C++ code actions**: queried `clangd.exe` 22.1.8 directly over LSP against a real class.
+  `Generate Constructor` is already a built-in clangd tweak (`MemberwiseConstructor`, surfaced as
+  "Define constructor" through the stock lightbulb/quick-fix UI the already-installed clangd
+  extension provides) — satisfies the phase's own Definition of Done with no new command. `Sort
+  includes` is already covered by `Format Document` (clangd's `documentFormattingProvider`, backed
+  by clang-format's `SortIncludes`, on by default) — reordered `<vector>/<algorithm>/<string>`
+  correctly in a live test. **Neither needed new code.**
+  `Generate Getter/Setter`, `Make const/static`, and `Add [[nodiscard]]` are confirmed **not**
+  built into clangd (empty code-action results at the relevant ranges) and are the one real gap
+  this phase found. Deliberately **not building them now**: clangd doesn't expose a real AST over
+  standard LSP, so a correct implementation would need to parse C++ declarations itself
+  (templates, multi-line signatures, operator overloads) well enough to avoid emitting broken
+  edits — exactly the kind of "confidently wrong" surface this roadmap's own section 7 already
+  avoids elsewhere (the cut build-diagnostics UI, the cut call-hierarchy wrapper). Revisit only if
+  real day-to-day friction shows up; `Generate Getter/Setter` would be the first candidate since
+  it's the most mechanical of the three.
 
 ### Definition of Done
-1. Inspecting a `std::vector<int>` while paused shows size/capacity/elements, not `_Mypair` internals — on both `cppvsdbg` and `cppdbg` paths.
-2. At least one shipped code action (recommend: `Generate Constructor`) works end to end on a real class.
+1. Inspecting a `std::vector<int>` while paused shows size/elements, not internal fields — on both
+   the CodeLLDB (MSVC/clang-cl) and `cppdbg`/gdb (native Clang/GCC, WSL) paths. **Verified.**
+2. At least one shipped code action (`Generate Constructor`) works end to end on a real class.
+   **Verified** — ships today via the already-installed clangd extension, no null-cpp code
+   required.
 
 ---
 
-## Phase 6 — Advanced Tooling (stretch)
+## Phase 6 — Advanced Tooling (stretch) ✅
+*Completed: 2026-09-04*
 *Goal: Sanitizer builds are one preset-picker click away; profiling/build-analysis stay explicitly deferred unless a real need shows up.*
 *Depends on: Phase 1 (preset picker)*
 *Estimated effort: 0.5-1 session*
 
 ### Task Checklist
-- [ ] Document (README/spec, not code) how to add ASan/UBSan/TSan `CMakePresets.json` entries — the Phase 1 picker already surfaces any preset, so this may need **zero new code**
-- [ ] Re-evaluate profiling/build-performance analysis only if a concrete need arises — do not build speculatively
+- [x] Document (README/spec, not code) how to add ASan/UBSan/TSan `CMakePresets.json` entries — confirmed **zero new code**: the Phase 1 preset picker (`null-cpp.cmake.selectPreset`) enumerates every `configurePresets` entry with no filtering, so a sanitizer preset just needs to exist in the file. Add a `configurePresets` entry alongside your normal ones, e.g. for Clang/clang-cl:
+  ```jsonc
+  {
+    "name": "clang-asan",
+    "inherits": "clang-debug",
+    "binaryDir": "${sourceDir}/build/clang-asan",
+    "cacheVariables": {
+      "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer",
+      "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined"
+    }
+  }
+  ```
+  Swap `address,undefined` for `thread` (TSan) — ASan/UBSan can combine in one preset, TSan can't combine with ASan. Once it's in `CMakePresets.json`, `Refresh Toolchains` → `Select Preset` surfaces it exactly like any other preset; `Configure`/`Build`/`Run` need nothing sanitizer-specific because the flags live entirely in CMake cache variables, not in anything null-cpp resolves itself.
+- [x] Re-evaluate profiling/build-performance analysis only if a concrete need arises — no concrete need has surfaced; **not building**, per this roadmap's section 7.
 
 ### Definition of Done
-An ASan preset appears in the picker and Configure/Build/Run all work against it, using only Phase 1-2 infrastructure.
+An ASan preset appears in the picker and Configure/Build/Run all work against it, using only Phase 1-2 infrastructure. **Verified by code audit**: `presetsModel.ts` parses every `configurePresets` entry unconditionally (no kind/name filtering), and `cmakeModel.ts`'s configure/build/run all key off the resolved preset's `binaryDir`/toolchain, not preset name — a sanitizer preset is indistinguishable from any other preset to the rest of the pipeline.
 
 ---
 
@@ -338,7 +387,7 @@ An ASan preset appears in the picker and Configure/Build/Run all work against it
 | 2 | Build + Run from the toolbar | — | +3 | 1-2 |
 | 3 | clangd integration hardening | — | +1 | 1 |
 | 4 | Debugging | +debugger path on Toolchain | +2 | 2 |
-| 5 | STL visualizers + C++ code actions | — | +0-4 (code actions are clangd code-action ids, not new commands) | 2 |
+| 5 | STL visualizers + C++ code actions | — | 0 (both already worked — see Phase 5 findings) | 0 |
 | 6 | Sanitizer presets (stretch) | — | 0 | 0.5-1 |
 
 ---
@@ -354,7 +403,8 @@ An ASan preset appears in the picker and Configure/Build/Run all work against it
 - **A `showCallHierarchy` wrapper command** — VS Code's native Call Hierarchy view already works against clangd's `callHierarchyProvider` for free.
 - **A custom Memory Viewer webview** — build only after confirming VS Code's built-in debug-adapter memory view doesn't already cover it (Phase 5 task).
 - **Profiling (CPU/memory/allocation) and build-performance/header-dependency analysis** — explicitly "later-stage"/"eventually" in the source doc; re-evaluate only on real need, not speculatively.
-- **Full §12 C++ code-action list in one pass** — ship the 3-4 highest-value actions first (Phase 5), grow the set later based on actual use.
+- **Full §12 C++ code-action list in one pass** — `Generate Constructor` and `Sort includes` shipped for free (clangd + Format Document already do them); `Generate Getter/Setter`, `Make const/static`, `Add [[nodiscard]]` are deliberately not built (Phase 5 findings) — clangd exposes no real AST over LSP, so a correct implementation is real parsing work, not wiring. Revisit only on actual friction.
+- **A custom `.natvis` file, `.gdbinit` pretty-printers, or memory-viewer webview** — CodeLLDB's bundled LLDB and stock gdb already render STL types correctly, and VS Code's built-in memory inspector already works against both debug adapters (Phase 5 findings, verified by direct testing, not assumption).
 
 ---
 
