@@ -489,7 +489,7 @@ This isn't unit-testable: it depends on real workspace content and a real runnin
 
 - [ ] **Step 1: Sync the build**
 
-Run `copy.ps1` (or trigger a `workflow_dispatch` CI build and install it) and restart Null IDE.
+Run `scripts\sync-local.ps1 -Full` (or trigger a `workflow_dispatch` CI build and install it) and restart Null IDE.
 
 - [ ] **Step 2: Verify a non-C++ workspace stays quiet**
 

@@ -281,7 +281,7 @@ This isn't unit-testable: it depends on real editor layout/focus state in a runn
 
 - [ ] **Step 1: Sync the build**
 
-Run `copy.ps1` and restart Null IDE.
+Run `scripts\sync-local.ps1 -Full` and restart Null IDE.
 
 - [ ] **Step 2: Verify Alt+O targets an existing split**
 

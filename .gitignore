@@ -2,6 +2,7 @@
 vscode-src/
 vscodium-src/
 shell-ext-build/
+appx-validate-stage/
 
 # Shell extension: wil headers fetched by CI
 shell-ext/deps/
