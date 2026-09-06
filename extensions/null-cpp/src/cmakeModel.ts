@@ -5,6 +5,7 @@ import type { CMakePreset } from './presetsModel';
 import { wrapWslCommand, pickLatestIndexFile, parseReplyIndex, parseCodemodelTargets, parseTargetDetail } from './cmakeReply';
 import { getMsvcDevEnvironment, type Toolchain } from './toolchainRegistry';
 import { toWslPath } from './wslPath';
+import { parseBuildDiagnosticLine, parseBuildOutput } from './buildDiagnostics';
 
 export type { CMakeTarget } from './cmakeReply';
 import type { CMakeTarget } from './cmakeReply';
@@ -50,6 +51,27 @@ function writeLine(text: string): void {
   writeEmitter?.fire(`${text.replace(/\r?\n/g, '\r\n')}\r\n`);
 }
 
+const ANSI_RESET = '\x1b[0m';
+const ANSI_DIM = '\x1b[2m';
+const ANSI_RED = '\x1b[31m';
+const ANSI_YELLOW = '\x1b[33m';
+const ANSI_GREEN = '\x1b[32m';
+
+/** Wraps error/warning lines in ANSI color so they stand out in the wall of compiler output. */
+function colorizeChunk(text: string): string {
+  return text
+    .split(/(\r?\n)/)
+    .map((part) => {
+      const diagnostic = parseBuildDiagnosticLine(part);
+      if (!diagnostic) {
+        return part;
+      }
+      const color = diagnostic.severity === 'error' ? ANSI_RED : ANSI_YELLOW;
+      return `${color}${part}${ANSI_RESET}`;
+    })
+    .join('');
+}
+
 /** Cancels whatever cmake/build/run process is currently streaming into the shared terminal. */
 export function cancelActive(): void {
   activeProcess?.kill();
@@ -83,7 +105,7 @@ export async function runCommand(command: string, args: string[], options: RunCo
       ? wrapWslCommand(command, args, options.wslDistro, toWslPath(options.cwd))
       : { command, args };
 
-  writeLine(`> ${resolved.command} ${resolved.args.join(' ')}`);
+  writeLine(`${ANSI_DIM}> ${resolved.command} ${resolved.args.join(' ')}${ANSI_RESET}`);
 
   return new Promise<CommandResult>((resolve) => {
     const child = spawn(resolved.command, resolved.args, { cwd: options.cwd, shell: false, env: options.env });
@@ -93,19 +115,30 @@ export async function runCommand(command: string, args: string[], options: RunCo
     const onData = (chunk: Buffer) => {
       const text = chunk.toString();
       output += text;
-      writeEmitter?.fire(text.replace(/\r?\n/g, '\r\n'));
+      writeEmitter?.fire(colorizeChunk(text).replace(/\r?\n/g, '\r\n'));
     };
     child.stdout?.on('data', onData);
     child.stderr?.on('data', onData);
 
     child.on('error', (err) => {
-      writeLine(`Failed to start "${resolved.command}": ${err.message}`);
+      writeLine(`${ANSI_RED}Failed to start "${resolved.command}": ${err.message}${ANSI_RESET}`);
       activeProcess = undefined;
       resolve({ exitCode: -1, output });
     });
 
     child.on('close', (code) => {
       writeLine(`[exit code ${code ?? -1}]`);
+      const diagnostics = parseBuildOutput(output);
+      const errors = diagnostics.filter((d) => d.severity === 'error').length;
+      const warnings = diagnostics.filter((d) => d.severity === 'warning').length;
+      if (errors || warnings) {
+        const parts = [errors && `${errors} error${errors === 1 ? '' : 's'}`, warnings && `${warnings} warning${warnings === 1 ? '' : 's'}`]
+          .filter(Boolean)
+          .join(', ');
+        writeLine(`${errors ? ANSI_RED : ANSI_YELLOW}✗ ${parts}${ANSI_RESET}`);
+      } else if (code === 0) {
+        writeLine(`${ANSI_GREEN}✓ build succeeded${ANSI_RESET}`);
+      }
       activeProcess = undefined;
       resolve({ exitCode: code ?? -1, output });
     });
