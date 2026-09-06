@@ -41,6 +41,7 @@ const scaffoldNaming_1 = require("./scaffoldNaming");
 const cmakeScaffoldContent_1 = require("./cmakeScaffoldContent");
 const makeScaffoldContent_1 = require("./makeScaffoldContent");
 const projectDetection_1 = require("./projectDetection");
+const makeToolbar_1 = require("./makeToolbar");
 async function fileExists(uri) {
     try {
         await vscode.workspace.fs.stat(uri);
@@ -78,6 +79,7 @@ function registerInitMakeProject(context) {
         }
         const enabled = await (0, projectDetection_1.initializeProjectDetection)();
         await vscode.commands.executeCommand('setContext', 'null-cpp.isCppProject', enabled);
+        await (0, makeToolbar_1.refreshMakeContext)();
         const doc = await vscode.workspace.openTextDocument(makefileUri);
         await vscode.window.showTextDocument(doc);
     }));

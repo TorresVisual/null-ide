@@ -5,6 +5,7 @@ import { validateClassName } from './scaffoldNaming';
 import * as toolchainRegistry from './toolchainRegistry';
 import { initializeProjectDetection } from './projectDetection';
 import { cmakeListsContent, MAIN_CPP_CONTENT, presetsJsonContent } from './cmakeScaffoldContent';
+import { refreshCMakeFileContext } from './cmakeToolbar';
 
 async function fileExists(uri: vscode.Uri): Promise<boolean> {
   try {
@@ -74,6 +75,7 @@ export function registerInitCMakeProject(context: vscode.ExtensionContext): void
 
       const enabled = await initializeProjectDetection();
       await vscode.commands.executeCommand('setContext', 'null-cpp.isCppProject', enabled);
+      await refreshCMakeFileContext(context);
 
       if (openUri) {
         const doc = await vscode.workspace.openTextDocument(openUri);

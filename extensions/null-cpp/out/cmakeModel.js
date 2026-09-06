@@ -48,7 +48,7 @@ const cmakeReply_1 = require("./cmakeReply");
 const toolchainRegistry_1 = require("./toolchainRegistry");
 const wslPath_1 = require("./wslPath");
 // ---- Process execution, streamed into a dedicated, reused terminal ----
-const TERMINAL_NAME = 'Null C++: CMake';
+const TERMINAL_NAME = 'Null C++: Build';
 let writeEmitter;
 let ptyTerminal;
 let activeProcess;

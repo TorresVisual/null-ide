@@ -5,6 +5,7 @@ import { validateClassName } from './scaffoldNaming';
 import { MAIN_CPP_CONTENT } from './cmakeScaffoldContent';
 import { makefileContent } from './makeScaffoldContent';
 import { initializeProjectDetection } from './projectDetection';
+import { refreshMakeContext } from './makeToolbar';
 
 async function fileExists(uri: vscode.Uri): Promise<boolean> {
   try {
@@ -52,6 +53,7 @@ export function registerInitMakeProject(context: vscode.ExtensionContext): void 
 
       const enabled = await initializeProjectDetection();
       await vscode.commands.executeCommand('setContext', 'null-cpp.isCppProject', enabled);
+      await refreshMakeContext();
 
       const doc = await vscode.workspace.openTextDocument(makefileUri);
       await vscode.window.showTextDocument(doc);

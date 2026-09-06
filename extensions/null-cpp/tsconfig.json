@@ -49,6 +49,9 @@
     "src/cmakeScaffold.ts",
     "src/cmakeScaffold.test.ts",
     "src/makeScaffold.ts",
-    "src/makeScaffold.test.ts"
+    "src/makeScaffold.test.ts",
+    "src/makeToolbar.ts",
+    "src/makefileParser.ts",
+    "src/makefileParser.test.ts"
   ]
 }

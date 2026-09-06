@@ -6,6 +6,7 @@ import { registerInitCMakeProject } from './cmakeScaffold';
 import { registerInitMakeProject } from './makeScaffold';
 import { initializeProjectDetection } from './projectDetection';
 import { registerCmakeToolbar } from './cmakeToolbar';
+import { registerMakeToolbar } from './makeToolbar';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const enabled = await initializeProjectDetection();
@@ -17,6 +18,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   registerInitCMakeProject(context);
   registerInitMakeProject(context);
   registerCmakeToolbar(context);
+  registerMakeToolbar(context);
 }
 
 export function deactivate(): void {}

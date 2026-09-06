@@ -11,7 +11,7 @@ import type { CMakeTarget } from './cmakeReply';
 
 // ---- Process execution, streamed into a dedicated, reused terminal ----
 
-const TERMINAL_NAME = 'Null C++: CMake';
+const TERMINAL_NAME = 'Null C++: Build';
 
 let writeEmitter: vscode.EventEmitter<string> | undefined;
 let ptyTerminal: vscode.Terminal | undefined;

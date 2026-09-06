@@ -41,6 +41,7 @@ const scaffoldNaming_1 = require("./scaffoldNaming");
 const toolchainRegistry = __importStar(require("./toolchainRegistry"));
 const projectDetection_1 = require("./projectDetection");
 const cmakeScaffoldContent_1 = require("./cmakeScaffoldContent");
+const cmakeToolbar_1 = require("./cmakeToolbar");
 async function fileExists(uri) {
     try {
         await vscode.workspace.fs.stat(uri);
@@ -94,6 +95,7 @@ function registerInitCMakeProject(context) {
         }
         const enabled = await (0, projectDetection_1.initializeProjectDetection)();
         await vscode.commands.executeCommand('setContext', 'null-cpp.isCppProject', enabled);
+        await (0, cmakeToolbar_1.refreshCMakeFileContext)(context);
         if (openUri) {
             const doc = await vscode.workspace.openTextDocument(openUri);
             await vscode.window.showTextDocument(doc);

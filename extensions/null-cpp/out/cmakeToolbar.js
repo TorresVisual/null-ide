@@ -33,6 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.refreshCMakeFileContext = refreshCMakeFileContext;
 exports.registerCmakeToolbar = registerCmakeToolbar;
 const vscode = __importStar(require("vscode"));
 const toolchainRegistry = __importStar(require("./toolchainRegistry"));
@@ -44,6 +45,25 @@ const clangdCompileDb_1 = require("./clangdCompileDb");
 const cppConfigState = __importStar(require("./cppConfigState"));
 const projectDetection_1 = require("./projectDetection");
 const uiState = { presets: [], targets: [] };
+let hasCMakeListsFile = false;
+async function detectCMakeLists() {
+    const root = workspaceRoot();
+    if (!root) {
+        return false;
+    }
+    try {
+        await vscode.workspace.fs.stat(vscode.Uri.joinPath(root, 'CMakeLists.txt'));
+        return true;
+    }
+    catch {
+        return false;
+    }
+}
+/** Re-checks whether the workspace root has a CMakeLists.txt — call after generating one so the toolbar appears without a reload. */
+async function refreshCMakeFileContext(context) {
+    hasCMakeListsFile = await detectCMakeLists();
+    updateStatusBar(context);
+}
 async function readJsonIfExists(uri) {
     try {
         const bytes = await vscode.workspace.fs.readFile(uri);
@@ -92,7 +112,7 @@ let debugItem;
 let buildDiagnostics;
 let building = false;
 function updateStatusBar(context) {
-    const enabled = (0, projectDetection_1.isEnabled)();
+    const enabled = (0, projectDetection_1.isEnabled)() && hasCMakeListsFile;
     const preset = activePreset(context);
     const target = activeTarget(context);
     presetItem.text = `$(gear) ${preset?.displayName ?? 'Select Preset'}`;
@@ -324,6 +344,7 @@ function registerCmakeToolbar(context) {
     context.subscriptions.push(vscode.commands.registerCommand('null-cpp.cmake.refreshToolchains', () => cmdRefreshToolchains(context)), vscode.commands.registerCommand('null-cpp.cmake.selectPreset', () => cmdSelectPreset(context)), vscode.commands.registerCommand('null-cpp.cmake.configure', () => cmdConfigure(context)), vscode.commands.registerCommand('null-cpp.cmake.selectTarget', () => cmdSelectTarget(context)), vscode.commands.registerCommand('null-cpp.cmake.build', () => cmdBuild(context)), vscode.commands.registerCommand('null-cpp.cmake.rebuild', () => cmdBuild(context, { clean: true })), vscode.commands.registerCommand('null-cpp.cmake.clean', () => cmdClean(context)), vscode.commands.registerCommand('null-cpp.cmake.run', () => cmdRun(context)), vscode.commands.registerCommand('null-cpp.cmake.buildAndRun', () => cmdBuildAndRun(context)), vscode.commands.registerCommand('null-cpp.debug.start', () => cmdDebug(context)), vscode.commands.registerCommand('null-cpp.debug.buildAndDebug', () => cmdBuildAndDebug(context)));
     void (async () => {
         uiState.presets = [];
+        hasCMakeListsFile = await detectCMakeLists();
         if ((0, projectDetection_1.isEnabled)()) {
             await toolchainRegistry.refresh();
         }

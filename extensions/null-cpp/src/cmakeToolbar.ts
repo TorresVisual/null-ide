@@ -14,6 +14,26 @@ interface UiState {
 }
 
 const uiState: UiState = { presets: [], targets: [] };
+let hasCMakeListsFile = false;
+
+async function detectCMakeLists(): Promise<boolean> {
+  const root = workspaceRoot();
+  if (!root) {
+    return false;
+  }
+  try {
+    await vscode.workspace.fs.stat(vscode.Uri.joinPath(root, 'CMakeLists.txt'));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Re-checks whether the workspace root has a CMakeLists.txt — call after generating one so the toolbar appears without a reload. */
+export async function refreshCMakeFileContext(context: vscode.ExtensionContext): Promise<void> {
+  hasCMakeListsFile = await detectCMakeLists();
+  updateStatusBar(context);
+}
 
 async function readJsonIfExists(uri: vscode.Uri): Promise<unknown> {
   try {
@@ -70,7 +90,7 @@ let buildDiagnostics: vscode.DiagnosticCollection;
 let building = false;
 
 function updateStatusBar(context: vscode.ExtensionContext): void {
-  const enabled = isEnabled();
+  const enabled = isEnabled() && hasCMakeListsFile;
   const preset = activePreset(context);
   const target = activeTarget(context);
 
@@ -342,6 +362,7 @@ export function registerCmakeToolbar(context: vscode.ExtensionContext): void {
 
   void (async () => {
     uiState.presets = [];
+    hasCMakeListsFile = await detectCMakeLists();
     if (isEnabled()) {
       await toolchainRegistry.refresh();
     }

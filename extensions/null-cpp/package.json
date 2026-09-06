@@ -11,7 +11,7 @@
   "extensionDependencies": ["llvm-vs-code-extensions.vscode-clangd", "ms-vscode.cpptools", "vadimcn.vscode-lldb"],
   "scripts": {
     "compile": "tsc -p tsconfig.json",
-    "test": "tsc -p tsconfig.json && node --test out/symbolTree.test.js out/pairRegistry.test.js out/scaffoldNaming.test.js out/wslPath.test.js out/toolchainRegistry.test.js out/presetsModel.test.js out/cmakeReply.test.js out/clangdConfigText.test.js out/buildDiagnostics.test.js out/projectDetection.test.js out/debugConfigSynth.test.js out/cmakeScaffold.test.js out/makeScaffold.test.js"
+    "test": "tsc -p tsconfig.json && node --test out/symbolTree.test.js out/pairRegistry.test.js out/scaffoldNaming.test.js out/wslPath.test.js out/toolchainRegistry.test.js out/presetsModel.test.js out/cmakeReply.test.js out/clangdConfigText.test.js out/buildDiagnostics.test.js out/projectDetection.test.js out/debugConfigSynth.test.js out/cmakeScaffold.test.js out/makeScaffold.test.js out/makefileParser.test.js"
   },
   "devDependencies": {
     "typescript": "^5.8.0",
@@ -80,6 +80,10 @@
       {
         "command": "null-cpp.debug.buildAndDebug",
         "title": "Null C++: Build and Debug Target"
+      },
+      {
+        "command": "null-cpp.make.runTarget",
+        "title": "Null C++: Run Make Target..."
       }
     ],
     "keybindings": [
@@ -156,7 +160,8 @@
         { "command": "null-cpp.cmake.run", "when": "null-cpp.isCppProject && null-cpp.cmake.configured" },
         { "command": "null-cpp.cmake.buildAndRun", "when": "null-cpp.isCppProject && null-cpp.cmake.configured" },
         { "command": "null-cpp.debug.start", "when": "null-cpp.isCppProject && null-cpp.cmake.configured" },
-        { "command": "null-cpp.debug.buildAndDebug", "when": "null-cpp.isCppProject && null-cpp.cmake.configured" }
+        { "command": "null-cpp.debug.buildAndDebug", "when": "null-cpp.isCppProject && null-cpp.cmake.configured" },
+        { "command": "null-cpp.make.runTarget", "when": "null-cpp.make.hasMakefile" }
       ]
     }
   }
