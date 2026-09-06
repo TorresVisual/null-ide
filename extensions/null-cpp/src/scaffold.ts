@@ -17,7 +17,7 @@ async function fileExists(uri: vscode.Uri): Promise<boolean> {
   }
 }
 
-async function resolveTargetFolder(target: vscode.Uri | undefined): Promise<vscode.Uri | undefined> {
+export async function resolveTargetFolder(target: vscode.Uri | undefined): Promise<vscode.Uri | undefined> {
   if (target) {
     const stat = await vscode.workspace.fs.stat(target);
     return stat.type === vscode.FileType.Directory ? target : vscode.Uri.joinPath(target, '..');

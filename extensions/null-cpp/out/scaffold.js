@@ -33,6 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.resolveTargetFolder = resolveTargetFolder;
 exports.registerNewClass = registerNewClass;
 const vscode = __importStar(require("vscode"));
 const scaffoldNaming_1 = require("./scaffoldNaming");

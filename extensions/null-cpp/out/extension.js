@@ -39,6 +39,8 @@ const vscode = __importStar(require("vscode"));
 const symbolSwitch_1 = require("./symbolSwitch");
 const pairedSplit_1 = require("./pairedSplit");
 const scaffold_1 = require("./scaffold");
+const cmakeScaffold_1 = require("./cmakeScaffold");
+const makeScaffold_1 = require("./makeScaffold");
 const projectDetection_1 = require("./projectDetection");
 const cmakeToolbar_1 = require("./cmakeToolbar");
 async function activate(context) {
@@ -47,6 +49,8 @@ async function activate(context) {
     (0, symbolSwitch_1.registerSwitchSourceHeader)(context);
     (0, pairedSplit_1.registerPairedSplit)(context);
     (0, scaffold_1.registerNewClass)(context);
+    (0, cmakeScaffold_1.registerInitCMakeProject)(context);
+    (0, makeScaffold_1.registerInitMakeProject)(context);
     (0, cmakeToolbar_1.registerCmakeToolbar)(context);
 }
 function deactivate() { }

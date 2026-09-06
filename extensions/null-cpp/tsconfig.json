@@ -45,6 +45,10 @@
     "src/buildDiagnostics.ts",
     "src/buildDiagnostics.test.ts",
     "src/debugConfigSynth.ts",
-    "src/debugConfigSynth.test.ts"
+    "src/debugConfigSynth.test.ts",
+    "src/cmakeScaffold.ts",
+    "src/cmakeScaffold.test.ts",
+    "src/makeScaffold.ts",
+    "src/makeScaffold.test.ts"
   ]
 }

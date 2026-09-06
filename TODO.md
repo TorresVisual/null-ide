@@ -3,6 +3,13 @@
 * [x] Restricted mode is annoying!!
 * [x] better window information need to see instantly which project
 
+## NULL-CPP
+
+* [x] Automatically generate CMakeLists.txt and CMakePresets.json
+* [x] Support for Make files and auto-generate
+* [ ] Better console output
+* [ ] Fix nested CMakeFiles for bigger projects
+
 ## AI Features
 
 * [x] AI Agents panel fixes (History/Rendering (Width bug))
