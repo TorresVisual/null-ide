@@ -51,6 +51,25 @@ async function fileExists(uri) {
         return false;
     }
 }
+/** Walks up from folderUri looking for an ancestor CMakeLists.txt, stopping at the workspace root. */
+async function findAncestorCMakeLists(folderUri) {
+    const workspaceRoot = vscode.workspace.getWorkspaceFolder(folderUri)?.uri;
+    let dir = folderUri;
+    for (;;) {
+        const parent = vscode.Uri.joinPath(dir, '..');
+        if (parent.fsPath === dir.fsPath) {
+            return undefined;
+        }
+        dir = parent;
+        const candidate = vscode.Uri.joinPath(dir, 'CMakeLists.txt');
+        if (await fileExists(candidate)) {
+            return candidate;
+        }
+        if (workspaceRoot && dir.fsPath === workspaceRoot.fsPath) {
+            return undefined;
+        }
+    }
+}
 function registerInitCMakeProject(context) {
     context.subscriptions.push(vscode.commands.registerCommand('null-cpp.cmake.initProject', async (target) => {
         const folderUri = await (0, scaffold_1.resolveTargetFolder)(target);
@@ -66,7 +85,27 @@ function registerInitCMakeProject(context) {
             return;
         }
         let openUri;
-        if (!hasCMakeLists) {
+        const ancestorCMakeLists = hasCMakeLists ? undefined : await findAncestorCMakeLists(folderUri);
+        if (!hasCMakeLists && ancestorCMakeLists) {
+            const defaultName = path.basename(folderUri.fsPath).replace(/[^A-Za-z0-9_]/g, '_') || 'Module';
+            const name = await vscode.window.showInputBox({
+                prompt: `CMake library target name (nested under ${path.basename(path.dirname(ancestorCMakeLists.fsPath))})`,
+                value: defaultName,
+                validateInput: scaffoldNaming_1.validateClassName,
+            });
+            if (!name) {
+                return;
+            }
+            await vscode.workspace.fs.writeFile(cmakeListsUri, Buffer.from((0, cmakeScaffoldContent_1.nestedCMakeListsContent)(name), 'utf8'));
+            openUri = cmakeListsUri;
+            const parentContent = Buffer.from(await vscode.workspace.fs.readFile(ancestorCMakeLists)).toString('utf8');
+            const relativeDir = path.relative(path.dirname(ancestorCMakeLists.fsPath), folderUri.fsPath);
+            const updated = (0, cmakeScaffoldContent_1.appendAddSubdirectory)(parentContent, relativeDir);
+            if (updated !== parentContent) {
+                await vscode.workspace.fs.writeFile(ancestorCMakeLists, Buffer.from(updated, 'utf8'));
+            }
+        }
+        else if (!hasCMakeLists) {
             const defaultName = path.basename(folderUri.fsPath).replace(/[^A-Za-z0-9_]/g, '_') || 'Project';
             const name = await vscode.window.showInputBox({
                 prompt: 'CMake project name',
@@ -84,7 +123,7 @@ function registerInitCMakeProject(context) {
                 await vscode.workspace.fs.writeFile(vscode.Uri.joinPath(srcDirUri, 'main.cpp'), Buffer.from(cmakeScaffoldContent_1.MAIN_CPP_CONTENT, 'utf8'));
             }
         }
-        if (!hasPresets) {
+        if (!hasPresets && !ancestorCMakeLists) {
             const toolchains = await toolchainRegistry.refresh();
             if (toolchains.length === 0) {
                 void vscode.window.showWarningMessage('No MSVC/Clang/WSL toolchains detected — install one, then run "Null C++: Refresh Toolchains" and re-run this command to generate CMakePresets.json.');

@@ -4,7 +4,13 @@ import { resolveTargetFolder } from './scaffold';
 import { validateClassName } from './scaffoldNaming';
 import * as toolchainRegistry from './toolchainRegistry';
 import { initializeProjectDetection } from './projectDetection';
-import { cmakeListsContent, MAIN_CPP_CONTENT, presetsJsonContent } from './cmakeScaffoldContent';
+import {
+  appendAddSubdirectory,
+  cmakeListsContent,
+  MAIN_CPP_CONTENT,
+  nestedCMakeListsContent,
+  presetsJsonContent,
+} from './cmakeScaffoldContent';
 import { refreshCMakeFileContext } from './cmakeToolbar';
 
 async function fileExists(uri: vscode.Uri): Promise<boolean> {
@@ -13,6 +19,26 @@ async function fileExists(uri: vscode.Uri): Promise<boolean> {
     return true;
   } catch {
     return false;
+  }
+}
+
+/** Walks up from folderUri looking for an ancestor CMakeLists.txt, stopping at the workspace root. */
+async function findAncestorCMakeLists(folderUri: vscode.Uri): Promise<vscode.Uri | undefined> {
+  const workspaceRoot = vscode.workspace.getWorkspaceFolder(folderUri)?.uri;
+  let dir = folderUri;
+  for (;;) {
+    const parent = vscode.Uri.joinPath(dir, '..');
+    if (parent.fsPath === dir.fsPath) {
+      return undefined;
+    }
+    dir = parent;
+    const candidate = vscode.Uri.joinPath(dir, 'CMakeLists.txt');
+    if (await fileExists(candidate)) {
+      return candidate;
+    }
+    if (workspaceRoot && dir.fsPath === workspaceRoot.fsPath) {
+      return undefined;
+    }
   }
 }
 
@@ -37,8 +63,29 @@ export function registerInitCMakeProject(context: vscode.ExtensionContext): void
       }
 
       let openUri: vscode.Uri | undefined;
+      const ancestorCMakeLists = hasCMakeLists ? undefined : await findAncestorCMakeLists(folderUri);
 
-      if (!hasCMakeLists) {
+      if (!hasCMakeLists && ancestorCMakeLists) {
+        const defaultName = path.basename(folderUri.fsPath).replace(/[^A-Za-z0-9_]/g, '_') || 'Module';
+        const name = await vscode.window.showInputBox({
+          prompt: `CMake library target name (nested under ${path.basename(path.dirname(ancestorCMakeLists.fsPath))})`,
+          value: defaultName,
+          validateInput: validateClassName,
+        });
+        if (!name) {
+          return;
+        }
+
+        await vscode.workspace.fs.writeFile(cmakeListsUri, Buffer.from(nestedCMakeListsContent(name), 'utf8'));
+        openUri = cmakeListsUri;
+
+        const parentContent = Buffer.from(await vscode.workspace.fs.readFile(ancestorCMakeLists)).toString('utf8');
+        const relativeDir = path.relative(path.dirname(ancestorCMakeLists.fsPath), folderUri.fsPath);
+        const updated = appendAddSubdirectory(parentContent, relativeDir);
+        if (updated !== parentContent) {
+          await vscode.workspace.fs.writeFile(ancestorCMakeLists, Buffer.from(updated, 'utf8'));
+        }
+      } else if (!hasCMakeLists) {
         const defaultName = path.basename(folderUri.fsPath).replace(/[^A-Za-z0-9_]/g, '_') || 'Project';
         const name = await vscode.window.showInputBox({
           prompt: 'CMake project name',
@@ -62,7 +109,7 @@ export function registerInitCMakeProject(context: vscode.ExtensionContext): void
         }
       }
 
-      if (!hasPresets) {
+      if (!hasPresets && !ancestorCMakeLists) {
         const toolchains = await toolchainRegistry.refresh();
         if (toolchains.length === 0) {
           void vscode.window.showWarningMessage(

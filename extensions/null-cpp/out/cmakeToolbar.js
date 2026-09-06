@@ -37,6 +37,7 @@ exports.refreshCMakeFileContext = refreshCMakeFileContext;
 exports.registerCmakeToolbar = registerCmakeToolbar;
 const vscode = __importStar(require("vscode"));
 const toolchainRegistry = __importStar(require("./toolchainRegistry"));
+const projectDetectionScan_1 = require("./projectDetectionScan");
 const presetsModel_1 = require("./presetsModel");
 const cmakeModel_1 = require("./cmakeModel");
 const buildDiagnostics_1 = require("./buildDiagnostics");
@@ -45,23 +46,44 @@ const clangdCompileDb_1 = require("./clangdCompileDb");
 const cppConfigState = __importStar(require("./cppConfigState"));
 const projectDetection_1 = require("./projectDetection");
 const uiState = { presets: [], targets: [] };
-let hasCMakeListsFile = false;
-async function detectCMakeLists() {
-    const root = workspaceRoot();
-    if (!root) {
-        return false;
-    }
+let cmakeRootUri;
+async function fileExists(uri) {
     try {
-        await vscode.workspace.fs.stat(vscode.Uri.joinPath(root, 'CMakeLists.txt'));
+        await vscode.workspace.fs.stat(uri);
         return true;
     }
     catch {
         return false;
     }
 }
-/** Re-checks whether the workspace root has a CMakeLists.txt — call after generating one so the toolbar appears without a reload. */
+/**
+ * Resolves the folder that actually holds the CMake project: the workspace root if it has a
+ * CMakeLists.txt directly, otherwise the nearest CMakeLists.txt found by scanning. Needed for
+ * monorepos where the CMake project isn't at the workspace root (e.g. this repo's own
+ * shell-ext/) — presets, binaryDir, and .clangd all resolve relative to this folder, not the
+ * workspace root.
+ */
+async function resolveCmakeRoot() {
+    const folders = vscode.workspace.workspaceFolders;
+    if (!folders || folders.length === 0) {
+        return undefined;
+    }
+    for (const folder of folders) {
+        if (await fileExists(vscode.Uri.joinPath(folder.uri, 'CMakeLists.txt'))) {
+            return folder.uri;
+        }
+    }
+    for (const folder of folders) {
+        const nested = (0, projectDetectionScan_1.findNearestCMakeListsDir)(folder.uri.fsPath);
+        if (nested) {
+            return vscode.Uri.file(nested);
+        }
+    }
+    return undefined;
+}
+/** Re-resolves the CMake project root — call after generating/editing a CMakeLists.txt so the toolbar appears without a reload. */
 async function refreshCMakeFileContext(context) {
-    hasCMakeListsFile = await detectCMakeLists();
+    cmakeRootUri = await resolveCmakeRoot();
     updateStatusBar(context);
 }
 async function readJsonIfExists(uri) {
@@ -74,7 +96,7 @@ async function readJsonIfExists(uri) {
     }
 }
 function workspaceRoot() {
-    return vscode.workspace.workspaceFolders?.[0]?.uri;
+    return cmakeRootUri;
 }
 async function setContext(key, value) {
     await vscode.commands.executeCommand('setContext', `null-cpp.cmake.${key}`, value);
@@ -111,8 +133,11 @@ let runItem;
 let debugItem;
 let buildDiagnostics;
 let building = false;
+function toolbarEnabled() {
+    return vscode.workspace.getConfiguration('null-cpp').get('toolbar.enabled', true);
+}
 function updateStatusBar(context) {
-    const enabled = (0, projectDetection_1.isEnabled)() && hasCMakeListsFile;
+    const enabled = (0, projectDetection_1.isEnabled)() && !!cmakeRootUri && toolbarEnabled();
     const preset = activePreset(context);
     const target = activeTarget(context);
     presetItem.text = `$(gear) ${preset?.displayName ?? 'Select Preset'}`;
@@ -339,12 +364,17 @@ function registerCmakeToolbar(context) {
     runItem.command = 'null-cpp.cmake.run';
     debugItem.command = 'null-cpp.debug.start';
     context.subscriptions.push(presetItem, targetItem, configureItem, refreshItem, buildItem, runItem, debugItem);
+    context.subscriptions.push(vscode.workspace.onDidChangeConfiguration((e) => {
+        if (e.affectsConfiguration('null-cpp.toolbar.enabled')) {
+            updateStatusBar(context);
+        }
+    }));
     buildDiagnostics = vscode.languages.createDiagnosticCollection('null-cpp-build');
     context.subscriptions.push(buildDiagnostics);
     context.subscriptions.push(vscode.commands.registerCommand('null-cpp.cmake.refreshToolchains', () => cmdRefreshToolchains(context)), vscode.commands.registerCommand('null-cpp.cmake.selectPreset', () => cmdSelectPreset(context)), vscode.commands.registerCommand('null-cpp.cmake.configure', () => cmdConfigure(context)), vscode.commands.registerCommand('null-cpp.cmake.selectTarget', () => cmdSelectTarget(context)), vscode.commands.registerCommand('null-cpp.cmake.build', () => cmdBuild(context)), vscode.commands.registerCommand('null-cpp.cmake.rebuild', () => cmdBuild(context, { clean: true })), vscode.commands.registerCommand('null-cpp.cmake.clean', () => cmdClean(context)), vscode.commands.registerCommand('null-cpp.cmake.run', () => cmdRun(context)), vscode.commands.registerCommand('null-cpp.cmake.buildAndRun', () => cmdBuildAndRun(context)), vscode.commands.registerCommand('null-cpp.debug.start', () => cmdDebug(context)), vscode.commands.registerCommand('null-cpp.debug.buildAndDebug', () => cmdBuildAndDebug(context)));
     void (async () => {
         uiState.presets = [];
-        hasCMakeListsFile = await detectCMakeLists();
+        cmakeRootUri = await resolveCmakeRoot();
         if ((0, projectDetection_1.isEnabled)()) {
             await toolchainRegistry.refresh();
         }

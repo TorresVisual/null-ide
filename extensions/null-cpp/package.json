@@ -116,6 +116,11 @@
           "default": true,
           "description": "Show 'New C++ Class...' in the Explorer context menu for folders."
         },
+        "null-cpp.toolbar.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the CMake build/run/debug status bar buttons (preset, target, configure, build, run, debug)."
+        },
         "null-cpp.projectDetection.override": {
           "type": "string",
           "enum": ["auto", "always", "never"],

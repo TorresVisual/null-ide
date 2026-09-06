@@ -57,6 +57,10 @@ function toolchain(overrides) {
     assert.equal(preset.cacheVariables.CMAKE_CXX_COMPILER, 'C:\\VS\\cl.exe');
     assert.equal(preset.binaryDir, '${sourceDir}/build/msvc-17-9-34728-x64-debug');
 });
+(0, node_test_1.test)('presetFor turns on CMAKE_EXPORT_COMPILE_COMMANDS so clangd works even against hand-written CMakeLists.txt', () => {
+    const preset = (0, cmakeScaffoldContent_1.presetFor)(toolchain({}));
+    assert.equal(preset.cacheVariables.CMAKE_EXPORT_COMPILE_COMMANDS, 'ON');
+});
 (0, node_test_1.test)('presetFor uses Unix Makefiles for WSL toolchains', () => {
     const preset = (0, cmakeScaffoldContent_1.presetFor)(toolchain({ id: 'wsl-Ubuntu-gcc', kind: 'wsl-gcc', compilerPath: '/usr/bin/gcc', wslDistro: 'Ubuntu' }));
     assert.equal(preset.generator, 'Unix Makefiles');
@@ -69,5 +73,20 @@ function toolchain(overrides) {
     const content = (0, cmakeScaffoldContent_1.cmakeListsContent)('MiniGit');
     assert.match(content, /project\(MiniGit CXX\)/);
     assert.match(content, /add_executable\(MiniGit \$\{MINIGIT_SOURCES\}\)/);
+});
+(0, node_test_1.test)('nestedCMakeListsContent emits a library target, not a standalone project', () => {
+    const content = (0, cmakeScaffoldContent_1.nestedCMakeListsContent)('Engine');
+    assert.doesNotMatch(content, /project\(/);
+    assert.match(content, /add_library\(Engine STATIC \$\{ENGINE_SOURCES\}\)/);
+});
+(0, node_test_1.test)('appendAddSubdirectory adds the line once', () => {
+    const once = (0, cmakeScaffoldContent_1.appendAddSubdirectory)('cmake_minimum_required(VERSION 3.20)\nproject(App CXX)\n', 'libs/engine');
+    assert.match(once, /add_subdirectory\(libs\/engine\)/);
+    const twice = (0, cmakeScaffoldContent_1.appendAddSubdirectory)(once, 'libs/engine');
+    assert.equal(twice, once);
+});
+(0, node_test_1.test)('appendAddSubdirectory normalizes backslashes to forward slashes', () => {
+    const content = (0, cmakeScaffoldContent_1.appendAddSubdirectory)('project(App CXX)\n', 'libs\\engine');
+    assert.match(content, /add_subdirectory\(libs\/engine\)/);
 });
 //# sourceMappingURL=cmakeScaffold.test.js.map

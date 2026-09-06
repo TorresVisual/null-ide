@@ -33,6 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.findNearestCMakeListsDir = findNearestCMakeListsDir;
 exports.scanDirectoryForCppProject = scanDirectoryForCppProject;
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
@@ -79,6 +80,37 @@ function isStrongEvidence(filename) {
 }
 function isWeakEvidence(filename) {
     return WEAK_EXTENSIONS.some(ext => filename.endsWith(ext));
+}
+/**
+ * Finds the nearest (shallowest) directory containing a CMakeLists.txt, BFS from rootDir.
+ * Used when the workspace root itself isn't a CMake project root — e.g. a monorepo where the
+ * CMake project lives in a subfolder (this repo's own shell-ext/).
+ */
+function findNearestCMakeListsDir(rootDir) {
+    const queue = [rootDir];
+    let dirsScanned = 0;
+    while (queue.length > 0) {
+        if (dirsScanned++ >= MAX_DIRS_SCANNED) {
+            break;
+        }
+        const dir = queue.shift();
+        let entries;
+        try {
+            entries = fs.readdirSync(dir, { withFileTypes: true });
+        }
+        catch {
+            continue;
+        }
+        if (entries.some((entry) => entry.isFile() && entry.name === 'CMakeLists.txt')) {
+            return dir;
+        }
+        for (const entry of entries) {
+            if (entry.isDirectory() && !PRUNED_DIRS.has(entry.name)) {
+                queue.push(path.join(dir, entry.name));
+            }
+        }
+    }
+    return undefined;
 }
 /** Recursively scans a directory for C/C++ project evidence. Pure Node fs, no vscode dependency. */
 function scanDirectoryForCppProject(rootDir) {

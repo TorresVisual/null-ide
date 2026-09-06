@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import * as toolchainRegistry from './toolchainRegistry';
+import { findNearestCMakeListsDir } from './projectDetectionScan';
 import { loadPresets, type CMakePreset } from './presetsModel';
 import { configure, readCodemodelTargets, build, cleanTarget, run as runTarget, cancelActive, type CMakeTarget } from './cmakeModel';
 import { resolveBuildDiagnostics, type ResolvedBuildDiagnostic } from './buildDiagnostics';
@@ -14,24 +15,46 @@ interface UiState {
 }
 
 const uiState: UiState = { presets: [], targets: [] };
-let hasCMakeListsFile = false;
+let cmakeRootUri: vscode.Uri | undefined;
 
-async function detectCMakeLists(): Promise<boolean> {
-  const root = workspaceRoot();
-  if (!root) {
-    return false;
-  }
+async function fileExists(uri: vscode.Uri): Promise<boolean> {
   try {
-    await vscode.workspace.fs.stat(vscode.Uri.joinPath(root, 'CMakeLists.txt'));
+    await vscode.workspace.fs.stat(uri);
     return true;
   } catch {
     return false;
   }
 }
 
-/** Re-checks whether the workspace root has a CMakeLists.txt — call after generating one so the toolbar appears without a reload. */
+/**
+ * Resolves the folder that actually holds the CMake project: the workspace root if it has a
+ * CMakeLists.txt directly, otherwise the nearest CMakeLists.txt found by scanning. Needed for
+ * monorepos where the CMake project isn't at the workspace root (e.g. this repo's own
+ * shell-ext/) — presets, binaryDir, and .clangd all resolve relative to this folder, not the
+ * workspace root.
+ */
+async function resolveCmakeRoot(): Promise<vscode.Uri | undefined> {
+  const folders = vscode.workspace.workspaceFolders;
+  if (!folders || folders.length === 0) {
+    return undefined;
+  }
+  for (const folder of folders) {
+    if (await fileExists(vscode.Uri.joinPath(folder.uri, 'CMakeLists.txt'))) {
+      return folder.uri;
+    }
+  }
+  for (const folder of folders) {
+    const nested = findNearestCMakeListsDir(folder.uri.fsPath);
+    if (nested) {
+      return vscode.Uri.file(nested);
+    }
+  }
+  return undefined;
+}
+
+/** Re-resolves the CMake project root — call after generating/editing a CMakeLists.txt so the toolbar appears without a reload. */
 export async function refreshCMakeFileContext(context: vscode.ExtensionContext): Promise<void> {
-  hasCMakeListsFile = await detectCMakeLists();
+  cmakeRootUri = await resolveCmakeRoot();
   updateStatusBar(context);
 }
 
@@ -45,7 +68,7 @@ async function readJsonIfExists(uri: vscode.Uri): Promise<unknown> {
 }
 
 function workspaceRoot(): vscode.Uri | undefined {
-  return vscode.workspace.workspaceFolders?.[0]?.uri;
+  return cmakeRootUri;
 }
 
 async function setContext(key: string, value: boolean): Promise<void> {
@@ -89,8 +112,12 @@ let debugItem: vscode.StatusBarItem;
 let buildDiagnostics: vscode.DiagnosticCollection;
 let building = false;
 
+function toolbarEnabled(): boolean {
+  return vscode.workspace.getConfiguration('null-cpp').get<boolean>('toolbar.enabled', true);
+}
+
 function updateStatusBar(context: vscode.ExtensionContext): void {
-  const enabled = isEnabled() && hasCMakeListsFile;
+  const enabled = isEnabled() && !!cmakeRootUri && toolbarEnabled();
   const preset = activePreset(context);
   const target = activeTarget(context);
 
@@ -343,6 +370,14 @@ export function registerCmakeToolbar(context: vscode.ExtensionContext): void {
   debugItem.command = 'null-cpp.debug.start';
   context.subscriptions.push(presetItem, targetItem, configureItem, refreshItem, buildItem, runItem, debugItem);
 
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration('null-cpp.toolbar.enabled')) {
+        updateStatusBar(context);
+      }
+    })
+  );
+
   buildDiagnostics = vscode.languages.createDiagnosticCollection('null-cpp-build');
   context.subscriptions.push(buildDiagnostics);
 
@@ -362,7 +397,7 @@ export function registerCmakeToolbar(context: vscode.ExtensionContext): void {
 
   void (async () => {
     uiState.presets = [];
-    hasCMakeListsFile = await detectCMakeLists();
+    cmakeRootUri = await resolveCmakeRoot();
     if (isEnabled()) {
       await toolchainRegistry.refresh();
     }

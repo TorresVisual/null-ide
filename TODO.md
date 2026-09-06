@@ -8,7 +8,7 @@
 * [x] Automatically generate CMakeLists.txt and CMakePresets.json
 * [x] Support for Make files and auto-generate
 * [x] Better console output
-* [ ] Fix nested CMakeFiles for bigger projects
+* [x] Fix nested CMakeFiles for bigger projects
 * [ ] Compile test files with clang++
 
 ## AI Features

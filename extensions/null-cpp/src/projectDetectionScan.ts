@@ -52,6 +52,40 @@ function isWeakEvidence(filename: string): boolean {
   return WEAK_EXTENSIONS.some(ext => filename.endsWith(ext));
 }
 
+/**
+ * Finds the nearest (shallowest) directory containing a CMakeLists.txt, BFS from rootDir.
+ * Used when the workspace root itself isn't a CMake project root — e.g. a monorepo where the
+ * CMake project lives in a subfolder (this repo's own shell-ext/).
+ */
+export function findNearestCMakeListsDir(rootDir: string): string | undefined {
+  const queue: string[] = [rootDir];
+  let dirsScanned = 0;
+
+  while (queue.length > 0) {
+    if (dirsScanned++ >= MAX_DIRS_SCANNED) {
+      break;
+    }
+    const dir = queue.shift()!;
+
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+
+    if (entries.some((entry) => entry.isFile() && entry.name === 'CMakeLists.txt')) {
+      return dir;
+    }
+    for (const entry of entries) {
+      if (entry.isDirectory() && !PRUNED_DIRS.has(entry.name)) {
+        queue.push(path.join(dir, entry.name));
+      }
+    }
+  }
+  return undefined;
+}
+
 /** Recursively scans a directory for C/C++ project evidence. Pure Node fs, no vscode dependency. */
 export function scanDirectoryForCppProject(rootDir: string): boolean {
   const stack: Array<{ dir: string; weakExcluded: boolean }> = [{ dir: rootDir, weakExcluded: false }];
