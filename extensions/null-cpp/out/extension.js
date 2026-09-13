@@ -44,9 +44,31 @@ const makeScaffold_1 = require("./makeScaffold");
 const projectDetection_1 = require("./projectDetection");
 const cmakeToolbar_1 = require("./cmakeToolbar");
 const makeToolbar_1 = require("./makeToolbar");
-async function activate(context) {
-    const enabled = await (0, projectDetection_1.initializeProjectDetection)();
+async function syncCppProjectContext() {
+    const enabled = await (0, projectDetection_1.refreshProjectDetection)();
     await vscode.commands.executeCommand('setContext', 'null-cpp.isCppProject', enabled);
+    return enabled;
+}
+async function activate(context) {
+    await (0, projectDetection_1.initializeProjectDetection)();
+    await syncCppProjectContext();
+    context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(() => {
+        void syncCppProjectContext();
+    }), vscode.workspace.onDidChangeWorkspaceFolders(() => {
+        void syncCppProjectContext();
+    }), vscode.workspace.onDidChangeConfiguration((event) => {
+        if (event.affectsConfiguration('null-cpp.projectDetection.override')) {
+            void syncCppProjectContext();
+        }
+    }), vscode.commands.registerCommand('null-cpp.openSettings', () => vscode.commands.executeCommand('workbench.action.openSettings', '@ext:null null-cpp')), vscode.commands.registerCommand('null-cpp.enableForWorkspace', async () => {
+        await vscode.workspace
+            .getConfiguration('null-cpp')
+            .update('projectDetection.override', 'always', vscode.ConfigurationTarget.Workspace);
+        const enabled = await syncCppProjectContext();
+        if (enabled) {
+            void vscode.window.showInformationMessage('Null C++ is now enabled for this workspace.');
+        }
+    }));
     (0, symbolSwitch_1.registerSwitchSourceHeader)(context);
     (0, pairedSplit_1.registerPairedSplit)(context);
     (0, scaffold_1.registerNewClass)(context);

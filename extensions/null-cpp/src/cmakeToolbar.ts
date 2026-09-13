@@ -409,5 +409,5 @@ export function registerCmakeToolbar(context: vscode.ExtensionContext): void {
       await setContext('configured', uiState.targets.length > 0);
     }
     updateStatusBar(context);
-  })();
+  })().catch(() => {});
 }

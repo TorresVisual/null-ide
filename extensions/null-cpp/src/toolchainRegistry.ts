@@ -87,7 +87,7 @@ async function detectMsvc(): Promise<Toolchain[]> {
     '-products', '*',
     '-requires', 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64',
     '-property', 'installationPath',
-  ]);
+  ], { timeout: 3000 });
   const installPaths = parseVswhereInstallPaths(stdout);
   const toolchains: Toolchain[] = [];
   for (const installPath of installPaths) {
@@ -161,7 +161,7 @@ async function detectClangAt(
   displayPrefix: string
 ): Promise<Toolchain | undefined> {
   try {
-    const { stdout } = await execFileAsync(compilerPath, ['--version']);
+    const { stdout } = await execFileAsync(compilerPath, ['--version'], { timeout: 3000 });
     const version = parseClangVersion(stdout);
     if (!version) {
       return undefined;
@@ -212,6 +212,7 @@ async function wslWhich(distro: string, tool: string): Promise<string | undefine
   try {
     const { stdout } = await execFileAsync('wsl.exe', ['-d', distro, '--', 'which', tool], {
       encoding: 'utf8',
+      timeout: 3000,
     });
     const cleaned = stdout.replace(/\u0000/g, '').trim();
     return cleaned.length > 0 ? cleaned : undefined;
@@ -259,7 +260,7 @@ async function detectWslDistro(distro: string): Promise<Toolchain[]> {
 async function detectWsl(): Promise<Toolchain[]> {
   let stdout: string;
   try {
-    ({ stdout } = await execFileAsync('wsl.exe', ['--list', '--quiet'], { encoding: 'utf16le' }));
+    ({ stdout } = await execFileAsync('wsl.exe', ['--list', '--quiet'], { encoding: 'utf16le', timeout: 3000 }));
   } catch {
     return [];
   }

@@ -33,7 +33,8 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.initializeProjectDetection = initializeProjectDetection;
+exports.initializeProjectDetection = void 0;
+exports.refreshProjectDetection = refreshProjectDetection;
 exports.isEnabled = isEnabled;
 const vscode = __importStar(require("vscode"));
 const projectDetectionScan_1 = require("./projectDetectionScan");
@@ -44,11 +45,14 @@ function getOverride() {
 function scanWorkspace() {
     const folders = vscode.workspace.workspaceFolders;
     if (!folders || folders.length === 0) {
-        return false;
+        // A file opened directly (without opening its containing folder) has no
+        // workspace folder, but it is still a valid C/C++ editing context.
+        const languageId = vscode.window.activeTextEditor?.document.languageId;
+        return languageId === 'c' || languageId === 'cpp';
     }
     return folders.some(folder => (0, projectDetectionScan_1.scanDirectoryForCppProject)(folder.uri.fsPath));
 }
-async function initializeProjectDetection() {
+async function refreshProjectDetection() {
     const override = getOverride();
     if (override === 'always') {
         enabled = true;
@@ -61,6 +65,7 @@ async function initializeProjectDetection() {
     }
     return enabled;
 }
+exports.initializeProjectDetection = refreshProjectDetection;
 function isEnabled() {
     return enabled;
 }

@@ -64,7 +64,7 @@ async function readMakefile() {
 }
 async function wslWhich(distro, tool) {
     try {
-        const { stdout } = await execFileAsync('wsl.exe', ['-d', distro, '--', 'which', tool], { encoding: 'utf8' });
+        const { stdout } = await execFileAsync('wsl.exe', ['-d', distro, '--', 'which', tool], { encoding: 'utf8', timeout: 3000 });
         return stdout.replace(/ /g, '').trim().length > 0;
     }
     catch {
@@ -75,7 +75,7 @@ async function wslWhich(distro, tool) {
 async function detectWslMakeEnv() {
     let stdout;
     try {
-        ({ stdout } = await execFileAsync('wsl.exe', ['--list', '--quiet'], { encoding: 'utf16le' }));
+        ({ stdout } = await execFileAsync('wsl.exe', ['--list', '--quiet'], { encoding: 'utf16le', timeout: 3000 }));
     }
     catch {
         return undefined;
@@ -159,6 +159,6 @@ async function runTargetCommand(target) {
 }
 function registerMakeToolbar(context) {
     context.subscriptions.push(vscode.commands.registerCommand('null-cpp.make.runTarget', (target) => runTargetCommand(target)), vscode.workspace.onDidChangeWorkspaceFolders(() => void refreshMakeContext()), { dispose: () => targetItems.forEach((item) => item.dispose()) });
-    void refreshMakeContext();
+    void refreshMakeContext().catch(() => { });
 }
 //# sourceMappingURL=makeToolbar.js.map

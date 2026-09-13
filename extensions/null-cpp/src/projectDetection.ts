@@ -13,12 +13,15 @@ function getOverride(): 'auto' | 'always' | 'never' {
 function scanWorkspace(): boolean {
   const folders = vscode.workspace.workspaceFolders;
   if (!folders || folders.length === 0) {
-    return false;
+    // A file opened directly (without opening its containing folder) has no
+    // workspace folder, but it is still a valid C/C++ editing context.
+    const languageId = vscode.window.activeTextEditor?.document.languageId;
+    return languageId === 'c' || languageId === 'cpp';
   }
   return folders.some(folder => scanDirectoryForCppProject(folder.uri.fsPath));
 }
 
-export async function initializeProjectDetection(): Promise<boolean> {
+export async function refreshProjectDetection(): Promise<boolean> {
   const override = getOverride();
   if (override === 'always') {
     enabled = true;
@@ -29,6 +32,8 @@ export async function initializeProjectDetection(): Promise<boolean> {
   }
   return enabled;
 }
+
+export const initializeProjectDetection = refreshProjectDetection;
 
 export function isEnabled(): boolean {
   return enabled;

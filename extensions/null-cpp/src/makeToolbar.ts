@@ -38,7 +38,7 @@ async function readMakefile(): Promise<string | undefined> {
 
 async function wslWhich(distro: string, tool: string): Promise<boolean> {
   try {
-    const { stdout } = await execFileAsync('wsl.exe', ['-d', distro, '--', 'which', tool], { encoding: 'utf8' });
+    const { stdout } = await execFileAsync('wsl.exe', ['-d', distro, '--', 'which', tool], { encoding: 'utf8', timeout: 3000 });
     return stdout.replace(/ /g, '').trim().length > 0;
   } catch {
     return false;
@@ -49,7 +49,7 @@ async function wslWhich(distro: string, tool: string): Promise<boolean> {
 async function detectWslMakeEnv(): Promise<WslMakeEnv | undefined> {
   let stdout: string;
   try {
-    ({ stdout } = await execFileAsync('wsl.exe', ['--list', '--quiet'], { encoding: 'utf16le' }));
+    ({ stdout } = await execFileAsync('wsl.exe', ['--list', '--quiet'], { encoding: 'utf16le', timeout: 3000 }));
   } catch {
     return undefined;
   }
@@ -148,5 +148,5 @@ export function registerMakeToolbar(context: vscode.ExtensionContext): void {
     { dispose: () => targetItems.forEach((item) => item.dispose()) }
   );
 
-  void refreshMakeContext();
+  void refreshMakeContext().catch(() => {});
 }

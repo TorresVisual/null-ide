@@ -386,6 +386,6 @@ function registerCmakeToolbar(context) {
             await setContext('configured', uiState.targets.length > 0);
         }
         updateStatusBar(context);
-    })();
+    })().catch(() => { });
 }
 //# sourceMappingURL=cmakeToolbar.js.map
