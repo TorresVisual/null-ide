@@ -29,13 +29,6 @@ node_modules/
 # null-actions: downloaded VS Code build used to host integration specs
 extensions/null-actions/.vscode-test/
 
-# Claude Code internals
-.claude/
-.antigravitycli/
-!.claude/agents/
-!.claude/hooks/
-!.claude/skills/
-
 # OS
 .DS_Store
 Thumbs.db
@@ -44,3 +37,4 @@ Thumbs.db
 dist/
 .null/
 .vscode/
+.claude/
