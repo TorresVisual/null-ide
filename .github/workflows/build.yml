@@ -636,6 +636,9 @@ jobs:
           }
           Compress-Archive -Path "$outDir\*" -DestinationPath null-ide-win32-x64.zip -Force
           Write-Host "Archive created: $((Get-Item null-ide-win32-x64.zip).Length / 1MB) MB"
+          $hash = Get-FileHash null-ide-win32-x64.zip -Algorithm SHA256
+          "$($hash.Hash.ToLower())  null-ide-win32-x64.zip" | Set-Content null-ide-win32-x64.zip.sha256 -Encoding ASCII -NoNewline
+          Write-Host "Checksum written: $($hash.Hash.ToLower())"
 
       - name: Install Inno Setup
         run: choco install innosetup --no-progress -y
@@ -678,6 +681,7 @@ jobs:
         with:
           files: |
             null-ide-win32-x64.zip
+            null-ide-win32-x64.zip.sha256
             NullIDESetup-*.exe
             ide-overlay/scripts/install-null-ide.ps1
           fail_on_unmatched_files: true
@@ -688,6 +692,7 @@ jobs:
           name: null-ide-win32-x64-${{ steps.tag.outputs.tag }}
           path: |
             null-ide-win32-x64.zip
+            null-ide-win32-x64.zip.sha256
             NullIDESetup-*.exe
             ide-overlay/scripts/install-null-ide.ps1
           if-no-files-found: error
