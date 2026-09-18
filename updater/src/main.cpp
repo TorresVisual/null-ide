@@ -257,22 +257,34 @@ private:
 
         fs::path stageDir = parentDir / (L".null-ide-stage-" + std::to_wstring(GetTickCount64()));
         fs::path bakDir   = parentDir / (L".null-ide-bak-" + std::to_wstring(GetTickCount64()));
+        bool bakCreated = false;
 
-        // Move files from packageRoot to stageDir
-        fs::rename(packageRoot, stageDir);
+        try {
+            // Move files from packageRoot to stageDir
+            fs::rename(packageRoot, stageDir);
 
-        // Preserve portable 'data' folder if present
-        fs::path dataDir = targetInstallDir / L"data";
-        if (fs::exists(dataDir)) {
-            DirectUpdateUI(-1, L"Preserving user data...");
-            fs::rename(dataDir, stageDir / L"data");
+            // Preserve portable 'data' folder if present
+            fs::path dataDir = targetInstallDir / L"data";
+            if (fs::exists(dataDir)) {
+                DirectUpdateUI(-1, L"Preserving user data...");
+                fs::rename(dataDir, stageDir / L"data");
+            }
+
+            // Perform atomic swap
+            if (fs::exists(targetInstallDir)) {
+                RenameWithRetry(targetInstallDir, bakDir, 10, 500);
+                bakCreated = true;
+            }
+            RenameWithRetry(stageDir, targetInstallDir, 10, 500);
+        } catch (...) {
+            // Restore the previous installation if the swap failed partway through,
+            // mirroring install-null-ide.ps1's rollback behavior.
+            if (bakCreated && fs::exists(bakDir) && !fs::exists(targetInstallDir)) {
+                std::error_code ec;
+                fs::rename(bakDir, targetInstallDir, ec);
+            }
+            throw;
         }
-
-        // Perform atomic swap
-        if (fs::exists(targetInstallDir)) {
-            RenameWithRetry(targetInstallDir, bakDir, 10, 500);
-        }
-        RenameWithRetry(stageDir, targetInstallDir, 10, 500);
 
         // Write install metadata
         WriteInstallMetadata(targetInstallDir, m_args.repo, releaseTag);
