@@ -34,4 +34,5 @@ target_link_libraries(null-updater PRIVATE
     user32
     advapi32
     shell32
+    bcrypt
 )
