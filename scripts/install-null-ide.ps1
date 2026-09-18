@@ -18,6 +18,7 @@ param(
     [switch]$UnregisterFileAssociations,
     [switch]$RegisterPreviewHandler,
     [switch]$UnregisterPreviewHandler,
+    [switch]$ReapplyRegistrations,
     [switch]$Launch
 )
 
@@ -919,6 +920,19 @@ if ($RegisterPreviewHandler) {
 if ($UnregisterPreviewHandler) {
     Write-Step "Unregistering preview handler"
     Unregister-PreviewHandler
+    Write-Host "Done."
+    return
+}
+
+if ($ReapplyRegistrations) {
+    $dir = [System.IO.Path]::GetFullPath($InstallDir)
+    $target = Get-NullIdeExecutable -Dir $dir
+    Write-Step "Reapplying context menu, file association, and preview handler registrations"
+    Register-ContextMenu -ExePath $target
+    Register-Win11ContextMenu -InstallDir $dir
+    Register-FileAssociations -InstallDir $dir
+    Register-PreviewHandler -InstallDir $dir
+    Set-DefaultSettings
     Write-Host "Done."
     return
 }
