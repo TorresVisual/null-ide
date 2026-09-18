@@ -294,6 +294,11 @@ private:
         fs::remove_all(bakDir, ec);
         fs::remove_all(tempDir, ec);
 
+        // 5b. Reapply context menu / file association / preview handler / default
+        // settings registrations, the way install-null-ide.ps1's Install-Zip does
+        // on every install. Best-effort: a failure here doesn't fail the update.
+        ReapplyRegistrations(targetInstallDir);
+
         // 6. Launch updated IDE if requested
         if (m_args.launch) {
             fs::path exePath = targetInstallDir / matchedExeName;
@@ -312,6 +317,27 @@ private:
                 if (pi.hProcess) CloseHandle(pi.hProcess);
                 if (pi.hThread) CloseHandle(pi.hThread);
             }
+        }
+    }
+
+    void ReapplyRegistrations(const fs::path& installDir) {
+        fs::path scriptPath = installDir / L"resources" / L"app" / L"null-updater" / L"install-null-ide.ps1";
+        if (!fs::exists(scriptPath)) return; // best-effort; not fatal
+
+        DirectUpdateUI(-1, L"Refreshing context menu and file associations...");
+
+        std::wstring cmd = L"powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"" +
+            scriptPath.wstring() + L"\" -ReapplyRegistrations -InstallDir \"" + installDir.wstring() + L"\"";
+
+        STARTUPINFOW si = { sizeof(si) };
+        si.dwFlags = STARTF_USESHOWWINDOW;
+        si.wShowWindow = SW_HIDE;
+        PROCESS_INFORMATION pi = {};
+
+        if (CreateProcessW(NULL, &cmd[0], NULL, NULL, FALSE, CREATE_NO_WINDOW, NULL, NULL, &si, &pi)) {
+            WaitForSingleObject(pi.hProcess, 30000);
+            CloseHandle(pi.hProcess);
+            CloseHandle(pi.hThread);
         }
     }
 
