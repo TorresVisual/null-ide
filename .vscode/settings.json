@@ -1,39 +1,49 @@
 {
     "markdown.validate.enabled": true,
-    "actionButtons": {
-        "commands": [
-            {
-                "name": "Sync Local",
-                "color": "#4CAF50",
-                "tooltip": "Run copy.ps1",
-                "singleInstance": true,
-                "command": "powershell -ExecutionPolicy Bypass ${workspaceFolder}\\copy.ps1"
-            },
-            {
-                "name": "Reload IDE",
-                "color": "#2196F3",
-                "tooltip": "Reload the VS Code window",
-                "singleInstance": true,
-                "useVsCodeApi": true,
-                "command": "workbench.action.reloadWindow"
-            },
-            {
-                "cwd": "${workspaceFolder}",
-                "name": "Push Tag",
-                "color": "#00ff7f",
-                "singleInstance": true,
-                "command": "powershell.exe -ExecutionPolicy Bypass ${workspaceFolder}\\push-tag.ps1"
-            },
-            {
-                "cwd": "${workspaceFolder}",
-                "name": "Re-Push Tag",
-                "color": "#2bc7fb",
-                "singleInstance": true,
-                "command": "powershell.exe -ExecutionPolicy Bypass ${workspaceFolder}\\repush-tag.ps1"
-            }
-        ],
-        "defaultColor": "white",
-        "reloadButton": "↻",
-        "loadNpmCommands": false
-    }
+    "null-actions.buttons": [
+        {
+            "id": "button-1787264500854",
+            "label": "Sync Local",
+            "type": "terminal",
+            "command": "powershell -ExecutionPolicy Bypass ${workspaceFolder}\\scripts\\sync-local.ps1",
+            "color": "#12c448",
+            "background": "none",
+            "saveAll": false,
+            "focus": true,
+            "priority": 0
+        },
+        {
+            "id": "button-1787431253153",
+            "label": "Reload IDE",
+            "type": "vscode-command",
+            "command": "workbench.action.reloadWindow",
+            "color": "#2196F3",
+            "background": "none",
+            "saveAll": false,
+            "focus": false,
+            "priority": 0
+        },
+        {
+            "id": "button-1787431396068",
+            "label": "Push Tag",
+            "type": "terminal",
+            "command": "powershell.exe -ExecutionPolicy Bypass ${workspaceFolder}\\\\push-tag.ps1",
+            "color": "#3ff584",
+            "background": "none",
+            "saveAll": false,
+            "focus": true,
+            "priority": 0
+        },
+        {
+            "id": "button-1787431430662",
+            "label": "Re-Push Tag",
+            "type": "terminal",
+            "command": "powershell.exe -ExecutionPolicy Bypass ${workspaceFolder}\\\\repush-tag.ps1",
+            "color": "#62aee5",
+            "background": "none",
+            "saveAll": false,
+            "focus": true,
+            "priority": 0
+        }
+    ]
 }

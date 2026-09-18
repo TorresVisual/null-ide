@@ -1,0 +1,76 @@
+{
+  "name": "null-actions",
+  "displayName": "Null Actions",
+  "description": "Status bar action buttons for Null IDE — run shell commands or VS Code commands with one click",
+  "version": "1.0.0",
+  "publisher": "null",
+  "license": "MIT",
+  "engines": { "vscode": "^1.85.0" },
+  "main": "./out/extension.js",
+  "activationEvents": ["onStartupFinished"],
+  "scripts": {
+    "compile": "tsc -p tsconfig.json && tsc -p tsconfig.webview.json",
+    "test": "tsc -p tsconfig.json && node --test out/buttonConfig.test.js out/variableResolver.test.js out/terminalRegistry.test.js out/projectDetector.test.js out/npmScriptsProvider.test.js",
+    "pretest:integration": "tsc -p tsconfig.json",
+    "test:integration": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0",
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^22.0.0",
+    "@vscode/test-electron": "^3.1.0",
+    "mocha": "^11.8.0",
+    "@types/mocha": "^10.0.10",
+    "glob": "^13.0.6"
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "null-actions.runButton",
+        "title": "Null Actions: Run Button"
+      },
+      {
+        "command": "null-actions.openSettings",
+        "title": "Null Actions: Open Settings",
+        "icon": "$(gear)"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        { "command": "null-actions.runButton", "when": "false" }
+      ]
+    },
+    "configuration": {
+      "title": "Null Actions",
+      "properties": {
+        "null-actions.buttons": {
+          "type": "array",
+          "default": [],
+          "description": "Status bar action buttons. Edit via the Action Buttons panel, or directly here.",
+          "items": {
+            "type": "object",
+            "required": ["id", "label", "command"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Stable identifier. Also used as the dedicated terminal's identity — changing it disconnects the button from its existing terminal."
+              },
+              "label": { "type": "string" },
+              "icon": { "type": "string", "description": "Codicon name, without $() wrapper, e.g. \"tools\"." },
+              "type": { "type": "string", "enum": ["terminal", "vscode-command"], "default": "terminal" },
+              "command": { "type": "string" },
+              "args": { "type": "array", "description": "Arguments for type: vscode-command." },
+              "color": { "type": "string" },
+              "background": { "type": "string", "enum": ["none", "warning", "error"], "default": "none" },
+              "tooltip": { "type": "string" },
+              "cwd": { "type": "string" },
+              "saveAll": { "type": "boolean", "default": false },
+              "focus": { "type": "boolean", "default": true },
+              "priority": { "type": "number", "default": 0 }
+            }
+          }
+        }
+      }
+    }
+  }
+}

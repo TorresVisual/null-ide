@@ -1,0 +1,182 @@
+{
+  "name": "null-cpp",
+  "displayName": "Null C++",
+  "description": "Symbol-aware C++ header/source navigation, paired editors, and class scaffolding for Null IDE",
+  "version": "1.0.0",
+  "publisher": "null",
+  "license": "MIT",
+  "engines": { "vscode": "^1.85.0" },
+  "main": "./out/extension.js",
+  "activationEvents": ["onStartupFinished"],
+  "scripts": {
+    "compile": "tsc -p tsconfig.json",
+    "test": "tsc -p tsconfig.json && node --test out/symbolTree.test.js out/pairRegistry.test.js out/scaffoldNaming.test.js out/wslPath.test.js out/toolchainRegistry.test.js out/presetsModel.test.js out/cmakeReply.test.js out/clangdConfigText.test.js out/buildDiagnostics.test.js out/projectDetection.test.js out/debugConfigSynth.test.js out/cmakeScaffold.test.js out/makeScaffold.test.js out/makefileParser.test.js"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0",
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^22.0.0"
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "null-cpp.switchSourceHeader",
+        "title": "Null C++: Switch Header/Source (Symbol-Aware)"
+      },
+      {
+        "command": "null-cpp.newClass",
+        "title": "New C++ Class...",
+        "icon": "$(new-file)"
+      },
+      {
+        "command": "null-cpp.cmake.initProject",
+        "title": "Null C++: Initialize CMake Project"
+      },
+      {
+        "command": "null-cpp.make.initProject",
+        "title": "Null C++: Initialize Makefile Project"
+      },
+      {
+        "command": "null-cpp.cmake.refreshToolchains",
+        "title": "Null C++: Refresh Toolchains (MSVC/Clang/WSL)"
+      },
+      {
+        "command": "null-cpp.cmake.selectPreset",
+        "title": "Null C++: Select CMake Preset..."
+      },
+      {
+        "command": "null-cpp.cmake.configure",
+        "title": "Null C++: CMake Configure"
+      },
+      {
+        "command": "null-cpp.cmake.selectTarget",
+        "title": "Null C++: Select CMake Target..."
+      },
+      {
+        "command": "null-cpp.cmake.build",
+        "title": "Null C++: CMake Build"
+      },
+      {
+        "command": "null-cpp.cmake.rebuild",
+        "title": "Null C++: CMake Rebuild (Clean First)"
+      },
+      {
+        "command": "null-cpp.cmake.clean",
+        "title": "Null C++: CMake Clean"
+      },
+      {
+        "command": "null-cpp.cmake.run",
+        "title": "Null C++: Run Target"
+      },
+      {
+        "command": "null-cpp.cmake.buildAndRun",
+        "title": "Null C++: Build and Run Target"
+      },
+      {
+        "command": "null-cpp.debug.start",
+        "title": "Null C++: Debug Target"
+      },
+      {
+        "command": "null-cpp.debug.buildAndDebug",
+        "title": "Null C++: Build and Debug Target"
+      },
+      {
+        "command": "null-cpp.make.runTarget",
+        "title": "Null C++: Run Make Target..."
+      },
+      {
+        "command": "null-cpp.openSettings",
+        "title": "Null C++: Open Settings"
+      },
+      {
+        "command": "null-cpp.enableForWorkspace",
+        "title": "Null C++: Enable for This Workspace"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "null-cpp.switchSourceHeader",
+        "key": "alt+o",
+        "when": "editorTextFocus && (editorLangId == cpp || editorLangId == c) && null-cpp.isCppProject"
+      }
+    ],
+    "configuration": {
+      "title": "Null C++",
+      "properties": {
+        "null-cpp.autoPairSplit.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically open a C/C++ file's header/source counterpart beside it when opened."
+        },
+        "null-cpp.scrollSync.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Sync scroll position between paired header/source editors as the cursor moves."
+        },
+        "null-cpp.pairedSplit.autoCloseCounterpart": {
+          "type": "boolean",
+          "default": false,
+          "description": "Closing one half of a paired header/source split also closes the other half."
+        },
+        "null-cpp.scaffold.showInExplorer": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show 'New C++ Class...' in the Explorer context menu for folders."
+        },
+        "null-cpp.toolbar.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the CMake build/run/debug status bar buttons (preset, target, configure, build, run, debug)."
+        },
+        "null-cpp.projectDetection.override": {
+          "type": "string",
+          "enum": ["auto", "always", "never"],
+          "default": "auto",
+          "description": "Controls whether null-cpp's features are active for this workspace. 'auto' detects a C/C++ project by scanning for build system files (CMake, Meson, Makefiles, Bazel, .vcxproj, .clangd, compile_commands.json) or, failing that, C/C++ source/header files outside dependency and build directories. 'always'/'never' force the result regardless of detection."
+        }
+      }
+    },
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "null-cpp.newClass",
+          "when": "explorerResourceIsFolder && config.null-cpp.scaffold.showInExplorer && null-cpp.isCppProject",
+          "group": "navigation"
+        },
+        {
+          "command": "null-cpp.cmake.initProject",
+          "when": "explorerResourceIsFolder && config.null-cpp.scaffold.showInExplorer",
+          "group": "navigation"
+        },
+        {
+          "command": "null-cpp.make.initProject",
+          "when": "explorerResourceIsFolder && config.null-cpp.scaffold.showInExplorer",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "null-cpp.switchSourceHeader",
+          "when": "(editorLangId == cpp || editorLangId == c) && null-cpp.isCppProject"
+        },
+        { "command": "null-cpp.newClass", "when": "null-cpp.isCppProject" },
+        { "command": "null-cpp.cmake.initProject" },
+        { "command": "null-cpp.make.initProject" },
+        { "command": "null-cpp.cmake.refreshToolchains", "when": "null-cpp.isCppProject" },
+        { "command": "null-cpp.cmake.selectPreset", "when": "null-cpp.isCppProject && null-cpp.cmake.hasPresets" },
+        { "command": "null-cpp.cmake.configure", "when": "null-cpp.isCppProject && null-cpp.cmake.presetSelected" },
+        { "command": "null-cpp.cmake.selectTarget", "when": "null-cpp.isCppProject && null-cpp.cmake.configured" },
+        { "command": "null-cpp.cmake.build", "when": "null-cpp.isCppProject && null-cpp.cmake.configured" },
+        { "command": "null-cpp.cmake.rebuild", "when": "null-cpp.isCppProject && null-cpp.cmake.configured" },
+        { "command": "null-cpp.cmake.clean", "when": "null-cpp.isCppProject && null-cpp.cmake.configured" },
+        { "command": "null-cpp.cmake.run", "when": "null-cpp.isCppProject && null-cpp.cmake.configured" },
+        { "command": "null-cpp.cmake.buildAndRun", "when": "null-cpp.isCppProject && null-cpp.cmake.configured" },
+        { "command": "null-cpp.debug.start", "when": "null-cpp.isCppProject && null-cpp.cmake.configured" },
+        { "command": "null-cpp.debug.buildAndDebug", "when": "null-cpp.isCppProject && null-cpp.cmake.configured" },
+        { "command": "null-cpp.make.runTarget", "when": "null-cpp.make.hasMakefile" },
+        { "command": "null-cpp.openSettings" },
+        { "command": "null-cpp.enableForWorkspace" }
+      ]
+    }
+  }
+}

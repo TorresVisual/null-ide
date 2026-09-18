@@ -3,6 +3,14 @@
 * [x] Restricted mode is annoying!!
 * [x] better window information need to see instantly which project
 
+## NULL-CPP
+
+* [x] Automatically generate CMakeLists.txt and CMakePresets.json
+* [x] Support for Make files and auto-generate
+* [x] Better console output
+* [x] Fix nested CMakeFiles for bigger projects
+* [ ] Compile test files with clang++
+
 ## AI Features
 
 * [x] AI Agents panel fixes (History/Rendering (Width bug))
@@ -38,8 +46,8 @@
   Known gap: extensionless filenames (bare Makefile, CMakeLists.txt) aren't
   supported — the registration mechanism is extension-keyed, not filename-keyed.
 * [ ] Distraction-free / minimal coding mode
-* [ ] Integrated scratchpad/temp files
-* [ ] Built-in quick notes panel
+* [X] Integrated scratchpad/temp files
+* [X] Built-in quick notes panel
 * [ ] Floating terminal mode
 * [ ] Fix broken updater
 * [x] The command null . needs to have a open powershell if i close the shell the ide closes this is unconvenient

@@ -37,21 +37,30 @@ target_compile_definitions(null_explorer_command PRIVATE
 set_property(TARGET null_explorer_command PROPERTY CXX_STANDARD 17)
 set_property(TARGET null_explorer_command PROPERTY CXX_STANDARD_REQUIRED ON)
 
-target_compile_options(null_explorer_command PRIVATE
-    /Zc:__cplusplus
-    /EHsc
-    /W4
-    /Qspectre
-    /guard:cf
-    /Ox
-)
-
-target_link_options(null_explorer_command PRIVATE
-    /guard:cf
-    /OPT:REF
-    /OPT:ICF
-    /MACHINE:X64
-)
+if(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+    # cl.exe or clang-cl.exe: MSVC-style slash flags
+    target_compile_options(null_explorer_command PRIVATE
+        /Zc:__cplusplus
+        /EHsc
+        /W4
+        /Qspectre
+        /guard:cf
+        /Ox
+    )
+    target_link_options(null_explorer_command PRIVATE
+        /guard:cf
+        /OPT:REF
+        /OPT:ICF
+        /MACHINE:X64
+    )
+else()
+    # plain clang.exe/gcc: GNU-style dash flags
+    target_compile_options(null_explorer_command PRIVATE
+        -Wall
+        -Wextra
+        -O2
+    )
+endif()
 
 target_link_libraries(null_explorer_command PRIVATE
     advapi32

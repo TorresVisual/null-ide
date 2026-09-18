@@ -1,0 +1,60 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "msvc-14-51-36231-x64-debug",
+      "displayName": "MSVC 14.51.36231 (x64) Debug",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/msvc-14-51-36231-x64-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_CXX_COMPILER": "C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.51.36231\\bin\\Hostx64\\x64\\cl.exe",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+    {
+      "name": "llvm-clang-cl-22-1-8-debug",
+      "displayName": "Clang-cl 22.1.8 Debug",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/llvm-clang-cl-22-1-8-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_CXX_COMPILER": "C:\\Program Files\\LLVM\\bin\\clang-cl.exe",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+    {
+      "name": "llvm-clang-22-1-8-debug",
+      "displayName": "Clang 22.1.8 Debug",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/llvm-clang-22-1-8-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_CXX_COMPILER": "C:\\Program Files\\LLVM\\bin\\clang.exe",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+    {
+      "name": "wsl-ubuntu-gcc-debug",
+      "displayName": "WSL: Ubuntu (gcc) Debug",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build/wsl-ubuntu-gcc-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_CXX_COMPILER": "/usr/bin/gcc",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+    {
+      "name": "wsl-ubuntu-clang-debug",
+      "displayName": "WSL: Ubuntu (clang) Debug",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build/wsl-ubuntu-clang-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_CXX_COMPILER": "/usr/bin/clang",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    }
+  ]
+}

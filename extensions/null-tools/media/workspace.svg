@@ -1,6 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-  <rect x="3" y="1.5" width="10" height="13" rx="1"/>
-  <line x1="5.5" y1="5" x2="10.5" y2="5"/>
-  <line x1="5.5" y1="8" x2="10.5" y2="8"/>
-  <line x1="5.5" y1="11" x2="8.5" y2="11"/>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg width="100%" height="100%" viewBox="0 0 16 16" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linecap:round;stroke-linejoin:round;">
+    <g transform="matrix(1,0,0,1,1.5,0)">
+        <path d="M10,4L10,12C10,12.552 9.552,13 9,13L4,13C3.448,13 3,12.552 3,12L3,4C3,3.448 3.448,3 4,3L9,3C9.552,3 10,3.448 10,4Z" style="fill:none;stroke:black;stroke-width:1.5px;"/>
+    </g>
+    <g transform="matrix(0.998809,0.0487966,-0.0487966,0.998809,0.933475,-0.354775)">
+        <path d="M2.716,13.238L12.216,2.762" style="fill:none;fill-rule:nonzero;stroke:black;stroke-width:1.5px;"/>
+    </g>
 </svg>

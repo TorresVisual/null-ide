@@ -4,10 +4,8 @@ import * as vscode from 'vscode';
 import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
-import * as https from 'https';
-import { execSync, spawn } from 'child_process';
+import { execSync } from 'child_process';
 import * as ollama from './ollama';
-import { ClaudeHistoryIndex, ClaudeCodeSession } from './claudeHistory';
 import { registerRecentProjectsUriHandler } from './recentProjectsIntegration';
 import { registerScratchAndNotesFeature } from './scratchNotesIntegration';
 import { registerAutoGitignoreFeature } from './autoGitignore';
@@ -1350,6 +1348,13 @@ function showWelcomePage(context: vscode.ExtensionContext): void {
     context.subscriptions,
   );
 }
+import { registerDiscordPresenceFeature } from './discordPresenceIntegration';
+import { registerAgentsPanelFeature } from './agentsPanelIntegration';
+import { SoundManager } from './soundManager';
+import { NullCodeActionsProvider } from './codeActions';
+import { getStagedDiff, runClaude } from './commitMessage';
+import { registerUpdaterFeature } from './updaterIntegration';
+import { showWelcomePage } from './welcomePage';
 
 // ── Activation ─────────────────────────────────────────────────────────────
 
@@ -1398,27 +1403,13 @@ export function activate(context: vscode.ExtensionContext): void {
   registerScratchAndNotesFeature(context);
   registerAutoGitignoreFeature(context);
 
-  const updateBar = vscode.window.createStatusBarItem('null.update', vscode.StatusBarAlignment.Right, 1);
-  updateBar.text = '$(cloud-download) Update'; updateBar.tooltip = 'Null IDE update available';
-  updateBar.command = 'null.installUpdate';
-  context.subscriptions.push(updateBar);
+  registerUpdaterFeature(context);
 
   const sounds = new SoundManager();
   const soundBar = vscode.window.createStatusBarItem('null.sound', vscode.StatusBarAlignment.Right, -1);
   soundBar.text = '$(unmute)'; soundBar.tooltip = 'Null: toggle sound design';
   soundBar.command = 'null.toggleSoundDesign'; soundBar.show();
   context.subscriptions.push(soundBar);
-
-  function refreshUpdateButton(): void {
-    const update = context.globalState.get<AvailableUpdate>('null.availableUpdate');
-    if (update?.latest) {
-      updateBar.text    = `$(cloud-download) ${update.latest}`;
-      updateBar.tooltip = `Install Null IDE ${update.latest}`;
-      updateBar.show();
-    } else {
-      updateBar.hide();
-    }
-  }
 
   context.subscriptions.push(vscode.commands.registerCommand('null.generateCommitMessage', async () => {
     const folders = vscode.workspace.workspaceFolders;
@@ -1441,21 +1432,6 @@ export function activate(context: vscode.ExtensionContext): void {
     const git  = gitExt.isActive ? gitExt.exports.getAPI(1) : (await gitExt.activate()).getAPI(1);
     const repo = git.repositories.find((r: { rootUri: vscode.Uri }) => r.rootUri.fsPath === cwd) ?? git.repositories[0];
     if (repo && message) { repo.inputBox.value = message; vscode.commands.executeCommand('workbench.view.scm'); }
-  }));
-
-  context.subscriptions.push(vscode.commands.registerCommand('null.checkForUpdates', async () => {
-    try {
-      const update = await checkForUpdate(context, false);
-      refreshUpdateButton();
-      if (update) await promptForUpdate(update);
-    } catch (err) {
-      vscode.window.showErrorMessage(`Null: update check failed - ${(err as Error).message}`);
-    }
-  }));
-
-  context.subscriptions.push(vscode.commands.registerCommand('null.installUpdate', async () => {
-    try { await installUpdate(context); }
-    catch (err) { vscode.window.showErrorMessage(`Null: update failed - ${(err as Error).message}`); }
   }));
 
   context.subscriptions.push(vscode.commands.registerCommand('null.clearWebviewCache', async () => {
@@ -1486,65 +1462,7 @@ export function activate(context: vscode.ExtensionContext): void {
     showWelcomePage(context);
   }
 
-  refreshUpdateButton();
-  checkForUpdate(context, true)
-    .then(update => { refreshUpdateButton(); if (update) return promptForUpdate(update); })
-    .catch(() => { /* startup check — stay silent when offline */ });
-
-  const nodePty        = loadNodePty(context.extensionUri.fsPath);
-  const agentsProvider = new AgentsViewProvider(context.extensionUri, nodePty, context);
-  context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider('null.agentsView', agentsProvider, {
-      webviewOptions: { retainContextWhenHidden: true },
-    }),
-  );
-  context.subscriptions.push({ dispose: () => agentsProvider._saveBuffers() });
-
-  const beforeProvider = new AgentBeforeProvider();
-  context.subscriptions.push(
-    vscode.workspace.registerTextDocumentContentProvider(beforeProvider.scheme, beforeProvider),
-  );
-
-  // Track whether the active tab is one of our agent diffs and expose context.
-  const updateDiffContext = () => {
-    const active = vscode.window.tabGroups.activeTabGroup.activeTab;
-    const viewing = active?.input instanceof vscode.TabInputTextDiff &&
-      active.input.original.scheme === beforeProvider.scheme;
-    vscode.commands.executeCommand('setContext', 'null.viewingProposedDiff', !!viewing);
-  };
-  context.subscriptions.push(
-    vscode.window.tabGroups.onDidChangeTabs(updateDiffContext),
-    vscode.window.onDidChangeActiveTextEditor(updateDiffContext),
-  );
-
-  context.subscriptions.push(vscode.commands.registerCommand('null.acceptProposedDiff', async () => {
-    const active = vscode.window.tabGroups.activeTabGroup.activeTab;
-    if (active) await vscode.window.tabGroups.close(active);
-  }));
-
-  context.subscriptions.push(vscode.commands.registerCommand('null.rejectProposedDiff', async () => {
-    const active = vscode.window.tabGroups.activeTabGroup.activeTab;
-    if (!(active?.input instanceof vscode.TabInputTextDiff)) return;
-    const diskUri = active.input.modified;
-    await vscode.window.tabGroups.close(active);
-    await vscode.commands.executeCommand('null.revertAgentChange', diskUri);
-  }));
-
-  context.subscriptions.push(vscode.commands.registerCommand(
-    'null.revertAgentChange',
-    async (uri: vscode.Uri) => {
-      try {
-        await vscode.commands.executeCommand('git.revertFile', uri);
-      } catch {
-        try { execSync(`git checkout -- "${uri.fsPath}"`, { cwd: path.dirname(uri.fsPath) }); }
-        catch (err) { vscode.window.showErrorMessage(`Null: revert failed — ${(err as Error).message}`); }
-      }
-    },
-  ));
-
-  context.subscriptions.push(
-    vscode.commands.registerCommand('null.agentsPaste', () => agentsProvider.paste()),
-  );
+  const agentsProvider = registerAgentsPanelFeature(context);
 
   // ── Ollama status bar ──────────────────────────────────────────────────────
   const ollamaBar = vscode.window.createStatusBarItem('null.ollama', vscode.StatusBarAlignment.Right, -2);
@@ -1700,6 +1618,7 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(plansWatcher);
 
   registerPortsFeature(context);
+  registerDiscordPresenceFeature(context);
 }
 
 export function deactivate(): void {}

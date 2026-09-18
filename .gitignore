@@ -3,9 +3,17 @@ vscode-src/
 vscodium-src/
 shell-ext-build/
 updater/build/
+shell-ext/build/
+appx-validate-stage/
 
 # Shell extension: wil headers fetched by CI
 shell-ext/deps/
+
+# wooting-analog: native Rust addon build output — compiled by CI/setup.ps1
+extensions/wooting-analog/native/target/
+extensions/wooting-analog/native/index.js
+extensions/wooting-analog/native/index.d.ts
+extensions/wooting-analog/native/*.node
 
 # Build outputs
 VSCode-*/
@@ -19,9 +27,8 @@ tmp/
 # Node
 node_modules/
 
-# Claude Code internals
-.claude/
-.antigravitycli/
+# null-actions: downloaded VS Code build used to host integration specs
+extensions/null-actions/.vscode-test/
 
 # OS
 .DS_Store
@@ -29,3 +36,8 @@ Thumbs.db
 
 # Added by Null IDE Auto-Gitignore
 dist/
+.null/
+.vscode/
+.claude/
+!.claude/
+.claude/settings.json

@@ -38,11 +38,15 @@ The null-markdown preview inherits several blue/purple-tinted values from an ear
 
 **Unchanged (intentional blue accents):**
 - Links: `#3c93f8` / hover `#48cae4`
-- Blockquote left border: `#3c93f8`
 - Inline `code` text color: `#3c93f8`
 - Task-list checkbox `accent-color`: `#3c93f8`
 - Wiki links: `#48cae4` / hover `#00b4d8`
 - All other alert type borders/backgrounds (tip, important, warning, caution)
+
+**Revision (2026-08-10):** Full neutral-grey pass over remaining off-neutral foreground colors in `null-markdown.css` (functional link/code/wiki-link/alert-note accents kept per user decision):
+- Blockquote left border: `#3c93f8` → `#616161` (matches `textBlockQuote.border` in `null-dark.json`)
+- Body text, `pre code` text, alert paragraph text: `#e6e6f0` → `#e6e6e6` (dropped the blue-pushed channel)
+- Blockquote text, footnotes text: `#9898b8` → `#9a9a9a` (was a distinct blue-gray, now true neutral)
 
 ---
 

@@ -7,7 +7,7 @@ html {
 body {
 	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
 	background-color: #1f1f1f;
-	color: #e6e6f0;
+	color: #e6e6e6;
 	line-height: 1.65;
 	padding: 20px 32px;
 	max-width: 900px;
@@ -52,18 +52,18 @@ pre {
 
 pre code {
 	background: transparent;
-	color: #e6e6f0;
+	color: #e6e6e6;
 	padding: 0;
 	font-size: 0.875em;
 }
 
 /* Blockquotes */
 blockquote {
-	border-left: 4px solid #3c93f8;
+	border-left: 4px solid #616161;
 	margin: 16px 0;
 	padding: 8px 16px;
 	background: #141414;
-	color: #9898b8;
+	color: #9a9a9a;
 	border-radius: 0 6px 6px 0;
 }
 
@@ -117,7 +117,7 @@ img { max-width: 100%; border-radius: 4px; }
 	padding-top: 16px;
 	border-top: 1px solid #2e2e2e;
 	font-size: 0.875em;
-	color: #9898b8;
+	color: #9a9a9a;
 }
 
 /* Mermaid diagrams */
@@ -136,7 +136,7 @@ img { max-width: 100%; border-radius: 4px; }
 	margin: 16px 0;
 }
 .markdown-alert .alert-title { display: block; margin-bottom: 4px; font-size: 0.9em; }
-.markdown-alert p { margin: 0; color: #e6e6f0; }
+.markdown-alert p { margin: 0; color: #e6e6e6; }
 .markdown-alert-note      { border-color: #3c93f8; background: rgba(128,128,128,.12); }
 .markdown-alert-tip       { border-color: #22c55e; background: rgba(34,197,94,.1); }
 .markdown-alert-important { border-color: #a855f7; background: rgba(168,85,247,.1); }

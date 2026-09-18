@@ -1,0 +1,34 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "lib": ["ES2022"],
+    "outDir": "./out",
+    "rootDir": "./src",
+    "strict": true,
+    "sourceMap": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true
+  },
+  "include": [
+    "src/extension.ts",
+    "src/buttonConfig.ts",
+    "src/buttonConfig.test.ts",
+    "src/variableResolver.ts",
+    "src/variableResolver.test.ts",
+    "src/terminalRegistry.ts",
+    "src/terminalRegistry.test.ts",
+    "src/projectDetector.ts",
+    "src/projectDetector.test.ts",
+    "src/npmScriptsProvider.ts",
+    "src/npmScriptsProvider.test.ts",
+    "src/buttonConfigIntegration.ts",
+    "src/terminalHostIntegration.ts",
+    "src/statusBarController.ts",
+    "src/runButton.ts",
+    "src/settingsPanel.ts",
+    "src/test/runTest.ts",
+    "src/test/suite/index.ts",
+    "src/test/suite/activation.spec.ts"
+  ]
+}

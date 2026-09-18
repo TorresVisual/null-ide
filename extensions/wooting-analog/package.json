@@ -1,0 +1,80 @@
+{
+  "name": "wooting-analog",
+  "displayName": "Wooting Analog Keys",
+  "description": "Depth-sensitive key actions for Wooting hall-effect keyboards",
+  "version": "0.1.0",
+  "publisher": "you",
+  "engines": { "vscode": "^1.85.0" },
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "Wooting Analog",
+      "properties": {
+        "wooting-analog.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable Wooting Analog Keys. When disabled, no analog key polling or SDK loading occurs and all keys behave normally. Loading/unloading the SDK requires a window reload; keybindings stop intercepting immediately."
+        },
+        "wooting-analog.dllPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to wooting_analog_sdk.dll. Leave empty to use the default Wootility install location."
+        },
+        "wooting-analog.deepThreshold": {
+          "type": "number",
+          "default": 0.55,
+          "minimum": 0.1,
+          "maximum": 0.95,
+          "description": "Press depth (0–1) at which a key switches from its light to its deep action. Lower = easier to trigger deep."
+        }
+      }
+    },
+    "keybindings": [
+      {
+        "key": "backspace",
+        "command": "wooting.analogBackspace",
+        "when": "wooting-analog.enabled && editorTextFocus && !editorReadonly"
+      },
+      {
+        "key": "delete",
+        "command": "wooting.analogDelete",
+        "when": "wooting-analog.enabled && editorTextFocus && !editorReadonly"
+      },
+      {
+        "key": "left",
+        "command": "wooting.analogLeft",
+        "when": "wooting-analog.enabled && editorTextFocus && !suggestWidgetVisible"
+      },
+      {
+        "key": "right",
+        "command": "wooting.analogRight",
+        "when": "wooting-analog.enabled && editorTextFocus && !suggestWidgetVisible"
+      },
+      {
+        "key": "up",
+        "command": "wooting.analogUp",
+        "when": "wooting-analog.enabled && editorTextFocus && !suggestWidgetVisible"
+      },
+      {
+        "key": "down",
+        "command": "wooting.analogDown",
+        "when": "wooting-analog.enabled && editorTextFocus && !suggestWidgetVisible"
+      },
+      {
+        "key": "enter",
+        "command": "wooting.analogEnter",
+        "when": "wooting-analog.enabled && editorTextFocus && !editorReadonly && !suggestWidgetVisible && !renameInputVisible"
+      }
+    ]
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "build:native": "npm --prefix native install && npm --prefix native run build"
+  }
+}
