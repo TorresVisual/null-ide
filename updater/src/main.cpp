@@ -25,6 +25,7 @@
 
 #include "miniz.h"
 #include <bcrypt.h>
+#include <regex>
 
 namespace fs = std::filesystem;
 
@@ -368,6 +369,48 @@ private:
         return result;
     }
 
+    static std::wstring ExtractJsonStringField(const std::string& obj, const std::string& key) {
+        std::string needle = "\"" + key + "\"";
+        size_t keyPos = obj.find(needle);
+        if (keyPos == std::string::npos) return L"";
+        size_t valStart = obj.find("\"", keyPos + needle.size());
+        if (valStart == std::string::npos) return L"";
+        size_t valEnd = obj.find("\"", valStart + 1);
+        if (valEnd == std::string::npos) return L"";
+        std::string val = obj.substr(valStart + 1, valEnd - valStart - 1);
+        return std::wstring(val.begin(), val.end());
+    }
+
+    static int64_t ExtractJsonNumberField(const std::string& obj, const std::string& key) {
+        std::string needle = "\"" + key + "\"";
+        size_t keyPos = obj.find(needle);
+        if (keyPos == std::string::npos) return 0;
+        size_t numStart = obj.find_first_of("0123456789", keyPos + needle.size());
+        if (numStart == std::string::npos) return 0;
+        size_t numEnd = obj.find_first_not_of("0123456789", numStart);
+        return std::stoll(obj.substr(numStart, numEnd - numStart));
+    }
+
+    static std::vector<std::string> SplitJsonObjects(const std::string& arrayBody) {
+        std::vector<std::string> objects;
+        int depth = 0;
+        size_t start = std::string::npos;
+        for (size_t i = 0; i < arrayBody.size(); ++i) {
+            char c = arrayBody[i];
+            if (c == '{') {
+                if (depth == 0) start = i;
+                depth++;
+            } else if (c == '}') {
+                depth--;
+                if (depth == 0 && start != std::string::npos) {
+                    objects.push_back(arrayBody.substr(start, i - start + 1));
+                    start = std::string::npos;
+                }
+            }
+        }
+        return objects;
+    }
+
     void FetchReleaseInfo(const std::wstring& repo, const std::wstring& tag,
                          std::wstring& outDownloadUrl, std::wstring& outAssetName,
                          int64_t& outAssetSize, std::wstring& outTag) {
@@ -412,6 +455,17 @@ private:
             throw std::runtime_error("GitHub API HTTP request failed.");
         }
 
+        DWORD statusCode = 0;
+        DWORD statusSize = sizeof(statusCode);
+        WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+                            WINHTTP_HEADER_NAME_BY_INDEX, &statusCode, &statusSize, WINHTTP_NO_HEADER_INDEX);
+        if (statusCode != 200) {
+            WinHttpCloseHandle(hRequest);
+            WinHttpCloseHandle(hConnect);
+            WinHttpCloseHandle(hSession);
+            throw std::runtime_error("GitHub API returned HTTP " + std::to_string(statusCode) + ".");
+        }
+
         std::string jsonBuffer;
         DWORD bytesAvailable = 0;
         while (WinHttpQueryDataAvailable(hRequest, &bytesAvailable) && bytesAvailable > 0) {
@@ -426,53 +480,43 @@ private:
         WinHttpCloseHandle(hConnect);
         WinHttpCloseHandle(hSession);
 
-        // Simple JSON extraction for asset matching "null-ide-win32-x64*.zip"
-        // Find "tag_name": "vX.Y.Z"
-        size_t tagPos = jsonBuffer.find("\"tag_name\"");
-        if (tagPos != std::string::npos) {
-            size_t valStart = jsonBuffer.find("\"", tagPos + 10);
-            size_t valEnd   = jsonBuffer.find("\"", valStart + 1);
-            if (valStart != std::string::npos && valEnd != std::string::npos) {
-                std::string t = jsonBuffer.substr(valStart + 1, valEnd - valStart - 1);
-                outTag = std::wstring(t.begin(), t.end());
+        // "tag_name" always appears before "assets" at the top level of the response.
+        size_t assetsArrayPos = jsonBuffer.find("\"assets\"");
+        std::string headBuffer = jsonBuffer.substr(0, assetsArrayPos == std::string::npos ? jsonBuffer.size() : assetsArrayPos);
+        outTag = ExtractJsonStringField(headBuffer, "tag_name");
+        if (outTag.empty()) {
+            outTag = ExtractJsonStringField(jsonBuffer, "tag_name");
+        }
+
+        if (assetsArrayPos == std::string::npos) {
+            throw std::runtime_error("Release response did not contain an assets array.");
+        }
+
+        size_t arrayStart = jsonBuffer.find('[', assetsArrayPos);
+        size_t arrayEnd   = jsonBuffer.find(']', arrayStart);
+        if (arrayStart == std::string::npos || arrayEnd == std::string::npos) {
+            throw std::runtime_error("Could not parse assets array in release response.");
+        }
+
+        // Scan asset objects individually so a field can never be read from the
+        // wrong asset (the old whole-buffer substring search could do exactly that).
+        std::vector<std::string> assetObjects = SplitJsonObjects(
+            jsonBuffer.substr(arrayStart, arrayEnd - arrayStart + 1));
+
+        static const std::wregex zipNamePattern(L"^null-ide-win32-x64(-[^/\\\\]+)?\\.zip$", std::regex::icase);
+
+        for (const auto& obj : assetObjects) {
+            std::wstring name = ExtractJsonStringField(obj, "name");
+            if (std::regex_match(name, zipNamePattern)) {
+                outAssetName   = name;
+                outDownloadUrl = ExtractJsonStringField(obj, "browser_download_url");
+                outAssetSize   = ExtractJsonNumberField(obj, "size");
+                break;
             }
         }
 
-        // Search assets array for null-ide-win32-x64*.zip
-        size_t assetPos = jsonBuffer.find("null-ide-win32-x64");
-        if (assetPos == std::string::npos) {
+        if (outDownloadUrl.empty()) {
             throw std::runtime_error("Release asset matching null-ide-win32-x64*.zip not found in release response.");
-        }
-
-        // Find asset name
-        size_t nameStart = jsonBuffer.rfind("\"", assetPos);
-        size_t nameEnd   = jsonBuffer.find("\"", assetPos);
-        std::string aName = jsonBuffer.substr(nameStart + 1, nameEnd - nameStart - 1);
-        outAssetName = std::wstring(aName.begin(), aName.end());
-
-        // Find browser_download_url near this asset
-        size_t urlPos = jsonBuffer.find("\"browser_download_url\"", assetPos);
-        if (urlPos == std::string::npos) {
-            urlPos = jsonBuffer.rfind("\"browser_download_url\"", assetPos);
-        }
-        if (urlPos != std::string::npos) {
-            size_t uStart = jsonBuffer.find("\"", urlPos + 22);
-            size_t uEnd   = jsonBuffer.find("\"", uStart + 1);
-            std::string uStr = jsonBuffer.substr(uStart + 1, uEnd - uStart - 1);
-            outDownloadUrl = std::wstring(uStr.begin(), uStr.end());
-        }
-
-        // Find size
-        size_t sizePos = jsonBuffer.find("\"size\"", assetPos);
-        if (sizePos == std::string::npos) {
-            sizePos = jsonBuffer.rfind("\"size\"", assetPos);
-        }
-        if (sizePos != std::string::npos) {
-            size_t numStart = jsonBuffer.find_first_of("0123456789", sizePos + 6);
-            size_t numEnd   = jsonBuffer.find_first_not_of("0123456789", numStart);
-            if (numStart != std::string::npos) {
-                outAssetSize = std::stoll(jsonBuffer.substr(numStart, numEnd - numStart));
-            }
         }
     }
 
