@@ -37,4 +37,6 @@ Thumbs.db
 dist/
 .null/
 .vscode/
+!.claude/
+.claude/settings.json
 .claude/
