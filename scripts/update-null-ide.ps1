@@ -130,25 +130,70 @@ if (-not (Test-Path $installer)) {
     throw "install-null-ide.ps1 not found at '$installer'. Both scripts must be in the same directory."
 }
 
+function Get-InstallDirProcesses {
+    param([string]$InstallDir)
+
+    $normalized = [System.IO.Path]::GetFullPath($InstallDir).TrimEnd('\') + '\'
+    $pids = @()
+
+    try {
+        $wmiProcs = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue
+        foreach ($p in $wmiProcs) {
+            if ($p.ExecutablePath -and $p.ExecutablePath.StartsWith($normalized, [System.StringComparison]::OrdinalIgnoreCase)) {
+                $pids += $p.ProcessId
+            }
+        }
+    }
+    catch {
+        foreach ($p in (Get-Process -ErrorAction SilentlyContinue)) {
+            try {
+                if ($p.Path -and $p.Path.StartsWith($normalized, [System.StringComparison]::OrdinalIgnoreCase)) {
+                    $pids += $p.Id
+                }
+            } catch {}
+        }
+    }
+
+    return $pids | Select-Object -Unique
+}
+
+function Wait-ForInstallDirProcesses {
+    param(
+        [string]$InstallDir,
+        [int]$TimeoutSeconds = 15
+    )
+
+    $spin = @('|', '/', '-', '\')
+    $i = 0
+    $startTime = [DateTime]::UtcNow
+    while (([DateTime]::UtcNow - $startTime).TotalSeconds -lt $TimeoutSeconds) {
+        $pids = Get-InstallDirProcesses -InstallDir $InstallDir
+        if (-not $pids -or $pids.Count -eq 0) {
+            Write-Progress -Activity "Waiting for Null IDE to close" -Completed
+            return
+        }
+        $elapsed = [int]([DateTime]::UtcNow - $startTime).TotalSeconds
+        Write-Progress -Activity "Waiting for Null IDE to close" `
+            -Status "$($spin[$i % 4]) Waiting... ($elapsed s)" `
+            -PercentComplete -1
+        $i++
+        Start-Sleep -Milliseconds 1000
+    }
+
+    Write-Progress -Activity "Waiting for Null IDE to close" -Completed
+
+    $pids = Get-InstallDirProcesses -InstallDir $InstallDir
+    foreach ($pidToKill in $pids) {
+        try {
+            Stop-Process -Id $pidToKill -Force -ErrorAction SilentlyContinue
+        } catch {}
+    }
+    Start-Sleep -Milliseconds 500
+}
+
 if ($WaitForExit) {
     Write-Step "Waiting for Null IDE to close"
-    $installPrefix = $installFullPath.TrimEnd('\') + '\'
-    while ($true) {
-        $running = Get-Process -Name "null" -ErrorAction SilentlyContinue | Where-Object {
-            try {
-                $_.MainModule.FileName.StartsWith($installPrefix, [System.StringComparison]::OrdinalIgnoreCase)
-            }
-            catch {
-                $false
-            }
-        }
-
-        if (-not $running) {
-            break
-        }
-
-        Start-Sleep -Seconds 1
-    }
+    Wait-ForInstallDirProcesses -InstallDir $installFullPath -TimeoutSeconds 15
 }
 
 Write-Step "Updating Null IDE"

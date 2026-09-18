@@ -2,6 +2,7 @@
 vscode-src/
 vscodium-src/
 shell-ext-build/
+updater/build/
 
 # Shell extension: wil headers fetched by CI
 shell-ext/deps/

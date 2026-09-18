@@ -135,11 +135,16 @@ foreach ($app in $targets) {
         Write-Host "  [ok] product.json"
     }
 
-    # --- 7. Updater scripts ---
+    # --- 7. Updater scripts & native binary ---
     $updaterDir = "$app\null-updater"
-    if (Test-Path $updaterDir) {
-        Copy-Item "$root\scripts\install-null-ide.ps1" $updaterDir -Force
-        Copy-Item "$root\scripts\update-null-ide.ps1"  $updaterDir -Force
+    New-Item -ItemType Directory -Path $updaterDir -Force | Out-Null
+    Copy-Item "$root\scripts\install-null-ide.ps1" $updaterDir -Force
+    Copy-Item "$root\scripts\update-null-ide.ps1"  $updaterDir -Force
+    $nativeExe = "$root\updater\build\Release\null-updater.exe"
+    if (Test-Path $nativeExe) {
+        Copy-Item $nativeExe $updaterDir -Force
+        Write-Host "  [ok] updater (null-updater.exe + ps1 scripts)"
+    } else {
         Write-Host "  [ok] updater scripts"
     }
 

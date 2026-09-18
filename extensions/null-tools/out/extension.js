@@ -126,11 +126,34 @@ function getInstallDir(context) {
     const candidates = getInstallDirCandidates(context);
     return candidates[0] || path.dirname(process.execPath);
 }
+function getUpdaterExePath(context) {
+    for (const installDir of getInstallDirCandidates(context)) {
+        const candidates = [
+            path.join(installDir, 'resources', 'app', 'null-updater', 'null-updater.exe'),
+            path.join(installDir, 'resources', 'null-updater', 'null-updater.exe'),
+            path.join(installDir, 'null-updater', 'null-updater.exe'),
+        ];
+        for (const p of candidates) {
+            if (fs.existsSync(p))
+                return p;
+        }
+    }
+    const repoUpdater = path.resolve(context.extensionPath, '..', '..', 'updater', 'build', 'Release', 'null-updater.exe');
+    if (fs.existsSync(repoUpdater))
+        return repoUpdater;
+    return null;
+}
 function getUpdaterScriptPath(context) {
     for (const installDir of getInstallDirCandidates(context)) {
-        const p = path.join(installDir, 'resources', 'app', 'null-updater', 'update-null-ide.ps1');
-        if (fs.existsSync(p))
-            return p;
+        const candidates = [
+            path.join(installDir, 'resources', 'app', 'null-updater', 'update-null-ide.ps1'),
+            path.join(installDir, 'resources', 'null-updater', 'update-null-ide.ps1'),
+            path.join(installDir, 'null-updater', 'update-null-ide.ps1'),
+        ];
+        for (const p of candidates) {
+            if (fs.existsSync(p))
+                return p;
+        }
     }
     const repoUpdater = path.resolve(context.extensionPath, '..', '..', 'scripts', 'update-null-ide.ps1');
     if (fs.existsSync(repoUpdater))
@@ -170,6 +193,12 @@ function trimVersionTag(tag) {
     return String(tag || '').replace(/^v/i, '');
 }
 function compareVersionTags(left, right) {
+    if (left === right)
+        return 0;
+    if (right === 'local')
+        return 1;
+    if (left === 'local')
+        return -1;
     const leftParts = trimVersionTag(left).split(/[.-]/).map(p => Number.parseInt(p, 10));
     const rightParts = trimVersionTag(right).split(/[.-]/).map(p => Number.parseInt(p, 10));
     if (leftParts.some(Number.isNaN) || rightParts.some(Number.isNaN)) {
@@ -183,54 +212,83 @@ function compareVersionTags(left, right) {
     }
     return 0;
 }
-function requestJson(url) {
-    return new Promise((resolve, reject) => {
-        const headers = {
-            Accept: 'application/vnd.github+json',
-            'X-GitHub-Api-Version': '2022-11-28',
-            'User-Agent': 'Null-IDE',
-        };
-        if (process.env.GITHUB_TOKEN) {
-            headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+function formatNetworkError(err) {
+    const msg = err.message || '';
+    if (msg.includes('ENOTFOUND') || msg.includes('EAI_AGAIN')) {
+        return new Error('Unable to resolve api.github.com. Please check your internet connection or proxy settings.');
+    }
+    if (msg.includes('ETIMEDOUT') || msg.includes('timed out')) {
+        return new Error('Connection to api.github.com timed out.');
+    }
+    if (msg.includes('ECONNREFUSED') || msg.includes('ECONNRESET')) {
+        return new Error('Connection to api.github.com was refused or reset.');
+    }
+    return err;
+}
+async function requestJson(url, retries = 2) {
+    let lastError = new Error('Unknown network error');
+    for (let attempt = 0; attempt <= retries; attempt++) {
+        if (attempt > 0) {
+            await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
         }
-        const req = https.get(url, { headers }, res => {
-            if (!res.statusCode || res.statusCode < 200 || res.statusCode >= 300) {
-                let body = '';
-                res.setEncoding('utf8');
-                res.on('data', (chunk) => { body += chunk; });
-                res.on('end', () => {
-                    let detail = '';
-                    try {
-                        const parsed = JSON.parse(body);
-                        detail = parsed?.message ? `: ${parsed.message}` : '';
+        try {
+            return await new Promise((resolve, reject) => {
+                const headers = {
+                    Accept: 'application/vnd.github+json',
+                    'X-GitHub-Api-Version': '2022-11-28',
+                    'User-Agent': 'Null-IDE',
+                };
+                if (process.env.GITHUB_TOKEN) {
+                    headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+                }
+                const req = https.get(url, { headers }, res => {
+                    if (!res.statusCode || res.statusCode < 200 || res.statusCode >= 300) {
+                        let body = '';
+                        res.setEncoding('utf8');
+                        res.on('data', (chunk) => { body += chunk; });
+                        res.on('end', () => {
+                            let detail = '';
+                            try {
+                                const parsed = JSON.parse(body);
+                                detail = parsed?.message ? `: ${parsed.message}` : '';
+                            }
+                            catch (_) { }
+                            reject(new Error(`GitHub returned ${res.statusCode}${detail}`));
+                        });
+                        return;
                     }
-                    catch (_) { }
-                    reject(new Error(`GitHub returned ${res.statusCode}${detail}`));
+                    let body = '';
+                    res.setEncoding('utf8');
+                    res.on('data', (chunk) => { body += chunk; });
+                    res.on('end', () => {
+                        try {
+                            resolve(JSON.parse(body));
+                        }
+                        catch (err) {
+                            reject(err);
+                        }
+                    });
                 });
-                return;
-            }
-            let body = '';
-            res.setEncoding('utf8');
-            res.on('data', (chunk) => { body += chunk; });
-            res.on('end', () => {
-                try {
-                    resolve(JSON.parse(body));
-                }
-                catch (err) {
-                    reject(err);
-                }
+                req.on('error', reject);
+                req.setTimeout(10000, () => { req.destroy(new Error('GitHub request timed out')); });
             });
-        });
-        req.on('error', reject);
-        req.setTimeout(10000, () => { req.destroy(new Error('GitHub request timed out')); });
-    });
+        }
+        catch (err) {
+            lastError = formatNetworkError(err);
+            // Don't retry HTTP 4xx/5xx status errors, only network/connect errors
+            if (err.message?.startsWith('GitHub returned')) {
+                throw err;
+            }
+        }
+    }
+    throw lastError;
 }
 async function getLatestRelease(repo) {
     return requestJson(`https://api.github.com/repos/${repo}/releases/latest`);
 }
 function hasWindowsPackage(release) {
     return Array.isArray(release.assets) &&
-        release.assets.some(a => /^(null-ide-win32-x64.*\.zip|NullIDESetup.*\.exe)$/i.test(a.name));
+        release.assets.some(a => /^(null-ide-win32-x64(-[^/\\]+)?\.zip|NullIDESetup.*\.exe)$/i.test(a.name));
 }
 async function checkForUpdate(context, silent) {
     const now = Date.now();
@@ -280,14 +338,10 @@ async function installUpdate(context) {
         || await checkForUpdate(context, false);
     if (!update)
         return;
-    const updater = getUpdaterScriptPath(context);
-    if (!updater) {
-        vscode.window.showErrorMessage('Null IDE updater script was not found in this installation.');
-        return;
-    }
-    const installer = path.join(path.dirname(updater), 'install-null-ide.ps1');
-    if (!fs.existsSync(installer)) {
-        vscode.window.showErrorMessage('Null IDE installer script was not found in this installation.');
+    const updaterExe = getUpdaterExePath(context);
+    const updaterScript = getUpdaterScriptPath(context);
+    if (!updaterExe && !updaterScript) {
+        vscode.window.showErrorMessage('Null IDE updater was not found in this installation.');
         return;
     }
     const choice = await vscode.window.showWarningMessage(`Install Null IDE ${update.latest}? The IDE will close, update, and reopen.`, { modal: true }, 'Restart and Update');
@@ -295,27 +349,28 @@ async function installUpdate(context) {
         return;
     const updaterDir = path.join(process.env.TEMP || process.env.TMP || getInstallDir(context), `null-ide-updater-${Date.now()}`);
     fs.mkdirSync(updaterDir, { recursive: true });
-    const stagedUpdater = path.join(updaterDir, 'update-null-ide.ps1');
-    fs.copyFileSync(updater, stagedUpdater);
-    fs.copyFileSync(installer, path.join(updaterDir, 'install-null-ide.ps1'));
     const installDir = getInstallDir(context);
-    // Build a tiny launcher script that uses Start-Process to create a new,
-    // independent console window. This ensures the updater survives the IDE's
-    // process group / job object being torn down on quit.
-    const launcherPath = path.join(updaterDir, 'launcher.ps1');
-    const psArgList = [
-        '-NoLogo', '-ExecutionPolicy', 'Bypass',
-        '-File', stagedUpdater,
-        '-Repo', update.repo,
-        '-InstallDir', installDir,
-        '-Force', '-WaitForExit', '-Launch',
-    ].map(a => `'${a.replace(/'/g, "''")}'`).join(', ');
-    fs.writeFileSync(launcherPath, `Start-Process -FilePath powershell.exe -ArgumentList @(${psArgList}) -WindowStyle Normal\n`, 'utf8');
-    const child = (0, child_process_1.spawn)('powershell.exe', [
-        '-NoLogo', '-ExecutionPolicy', 'Bypass', '-NonInteractive', '-File', launcherPath,
-    ], { detached: true, stdio: 'ignore' });
+    const launcherPath = path.join(updaterDir, 'launcher.cmd');
+    const cmdQ = (s) => `"${s.replace(/"/g, '""')}"`;
+    let launchCmd;
+    if (updaterExe) {
+        const stagedExe = path.join(updaterDir, 'null-updater.exe');
+        fs.copyFileSync(updaterExe, stagedExe);
+        launchCmd = `${cmdQ(stagedExe)} --repo ${cmdQ(update.repo)} --install-dir ${cmdQ(installDir)} --wait --force --launch`;
+    }
+    else {
+        const stagedUpdater = path.join(updaterDir, 'update-null-ide.ps1');
+        const installer = path.join(path.dirname(updaterScript), 'install-null-ide.ps1');
+        fs.copyFileSync(updaterScript, stagedUpdater);
+        if (fs.existsSync(installer)) {
+            fs.copyFileSync(installer, path.join(updaterDir, 'install-null-ide.ps1'));
+        }
+        launchCmd = `powershell.exe -NoLogo -ExecutionPolicy Bypass -WindowStyle Normal -File ${cmdQ(stagedUpdater)} -Repo ${cmdQ(update.repo)} -InstallDir ${cmdQ(installDir)} -Force -WaitForExit -Launch`;
+    }
+    fs.writeFileSync(launcherPath, `@echo off\r\nstart "Null IDE Update" ${launchCmd}\r\n`, 'utf8');
+    const child = (0, child_process_1.spawn)('cmd.exe', ['/c', launcherPath], { detached: true, stdio: 'ignore' });
     child.unref();
-    setTimeout(() => vscode.commands.executeCommand('workbench.action.quit'), 500);
+    setTimeout(() => vscode.commands.executeCommand('workbench.action.quit'), 1000);
 }
 // ── Agent file watcher ────────────────────────────────────────────────────
 const WATCH_IGNORE = /[/\\](\.git|node_modules|out|dist|\.vscodium)[/\\]|\.(?:map|log|bin)$/;

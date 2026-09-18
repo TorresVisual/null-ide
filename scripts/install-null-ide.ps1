@@ -74,7 +74,7 @@ function Get-ReleaseAsset {
     param($Release)
 
     $asset = $Release.assets |
-        Where-Object { $_.name -match '^null-ide-win32-x64.*\.zip$' } |
+        Where-Object { $_.name -match '^null-ide-win32-x64(-[^/\\]+)?\.zip$' } |
         Select-Object -First 1
 
     if (-not $asset) {
@@ -84,31 +84,135 @@ function Get-ReleaseAsset {
     $asset
 }
 
+function Invoke-DownloadWithProgress {
+    param(
+        [string]$Uri,
+        [string]$OutFile,
+        [hashtable]$Headers,
+        [long]$ExpectedBytes = 0,
+        [string]$Label = 'Downloading'
+    )
+
+    if (Test-Path $OutFile) { Remove-Item $OutFile -Force }
+
+    $job = Start-Job -ScriptBlock {
+        param($Uri, $OutFile, $Headers)
+        $ProgressPreference = 'SilentlyContinue'
+        Invoke-WebRequest -Uri $Uri -OutFile $OutFile -UseBasicParsing -Headers $Headers
+    } -ArgumentList $Uri, $OutFile, $Headers
+
+    try {
+        while ($job.State -eq 'Running') {
+            $current = if (Test-Path $OutFile) { (Get-Item $OutFile).Length } else { 0 }
+            if ($ExpectedBytes -gt 0) {
+                $pct    = [Math]::Min(99, [int](($current / $ExpectedBytes) * 100))
+                $status = "$([Math]::Round($current / 1MB, 1)) MB / $([Math]::Round($ExpectedBytes / 1MB, 1)) MB"
+            } else {
+                $pct    = -1
+                $status = "$([Math]::Round($current / 1MB, 1)) MB"
+            }
+            Write-Progress -Activity $Label -Status $status -PercentComplete $pct
+            Start-Sleep -Milliseconds 300
+        }
+
+        if ($job.State -eq 'Failed') {
+            $reason = $job.ChildJobs[0].JobStateInfo.Reason
+            throw "Download failed: $reason"
+        }
+        Receive-Job $job -ErrorAction Stop | Out-Null
+    }
+    finally {
+        Write-Progress -Activity $Label -Completed
+        Remove-Job $job -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Expand-ZipFast {
+    param(
+        [string]$ZipPath,
+        [string]$Destination,
+        [string]$Label = 'Extracting'
+    )
+
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+
+    $zip   = [System.IO.Compression.ZipFile]::OpenRead($ZipPath)
+    $total = $zip.Entries.Count
+    $i     = 0
+
+    try {
+        foreach ($entry in $zip.Entries) {
+            $i++
+            $pct     = [Math]::Min(99, [int](($i / $total) * 100))
+            $destPath = [System.IO.Path]::Combine($Destination, $entry.FullName)
+
+            if ($entry.FullName.EndsWith('/') -or $entry.FullName.EndsWith('\')) {
+                [System.IO.Directory]::CreateDirectory($destPath) | Out-Null
+            } else {
+                $destDir = [System.IO.Path]::GetDirectoryName($destPath)
+                [System.IO.Directory]::CreateDirectory($destDir) | Out-Null
+                [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $destPath, $true)
+            }
+
+            if ($i % 100 -eq 0 -or $i -eq $total) {
+                Write-Progress -Activity $Label -Status "$i / $total files" -PercentComplete $pct
+            }
+        }
+    }
+    finally {
+        $zip.Dispose()
+        Write-Progress -Activity $Label -Completed
+    }
+}
+
 function Test-NullIdeRunning {
     param([string]$Destination)
 
-    $processes = Get-Process -Name "null" -ErrorAction SilentlyContinue
-    if (-not $processes) {
-        return $false
-    }
-
     $destinationFullPath = [System.IO.Path]::GetFullPath($Destination).TrimEnd('\') + '\'
 
-    foreach ($process in $processes) {
-        try {
-            $processPath = $process.MainModule.FileName
-            if ($processPath -and $processPath.StartsWith($destinationFullPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+    try {
+        $wmiProcs = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue
+        foreach ($p in $wmiProcs) {
+            if ($p.ExecutablePath -and $p.ExecutablePath.StartsWith($destinationFullPath, [System.StringComparison]::OrdinalIgnoreCase)) {
                 return $true
             }
         }
-        catch {
-            if (Test-Path (Join-Path $Destination "null.exe")) {
-                return $true
+    }
+    catch {
+        $processes = Get-Process -Name "null" -ErrorAction SilentlyContinue
+        foreach ($process in $processes) {
+            try {
+                if ($process.Path -and $process.Path.StartsWith($destinationFullPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+                    return $true
+                }
             }
+            catch {}
         }
     }
 
     return $false
+}
+
+function Rename-ItemWithRetry {
+    param(
+        [string]$Path,
+        [string]$NewName,
+        [int]$MaxRetries = 5,
+        [int]$DelayMs = 1000
+    )
+
+    for ($i = 1; $i -le $MaxRetries; $i++) {
+        try {
+            Rename-Item -LiteralPath $Path -NewName $NewName -ErrorAction Stop
+            return
+        }
+        catch {
+            if ($i -eq $MaxRetries) {
+                throw
+            }
+            Start-Sleep -Milliseconds $DelayMs
+        }
+    }
 }
 
 function New-Shortcut {
@@ -640,19 +744,22 @@ function Install-Zip {
     try {
         Write-Step "Extracting package"
         New-Item -ItemType Directory -Path $extractDir -Force | Out-Null
-        Expand-Archive -Path $SourceZip -DestinationPath $extractDir -Force
+        Expand-ZipFast -ZipPath $SourceZip -Destination $extractDir -Label 'Extracting package'
 
         $exe = Get-ChildItem -Path $extractDir -Filter "null.exe" -Recurse -File |
             Sort-Object { $_.FullName.Length } | Select-Object -First 1
         if (-not $exe) { throw "The package does not contain null.exe." }
         $packageRoot = $exe.Directory.FullName
 
-        # Stage new files on the same volume as the install dir so Rename-Item is atomic
+        # Stage: robocopy /MOVE is a single native call — much faster than
+        # a PowerShell ForEach-Object Move-Item loop for thousands of files.
         Write-Step "Staging new version"
         New-Item -ItemType Directory -Path $stageDir -Force | Out-Null
-        Get-ChildItem -LiteralPath $packageRoot -Force |
-            ForEach-Object { Move-Item -LiteralPath $_.FullName -Destination $stageDir -Force }
-        Remove-Item -LiteralPath $extractDir -Recurse -Force -ErrorAction SilentlyContinue
+        robocopy $packageRoot $stageDir /E /MOVE /NP /NFL /NDL /NJH /NJS | Out-Null
+        if ($LASTEXITCODE -ge 8) { throw "robocopy failed staging files (exit $LASTEXITCODE)." }
+        if (Test-Path $extractDir) {
+            cmd /c "rd /s /q `"$extractDir`"" 2>$null
+        }
         $extractDir = $null
 
         if ($isUpdate) {
@@ -663,13 +770,13 @@ function Install-Zip {
                 Move-Item -LiteralPath $dataSource -Destination (Join-Path $stageDir "data")
             }
 
-            # Rename-swap: directory rename works even when files inside are open/locked
+            # Rename-swap with retry
             Write-Step "Swapping installation ($(Split-Path $bakDir -Leaf))"
-            Rename-Item -LiteralPath $destinationFullPath -NewName (Split-Path $bakDir -Leaf)
+            Rename-ItemWithRetry -Path $destinationFullPath -NewName (Split-Path $bakDir -Leaf)
         }
 
         # Promote staged dir to the real install path
-        Rename-Item -LiteralPath $stageDir -NewName $installName
+        Rename-ItemWithRetry -Path $stageDir -NewName $installName
         $stageDir = $null
 
         $binDir = Write-NullShim -InstallDir $destinationFullPath
@@ -681,10 +788,16 @@ function Install-Zip {
             installDir  = $destinationFullPath
         } | ConvertTo-Json | Set-Content -Path (Join-Path $destinationFullPath ".null-ide-install.json") -Encoding UTF8
 
-        # Delete old backup - may fail if IDE is still holding handles; that is non-fatal
+        # Delete old backup — cmd rd /s /q is far faster than Remove-Item -Recurse
+        # for large directory trees, and is non-fatal if the IDE still holds handles.
         if (Test-Path $bakDir) {
-            try   { Remove-Item -LiteralPath $bakDir -Recurse -Force -ErrorAction Stop }
-            catch { Write-Warning "Old files left at '$bakDir' (IDE still running?) - delete manually after closing Null IDE." }
+            try {
+                cmd /c "rd /s /q `"$bakDir`"" 2>$null
+                if ($LASTEXITCODE -ne 0) { throw "rd exited $LASTEXITCODE" }
+            }
+            catch {
+                Write-Warning "Old files left at '$bakDir' (IDE still running?) - delete manually after closing Null IDE."
+            }
         }
 
         $target = Get-NullIdeExecutable -Dir $destinationFullPath
@@ -829,8 +942,22 @@ New-Item -ItemType Directory -Path $downloadDir -Force | Out-Null
 $downloadPath = Join-Path $downloadDir $asset.name
 
 try {
-    Write-Step "Downloading $($asset.name)"
-    Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $downloadPath
+    $headers = @{ "User-Agent" = "Null-IDE-Installer" }
+    if ($env:GITHUB_TOKEN) { $headers["Authorization"] = "Bearer $env:GITHUB_TOKEN" }
+
+    $expectedBytes = if ($asset.size) { [long]$asset.size } else { 0 }
+    $expectedMB    = if ($expectedBytes) { "$([Math]::Round($expectedBytes / 1MB, 1)) MB" } else { 'unknown size' }
+    Write-Step "Downloading $($asset.name) ($expectedMB)"
+
+    Invoke-DownloadWithProgress `
+        -Uri           $asset.browser_download_url `
+        -OutFile       $downloadPath `
+        -Headers       $headers `
+        -ExpectedBytes $expectedBytes `
+        -Label         "Downloading $($asset.name)"
+
+    $actualMB = [Math]::Round((Get-Item $downloadPath).Length / 1MB, 1)
+    Write-Host "Download complete ($actualMB MB)"
     Install-Zip -SourceZip $downloadPath -Destination $InstallDir -InstalledVersion $release.tag_name -Repository $Repo
 }
 finally {
