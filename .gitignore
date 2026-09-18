@@ -32,6 +32,9 @@ extensions/null-actions/.vscode-test/
 # Claude Code internals
 .claude/
 .antigravitycli/
+!.claude/agents/
+!.claude/hooks/
+!.claude/skills/
 
 # OS
 .DS_Store
@@ -40,3 +43,4 @@ Thumbs.db
 # Added by Null IDE Auto-Gitignore
 dist/
 .null/
+.vscode/
