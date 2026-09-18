@@ -24,6 +24,7 @@
 #include <algorithm>
 
 #include "miniz.h"
+#include <bcrypt.h>
 
 namespace fs = std::filesystem;
 
@@ -34,6 +35,7 @@ struct UpdaterArgs {
     std::wstring repo = L"TorresVisual/null-ide";
     std::wstring version = L"";
     std::wstring installDir = L"";
+    std::wstring zipPath = L"";
     bool waitForExit = false;
     bool force = false;
     bool launch = false;
@@ -168,31 +170,49 @@ private:
 
         if (m_cancelRequested) return;
 
-        // 2. Fetch Release Metadata from GitHub API
-        DirectUpdateUI(-1, L"Checking for latest release from GitHub...");
-        std::wstring tagToFetch = m_args.version;
-        std::wstring downloadUrl;
-        std::wstring assetName;
-        int64_t assetSize = 0;
-        std::wstring releaseTag;
-
-        FetchReleaseInfo(m_args.repo, tagToFetch, downloadUrl, assetName, assetSize, releaseTag);
-
-        if (downloadUrl.empty()) {
-            throw std::runtime_error("Could not find suitable null-ide-win32-x64 release asset.");
-        }
-
-        if (m_cancelRequested) return;
-
-        // 3. Download Asset
         fs::path tempDir = fs::temp_directory_path() / (L"null-ide-update-" + std::to_wstring(GetTickCount64()));
-        fs::create_directories(tempDir);
-        fs::path zipPath = tempDir / assetName;
+        fs::path zipPath;
+        std::wstring releaseTag = m_args.version;
 
-        DirectUpdateUI(0, L"Downloading " + assetName + L"...");
-        DownloadFile(downloadUrl, zipPath, assetSize);
+        if (!m_args.zipPath.empty()) {
+            // 2. Use the already-downloaded, already-verified package staged by the caller.
+            zipPath = m_args.zipPath;
+            if (!fs::exists(zipPath)) {
+                throw std::runtime_error("Staged update package not found: " + zipPath.string());
+            }
+            if (releaseTag.empty()) {
+                throw std::runtime_error("--zip-path requires --version to also be specified.");
+            }
+            fs::create_directories(tempDir);
+        } else {
+            // 2. Fetch Release Metadata from GitHub API
+            DirectUpdateUI(-1, L"Checking for latest release from GitHub...");
+            std::wstring tagToFetch = m_args.version;
+            std::wstring downloadUrl;
+            std::wstring assetName;
+            int64_t assetSize = 0;
 
-        if (m_cancelRequested) return;
+            FetchReleaseInfo(m_args.repo, tagToFetch, downloadUrl, assetName, assetSize, releaseTag);
+
+            if (downloadUrl.empty()) {
+                throw std::runtime_error("Could not find suitable null-ide-win32-x64 release asset.");
+            }
+
+            if (m_cancelRequested) return;
+
+            // 3. Download Asset
+            fs::create_directories(tempDir);
+            zipPath = tempDir / assetName;
+
+            DirectUpdateUI(0, L"Downloading " + assetName + L"...");
+            DownloadFile(downloadUrl, zipPath, assetSize);
+
+            if (m_cancelRequested) return;
+
+            // 3b. Verify integrity
+            DirectUpdateUI(-1, L"Verifying download integrity...");
+            VerifyZipChecksum(downloadUrl, zipPath);
+        }
 
         // 4. Extract Package
         fs::path extractDir = tempDir / L"extract";
@@ -544,6 +564,162 @@ private:
         WinHttpCloseHandle(hSession);
     }
 
+    bool EqualsIgnoreCase(const std::wstring& a, const std::wstring& b) {
+        if (a.size() != b.size()) return false;
+        return std::equal(a.begin(), a.end(), b.begin(), [](wchar_t x, wchar_t y) {
+            return towlower(x) == towlower(y);
+        });
+    }
+
+    std::wstring ComputeFileSha256(const fs::path& filePath) {
+        BCRYPT_ALG_HANDLE hAlg = NULL;
+        BCRYPT_HASH_HANDLE hHash = NULL;
+        NTSTATUS status;
+
+        status = BCryptOpenAlgorithmProvider(&hAlg, BCRYPT_SHA256_ALGORITHM, NULL, 0);
+        if (!BCRYPT_SUCCESS(status)) {
+            throw std::runtime_error("BCryptOpenAlgorithmProvider failed.");
+        }
+
+        DWORD hashObjectSize = 0, cbData = 0, hashLen = 0;
+        BCryptGetProperty(hAlg, BCRYPT_OBJECT_LENGTH, (PUCHAR)&hashObjectSize, sizeof(DWORD), &cbData, 0);
+        BCryptGetProperty(hAlg, BCRYPT_HASH_LENGTH, (PUCHAR)&hashLen, sizeof(DWORD), &cbData, 0);
+
+        std::vector<UCHAR> hashObject(hashObjectSize);
+        status = BCryptCreateHash(hAlg, &hHash, hashObject.data(), hashObjectSize, NULL, 0, 0);
+        if (!BCRYPT_SUCCESS(status)) {
+            BCryptCloseAlgorithmProvider(hAlg, 0);
+            throw std::runtime_error("BCryptCreateHash failed.");
+        }
+
+        std::ifstream file(filePath, std::ios::binary);
+        if (!file) {
+            BCryptDestroyHash(hHash);
+            BCryptCloseAlgorithmProvider(hAlg, 0);
+            throw std::runtime_error("Cannot open file for hashing: " + filePath.string());
+        }
+
+        std::vector<char> buffer(65536);
+        while (file.read(buffer.data(), static_cast<std::streamsize>(buffer.size())) || file.gcount() > 0) {
+            status = BCryptHashData(hHash, (PUCHAR)buffer.data(), static_cast<ULONG>(file.gcount()), 0);
+            if (!BCRYPT_SUCCESS(status)) {
+                BCryptDestroyHash(hHash);
+                BCryptCloseAlgorithmProvider(hAlg, 0);
+                throw std::runtime_error("BCryptHashData failed.");
+            }
+        }
+
+        std::vector<UCHAR> hash(hashLen);
+        status = BCryptFinishHash(hHash, hash.data(), hashLen, 0);
+        BCryptDestroyHash(hHash);
+        BCryptCloseAlgorithmProvider(hAlg, 0);
+        if (!BCRYPT_SUCCESS(status)) {
+            throw std::runtime_error("BCryptFinishHash failed.");
+        }
+
+        std::wstring result;
+        wchar_t hexBuf[3];
+        for (UCHAR b : hash) {
+            swprintf_s(hexBuf, L"%02x", b);
+            result += hexBuf;
+        }
+        return result;
+    }
+
+    std::wstring FetchSha256Sidecar(const std::wstring& url) {
+        URL_COMPONENTS urlComp = { sizeof(urlComp) };
+        wchar_t hostName[256] = { 0 };
+        wchar_t urlPath[2048] = { 0 };
+        urlComp.lpszHostName = hostName;
+        urlComp.dwHostNameLength = 256;
+        urlComp.lpszUrlPath = urlPath;
+        urlComp.dwUrlPathLength = 2048;
+
+        if (!WinHttpCrackUrl(url.c_str(), static_cast<DWORD>(url.length()), 0, &urlComp)) {
+            throw std::runtime_error("Invalid checksum sidecar URL.");
+        }
+
+        HINTERNET hSession = WinHttpOpen(L"Null-IDE-Updater/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+                                         WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+        if (!hSession) throw std::runtime_error("WinHttpOpen failed.");
+
+        DWORD redirectOption = WINHTTP_OPTION_REDIRECT_POLICY_ALWAYS;
+        WinHttpSetOption(hSession, WINHTTP_OPTION_REDIRECT_POLICY, &redirectOption, sizeof(redirectOption));
+
+        INTERNET_PORT port = (urlComp.nScheme == INTERNET_SCHEME_HTTPS) ? INTERNET_DEFAULT_HTTPS_PORT : INTERNET_DEFAULT_HTTP_PORT;
+        HINTERNET hConnect = WinHttpConnect(hSession, hostName, port, 0);
+        if (!hConnect) {
+            WinHttpCloseHandle(hSession);
+            throw std::runtime_error("Checksum sidecar connect failed.");
+        }
+
+        DWORD reqFlags = (urlComp.nScheme == INTERNET_SCHEME_HTTPS) ? WINHTTP_FLAG_SECURE : 0;
+        HINTERNET hRequest = WinHttpOpenRequest(hConnect, L"GET", urlPath, NULL,
+                                                WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES,
+                                                reqFlags);
+        if (!hRequest) {
+            WinHttpCloseHandle(hConnect);
+            WinHttpCloseHandle(hSession);
+            throw std::runtime_error("Checksum sidecar request failed.");
+        }
+
+        if (!WinHttpSendRequest(hRequest, WINHTTP_NO_ADDITIONAL_HEADERS, 0,
+                                WINHTTP_NO_REQUEST_DATA, 0, 0, 0) ||
+            !WinHttpReceiveResponse(hRequest, NULL)) {
+            WinHttpCloseHandle(hRequest);
+            WinHttpCloseHandle(hConnect);
+            WinHttpCloseHandle(hSession);
+            throw std::runtime_error("Checksum sidecar request failed.");
+        }
+
+        DWORD statusCode = 0;
+        DWORD statusSize = sizeof(statusCode);
+        WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+                            WINHTTP_HEADER_NAME_BY_INDEX, &statusCode, &statusSize, WINHTTP_NO_HEADER_INDEX);
+        if (statusCode != 200) {
+            WinHttpCloseHandle(hRequest);
+            WinHttpCloseHandle(hConnect);
+            WinHttpCloseHandle(hSession);
+            throw std::runtime_error("Checksum sidecar not available (HTTP " + std::to_string(statusCode) + ").");
+        }
+
+        std::string body;
+        DWORD bytesAvailable = 0;
+        while (WinHttpQueryDataAvailable(hRequest, &bytesAvailable) && bytesAvailable > 0) {
+            std::vector<char> buf(bytesAvailable);
+            DWORD bytesRead = 0;
+            if (WinHttpReadData(hRequest, buf.data(), bytesAvailable, &bytesRead)) {
+                body.append(buf.data(), bytesRead);
+            }
+        }
+
+        WinHttpCloseHandle(hRequest);
+        WinHttpCloseHandle(hConnect);
+        WinHttpCloseHandle(hSession);
+
+        size_t hashEnd = body.find_first_of(" \t\r\n");
+        std::string hashStr = (hashEnd == std::string::npos) ? body : body.substr(0, hashEnd);
+        if (hashStr.empty()) {
+            throw std::runtime_error("Checksum sidecar was empty.");
+        }
+        return std::wstring(hashStr.begin(), hashStr.end());
+    }
+
+    void VerifyZipChecksum(const std::wstring& downloadUrl, const fs::path& zipPath) {
+        std::wstring expectedHash;
+        try {
+            expectedHash = FetchSha256Sidecar(downloadUrl + L".sha256");
+        } catch (const std::exception&) {
+            // No sidecar published for this release yet - don't block the update over it.
+            return;
+        }
+
+        std::wstring actualHash = ComputeFileSha256(zipPath);
+        if (!EqualsIgnoreCase(actualHash, expectedHash)) {
+            throw std::runtime_error("Downloaded file failed integrity check (SHA256 mismatch).");
+        }
+    }
+
     void ExtractZip(const fs::path& zipPath, const fs::path& destDir) {
         std::string zipPathStr = zipPath.string();
 
@@ -626,6 +802,10 @@ UpdaterArgs ParseArgs(int argc, wchar_t* argv[]) {
             args.version = argv[++i];
         } else if (arg.rfind(L"--version=", 0) == 0) {
             args.version = arg.substr(10);
+        } else if (arg == L"--zip-path" && i + 1 < argc) {
+            args.zipPath = argv[++i];
+        } else if (arg.rfind(L"--zip-path=", 0) == 0) {
+            args.zipPath = arg.substr(11);
         } else if (arg == L"--wait" || arg == L"-WaitForExit") {
             args.waitForExit = true;
         } else if (arg == L"--force" || arg == L"-Force") {
