@@ -90,30 +90,6 @@ Right-click any file or folder and choose **Open in Null** or **Open Folder in N
 
 Right-click inside a folder (on the background) and choose **Open Folder in Null**.
 
-### AI Agents panel
-
-The secondary sidebar contains an **AI Agents** panel with embedded terminals for `claude`, `agy`, `codex`, and `ollama`. Switch between them using the tabs at the top.
-
-- Scrollback is persisted across reloads (up to 300 KB per agent)
-- Paste with `Ctrl+V` while the terminal is focused
-- **Session history**: click the history icon to browse past Claude Code sessions for the current project; click any session to resume it
-- **Inject file context**: press `Ctrl+Shift+K` (or the file-code icon in the panel toolbar) to send the active editor's content into the agent terminal
-- **Prompt templates**: click the library icon to insert a saved prompt template; templates are configurable via `null.promptTemplates` in settings
-- The panel requires `node-pty` built for the current Electron version. If you see a setup screen, click **Install dependencies** (takes ~30 seconds, then reload the window)
-
-### Ollama integration
-
-With [Ollama](https://ollama.com) running locally:
-
-- `Ctrl+Shift+O` — open an inline chat panel for the active editor using the configured model
-- **Null: Ollama Code Review** — review the active file for bugs and improvements
-- **Null: Switch Ollama Model** — pick a different model from those pulled in Ollama
-- Default model is `llama3.2`; change it via `null.ollama.model` in settings
-
-### Claude commit messages
-
-Press `Ctrl+Shift+Alt+G` (or click `$(sparkle)` in the status bar, or use the sparkle icon above the SCM commit box) to generate a conventional commit message from your staged diff via `claude --print`. The message is written directly into the commit input box.
-
 ### Extensions
 
 The IDE connects to the VS Marketplace by default. Install extensions normally via `Ctrl+Shift+X` or from the terminal:
