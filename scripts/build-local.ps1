@@ -428,6 +428,14 @@ try {
     }
     else {
         Write-Host "node_modules already present, skipping npm ci"
+        # npm ci's postinstall hook is what installs each extension's own
+        # node_modules (extensions/*, .vscode/extensions/*, remote/web, ...).
+        # On a reused clone, Get-OrCloneRepo's `git clean -fdx` just wiped all
+        # of those (only the root node_modules is preserved) - so postinstall
+        # has to be re-run explicitly here, or every extension stays
+        # uninstalled and later compile/typecheck steps fail with missing
+        # modules (e.g. "Cannot find type definition file for 'node'").
+        Invoke-Native "npm run postinstall (vscode-src)" { npm run postinstall }
     }
 
     if (-not (Test-Path "node_modules")) {
@@ -436,6 +444,24 @@ try {
 
     Write-Step "Installing @anthropic-ai/sdk pin"
     Invoke-Native "npm install @anthropic-ai/sdk" { npm install "@anthropic-ai/sdk@0.82.0" --no-save --no-audit --fund=false }
+}
+finally {
+    Pop-Location
+}
+
+# gulp itself (esbuild, gulp-merge-json, jsonc-parser, workerpool, etc.) is a
+# separate npm project rooted at vscode-src/build - installing only the repo
+# root's node_modules leaves these unresolved and gulp fails with
+# ERR_MODULE_NOT_FOUND partway through the build.
+Write-Step "Installing vscode-src/build dependencies (gulp toolchain)"
+Push-Location (Join-Path $VscodeSrc "build")
+try {
+    if ($Clean -or -not (Test-Path "node_modules")) {
+        Invoke-Native "npm ci (vscode-src/build)" { npm ci --prefer-offline --no-audit --fund=false }
+    }
+    else {
+        Write-Host "node_modules already present, skipping npm ci"
+    }
 }
 finally {
     Pop-Location
