@@ -105,6 +105,46 @@ function Invoke-Native {
     }
 }
 
+function Test-NodeModulesStale {
+    # npm writes node_modules/.package-lock.json as a snapshot of the
+    # lockfile it last installed from. A reused clone's preserved
+    # node_modules can predate a VSCODIUM_TAG/MS_TAG bump that changed
+    # package-lock.json (e.g. @vscode/proxy-agent 0.42.0 -> 0.44.0),
+    # silently leaving stale packages installed. Comparing resolved
+    # versions against that snapshot is how we detect it needs a real
+    # `npm ci` instead of being skipped outright.
+    #
+    # Compares by package version rather than a whole-file hash because
+    # a later `npm install --no-save` step (the @anthropic-ai/sdk pin)
+    # legitimately adds extra entries to the snapshot that never appear
+    # in package-lock.json - a raw hash diff would always call that stale.
+    param([Parameter(Mandatory)][string]$Dir)
+
+    $snapshot = Join-Path $Dir "node_modules/.package-lock.json"
+    if (-not (Test-Path $snapshot)) {
+        return $true
+    }
+
+    $checkScript = @'
+const lockfile = require(process.argv[1]);
+const snapshot = require(process.argv[2]);
+for (const [key, entry] of Object.entries(lockfile.packages)) {
+    // Skip the root package entry and optionalDependencies - npm
+    // legitimately omits optional packages that don't match the current
+    // platform/arch (e.g. darwin/linux variants of native modules), so
+    // their absence from the snapshot isn't staleness.
+    if (key === '' || entry.optional) continue;
+    const installed = snapshot.packages[key];
+    if (!installed || installed.version !== entry.version) {
+        process.exit(1);
+    }
+}
+process.exit(0);
+'@
+    node -e $checkScript (Join-Path $Dir "package-lock.json") $snapshot
+    return $LASTEXITCODE -ne 0
+}
+
 # ============================================================
 # PATHS
 # ============================================================
@@ -423,11 +463,11 @@ if (-not $html.Contains("null-splash.js")) {
 Write-Step "Installing vscode-src dependencies"
 Push-Location $VscodeSrc
 try {
-    if ($Clean -or -not (Test-Path "node_modules")) {
+    if ($Clean -or -not (Test-Path "node_modules") -or (Test-NodeModulesStale $VscodeSrc)) {
         Invoke-Native "npm ci (vscode-src)" { npm ci --prefer-offline --no-audit --fund=false }
     }
     else {
-        Write-Host "node_modules already present, skipping npm ci"
+        Write-Host "node_modules already present and up to date, skipping npm ci"
         # npm ci's postinstall hook is what installs each extension's own
         # node_modules (extensions/*, .vscode/extensions/*, remote/web, ...).
         # On a reused clone, Get-OrCloneRepo's `git clean -fdx` just wiped all
@@ -466,11 +506,12 @@ finally {
 Write-Step "Installing vscode-src/build dependencies (gulp toolchain)"
 Push-Location (Join-Path $VscodeSrc "build")
 try {
-    if ($Clean -or -not (Test-Path "node_modules")) {
+    $buildDir = Join-Path $VscodeSrc "build"
+    if ($Clean -or -not (Test-Path "node_modules") -or (Test-NodeModulesStale $buildDir)) {
         Invoke-Native "npm ci (vscode-src/build)" { npm ci --prefer-offline --no-audit --fund=false }
     }
     else {
-        Write-Host "node_modules already present, skipping npm ci"
+        Write-Host "node_modules already present and up to date, skipping npm ci"
     }
 }
 finally {
