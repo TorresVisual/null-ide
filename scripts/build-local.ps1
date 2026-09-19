@@ -435,7 +435,17 @@ try {
         # has to be re-run explicitly here, or every extension stays
         # uninstalled and later compile/typecheck steps fail with missing
         # modules (e.g. "Cannot find type definition file for 'node'").
-        Invoke-Native "npm run postinstall (vscode-src)" { npm run postinstall }
+        # postinstall.ts's own isUpToDate() check reads a state file that
+        # lives *inside* the preserved root node_modules, so it survives the
+        # clean too and (since package.json/lockfile hashes didn't change)
+        # reports "up to date" and skips reinstalling - even though the
+        # extension node_modules it's supposed to guard are gone. Force it.
+        # Must invoke the script directly (not via `npm run postinstall`):
+        # `npm run` sets its own npm_command=run in the environment, which
+        # postinstall.ts inherits into every per-extension install call
+        # (npm_command || 'install'), turning each one into a no-op
+        # `npm run` (lists scripts) instead of `npm install`.
+        Invoke-Native "postinstall (vscode-src)" { $env:VSCODE_FORCE_INSTALL = '1'; Remove-Item Env:\npm_command -ErrorAction SilentlyContinue; node build/npm/postinstall.ts; Remove-Item Env:\VSCODE_FORCE_INSTALL }
     }
 
     if (-not (Test-Path "node_modules")) {
