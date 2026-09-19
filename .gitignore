@@ -18,8 +18,13 @@ extensions/wooting-analog/native/*.node
 # Build outputs
 VSCode-*/
 *.zip
+*.zip.sha256
 *.tar.gz
 *.tar.xz
+NullIDESetup-*.exe
+
+# scripts/build-local.ps1 working directories (repo root is its default -WorkspaceDir)
+rcedit-tool/
 
 # Local test artifacts
 tmp/

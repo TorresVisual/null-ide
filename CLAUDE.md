@@ -63,7 +63,8 @@ Key characteristics:
 │   ├── convert-icons.js       # SVG → PNG/ICO/ICNS via sharp, to-ico, png2icons
 │   ├── merge-json.js          # Deep-merges product.json overlay (our values win)
 │   ├── install-null-ide.ps1   # Downloads from GitHub Releases or installs a local ZIP
-│   └── update-null-ide.ps1    # Checks latest release tag, delegates to installer
+│   ├── update-null-ide.ps1    # Checks latest release tag, delegates to installer
+│   └── build-local.ps1        # Mirrors build.yml's build-windows job for local iteration
 ├── workbench/
 │   ├── custom.css             # Injected as null-custom.css into workbench.html
 │   ├── splash.js              # Runs in <head> before the workbench (no Node/AMD)
@@ -258,5 +259,5 @@ on:
 
 - Work only inside `D:\Coding\Apps\null-ide\` and its subdirectories.
 - Do not touch system PATH, registry, or any existing VS Code/VSCodium installation outside this repo's installer scripts.
-- Do not run CI or build scripts locally — patches are authored here; builds run in GitHub Actions.
+- Full builds normally run in GitHub Actions, not locally. `scripts/build-local.ps1` is the exception: it mirrors the `build-windows` job for iterating on `build.yml`, `shell-ext/`, `installer/`, or the VSCodium/VS Code patch/merge steps — things `scripts/sync-local.ps1` can't reach. Don't run it without being asked; it takes tens of minutes and needs Node, Rust, CMake, VS2022, and Inno Setup 6 installed (see the script's header for the full list).
 - Do not set the Microsoft extension gallery env var silently; document it in the README only.

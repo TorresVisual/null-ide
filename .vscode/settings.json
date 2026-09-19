@@ -44,6 +44,17 @@
             "saveAll": false,
             "focus": true,
             "priority": 0
+        },
+        {
+            "id": "button-1789836721326",
+            "label": "Build Local",
+            "type": "terminal",
+            "command": ".\\scripts\\build-local.ps1",
+            "color": "#f53f50",
+            "background": "none",
+            "saveAll": false,
+            "focus": true,
+            "priority": 0
         }
     ]
 }
