@@ -1,31 +1,15 @@
-From 91f476fef33c78f06ab6ba1fcac0a0a2f983c388 Mon Sep 17 00:00:00 2001
-From: Null IDE <dev@null-ide.local>
-Date: Thu, 9 Jul 2026 21:39:43 +0200
+From ab0354a1b40e9ea26248f213de0ad8793a3dbe92 Mon Sep 17 00:00:00 2001
+From: TorresVisual <torresvisuals1@gmx.at>
+Date: Sat, 19 Sep 2026 21:27:26 +0200
 Subject: [PATCH] feat(jumplist): source Windows jump list Recent category from
  null-tools
 
-Adds a 'More Recent Projects...' task and repoints the jump list's
-'Recent' category to read from a JSON file maintained directly from
-addRecentlyOpened(), instead of VS Code's built-in recently-opened-
-workspaces history array. Bumps the visible cap from 7 to 10 entries.
-Removes the now-dead getWindowsJumpListLabel helper (and its now-unused
-splitRecentLabel/WORKSPACE_EXTENSION imports) since noUnusedLocals is
-enabled in VS Code's tsconfig. Uses Node's fs/promises directly rather
-than VS Code's internal Promises helper from pfs.js, which has no
-readFile method.
-
-Tracks recent projects directly inside addRecentlyOpened() -- the one
-universal call site every folder/workspace-open path in
-windowsMainService.ts (new window or reused window) funnels through --
-rather than relying on the null-tools extension host to track on
-activation, which does not reliably re-fire when a window is reused
-for a different folder.
 ---
- .../workspacesHistoryMainService.ts           | 167 +++++++++++-------
- 1 file changed, 102 insertions(+), 65 deletions(-)
+ .../workspacesHistoryMainService.ts           | 164 +++++++++++-------
+ 1 file changed, 101 insertions(+), 63 deletions(-)
 
 diff --git a/src/vs/platform/workspaces/electron-main/workspacesHistoryMainService.ts b/src/vs/platform/workspaces/electron-main/workspacesHistoryMainService.ts
-index 560f5ca..f1bf944 100644
+index 70356b90..7a9de8e5 100644
 --- a/src/vs/platform/workspaces/electron-main/workspacesHistoryMainService.ts
 +++ b/src/vs/platform/workspaces/electron-main/workspacesHistoryMainService.ts
 @@ -7,7 +7,7 @@ import { app, JumpListCategory, JumpListItem } from 'electron';
@@ -37,12 +21,13 @@ index 560f5ca..f1bf944 100644
  import { Disposable } from '../../../base/common/lifecycle.js';
  import { Schemas } from '../../../base/common/network.js';
  import { isMacintosh, isWindows } from '../../../base/common/platform.js';
-@@ -21,11 +21,13 @@ import { ILogService } from '../../log/common/log.js';
+@@ -21,12 +21,14 @@ import { ILogService } from '../../log/common/log.js';
  import { StorageScope, StorageTarget } from '../../storage/common/storage.js';
  import { IApplicationStorageMainService } from '../../storage/electron-main/storageMainService.js';
  import { IRecent, IRecentFile, IRecentFolder, IRecentlyOpened, IRecentWorkspace, isRecentFile, isRecentFolder, isRecentWorkspace, restoreRecentlyOpened, toStoreData } from '../common/workspaces.js';
 -import { IWorkspaceIdentifier, WORKSPACE_EXTENSION } from '../../workspace/common/workspace.js';
 +import { IWorkspaceIdentifier } from '../../workspace/common/workspace.js';
+ import { getWorkspaceIdentifier } from '../common/workspaceIdentifier.js';
  import { IWorkspacesManagementMainService } from './workspacesManagementMainService.js';
  import { ResourceMap } from '../../../base/common/map.js';
  import { IDialogMainService } from '../../dialogs/electron-main/dialogMainService.js';
@@ -52,7 +37,7 @@ index 560f5ca..f1bf944 100644
  
  export const IWorkspacesHistoryMainService = createDecorator<IWorkspacesHistoryMainService>('workspacesHistoryMainService');
  
-@@ -78,6 +80,50 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
+@@ -79,6 +81,50 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
  	//#region Workspaces History
  
  	async addRecentlyOpened(recentToAdd: IRecent[]): Promise<void> {
@@ -103,23 +88,14 @@ index 560f5ca..f1bf944 100644
  		let workspaces: Array<IRecentFolder | IRecentWorkspace> = [];
  		let files: IRecentFile[] = [];
  
-@@ -305,7 +351,7 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
- 	private static readonly MAX_MACOS_DOCK_RECENT_WORKSPACES = 7; 		// prefer higher number of workspaces...
- 	private static readonly MAX_MACOS_DOCK_RECENT_ENTRIES_TOTAL = 10; 	// ...over number of files
- 
--	private static readonly MAX_WINDOWS_JUMP_LIST_ENTRIES = 7;
-+	private static readonly MAX_WINDOWS_JUMP_LIST_ENTRIES = 10; // Null IDE: was 7 upstream
- 
- 	// Exclude some very common files from the dock/taskbar
- 	private static readonly COMMON_FILES_FILTER = [
-@@ -349,58 +395,75 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
+@@ -385,59 +431,77 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
  					args: '-n', // force new window
  					iconPath: process.execPath,
  					iconIndex: 0
 +				},
 +				{
 +					// Null IDE: opens a quick-pick of all tracked recent projects (beyond the
-+					// MAX_WINDOWS_JUMP_LIST_ENTRIES cap below), handled by the null-tools extension's
++					// jumpListSettings.minItems cap below), handled by the null-tools extension's
 +					// registered URI handler. 'null' below must match product.json's urlProtocol.
 +					type: 'task',
 +					title: localize('moreRecentProjects', "More Recent Projects..."),
@@ -156,14 +132,15 @@ index 560f5ca..f1bf944 100644
  			// so we need to update our list of recent paths with the choice of the user to not add them again
  			// Also: Windows will not show our custom category at all if there is any entry which was removed
  			// by the user! See https://github.com/microsoft/vscode/issues/15052
+ 			const jumpListSettings = app.getJumpListSettings();
 -			const toRemove: URI[] = [];
--			for (const item of app.getJumpListSettings().removedItems) {
+-			for (const item of jumpListSettings.removedItems) {
 -				const args = item.args;
 -				if (args) {
 -					const match = /^--(folder|file)-uri\s+"([^"]+)"$/.exec(args);
 -					if (match) {
 -						toRemove.push(URI.parse(match[2]));
-+			const removedArgs = new Set(coalesce(app.getJumpListSettings().removedItems.map(item => item.args)));
++			const removedArgs = new Set(coalesce(jumpListSettings.removedItems.map(item => item.args)));
 +			if (removedArgs.size > 0) {
 +				const filtered = nullRecentProjects.filter(entry => !removedArgs.has(argsForEntry(entry)));
 +				if (filtered.length !== nullRecentProjects.length) {
@@ -176,10 +153,10 @@ index 560f5ca..f1bf944 100644
  				}
  			}
 -			await this.removeRecentlyOpened(toRemove);
--
--			// Add entries
+ 
+ 			// Add entries up to the slot count Explorer requested (jumpListSettings.minItems).
 -			let hasWorkspaces = false;
--			const items: JumpListItem[] = coalesce((await this.getRecentlyOpened()).workspaces.slice(0, WorkspacesHistoryMainService.MAX_WINDOWS_JUMP_LIST_ENTRIES).map(recent => {
+-			const items: JumpListItem[] = coalesce((await this.getRecentlyOpened()).workspaces.slice(0, jumpListSettings.minItems).map(recent => {
 -				const workspace = isRecentWorkspace(recent) ? recent.workspace : recent.folderUri;
 -
 -				const { title, description } = this.getWindowsJumpListLabel(workspace, recent.label);
@@ -190,7 +167,7 @@ index 560f5ca..f1bf944 100644
 -					hasWorkspaces = true;
 -					args = `--file-uri "${workspace.configPath.toString()}"`;
 -				}
- 
+-
 -				return {
 -					type: 'task',
 -					title: title.substr(0, 255), 				// Windows seems to be picky around the length of entries
@@ -202,7 +179,7 @@ index 560f5ca..f1bf944 100644
 -				};
 -			}));
 +			if (nullRecentProjects.length > 0) {
-+				const items: JumpListItem[] = nullRecentProjects.slice(0, WorkspacesHistoryMainService.MAX_WINDOWS_JUMP_LIST_ENTRIES).map(entry => {
++				const items: JumpListItem[] = nullRecentProjects.slice(0, jumpListSettings.minItems).map(entry => {
 +					const uri = URI.file(entry.path);
 +
 +					return {
@@ -224,7 +201,7 @@ index 560f5ca..f1bf944 100644
  					items
  				});
  			}
-@@ -421,32 +484,6 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
+@@ -458,32 +522,6 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
  		}
  	}
  
@@ -258,5 +235,5 @@ index 560f5ca..f1bf944 100644
  		return uri.scheme === 'file' ? normalizeDriveLetter(uri.fsPath) : uri.toString();
  	}
 -- 
-2.55.0.windows.2
+2.55.0.windows.5
 
