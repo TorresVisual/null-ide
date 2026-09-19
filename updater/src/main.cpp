@@ -61,6 +61,7 @@ private:
     std::thread m_workerThread;
     std::atomic<bool> m_cancelRequested{false};
     bool m_success = false;
+    bool m_started = false;
     std::wstring m_errorMessage;
 
     UpdaterWindow(const UpdaterArgs& args) : m_args(args) {}
@@ -88,6 +89,9 @@ private:
         }
     }
 
+    static const int IDC_RETRY = 100;
+    static const int IDC_CLOSE = 101;
+
     static HRESULT CALLBACK TaskDialogCallbackProc(HWND hwnd, UINT uNotification, WPARAM wParam, LPARAM lParam, LONG_PTR dwRefData) {
         (void)lParam;
         UpdaterWindow* self = reinterpret_cast<UpdaterWindow*>(dwRefData);
@@ -96,9 +100,11 @@ private:
         switch (uNotification) {
         case TDN_CREATED:
             self->m_hwndTD = hwnd;
-            // Send marquee style if needed or initial state
             SendMessage(hwnd, TDM_SET_PROGRESS_BAR_POS, 0, 0);
-            self->m_workerThread = std::thread(&UpdaterWindow::WorkerThreadProc, self);
+            if (!self->m_started) {
+                self->m_started = true;
+                self->m_workerThread = std::thread(&UpdaterWindow::WorkerThreadProc, self);
+            }
             break;
 
         case TDN_BUTTON_CLICKED:
@@ -106,6 +112,15 @@ private:
                 self->m_cancelRequested = true;
                 SendMessage(hwnd, TDM_SET_ELEMENT_TEXT, TDE_CONTENT, reinterpret_cast<LPARAM>(L"Cancelling update..."));
                 return S_FALSE; // Don't close dialog immediately, wait for worker thread
+            }
+            if (static_cast<int>(wParam) == IDC_RETRY) {
+                if (self->m_workerThread.joinable()) self->m_workerThread.join();
+                self->m_cancelRequested = false;
+                self->m_workerThread = std::thread(&UpdaterWindow::WorkerThreadProc, self);
+                return S_FALSE; // stay open, worker thread drives the next state
+            }
+            if (static_cast<int>(wParam) == IDC_CLOSE) {
+                return S_OK; // allow the dialog to close
             }
             break;
 
@@ -145,6 +160,10 @@ private:
     void WorkerThreadProc() {
         try {
             ExecuteUpdate();
+            if (m_cancelRequested) {
+                SendMessage(m_hwndTD, TDM_CLICK_BUTTON, IDCANCEL, 0);
+                return;
+            }
             DirectUpdateUI(100, L"Update completed successfully!");
             Sleep(500);
             SendMessage(m_hwndTD, TDM_CLICK_BUTTON, IDOK, 0);
@@ -152,15 +171,35 @@ private:
         catch (const std::exception& ex) {
             std::string errStr = ex.what();
             std::wstring wErr(errStr.begin(), errStr.end());
-            DirectUpdateUI(0, L"Error: " + wErr);
-            MessageBoxW(m_hwndTD, wErr.c_str(), L"Update Failed", MB_ICONERROR | MB_OK);
-            SendMessage(m_hwndTD, TDM_CLICK_BUTTON, IDCANCEL, 0);
+            ShowFailureButtons(wErr);
         }
         catch (...) {
-            DirectUpdateUI(0, L"An unknown error occurred during update.");
-            MessageBoxW(m_hwndTD, L"An unknown error occurred.", L"Update Failed", MB_ICONERROR | MB_OK);
-            SendMessage(m_hwndTD, TDM_CLICK_BUTTON, IDCANCEL, 0);
+            ShowFailureButtons(L"An unknown error occurred during update.");
         }
+    }
+
+    void ShowFailureButtons(const std::wstring& errorText) {
+        if (!m_hwndTD) return;
+
+        static TASKDIALOG_BUTTON buttons[] = {
+            { IDC_RETRY, L"Retry" },
+            { IDC_CLOSE, L"Close" },
+        };
+
+        TASKDIALOGCONFIG tdc = { sizeof(tdc) };
+        tdc.hwndParent = NULL;
+        tdc.hInstance = GetModuleHandle(NULL);
+        tdc.dwFlags = TDF_CALLBACK_TIMER;
+        tdc.pszWindowTitle = L"Null IDE Updater";
+        tdc.pszMainInstruction = L"Update Failed";
+        tdc.pszContent = errorText.c_str();
+        tdc.pButtons = buttons;
+        tdc.cButtons = ARRAYSIZE(buttons);
+        tdc.nDefaultButton = IDC_RETRY;
+        tdc.pfCallback = TaskDialogCallbackProc;
+        tdc.lpCallbackData = reinterpret_cast<LONG_PTR>(this);
+
+        SendMessage(m_hwndTD, TDM_NAVIGATE_PAGE, 0, reinterpret_cast<LPARAM>(&tdc));
     }
 
     void ExecuteUpdate() {
