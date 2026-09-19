@@ -38,21 +38,27 @@ const vscode = __importStar(require("vscode"));
 const updater_1 = require("./updater");
 function registerUpdaterFeature(context) {
     const updateBar = vscode.window.createStatusBarItem('null.update', vscode.StatusBarAlignment.Right, 1);
-    updateBar.text = '$(cloud-download) Update';
-    updateBar.tooltip = 'Null IDE update available';
     updateBar.command = 'null.installUpdate';
     context.subscriptions.push(updateBar);
     function refreshUpdateButton() {
         const update = context.globalState.get('null.availableUpdate');
-        if (update?.latest) {
-            updateBar.text = `$(cloud-download) ${update.latest}`;
-            updateBar.tooltip = `Install Null IDE ${update.latest}`;
-            updateBar.show();
+        if (!update?.latest) {
+            updateBar.hide();
+            return;
+        }
+        const staged = context.globalState.get('null.stagedUpdate');
+        const isReady = staged?.version === update.latest && staged.verified;
+        if (isReady) {
+            updateBar.text = `$(rocket) Restart to update`;
+            updateBar.tooltip = `Null IDE ${update.latest} is downloaded and ready to install`;
         }
         else {
-            updateBar.hide();
+            updateBar.text = `$(cloud-download) ${update.latest}`;
+            updateBar.tooltip = `Downloading Null IDE ${update.latest}…`;
         }
+        updateBar.show();
     }
+    context.subscriptions.push(updater_1.onStagedUpdateChanged.event(() => refreshUpdateButton()));
     context.subscriptions.push(vscode.commands.registerCommand('null.checkForUpdates', async () => {
         try {
             const update = await (0, updater_1.checkForUpdate)(context, false);
