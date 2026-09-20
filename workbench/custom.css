@@ -170,11 +170,24 @@
   line-height: 30px !important;
 }
 
-/* Icon ::before has height:22px in compiled CSS — shrink to fit our compact tab */
+/* Icon ::before has height:22px in compiled CSS — shrink to fit our compact tab.
+   .monaco-icon-label is already display:flex in VS Code's own iconlabel.css,
+   so align-self here is what actually centers the box — this was already
+   correct before touching it. */
 .tabs-container .tab .monaco-icon-label.tab-label::before {
   height: 16px !important;
   align-self: center !important;
   vertical-align: middle !important;
+}
+
+/* Extension-editor tab icon (registered icon id "extensions-editor-label-icon",
+   see vscode-src extensionsInput.ts) uses the puzzle-piece codicon glyph, which
+   is not drawn centered within its own 16x16 em box — the box above IS
+   centered, the glyph inside it isn't. Nudge only this one glyph to
+   compensate. ponytail: font-metrics hack tied to this specific codicon id;
+   re-check if it drifts after a VSCodium/codicon version bump. */
+.tabs-container .tab .monaco-icon-label.tab-label.codicon-extensions-editor-label-icon::before {
+  transform: translateY(-5px);
 }
 
 /* Editor actions toolbar (split/layout/lock/more) — match the 30px tab row height
