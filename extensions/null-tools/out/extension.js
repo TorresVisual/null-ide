@@ -51,6 +51,7 @@ const soundManager_1 = require("./soundManager");
 const codeActions_1 = require("./codeActions");
 const commitMessage_1 = require("./commitMessage");
 const updaterIntegration_1 = require("./updaterIntegration");
+const nullNotes_1 = require("./nullNotes");
 const welcomePage_1 = require("./welcomePage");
 // ── Activation ─────────────────────────────────────────────────────────────
 async function disableRestrictedMode() {
@@ -314,6 +315,7 @@ function activate(context) {
     context.subscriptions.push(plansWatcher);
     (0, portsIntegration_1.registerPortsFeature)(context);
     (0, discordPresenceIntegration_1.registerDiscordPresenceFeature)(context);
+    (0, nullNotes_1.registerOpenInNullNotesFeature)(context);
 }
 function deactivate() { }
 //# sourceMappingURL=extension.js.map

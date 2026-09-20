@@ -9,7 +9,7 @@
   "main": "./out/extension.js",
   "scripts": {
     "compile": "tsc -p tsconfig.json && tsc -p tsconfig.webview.json",
-    "test": "tsc -p tsconfig.json && node --test out/recentProjects.test.js out/scratchNotesStorage.test.js out/autoGitignore.test.js out/versionComparison.test.js"
+    "test": "tsc -p tsconfig.json && node --test out/recentProjects.test.js out/scratchNotesStorage.test.js out/autoGitignore.test.js out/versionComparison.test.js out/nullNotes.test.js"
   },
   "dependencies": {
     "ws": "^8.18.3"
@@ -150,6 +150,11 @@
         "command": "null.discord.testConnection",
         "title": "Null: Test Discord Rich Presence",
         "icon": "$(debug-disconnect)"
+      },
+      {
+        "command": "null.openInNullNotes",
+        "title": "Null: Open in null-notes",
+        "icon": "$(notebook)"
       }
     ],
     "viewsContainers": {
@@ -207,6 +212,18 @@
         {
           "command": "null.runScratchFile",
           "when": "null.canRunScratchFile",
+          "group": "navigation"
+        },
+        {
+          "command": "null.openInNullNotes",
+          "when": "resourceExtname == .md",
+          "group": "navigation"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "null.openInNullNotes",
+          "when": "resourceExtname == .md",
           "group": "navigation"
         }
       ],
@@ -340,6 +357,11 @@
           "type": "boolean",
           "default": false,
           "description": "Show diffs and offer revert when an agent terminal modifies workspace files."
+        },
+        "null.nullNotes.exePath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to null-notes.exe, used by \"Open in null-notes\". Leave empty to use the default per-user install location (%LOCALAPPDATA%\\null-notes\\null-notes.exe)."
         },
         "null.promptTemplates": {
           "type": "array",

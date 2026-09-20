@@ -16,6 +16,7 @@ import { SoundManager } from './soundManager';
 import { NullCodeActionsProvider } from './codeActions';
 import { getStagedDiff, runClaude } from './commitMessage';
 import { registerUpdaterFeature } from './updaterIntegration';
+import { registerOpenInNullNotesFeature } from './nullNotes';
 import { showWelcomePage } from './welcomePage';
 
 // ── Activation ─────────────────────────────────────────────────────────────
@@ -281,6 +282,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   registerPortsFeature(context);
   registerDiscordPresenceFeature(context);
+  registerOpenInNullNotesFeature(context);
 }
 
 export function deactivate(): void {}
