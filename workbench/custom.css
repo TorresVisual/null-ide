@@ -177,6 +177,66 @@
   vertical-align: middle !important;
 }
 
+/* Editor actions toolbar (split/layout/lock/more) — match the 30px tab row height
+   so icons center instead of sitting in their taller default box. */
+.tabs-and-actions-container .editor-actions {
+  height: 30px !important;
+}
+
+.tabs-and-actions-container .editor-actions .action-item,
+.tabs-and-actions-container .editor-actions .action-label {
+  height: 30px !important;
+  line-height: 30px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Toggled state (e.g. locked group) — VS Code puts the "checked" class on
+   the .action-label itself (see actions-container.highlight-toggled rule in
+   workbench.desktop.main.css) and its flex box resists resizing directly, so
+   kill the built-in full-height highlight and paint our own fixed-size
+   rounded square as an overlay instead (same technique as the activity
+   bar's checked indicator above). */
+.tabs-and-actions-container .editor-actions .actions-container.highlight-toggled .action-label.checked {
+  background: none !important;
+  position: relative !important;
+}
+
+.tabs-and-actions-container .editor-actions .actions-container.highlight-toggled .action-label.checked::after {
+  content: '' !important;
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  width: 26px !important;
+  height: 26px !important;
+  border-radius: 6px !important;
+  background: var(--vscode-actionBar-toggledBackground) !important;
+  pointer-events: none !important;
+}
+
+/* Hover — same overlay technique; skip when already checked so the two
+   backgrounds don't stack. */
+.tabs-and-actions-container .editor-actions .action-item .action-label:hover:not(.disabled) {
+  background: none !important;
+  outline: none !important;
+  position: relative !important;
+}
+
+.tabs-and-actions-container .editor-actions .action-item .action-label:hover:not(.disabled):not(.checked)::after {
+  content: '' !important;
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  width: 26px !important;
+  height: 26px !important;
+  border-radius: 6px !important;
+  background: var(--vscode-toolbar-hoverBackground) !important;
+  pointer-events: none !important;
+}
+
 /* Tab close — hidden until hover/active */
 .tab .tab-actions {
   display: flex !important;
