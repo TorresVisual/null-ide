@@ -37,6 +37,8 @@ exports.PortsTreeProvider = void 0;
 exports.scanPorts = scanPorts;
 const vscode = __importStar(require("vscode"));
 const child_process_1 = require("child_process");
+const util_1 = require("util");
+const execAsync = (0, util_1.promisify)(child_process_1.exec);
 // ── Well-known port → server label mapping ───────────────────────────────────
 const WELL_KNOWN_PORTS = {
     1420: 'Tauri Dev',
@@ -105,9 +107,9 @@ function resolveIcon(processName, port) {
     }
     return '$(plug)';
 }
-function scanListeningPorts() {
+async function scanListeningPorts() {
     try {
-        const raw = (0, child_process_1.execSync)('netstat -ano', { encoding: 'utf8', timeout: 5000, windowsHide: true });
+        const { stdout: raw } = await execAsync('netstat -ano', { encoding: 'utf8', timeout: 5000, windowsHide: true });
         const results = [];
         const seen = new Set();
         for (const line of raw.split('\n')) {
@@ -133,13 +135,13 @@ function scanListeningPorts() {
         return [];
     }
 }
-function resolveProcessNames(pids) {
+async function resolveProcessNames(pids) {
     const map = new Map();
     if (pids.length === 0) {
         return map;
     }
     try {
-        const raw = (0, child_process_1.execSync)('tasklist /fo csv /nh', { encoding: 'utf8', timeout: 5000, windowsHide: true });
+        const { stdout: raw } = await execAsync('tasklist /fo csv /nh', { encoding: 'utf8', timeout: 5000, windowsHide: true });
         for (const line of raw.split('\n')) {
             // CSV format: "node.exe","12345","Console","1","123,456 K"
             const m = line.match(/^"([^"]+)","([\d]+)"/);
@@ -158,13 +160,13 @@ function resolveProcessNames(pids) {
     }
     return map;
 }
-function scanPorts(filterDevOnly) {
-    const rawPorts = scanListeningPorts();
+async function scanPorts(filterDevOnly) {
+    const rawPorts = await scanListeningPorts();
     if (rawPorts.length === 0) {
         return [];
     }
     const allPids = [...new Set(rawPorts.map(r => r.pid))];
-    const pidNames = resolveProcessNames(allPids);
+    const pidNames = await resolveProcessNames(allPids);
     const entries = [];
     for (const { port, pid } of rawPorts) {
         const processName = pidNames.get(pid) ?? `pid-${pid}`;
@@ -184,17 +186,18 @@ class PortsTreeProvider {
     _entries = [];
     _timer;
     _filterDevOnly = true;
+    _scanning = false;
     constructor() {
-        this._scan();
+        void this._scan();
     }
     // ── Public API ─────────────────────────────────────────────────────────────
     refresh() {
-        this._scan();
+        void this._scan();
     }
     startAutoRefresh(intervalSec) {
         this._stopAutoRefresh();
         if (intervalSec > 0) {
-            this._timer = setInterval(() => this._scan(), intervalSec * 1000);
+            this._timer = setInterval(() => void this._scan(), intervalSec * 1000);
         }
     }
     stopAutoRefresh() {
@@ -202,7 +205,7 @@ class PortsTreeProvider {
     }
     setFilterDevOnly(value) {
         this._filterDevOnly = value;
-        this._scan();
+        void this._scan();
     }
     get entries() {
         return this._entries;
@@ -226,9 +229,18 @@ class PortsTreeProvider {
         return this._entries;
     }
     // ── Private ────────────────────────────────────────────────────────────────
-    _scan() {
-        this._entries = scanPorts(this._filterDevOnly);
-        this._onDidChangeTreeData.fire();
+    async _scan() {
+        if (this._scanning) {
+            return;
+        }
+        this._scanning = true;
+        try {
+            this._entries = await scanPorts(this._filterDevOnly);
+            this._onDidChangeTreeData.fire();
+        }
+        finally {
+            this._scanning = false;
+        }
     }
     _stopAutoRefresh() {
         if (this._timer !== undefined) {

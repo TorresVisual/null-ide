@@ -1,7 +1,10 @@
 'use strict';
 
 import * as vscode from 'vscode';
-import { execSync } from 'child_process';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 // ── Port entry data model ────────────────────────────────────────────────────
 
@@ -74,9 +77,9 @@ function resolveIcon(processName: string, port: number): string {
 
 interface RawPort { port: number; pid: number; }
 
-function scanListeningPorts(): RawPort[] {
+async function scanListeningPorts(): Promise<RawPort[]> {
   try {
-    const raw = execSync('netstat -ano', { encoding: 'utf8', timeout: 5000, windowsHide: true });
+    const { stdout: raw } = await execAsync('netstat -ano', { encoding: 'utf8', timeout: 5000, windowsHide: true });
     const results: RawPort[] = [];
     const seen = new Set<number>();
     for (const line of raw.split('\n')) {
@@ -102,11 +105,11 @@ function scanListeningPorts(): RawPort[] {
   }
 }
 
-function resolveProcessNames(pids: number[]): Map<number, string> {
+async function resolveProcessNames(pids: number[]): Promise<Map<number, string>> {
   const map = new Map<number, string>();
   if (pids.length === 0) { return map; }
   try {
-    const raw = execSync('tasklist /fo csv /nh', { encoding: 'utf8', timeout: 5000, windowsHide: true });
+    const { stdout: raw } = await execAsync('tasklist /fo csv /nh', { encoding: 'utf8', timeout: 5000, windowsHide: true });
     for (const line of raw.split('\n')) {
       // CSV format: "node.exe","12345","Console","1","123,456 K"
       const m = line.match(/^"([^"]+)","([\d]+)"/);
@@ -123,12 +126,12 @@ function resolveProcessNames(pids: number[]): Map<number, string> {
   return map;
 }
 
-export function scanPorts(filterDevOnly: boolean): PortEntry[] {
-  const rawPorts = scanListeningPorts();
+export async function scanPorts(filterDevOnly: boolean): Promise<PortEntry[]> {
+  const rawPorts = await scanListeningPorts();
   if (rawPorts.length === 0) { return []; }
 
   const allPids = [...new Set(rawPorts.map(r => r.pid))];
-  const pidNames = resolveProcessNames(allPids);
+  const pidNames = await resolveProcessNames(allPids);
 
   const entries: PortEntry[] = [];
   for (const { port, pid } of rawPorts) {
@@ -153,21 +156,22 @@ export class PortsTreeProvider implements vscode.TreeDataProvider<PortEntry> {
   private _entries: PortEntry[] = [];
   private _timer: ReturnType<typeof setInterval> | undefined;
   private _filterDevOnly = true;
+  private _scanning = false;
 
   constructor() {
-    this._scan();
+    void this._scan();
   }
 
   // ── Public API ─────────────────────────────────────────────────────────────
 
   refresh(): void {
-    this._scan();
+    void this._scan();
   }
 
   startAutoRefresh(intervalSec: number): void {
     this._stopAutoRefresh();
     if (intervalSec > 0) {
-      this._timer = setInterval(() => this._scan(), intervalSec * 1000);
+      this._timer = setInterval(() => void this._scan(), intervalSec * 1000);
     }
   }
 
@@ -177,7 +181,7 @@ export class PortsTreeProvider implements vscode.TreeDataProvider<PortEntry> {
 
   setFilterDevOnly(value: boolean): void {
     this._filterDevOnly = value;
-    this._scan();
+    void this._scan();
   }
 
   get entries(): readonly PortEntry[] {
@@ -213,9 +217,15 @@ export class PortsTreeProvider implements vscode.TreeDataProvider<PortEntry> {
 
   // ── Private ────────────────────────────────────────────────────────────────
 
-  private _scan(): void {
-    this._entries = scanPorts(this._filterDevOnly);
-    this._onDidChangeTreeData.fire();
+  private async _scan(): Promise<void> {
+    if (this._scanning) { return; }
+    this._scanning = true;
+    try {
+      this._entries = await scanPorts(this._filterDevOnly);
+      this._onDidChangeTreeData.fire();
+    } finally {
+      this._scanning = false;
+    }
   }
 
   private _stopAutoRefresh(): void {
