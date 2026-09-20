@@ -154,7 +154,7 @@
       {
         "command": "null.openInNullNotes",
         "title": "Null: Open in null-notes",
-        "icon": "$(notebook)"
+        "icon": "media/null-notes.svg"
       }
     ],
     "viewsContainers": {
