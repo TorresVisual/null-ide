@@ -46,3 +46,5 @@ dist/
 .claude/
 !.claude/
 .claude/settings.json
+.workspace.json
+.*.tmp
