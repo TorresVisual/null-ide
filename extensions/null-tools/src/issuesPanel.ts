@@ -57,7 +57,12 @@ export class IssuesViewProvider implements vscode.WebviewViewProvider {
       return;
     }
     this._filters = { ...this._filters, viewerLogin: result.viewerLogin };
-    this._view.postMessage({ type: 'issues', status: 'ok', issues: this._store.getFiltered(this._filters) });
+    this._view.postMessage({
+      type: 'issues',
+      status: 'ok',
+      issues: this._store.getFiltered(this._filters),
+      viewerLogin: result.viewerLogin,
+    });
   }
 
   private async _handleMessage(msg: InboundMessage): Promise<void> {
@@ -72,7 +77,12 @@ export class IssuesViewProvider implements vscode.WebviewViewProvider {
         break;
       case 'setFilters':
         this._filters = { ...this._filters, labels: msg.labels, assignee: msg.assignee, query: msg.query };
-        this._view?.postMessage({ type: 'issues', status: 'ok', issues: this._store.getFiltered(this._filters) });
+        this._view?.postMessage({
+          type: 'issues',
+          status: 'ok',
+          issues: this._store.getFiltered(this._filters),
+          viewerLogin: this._filters.viewerLogin,
+        });
         break;
       case 'selectIssue': {
         const issue = this._store.getByNumber(msg.number);
@@ -94,25 +104,43 @@ export class IssuesViewProvider implements vscode.WebviewViewProvider {
 <meta http-equiv="Content-Security-Policy"
       content="default-src 'none'; script-src ${webview.cspSource} 'nonce-${nonce}'; style-src ${webview.cspSource} 'unsafe-inline';">
 <style>
-  html,body { margin:0; padding:0; height:100%; background:#181818; color:#ccc;
-              font:12px/1.5 'Cascadia Code',Consolas,monospace; }
+  html,body { margin:0; padding:0; height:100%; background:var(--vscode-editor-background); color:var(--vscode-foreground);
+              font:12px/1.5 var(--vscode-font-family); }
   #app { display:flex; flex-direction:column; height:100%; }
-  #toolbar { display:flex; flex-wrap:wrap; gap:6px; padding:8px; border-bottom:1px solid #2b2b2b; flex-shrink:0; }
-  #toolbar input, #toolbar select { background:#1e1e1e; border:1px solid #333; color:#ccc; padding:4px 6px; font:inherit; border-radius:2px; }
+  #toolbar { display:flex; flex-wrap:wrap; gap:6px; padding:8px; border-bottom:1px solid var(--vscode-widget-border,rgba(128,128,128,.2)); flex-shrink:0; }
+  #toolbar input, #toolbar select {
+    background:var(--vscode-input-background); border:1px solid var(--vscode-input-border,transparent);
+    color:var(--vscode-input-foreground); padding:4px 6px; font:inherit; border-radius:2px;
+  }
+  #toolbar input:focus, #toolbar select:focus { outline:none; border-color:var(--vscode-focusBorder); }
   #toolbar input { flex:1; min-width:80px; }
-  .assignee-btn { background:#1e1e1e; border:1px solid #333; color:#888; padding:4px 8px; cursor:pointer; border-radius:2px; }
-  .assignee-btn.active { color:#e0e0e0; border-color:#0078D4; }
+  .assignee-btn {
+    background:var(--vscode-button-secondaryBackground); border:1px solid transparent;
+    color:var(--vscode-button-secondaryForeground); padding:4px 8px; cursor:pointer; border-radius:2px;
+  }
+  .assignee-btn:hover { background:var(--vscode-button-secondaryHoverBackground); }
+  .assignee-btn.active { background:var(--vscode-button-background); color:var(--vscode-button-foreground); }
   #list { flex:1; overflow-y:auto; }
-  .issue-row { padding:8px 10px; border-bottom:1px solid #222; cursor:pointer; }
-  .issue-row:hover { background:#1e1e1e; }
-  .issue-row.selected { background:#242424; border-left:2px solid #4EC9B0; }
-  .issue-num { color:#666; }
-  .issue-title { color:#e0e0e0; }
-  .issue-meta { color:#666; font-size:11px; margin-top:2px; }
+  .issue-row { display:flex; gap:6px; padding:8px 10px; border-bottom:1px solid var(--vscode-widget-border,rgba(128,128,128,.12)); cursor:pointer; }
+  .issue-row:hover { background:var(--vscode-list-hoverBackground); }
+  .issue-row.selected { background:var(--vscode-list-activeSelectionBackground); color:var(--vscode-list-activeSelectionForeground); }
+  .state-dot {
+    flex-shrink:0; width:9px; height:9px; margin-top:4px; border-radius:50%;
+    background:var(--vscode-charts-green,#89d185);
+  }
+  .issue-row.closed .state-dot { background:var(--vscode-charts-purple,#b180d7); }
+  .issue-main { min-width:0; }
+  .issue-num { color:var(--vscode-descriptionForeground); }
+  .issue-title { font-weight:600; }
+  .you-badge {
+    display:inline-block; margin-left:5px; padding:0 5px; border-radius:8px; font-size:10px;
+    background:var(--vscode-badge-background); color:var(--vscode-badge-foreground);
+  }
+  .issue-meta { color:var(--vscode-descriptionForeground); font-size:11px; margin-top:2px; }
   .label-chip { display:inline-block; padding:0 5px; border-radius:8px; font-size:10px; margin-right:4px; color:#111; }
-  button.action { background:#0078D4; color:#fff; border:none; padding:5px 10px; border-radius:2px; cursor:pointer; margin-right:6px; }
-  button.action:hover { background:#106EBE; }
-  #empty { padding:20px; color:#666; text-align:center; }
+  button.action { background:var(--vscode-button-background); color:var(--vscode-button-foreground); border:none; padding:5px 10px; border-radius:2px; cursor:pointer; margin-right:6px; font:inherit; }
+  button.action:hover { background:var(--vscode-button-hoverBackground); }
+  #empty { padding:20px; color:var(--vscode-descriptionForeground); text-align:center; }
 </style></head><body>
 <div id="app">
   <div id="toolbar">

@@ -21,6 +21,7 @@ declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
 
   let assignee: 'me' | 'everyone' = 'everyone';
   let selectedNumber: number | null = null;
+  let viewerLogin: string | null = null;
 
   function escapeHtml(s: string): string {
     const map: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
@@ -59,14 +60,20 @@ declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
       listEl.innerHTML = '<div id="empty">No issues match.</div>';
       return;
     }
-    listEl.innerHTML = issues.map(issue => `
-      <div class="issue-row${issue.number === selectedNumber ? ' selected' : ''}" data-number="${issue.number}">
-        <div><span class="issue-num">#${issue.number}</span> <span class="issue-title">${escapeHtml(issue.title)}</span></div>
-        <div class="issue-meta">
-          ${issue.labels.map(l => `<span class="label-chip" style="background:#${l.color}">${escapeHtml(l.name)}</span>`).join('')}
-          ${issue.comments} comments · updated ${issue.updated_at.slice(0, 10)}
+    listEl.innerHTML = issues.map(issue => {
+      const you = viewerLogin && issue.assignees.some(a => a.login === viewerLogin);
+      return `
+      <div class="issue-row${issue.state === 'closed' ? ' closed' : ''}${issue.number === selectedNumber ? ' selected' : ''}" data-number="${issue.number}">
+        <span class="state-dot" title="${issue.state}"></span>
+        <div class="issue-main">
+          <div><span class="issue-num">#${issue.number}</span> <span class="issue-title">${escapeHtml(issue.title)}</span>${you ? '<span class="you-badge">@you</span>' : ''}</div>
+          <div class="issue-meta">
+            ${issue.labels.map(l => `<span class="label-chip" style="background:#${l.color}">${escapeHtml(l.name)}</span>`).join('')}
+            ${issue.comments} comments · updated ${issue.updated_at.slice(0, 10)}
+          </div>
         </div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
     listEl.querySelectorAll<HTMLDivElement>('.issue-row').forEach(row => {
       row.addEventListener('click', () => {
         selectedNumber = Number(row.dataset.number);
@@ -85,6 +92,7 @@ declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
         break;
       case 'issues':
         if (msg.status === 'ok') {
+          viewerLogin = msg.viewerLogin ?? viewerLogin;
           renderList(msg.issues);
         } else {
           const messages: Record<string, string> = {

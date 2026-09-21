@@ -9,14 +9,14 @@
     function renderDetail(issue, comments) {
         var _a, _b;
         detailEl.innerHTML = `
-      <h2>#${issue.number} ${escapeHtml(issue.title)}</h2>
+      <h2><span class="state-badge${issue.state === 'closed' ? ' closed' : ''}">${issue.state}</span> #${issue.number} ${escapeHtml(issue.title)}</h2>
       <div class="issue-meta">
         ${issue.labels.map(l => `<span class="label-chip" style="background:#${l.color}">${escapeHtml(l.name)}</span>`).join('')}
         opened by ${escapeHtml(issue.user.login)} · ${issue.comments} comments · updated ${issue.updated_at.slice(0, 10)}
       </div>
       <div>
         <button class="action" id="copy-btn">Copy as prompt</button>
-        <button class="action" id="browser-btn">Open in Browser</button>
+        <button class="action" id="browser-btn">Open in browser ↗</button>
       </div>
       <div id="detail-body">${escapeHtml(issue.body || '(no description)')}</div>
       <div id="comments">
