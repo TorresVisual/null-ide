@@ -15,7 +15,7 @@ declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
   const stateSelect      = document.getElementById('state-select') as HTMLSelectElement;
   const assigneeMe       = document.getElementById('assignee-me') as HTMLButtonElement;
   const assigneeEveryone = document.getElementById('assignee-everyone') as HTMLButtonElement;
-  const labelInput       = document.getElementById('label-input') as HTMLInputElement;
+  const labelPicker      = document.getElementById('label-picker') as HTMLDivElement;
   const searchInput      = document.getElementById('search-input') as HTMLInputElement;
   const listEl           = document.getElementById('list') as HTMLDivElement;
   const refreshBtn       = document.getElementById('refresh-btn') as HTMLButtonElement;
@@ -38,6 +38,7 @@ declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
   let assignee: 'me' | 'everyone' = 'everyone';
   let selectedNumber: number | null = null;
   let viewerLogin: string | null = null;
+  const selectedLabels = new Set<string>();
 
   function escapeHtml(s: string): string {
     const map: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
@@ -47,16 +48,34 @@ declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
   function sendFilters(): void {
     vscode.postMessage({
       type: 'setFilters',
-      labels: labelInput.value.split(',').map(s => s.trim()).filter(Boolean),
+      labels: Array.from(selectedLabels),
       assignee,
       query: searchInput.value,
+    });
+  }
+
+  function renderLabelPicker(labels: GithubLabel[]): void {
+    if (labels.length === 0) {
+      labelPicker.innerHTML = '<span class="issue-meta">No labels in this repo.</span>';
+      return;
+    }
+    labelPicker.innerHTML = labels.map(l => `
+      <label class="chip-check">
+        <input type="checkbox" value="${escapeHtml(l.name)}" ${selectedLabels.has(l.name) ? 'checked' : ''}>
+        <span class="label-chip" style="background:#${l.color}">${escapeHtml(l.name)}</span>
+      </label>`).join('');
+    labelPicker.querySelectorAll<HTMLInputElement>('input').forEach(cb => {
+      cb.addEventListener('change', () => {
+        if (cb.checked) selectedLabels.add(cb.value);
+        else selectedLabels.delete(cb.value);
+        sendFilters();
+      });
     });
   }
 
   stateSelect.addEventListener('change', () => {
     vscode.postMessage({ type: 'setState', state: stateSelect.value });
   });
-  labelInput.addEventListener('input', sendFilters);
   searchInput.addEventListener('input', sendFilters);
   assigneeMe.addEventListener('click', () => {
     assignee = 'me';
@@ -122,6 +141,7 @@ declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
       case 'issues':
         if (msg.status === 'ok') {
           viewerLogin = msg.viewerLogin ?? viewerLogin;
+          if (msg.repoLabels) renderLabelPicker(msg.repoLabels);
           renderList(msg.issues);
         } else {
           const messages: Record<string, string> = {

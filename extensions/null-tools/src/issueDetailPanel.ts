@@ -11,7 +11,7 @@ type InboundMessage =
   | { type: 'copyAsPrompt' }
   | { type: 'openInBrowser' }
   | { type: 'setState'; state: 'open' | 'closed' }
-  | { type: 'saveEdit'; title: string; body: string }
+  | { type: 'saveEdit'; title: string; body: string; labels: string[]; assignees: string[] }
   | { type: 'createBranch' }
   | { type: 'postComment'; body: string };
 
@@ -62,8 +62,12 @@ export class IssueDetailPanel {
   private async _sendDetail(): Promise<void> {
     const issue = this.store.getByNumber(this.issueNumber);
     if (!issue) return;
-    const comments = await this.store.getComments(this.issueNumber);
-    this.panel.webview.postMessage({ type: 'issueDetail', issue, comments });
+    const [comments, repoLabels, assignableUsers] = await Promise.all([
+      this.store.getComments(this.issueNumber),
+      this.store.getRepoLabels(),
+      this.store.getAssignableUsers(),
+    ]);
+    this.panel.webview.postMessage({ type: 'issueDetail', issue, comments, repoLabels, assignableUsers });
   }
 
   private async _handleMessage(msg: InboundMessage): Promise<void> {
@@ -94,7 +98,9 @@ export class IssueDetailPanel {
       }
       case 'saveEdit': {
         try {
-          await this.store.updateIssue(this.issueNumber, { title: msg.title, body: msg.body });
+          await this.store.updateIssue(this.issueNumber, {
+            title: msg.title, body: msg.body, labels: msg.labels, assignees: msg.assignees,
+          });
           await this._sendDetail();
         } catch (err) {
           void vscode.window.showErrorMessage(`Failed to save issue: ${(err as Error).message}`);
@@ -173,6 +179,10 @@ export class IssueDetailPanel {
   }
   .edit-form input:focus, .edit-form textarea:focus, #comment-input:focus { outline:none; border-color:var(--vscode-focusBorder); }
   .edit-form textarea { min-height:160px; resize:vertical; }
+  .picker-group { margin-bottom:10px; }
+  .chip-picker { display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
+  .chip-check { display:inline-flex; align-items:center; gap:4px; font-size:11px; cursor:pointer; }
+  .chip-check input { margin:0; }
   h3 { font-size:13px; margin:22px 0 8px; }
   .comment { border-top:1px solid var(--vscode-widget-border,rgba(128,128,128,.2)); padding:10px 0; }
   .comment-author { color:var(--vscode-textLink-foreground); font-weight:600; }

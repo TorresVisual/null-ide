@@ -4,7 +4,7 @@
     const stateSelect = document.getElementById('state-select');
     const assigneeMe = document.getElementById('assignee-me');
     const assigneeEveryone = document.getElementById('assignee-everyone');
-    const labelInput = document.getElementById('label-input');
+    const labelPicker = document.getElementById('label-picker');
     const searchInput = document.getElementById('search-input');
     const listEl = document.getElementById('list');
     const refreshBtn = document.getElementById('refresh-btn');
@@ -26,6 +26,7 @@
     let assignee = 'everyone';
     let selectedNumber = null;
     let viewerLogin = null;
+    const selectedLabels = new Set();
     function escapeHtml(s) {
         const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
         return s.replace(/[&<>"']/g, c => map[c]);
@@ -33,15 +34,34 @@
     function sendFilters() {
         vscode.postMessage({
             type: 'setFilters',
-            labels: labelInput.value.split(',').map(s => s.trim()).filter(Boolean),
+            labels: Array.from(selectedLabels),
             assignee,
             query: searchInput.value,
+        });
+    }
+    function renderLabelPicker(labels) {
+        if (labels.length === 0) {
+            labelPicker.innerHTML = '<span class="issue-meta">No labels in this repo.</span>';
+            return;
+        }
+        labelPicker.innerHTML = labels.map(l => `
+      <label class="chip-check">
+        <input type="checkbox" value="${escapeHtml(l.name)}" ${selectedLabels.has(l.name) ? 'checked' : ''}>
+        <span class="label-chip" style="background:#${l.color}">${escapeHtml(l.name)}</span>
+      </label>`).join('');
+        labelPicker.querySelectorAll('input').forEach(cb => {
+            cb.addEventListener('change', () => {
+                if (cb.checked)
+                    selectedLabels.add(cb.value);
+                else
+                    selectedLabels.delete(cb.value);
+                sendFilters();
+            });
         });
     }
     stateSelect.addEventListener('change', () => {
         vscode.postMessage({ type: 'setState', state: stateSelect.value });
     });
-    labelInput.addEventListener('input', sendFilters);
     searchInput.addEventListener('input', sendFilters);
     assigneeMe.addEventListener('click', () => {
         assignee = 'me';
@@ -107,6 +127,8 @@
             case 'issues':
                 if (msg.status === 'ok') {
                     viewerLogin = (_a = msg.viewerLogin) !== null && _a !== void 0 ? _a : viewerLogin;
+                    if (msg.repoLabels)
+                        renderLabelPicker(msg.repoLabels);
                     renderList(msg.issues);
                 }
                 else {

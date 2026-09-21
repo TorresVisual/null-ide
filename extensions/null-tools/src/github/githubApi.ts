@@ -1,7 +1,7 @@
 'use strict';
 
 import * as https from 'https';
-import { GithubComment, GithubIssue, IssueState } from './types';
+import { GithubComment, GithubIssue, GithubLabel, GithubUser, IssueState } from './types';
 import { stripPullRequests } from './issueFilter';
 
 function requestJson<T>(
@@ -59,7 +59,8 @@ export function fetchComments(
 
 export function updateIssue(
   owner: string, repo: string, issueNumber: number,
-  patch: { title?: string; body?: string; state?: 'open' | 'closed' }, token: string | null,
+  patch: { title?: string; body?: string; state?: 'open' | 'closed'; labels?: string[]; assignees?: string[] },
+  token: string | null,
 ): Promise<GithubIssue> {
   return requestJson<GithubIssue>(`/repos/${owner}/${repo}/issues/${issueNumber}`, token, 'PATCH', patch);
 }
@@ -70,4 +71,12 @@ export function createComment(
   return requestJson<GithubComment>(
     `/repos/${owner}/${repo}/issues/${issueNumber}/comments`, token, 'POST', { body },
   );
+}
+
+export function fetchRepoLabels(owner: string, repo: string, token: string | null): Promise<GithubLabel[]> {
+  return requestJson<GithubLabel[]>(`/repos/${owner}/${repo}/labels?per_page=100`, token);
+}
+
+export function fetchAssignableUsers(owner: string, repo: string, token: string | null): Promise<GithubUser[]> {
+  return requestJson<GithubUser[]>(`/repos/${owner}/${repo}/assignees?per_page=100`, token);
 }

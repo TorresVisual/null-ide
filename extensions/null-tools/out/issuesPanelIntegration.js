@@ -37,6 +37,7 @@ exports.registerIssuesPanelFeature = registerIssuesPanelFeature;
 const vscode = __importStar(require("vscode"));
 const issuesStore_1 = require("./github/issuesStore");
 const issuesPanel_1 = require("./issuesPanel");
+const githubRemote_1 = require("./github/githubRemote");
 function registerIssuesPanelFeature(context) {
     const store = new issuesStore_1.IssuesStore();
     const provider = new issuesPanel_1.IssuesViewProvider(context.extensionUri, store);
@@ -45,5 +46,45 @@ function registerIssuesPanelFeature(context) {
     }));
     context.subscriptions.push(vscode.commands.registerCommand('null.issues.refresh', () => provider.refresh()));
     context.subscriptions.push(vscode.commands.registerCommand('null.issues.signIn', () => provider.signIn()));
+    context.subscriptions.push(vscode.commands.registerCommand('null.issues.linkFromCommitMessage', linkFromCommitMessage));
+}
+// ponytail: VS Code's SCM input box exposes only `.value` (a string) to
+// third-party extensions — there's no public document/URI to register a
+// DocumentLinkProvider against (that needs a proposed API the built-in
+// GitHub PR/Issues extension gets but we don't). This quick-pick, triggered
+// from the SCM title bar, is the documented fallback in the design spec.
+async function linkFromCommitMessage() {
+    const folders = vscode.workspace.workspaceFolders;
+    if (!folders?.length) {
+        void vscode.window.showErrorMessage('Open a folder first.');
+        return;
+    }
+    const cwd = folders[0].uri.fsPath;
+    const repo = (0, githubRemote_1.getWorkspaceGithubRepo)(cwd);
+    if (!repo) {
+        void vscode.window.showInformationMessage('This folder has no GitHub remote.');
+        return;
+    }
+    const gitExt = vscode.extensions.getExtension('vscode.git');
+    if (!gitExt) {
+        void vscode.window.showErrorMessage('Built-in git extension not found.');
+        return;
+    }
+    const git = gitExt.isActive ? gitExt.exports.getAPI(1) : (await gitExt.activate()).getAPI(1);
+    const scmRepo = git.repositories.find((r) => r.rootUri.fsPath === cwd) ?? git.repositories[0];
+    const message = scmRepo?.inputBox.value ?? '';
+    const numbers = [...new Set([...message.matchAll(/#(\d+)/g)].map(m => Number(m[1])))];
+    if (numbers.length === 0) {
+        void vscode.window.showInformationMessage('No issue references (#N) found in the commit message.');
+        return;
+    }
+    let number = numbers[0];
+    if (numbers.length > 1) {
+        const picked = await vscode.window.showQuickPick(numbers.map(String), { placeHolder: 'Open which referenced issue?' });
+        number = picked ? Number(picked) : undefined;
+    }
+    if (number === undefined)
+        return;
+    await vscode.env.openExternal(vscode.Uri.parse(`https://github.com/${repo.owner}/${repo.repo}/issues/${number}`));
 }
 //# sourceMappingURL=issuesPanelIntegration.js.map

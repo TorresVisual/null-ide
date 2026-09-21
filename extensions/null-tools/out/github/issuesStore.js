@@ -9,6 +9,8 @@ class IssuesStore {
     issues = [];
     repo = null;
     token = null;
+    repoLabels = null;
+    assignableUsers = null;
     async refresh(cwd, state) {
         if (!cwd)
             return { status: 'no-workspace' };
@@ -18,6 +20,10 @@ class IssuesStore {
         const session = await (0, githubAuth_1.getGithubSession)(false);
         if (!session)
             return { status: 'signed-out' };
+        if (this.repo && (this.repo.owner !== repo.owner || this.repo.repo !== repo.repo)) {
+            this.repoLabels = null;
+            this.assignableUsers = null;
+        }
         try {
             const issues = await (0, githubApi_1.fetchIssues)(repo.owner, repo.repo, state, session.accessToken);
             this.issues = issues;
@@ -28,6 +34,21 @@ class IssuesStore {
         catch (err) {
             return { status: 'error', message: err.message };
         }
+    }
+    async getRepoLabels() {
+        if (!this.repo)
+            return [];
+        if (!this.repoLabels)
+            this.repoLabels = await (0, githubApi_1.fetchRepoLabels)(this.repo.owner, this.repo.repo, this.token);
+        return this.repoLabels;
+    }
+    async getAssignableUsers() {
+        if (!this.repo)
+            return [];
+        if (!this.assignableUsers) {
+            this.assignableUsers = await (0, githubApi_1.fetchAssignableUsers)(this.repo.owner, this.repo.repo, this.token);
+        }
+        return this.assignableUsers;
     }
     getFiltered(opts) {
         return (0, issueFilter_1.filterIssues)(this.issues, opts);

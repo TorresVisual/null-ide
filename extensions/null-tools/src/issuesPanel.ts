@@ -61,11 +61,13 @@ export class IssuesViewProvider implements vscode.WebviewViewProvider {
       return;
     }
     this._filters = { ...this._filters, viewerLogin: result.viewerLogin };
+    const repoLabels = await this._store.getRepoLabels();
     this._view.postMessage({
       type: 'issues',
       status: 'ok',
       issues: this._store.getFiltered(this._filters),
       viewerLogin: result.viewerLogin,
+      repoLabels,
     });
   }
 
@@ -86,6 +88,7 @@ export class IssuesViewProvider implements vscode.WebviewViewProvider {
           status: 'ok',
           issues: this._store.getFiltered(this._filters),
           viewerLogin: this._filters.viewerLogin,
+          repoLabels: await this._store.getRepoLabels(),
         });
         break;
       case 'selectIssue': {
@@ -180,6 +183,9 @@ export class IssuesViewProvider implements vscode.WebviewViewProvider {
     background:transparent; border:none; cursor:pointer; font-size:12px; padding:2px 4px; border-radius:3px; color:inherit;
   }
   .row-actions button:hover { background:var(--vscode-toolbar-hoverBackground,rgba(128,128,128,.2)); }
+  .chip-picker { display:flex; flex-wrap:wrap; gap:6px; }
+  .chip-check { display:inline-flex; align-items:center; gap:4px; font-size:11px; cursor:pointer; }
+  .chip-check input { margin:0; }
   button.action { background:var(--vscode-button-background); color:var(--vscode-button-foreground); border:none; padding:5px 10px; border-radius:2px; cursor:pointer; margin-right:6px; font:inherit; }
   button.action:hover { background:var(--vscode-button-hoverBackground); }
   #empty { padding:20px; color:var(--vscode-descriptionForeground); text-align:center; }
@@ -204,7 +210,7 @@ export class IssuesViewProvider implements vscode.WebviewViewProvider {
       <button class="assignee-btn active" id="assignee-everyone">Everyone</button>
       <button class="assignee-btn" id="assignee-me">Assigned to me</button>
     </div>
-    <input id="label-input" placeholder="labels, comma-separated">
+    <div id="label-picker" class="chip-picker"><span class="issue-meta">Loading labels…</span></div>
   </div>
   <div id="list"><div id="empty">Loading…</div></div>
 </div>

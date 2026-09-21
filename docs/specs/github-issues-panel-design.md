@@ -68,9 +68,6 @@ Repo precedent this design reuses rather than reinvents:
 - GitLab / self-hosted Git hosting — GitHub.com only, no current use case in
   this repo.
 - Milestones, emoji reactions, markdown-preview toggling in the comment view.
-- Fetching the repo's full label set for a proper multi-select label picker
-  — the label filter matches against labels already present on loaded
-  issues (typed, comma-separated).
 - Rendering issue/comment bodies as rendered Markdown — plain pre-wrapped
   text only. (`null-markdown`'s preview machinery is a separate webview
   context; wiring it into this panel is a possible future enhancement, not
@@ -80,20 +77,20 @@ Repo precedent this design reuses rather than reinvents:
 
 ## Deviations from source issue
 
-Two points where this design doesn't literally match
+One point where this design doesn't literally match
 [#43](https://github.com/TorresVisual/null-ide/issues/43)'s wording:
 
-- **Labels filter isn't multi-select.** #43 asks for "labels (multi-select)";
-  MVP ships a comma-separated free-text filter matched against labels already
-  present on loaded issues instead, because a real picker needs the repo's
-  full label set (a separate fetch) — see the Write Path section's label
-  picker, which is where this should get upgraded.
-- **`#123` SCM-input linking isn't guaranteed as specified.** #43 lists it as
-  in-scope; the Git Integration section flags it as needing a feasibility
-  check (whether a third-party extension can register against VS Code's SCM
-  input document the way the built-in GitHub PR/Issues extension does) before
-  a follow-up plan can commit to it as described, with a lighter fallback
-  noted if it isn't reachable.
+- **`#123` SCM-input linking ships as the lighter fallback, not literal
+  in-document linking.** #43 asks for `#123` references to link back to the
+  issue directly inside the SCM commit-message box. Checked: VS Code's
+  `SourceControlInputBox` exposes only a plain `.value` string to third-party
+  extensions — there is no public document/URI to register a
+  `DocumentLinkProvider` against (the built-in "GitHub Pull Requests and
+  Issues" extension does this via a proposed API this extension doesn't have
+  access to). Shipped instead: `null.issues.linkFromCommitMessage`, a
+  scm/title button that reads the current commit message, regex-matches
+  `#(\d+)`, and opens the referenced issue (prompting with a quick-pick if
+  there's more than one) — see `issuesPanelIntegration.ts`.
 
 ## Architecture
 
@@ -221,42 +218,39 @@ pagination — fine for this repo's current issue volume; add
 `Link`-header-based paging if a tracked repo ever exceeds 100 open issues in
 one state.
 
-## Write Path — comments and editing (not yet planned)
-
-Deferred out of the MVP plan; a follow-up plan under this spec should cover:
+## Write Path — comments and editing (implemented)
 
 - **Add comment**: `POST /repos/{owner}/{repo}/issues/{number}/comments`
-  with `{body}`, requires the `repo` scope session already held from the
-  read path (no new auth prompt). Webview adds a textarea + submit button
-  under the comments list in the detail pane; on success, append the
-  returned comment optimistically rather than re-fetching the whole list.
-- **Edit title/labels/assignees**: `PATCH /repos/{owner}/{repo}/issues/{number}`
-  with a partial body (`{title}`, `{labels}`, `{assignees}`). Needs the
-  repo's assignable-users list (`GET .../assignees`) and its label set
-  (`GET .../labels`) to back proper pickers — this is also where the MVP's
-  "type labels as free text" filter should probably get upgraded to a real
-  multi-select using the same fetched label set, since both need it.
-- Error handling for concurrent edits (GitHub returns 409/422 on some
-  conflicting states) should surface as an inline webview error, not a
-  silent failure — no optimistic-then-silently-revert UX.
+  with `{body}` (`githubApi.createComment`, `IssuesStore.addComment`),
+  reusing the `repo`-scope session from the read path. The detail webview's
+  composer posts a comment and the panel re-fetches the detail view on
+  success.
+- **Edit title/body/state/labels/assignees**:
+  `PATCH /repos/{owner}/{repo}/issues/{number}` (`githubApi.updateIssue`,
+  `IssuesStore.updateIssue`) with a partial body. Labels and assignees are
+  backed by real pickers in the edit form, fed by the repo's assignable-users
+  list (`GET .../assignees` — `githubApi.fetchAssignableUsers`) and label set
+  (`GET .../labels` — `githubApi.fetchRepoLabels`), both cached per-repo on
+  `IssuesStore`. The main list's labels filter was upgraded alongside this
+  from free-text to a checkbox multi-select using the same fetched label set
+  (`issuesPanel.ts` / `webview/issues.ts`).
+- Errors from `updateIssue`/`addComment` (including 409/422 on conflicting
+  states) surface via `vscode.window.showErrorMessage` in
+  `issueDetailPanel.ts` — no optimistic-then-silently-revert UX.
 
-## Git Integration — branch-from-issue, `#123` linking (not yet planned)
+## Git Integration — branch-from-issue, `#123` linking (implemented)
 
-Deferred out of the MVP plan; a follow-up plan under this spec should cover:
-
-- **Branch from issue**: a "Create branch" action on an issue that shells
-  out via the built-in `vscode.git` extension API (same
-  `vscode.extensions.getExtension('vscode.git')` access pattern
-  `null.generateCommitMessage` already uses in `extension.ts`) to create and
-  check out a branch named from the issue (e.g. `43-add-github-issues-panel`).
-- **`#123` linking in the SCM input box**: needs investigation before
-  planning — VS Code's SCM input box is backed by a text document VS Code's
-  own "GitHub Pull Requests and Issues" extension decorates via a
-  `DocumentLinkProvider`/`CompletionItemProvider` registered against that
-  document's URI scheme. Confirm this is reachable from a third-party
-  extension (not a private API) before committing to it in a plan; if not
-  feasible, a lighter fallback (a status-bar hint or a quick-pick triggered
-  from the commit message) should be considered instead.
+- **Branch from issue**: a "Branch" action in the detail panel and a
+  per-row action in the list, both calling `createIssueBranch`
+  (`github/gitBranch.ts`), which shells out via `git checkout -b` to create
+  and check out a branch named from the issue (e.g.
+  `issue-43-add-github-issues-panel`).
+- **`#123` linking in the SCM input box**: confirmed not reachable from a
+  third-party extension on the public API (see the Deviations section above)
+  — shipped as the documented fallback instead: `null.issues.linkFromCommitMessage`
+  (`issuesPanelIntegration.ts`), a button on the SCM title bar next to
+  "Generate Commit Message" that reads the commit message box, finds `#N`
+  references, and opens the issue (via quick-pick if there's more than one).
 
 ## Testing
 
@@ -272,9 +266,9 @@ plan, since this repo has no HTTP-mocking or webview-DOM test harness.
 
 1. **[github-issues-panel-mvp.md](../plans/github-issues-panel-mvp.md)** —
    read-only MVP: repo/auth resolution, list/filter/search, detail +
-   comments view, copy as prompt. *(in progress)*
-2. **Write path** (not yet planned) — add comment, edit title/labels/
-   assignees, per the Write Path section above.
-3. **Git integration** (not yet planned) — branch-from-issue and `#123`
-   SCM-input linking, per the Git Integration section above, pending the
-   linking-API feasibility check called out there.
+   comments view, copy as prompt. *(done)*
+2. **Write path** *(done, no separate plan doc)* — add comment, edit
+   title/body/state/labels/assignees, per the Write Path section above.
+3. **Git integration** *(done, no separate plan doc)* — branch-from-issue
+   and the `#123` commit-message quick-pick fallback, per the Git
+   Integration section above.

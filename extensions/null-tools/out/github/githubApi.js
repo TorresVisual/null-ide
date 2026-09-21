@@ -37,6 +37,8 @@ exports.fetchIssues = fetchIssues;
 exports.fetchComments = fetchComments;
 exports.updateIssue = updateIssue;
 exports.createComment = createComment;
+exports.fetchRepoLabels = fetchRepoLabels;
+exports.fetchAssignableUsers = fetchAssignableUsers;
 const https = __importStar(require("https"));
 const issueFilter_1 = require("./issueFilter");
 function requestJson(path, token, method = 'GET', body) {
@@ -90,5 +92,11 @@ function updateIssue(owner, repo, issueNumber, patch, token) {
 }
 function createComment(owner, repo, issueNumber, body, token) {
     return requestJson(`/repos/${owner}/${repo}/issues/${issueNumber}/comments`, token, 'POST', { body });
+}
+function fetchRepoLabels(owner, repo, token) {
+    return requestJson(`/repos/${owner}/${repo}/labels?per_page=100`, token);
+}
+function fetchAssignableUsers(owner, repo, token) {
+    return requestJson(`/repos/${owner}/${repo}/assignees?per_page=100`, token);
 }
 //# sourceMappingURL=githubApi.js.map

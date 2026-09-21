@@ -5,6 +5,8 @@
     let editing = false;
     let currentIssue = null;
     let lastComments = [];
+    let repoLabels = [];
+    let assignableUsers = [];
     function escapeHtml(s) {
         const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
         return s.replace(/[&<>"']/g, c => map[c]);
@@ -42,6 +44,26 @@
       <div class="edit-form">
         <input id="edit-title" value="${escapeHtml(issue.title)}">
         <textarea id="edit-body">${escapeHtml(issue.body || '')}</textarea>
+        <div class="picker-group">
+          <span class="assignees-label">Labels:</span>
+          <div class="chip-picker" id="label-picker">
+            ${repoLabels.length === 0 ? '<span class="issue-meta">No labels in this repo.</span>' : repoLabels.map(l => `
+              <label class="chip-check">
+                <input type="checkbox" value="${escapeHtml(l.name)}" ${issue.labels.some(il => il.name === l.name) ? 'checked' : ''}>
+                <span class="label-chip" style="background:#${l.color}">${escapeHtml(l.name)}</span>
+              </label>`).join('')}
+          </div>
+        </div>
+        <div class="picker-group">
+          <span class="assignees-label">Assignees:</span>
+          <div class="chip-picker" id="assignee-picker">
+            ${assignableUsers.length === 0 ? '<span class="issue-meta">No assignable users.</span>' : assignableUsers.map(u => `
+              <label class="chip-check">
+                <input type="checkbox" value="${escapeHtml(u.login)}" ${issue.assignees.some(a => a.login === u.login) ? 'checked' : ''}>
+                ${escapeHtml(u.login)}
+              </label>`).join('')}
+          </div>
+        </div>
         <div class="btn-row">
           <button class="btn btn-primary" id="save-btn">Save</button>
           <button class="btn btn-secondary" id="cancel-btn">Cancel</button>
@@ -93,7 +115,9 @@
             const body = document.getElementById('edit-body').value;
             if (!title)
                 return;
-            vscode.postMessage({ type: 'saveEdit', title, body });
+            const labels = Array.from(document.querySelectorAll('#label-picker input:checked')).map(el => el.value);
+            const assignees = Array.from(document.querySelectorAll('#assignee-picker input:checked')).map(el => el.value);
+            vscode.postMessage({ type: 'saveEdit', title, body, labels, assignees });
         });
         const commentInput = document.getElementById('comment-input');
         const commentBtn = document.getElementById('comment-btn');
@@ -113,6 +137,8 @@
         switch (msg.type) {
             case 'issueDetail':
                 lastComments = msg.comments;
+                repoLabels = msg.repoLabels;
+                assignableUsers = msg.assignableUsers;
                 renderDetail(msg.issue, msg.comments);
                 break;
             case 'copied': {

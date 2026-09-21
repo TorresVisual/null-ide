@@ -164,6 +164,11 @@
       {
         "command": "null.issues.signIn",
         "title": "Null: Sign in to GitHub"
+      },
+      {
+        "command": "null.issues.linkFromCommitMessage",
+        "title": "Null: Open Issue Referenced in Commit Message",
+        "icon": "$(issues)"
       }
     ],
     "viewsContainers": {
@@ -252,6 +257,11 @@
       "scm/title": [
         {
           "command": "null.generateCommitMessage",
+          "when": "scmProvider == git",
+          "group": "navigation"
+        },
+        {
+          "command": "null.issues.linkFromCommitMessage",
           "when": "scmProvider == git",
           "group": "navigation"
         }
@@ -354,7 +364,8 @@
         { "command": "null.toggleDiscordPresence" },
         { "command": "null.discord.testConnection" },
         { "command": "null.issues.refresh" },
-        { "command": "null.issues.signIn" }
+        { "command": "null.issues.signIn" },
+        { "command": "null.issues.linkFromCommitMessage" }
       ]
     },
     "configuration": {

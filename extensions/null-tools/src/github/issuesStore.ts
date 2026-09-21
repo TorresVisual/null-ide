@@ -2,9 +2,11 @@
 
 import { getWorkspaceGithubRepo } from './githubRemote';
 import { getGithubSession } from './githubAuth';
-import { createComment, fetchComments, fetchIssues, updateIssue } from './githubApi';
+import {
+  createComment, fetchAssignableUsers, fetchComments, fetchIssues, fetchRepoLabels, updateIssue,
+} from './githubApi';
 import { filterIssues } from './issueFilter';
-import { GithubComment, GithubIssue, GithubRepoRef, IssueFilterOptions, IssueState } from './types';
+import { GithubComment, GithubIssue, GithubLabel, GithubRepoRef, GithubUser, IssueFilterOptions, IssueState } from './types';
 
 export type IssuesResult =
   | { status: 'no-workspace' }
@@ -17,6 +19,8 @@ export class IssuesStore {
   private issues: GithubIssue[] = [];
   private repo: GithubRepoRef | null = null;
   private token: string | null = null;
+  private repoLabels: GithubLabel[] | null = null;
+  private assignableUsers: GithubUser[] | null = null;
 
   async refresh(cwd: string | null, state: IssueState): Promise<IssuesResult> {
     if (!cwd) return { status: 'no-workspace' };
@@ -27,6 +31,11 @@ export class IssuesStore {
     const session = await getGithubSession(false);
     if (!session) return { status: 'signed-out' };
 
+    if (this.repo && (this.repo.owner !== repo.owner || this.repo.repo !== repo.repo)) {
+      this.repoLabels = null;
+      this.assignableUsers = null;
+    }
+
     try {
       const issues = await fetchIssues(repo.owner, repo.repo, state, session.accessToken);
       this.issues = issues;
@@ -36,6 +45,20 @@ export class IssuesStore {
     } catch (err) {
       return { status: 'error', message: (err as Error).message };
     }
+  }
+
+  async getRepoLabels(): Promise<GithubLabel[]> {
+    if (!this.repo) return [];
+    if (!this.repoLabels) this.repoLabels = await fetchRepoLabels(this.repo.owner, this.repo.repo, this.token);
+    return this.repoLabels;
+  }
+
+  async getAssignableUsers(): Promise<GithubUser[]> {
+    if (!this.repo) return [];
+    if (!this.assignableUsers) {
+      this.assignableUsers = await fetchAssignableUsers(this.repo.owner, this.repo.repo, this.token);
+    }
+    return this.assignableUsers;
   }
 
   getFiltered(opts: IssueFilterOptions): GithubIssue[] {
@@ -52,7 +75,8 @@ export class IssuesStore {
   }
 
   async updateIssue(
-    issueNumber: number, patch: { title?: string; body?: string; state?: 'open' | 'closed' },
+    issueNumber: number,
+    patch: { title?: string; body?: string; state?: 'open' | 'closed'; labels?: string[]; assignees?: string[] },
   ): Promise<GithubIssue | null> {
     if (!this.repo) return null;
     const updated = await updateIssue(this.repo.owner, this.repo.repo, issueNumber, patch, this.token);
