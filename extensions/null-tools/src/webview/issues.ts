@@ -6,7 +6,6 @@ interface GithubIssue {
   number: number; title: string; body: string; state: string; html_url: string;
   labels: GithubLabel[]; assignees: GithubUser[]; user: GithubUser; comments: number; updated_at: string;
 }
-interface GithubComment { id: number; user: GithubUser; body: string; created_at: string; }
 
 declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
 
@@ -19,7 +18,6 @@ declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
   const labelInput       = document.getElementById('label-input') as HTMLInputElement;
   const searchInput      = document.getElementById('search-input') as HTMLInputElement;
   const listEl           = document.getElementById('list') as HTMLDivElement;
-  const detailEl         = document.getElementById('detail') as HTMLDivElement;
 
   let assignee: 'me' | 'everyone' = 'everyone';
   let selectedNumber: number | null = null;
@@ -79,28 +77,6 @@ declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
     });
   }
 
-  function renderDetail(issue: GithubIssue, comments: GithubComment[]): void {
-    detailEl.innerHTML = `
-      <h2>#${issue.number} ${escapeHtml(issue.title)}</h2>
-      <div>
-        <button class="action" id="copy-btn">Copy as prompt</button>
-        <button class="action" id="browser-btn">Open in Browser</button>
-      </div>
-      <div id="detail-body">${escapeHtml(issue.body || '(no description)')}</div>
-      <div id="comments">
-        ${comments.map(c => `
-          <div class="comment">
-            <span class="comment-author">${escapeHtml(c.user.login)}</span>
-            <span class="issue-meta">${c.created_at.slice(0, 10)}</span>
-            <div>${escapeHtml(c.body)}</div>
-          </div>`).join('') || '<div class="issue-meta">No comments.</div>'}
-      </div>`;
-    document.getElementById('copy-btn')?.addEventListener('click', () =>
-      vscode.postMessage({ type: 'copyAsPrompt', number: issue.number }));
-    document.getElementById('browser-btn')?.addEventListener('click', () =>
-      vscode.postMessage({ type: 'openInBrowser', number: issue.number }));
-  }
-
   window.addEventListener('message', event => {
     const msg = event.data;
     switch (msg.type) {
@@ -125,17 +101,6 @@ declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
             vscode.postMessage({ type: 'signIn' }));
         }
         break;
-      case 'issueDetail':
-        renderDetail(msg.issue, msg.comments);
-        break;
-      case 'copied': {
-        const btn = detailEl.querySelector('#copy-btn');
-        if (btn) {
-          btn.textContent = 'Copied!';
-          setTimeout(() => { if (btn) btn.textContent = 'Copy as prompt'; }, 1500);
-        }
-        break;
-      }
     }
   });
 

@@ -7,7 +7,6 @@
     const labelInput = document.getElementById('label-input');
     const searchInput = document.getElementById('search-input');
     const listEl = document.getElementById('list');
-    const detailEl = document.getElementById('detail');
     let assignee = 'everyone';
     let selectedNumber = null;
     function escapeHtml(s) {
@@ -61,26 +60,6 @@
             });
         });
     }
-    function renderDetail(issue, comments) {
-        var _a, _b;
-        detailEl.innerHTML = `
-      <h2>#${issue.number} ${escapeHtml(issue.title)}</h2>
-      <div>
-        <button class="action" id="copy-btn">Copy as prompt</button>
-        <button class="action" id="browser-btn">Open in Browser</button>
-      </div>
-      <div id="detail-body">${escapeHtml(issue.body || '(no description)')}</div>
-      <div id="comments">
-        ${comments.map(c => `
-          <div class="comment">
-            <span class="comment-author">${escapeHtml(c.user.login)}</span>
-            <span class="issue-meta">${c.created_at.slice(0, 10)}</span>
-            <div>${escapeHtml(c.body)}</div>
-          </div>`).join('') || '<div class="issue-meta">No comments.</div>'}
-      </div>`;
-        (_a = document.getElementById('copy-btn')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', () => vscode.postMessage({ type: 'copyAsPrompt', number: issue.number }));
-        (_b = document.getElementById('browser-btn')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', () => vscode.postMessage({ type: 'openInBrowser', number: issue.number }));
-    }
     window.addEventListener('message', event => {
         var _a;
         const msg = event.data;
@@ -104,18 +83,6 @@
                     (_a = document.getElementById('signin-btn')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', () => vscode.postMessage({ type: 'signIn' }));
                 }
                 break;
-            case 'issueDetail':
-                renderDetail(msg.issue, msg.comments);
-                break;
-            case 'copied': {
-                const btn = detailEl.querySelector('#copy-btn');
-                if (btn) {
-                    btn.textContent = 'Copied!';
-                    setTimeout(() => { if (btn)
-                        btn.textContent = 'Copy as prompt'; }, 1500);
-                }
-                break;
-            }
         }
     });
     vscode.postMessage({ type: 'ready' });

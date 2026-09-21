@@ -4,7 +4,7 @@ import * as vscode from 'vscode';
 import { getNonce } from './webviewUtils';
 import { IssuesStore } from './github/issuesStore';
 import { getGithubSession } from './github/githubAuth';
-import { formatIssueAsPrompt } from './github/promptFormat';
+import { IssueDetailPanel } from './issueDetailPanel';
 import { IssueFilterOptions, IssueState } from './github/types';
 
 type InboundMessage =
@@ -12,8 +12,6 @@ type InboundMessage =
   | { type: 'setState'; state: IssueState }
   | { type: 'setFilters'; labels: string[]; assignee: 'me' | 'everyone'; query: string }
   | { type: 'selectIssue'; number: number }
-  | { type: 'copyAsPrompt'; number: number }
-  | { type: 'openInBrowser'; number: number }
   | { type: 'signIn' };
 
 export class IssuesViewProvider implements vscode.WebviewViewProvider {
@@ -79,20 +77,7 @@ export class IssuesViewProvider implements vscode.WebviewViewProvider {
       case 'selectIssue': {
         const issue = this._store.getByNumber(msg.number);
         if (!issue) break;
-        const comments = await this._store.getComments(msg.number);
-        this._view?.postMessage({ type: 'issueDetail', issue, comments });
-        break;
-      }
-      case 'copyAsPrompt': {
-        const issue = this._store.getByNumber(msg.number);
-        if (!issue) break;
-        await vscode.env.clipboard.writeText(formatIssueAsPrompt(issue));
-        this._view?.postMessage({ type: 'copied' });
-        break;
-      }
-      case 'openInBrowser': {
-        const issue = this._store.getByNumber(msg.number);
-        if (issue) await vscode.env.openExternal(vscode.Uri.parse(issue.html_url));
+        await IssueDetailPanel.show(this._extensionUri, this._store, msg.number);
         break;
       }
       case 'signIn':
@@ -117,8 +102,7 @@ export class IssuesViewProvider implements vscode.WebviewViewProvider {
   #toolbar input { flex:1; min-width:80px; }
   .assignee-btn { background:#1e1e1e; border:1px solid #333; color:#888; padding:4px 8px; cursor:pointer; border-radius:2px; }
   .assignee-btn.active { color:#e0e0e0; border-color:#0078D4; }
-  #body { flex:1; display:flex; min-height:0; }
-  #list { width:45%; overflow-y:auto; border-right:1px solid #2b2b2b; }
+  #list { flex:1; overflow-y:auto; }
   .issue-row { padding:8px 10px; border-bottom:1px solid #222; cursor:pointer; }
   .issue-row:hover { background:#1e1e1e; }
   .issue-row.selected { background:#242424; border-left:2px solid #4EC9B0; }
@@ -126,10 +110,6 @@ export class IssuesViewProvider implements vscode.WebviewViewProvider {
   .issue-title { color:#e0e0e0; }
   .issue-meta { color:#666; font-size:11px; margin-top:2px; }
   .label-chip { display:inline-block; padding:0 5px; border-radius:8px; font-size:10px; margin-right:4px; color:#111; }
-  #detail { flex:1; overflow-y:auto; padding:12px; }
-  #detail-body { white-space:pre-wrap; margin:10px 0; color:#ccc; }
-  .comment { border-top:1px solid #2b2b2b; padding:8px 0; }
-  .comment-author { color:#4EC9B0; }
   button.action { background:#0078D4; color:#fff; border:none; padding:5px 10px; border-radius:2px; cursor:pointer; margin-right:6px; }
   button.action:hover { background:#106EBE; }
   #empty { padding:20px; color:#666; text-align:center; }
@@ -146,10 +126,7 @@ export class IssuesViewProvider implements vscode.WebviewViewProvider {
     <input id="label-input" placeholder="labels, comma-separated">
     <input id="search-input" placeholder="Search title &amp; body">
   </div>
-  <div id="body">
-    <div id="list"><div id="empty">Loading…</div></div>
-    <div id="detail"><div id="empty">Select an issue.</div></div>
-  </div>
+  <div id="list"><div id="empty">Loading…</div></div>
 </div>
 <script nonce="${nonce}" src="${scriptUri}"></script>
 </body></html>`;
