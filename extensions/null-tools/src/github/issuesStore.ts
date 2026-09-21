@@ -2,7 +2,7 @@
 
 import { getWorkspaceGithubRepo } from './githubRemote';
 import { getGithubSession } from './githubAuth';
-import { fetchComments, fetchIssues } from './githubApi';
+import { createComment, fetchComments, fetchIssues, updateIssue } from './githubApi';
 import { filterIssues } from './issueFilter';
 import { GithubComment, GithubIssue, GithubRepoRef, IssueFilterOptions, IssueState } from './types';
 
@@ -49,5 +49,23 @@ export class IssuesStore {
   getComments(issueNumber: number): Promise<GithubComment[]> {
     if (!this.repo) return Promise.resolve([]);
     return fetchComments(this.repo.owner, this.repo.repo, issueNumber, this.token);
+  }
+
+  async updateIssue(
+    issueNumber: number, patch: { title?: string; body?: string; state?: 'open' | 'closed' },
+  ): Promise<GithubIssue | null> {
+    if (!this.repo) return null;
+    const updated = await updateIssue(this.repo.owner, this.repo.repo, issueNumber, patch, this.token);
+    this.issues = this.issues.map(issue => (issue.number === issueNumber ? updated : issue));
+    return updated;
+  }
+
+  async addComment(issueNumber: number, body: string): Promise<GithubComment | null> {
+    if (!this.repo) return null;
+    const comment = await createComment(this.repo.owner, this.repo.repo, issueNumber, body, this.token);
+    this.issues = this.issues.map(issue =>
+      issue.number === issueNumber ? { ...issue, comments: issue.comments + 1 } : issue,
+    );
+    return comment;
   }
 }

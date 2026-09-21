@@ -14,41 +14,121 @@ declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
   const vscode = acquireVsCodeApi();
   const detailEl = document.getElementById('detail') as HTMLDivElement;
 
+  let editing = false;
+  let currentIssue: GithubIssue | null = null;
+  let lastComments: GithubComment[] = [];
+
   function escapeHtml(s: string): string {
     const map: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
     return s.replace(/[&<>"']/g, c => map[c]);
   }
 
+  const AVATAR_COLORS = ['#e57373', '#ba68c8', '#64b5f6', '#4db6ac', '#81c784', '#ffb74d', '#a1887f', '#90a4ae'];
+  function avatarColor(login: string): string {
+    let hash = 0;
+    for (let i = 0; i < login.length; i++) hash = (hash * 31 + login.charCodeAt(i)) >>> 0;
+    return AVATAR_COLORS[hash % AVATAR_COLORS.length];
+  }
+  function avatar(login: string): string {
+    const initials = escapeHtml(login.slice(0, 2).toUpperCase());
+    return `<span class="avatar" style="background:${avatarColor(login)}">${initials}</span>`;
+  }
+
   function renderDetail(issue: GithubIssue, comments: GithubComment[]): void {
+    currentIssue = issue;
+    editing = false;
+    render(issue, comments);
+  }
+
+  function render(issue: GithubIssue, comments: GithubComment[]): void {
+    const closed = issue.state === 'closed';
     detailEl.innerHTML = `
-      <h2><span class="state-badge${issue.state === 'closed' ? ' closed' : ''}">${issue.state}</span> #${issue.number} ${escapeHtml(issue.title)}</h2>
-      <div class="issue-meta">
+      <h2><span class="state-badge${closed ? ' closed' : ''}">${issue.state}</span> #${issue.number} ${editing ? '' : escapeHtml(issue.title)}</h2>
+      <div class="meta-row">
         ${issue.labels.map(l => `<span class="label-chip" style="background:#${l.color}">${escapeHtml(l.name)}</span>`).join('')}
-        opened by ${escapeHtml(issue.user.login)} · ${issue.comments} comments · updated ${issue.updated_at.slice(0, 10)}
+        ${avatar(issue.user.login)} opened by ${escapeHtml(issue.user.login)} · ${issue.comments} comments · updated ${issue.updated_at.slice(0, 10)}
       </div>
-      <div>
-        <button class="action" id="copy-btn">Copy as prompt</button>
-        <button class="action" id="browser-btn">Open in browser ↗</button>
+      ${issue.assignees.length > 0 ? `
+      <div class="assignees-row">
+        <span class="assignees-label">Assignees:</span>
+        ${issue.assignees.map(a => `<span class="assignee-chip">${avatar(a.login)} ${escapeHtml(a.login)}</span>`).join('')}
+      </div>` : ''}
+      ${editing ? `
+      <div class="edit-form">
+        <input id="edit-title" value="${escapeHtml(issue.title)}">
+        <textarea id="edit-body">${escapeHtml(issue.body || '')}</textarea>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="save-btn">Save</button>
+          <button class="btn btn-secondary" id="cancel-btn">Cancel</button>
+        </div>
+      </div>` : `
+      <div class="btn-row">
+        <button class="btn btn-primary" id="edit-btn">Edit</button>
+        <button class="btn btn-secondary" id="branch-btn">Branch</button>
+        <button class="btn btn-secondary" id="browser-btn">Browser ↗</button>
+        <button class="btn btn-secondary" id="copy-btn">Copy as prompt</button>
+        <button class="btn btn-danger" id="state-btn">${closed ? 'Reopen' : 'Close'}</button>
       </div>
-      <div id="detail-body">${escapeHtml(issue.body || '(no description)')}</div>
+      <div class="body-card">${escapeHtml(issue.body || '(no description)')}</div>`}
+      <h3>Comments (${comments.length})</h3>
       <div id="comments">
         ${comments.map(c => `
           <div class="comment">
-            <span class="comment-author">${escapeHtml(c.user.login)}</span>
+            <span class="comment-author">${avatar(c.user.login)} ${escapeHtml(c.user.login)}</span>
             <span class="issue-meta">${c.created_at.slice(0, 10)}</span>
             <div>${escapeHtml(c.body)}</div>
-          </div>`).join('') || '<div class="issue-meta">No comments.</div>'}
+          </div>`).join('') || '<div class="issue-meta">No comments yet.</div>'}
+      </div>
+      <div id="composer">
+        <textarea id="comment-input" placeholder="Write a comment…"></textarea>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="comment-btn" disabled>Comment</button>
+        </div>
       </div>`;
+    bindEvents(issue);
+  }
+
+  function bindEvents(issue: GithubIssue): void {
     document.getElementById('copy-btn')?.addEventListener('click', () =>
       vscode.postMessage({ type: 'copyAsPrompt' }));
     document.getElementById('browser-btn')?.addEventListener('click', () =>
       vscode.postMessage({ type: 'openInBrowser' }));
+    document.getElementById('branch-btn')?.addEventListener('click', () =>
+      vscode.postMessage({ type: 'createBranch' }));
+    document.getElementById('state-btn')?.addEventListener('click', () =>
+      vscode.postMessage({ type: 'setState', state: issue.state === 'closed' ? 'open' : 'closed' }));
+    document.getElementById('edit-btn')?.addEventListener('click', () => {
+      editing = true;
+      if (currentIssue) render(currentIssue, lastComments);
+    });
+    document.getElementById('cancel-btn')?.addEventListener('click', () => {
+      editing = false;
+      if (currentIssue) render(currentIssue, lastComments);
+    });
+    document.getElementById('save-btn')?.addEventListener('click', () => {
+      const title = (document.getElementById('edit-title') as HTMLInputElement).value.trim();
+      const body = (document.getElementById('edit-body') as HTMLTextAreaElement).value;
+      if (!title) return;
+      vscode.postMessage({ type: 'saveEdit', title, body });
+    });
+    const commentInput = document.getElementById('comment-input') as HTMLTextAreaElement;
+    const commentBtn = document.getElementById('comment-btn') as HTMLButtonElement;
+    commentInput?.addEventListener('input', () => {
+      commentBtn.disabled = commentInput.value.trim().length === 0;
+    });
+    commentBtn?.addEventListener('click', () => {
+      const body = commentInput.value.trim();
+      if (!body) return;
+      commentBtn.disabled = true;
+      vscode.postMessage({ type: 'postComment', body });
+    });
   }
 
   window.addEventListener('message', event => {
     const msg = event.data;
     switch (msg.type) {
       case 'issueDetail':
+        lastComments = msg.comments;
         renderDetail(msg.issue, msg.comments);
         break;
       case 'copied': {

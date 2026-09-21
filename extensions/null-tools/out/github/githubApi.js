@@ -35,9 +35,11 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.fetchIssues = fetchIssues;
 exports.fetchComments = fetchComments;
+exports.updateIssue = updateIssue;
+exports.createComment = createComment;
 const https = __importStar(require("https"));
 const issueFilter_1 = require("./issueFilter");
-function requestJson(path, token) {
+function requestJson(path, token, method = 'GET', body) {
     return new Promise((resolve, reject) => {
         const headers = {
             Accept: 'application/vnd.github+json',
@@ -46,7 +48,10 @@ function requestJson(path, token) {
         };
         if (token)
             headers.Authorization = `Bearer ${token}`;
-        const req = https.get(`https://api.github.com${path}`, { headers }, res => {
+        const payload = body !== undefined ? JSON.stringify(body) : undefined;
+        if (payload)
+            headers['Content-Type'] = 'application/json';
+        const req = https.request(`https://api.github.com${path}`, { method, headers }, res => {
             if (!res.statusCode || res.statusCode < 200 || res.statusCode >= 300) {
                 res.resume();
                 reject(new Error(`GitHub API ${res.statusCode ?? 'error'}: ${path}`));
@@ -66,6 +71,9 @@ function requestJson(path, token) {
         });
         req.on('error', reject);
         req.setTimeout(10000, () => req.destroy(new Error('GitHub API request timed out')));
+        if (payload)
+            req.write(payload);
+        req.end();
     });
 }
 // ponytail: single page, 100 issues max — add Link-header pagination if a
@@ -76,5 +84,11 @@ async function fetchIssues(owner, repo, state, token) {
 }
 function fetchComments(owner, repo, issueNumber, token) {
     return requestJson(`/repos/${owner}/${repo}/issues/${issueNumber}/comments?per_page=100`, token);
+}
+function updateIssue(owner, repo, issueNumber, patch, token) {
+    return requestJson(`/repos/${owner}/${repo}/issues/${issueNumber}`, token, 'PATCH', patch);
+}
+function createComment(owner, repo, issueNumber, body, token) {
+    return requestJson(`/repos/${owner}/${repo}/issues/${issueNumber}/comments`, token, 'POST', { body });
 }
 //# sourceMappingURL=githubApi.js.map

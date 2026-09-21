@@ -7,6 +7,22 @@
     const labelInput = document.getElementById('label-input');
     const searchInput = document.getElementById('search-input');
     const listEl = document.getElementById('list');
+    const refreshBtn = document.getElementById('refresh-btn');
+    const searchToggleBtn = document.getElementById('search-toggle-btn');
+    const filterToggleBtn = document.getElementById('filter-toggle-btn');
+    const searchBar = document.getElementById('search-bar');
+    const filterPopover = document.getElementById('filter-popover');
+    refreshBtn.addEventListener('click', () => vscode.postMessage({ type: 'refresh' }));
+    searchToggleBtn.addEventListener('click', () => {
+        searchBar.classList.toggle('hidden');
+        searchToggleBtn.classList.toggle('active');
+        if (!searchBar.classList.contains('hidden'))
+            searchInput.focus();
+    });
+    filterToggleBtn.addEventListener('click', () => {
+        filterPopover.classList.toggle('hidden');
+        filterToggleBtn.classList.toggle('active');
+    });
     let assignee = 'everyone';
     let selectedNumber = null;
     let viewerLogin = null;
@@ -56,14 +72,28 @@
             ${issue.comments} comments · updated ${issue.updated_at.slice(0, 10)}
           </div>
         </div>
+        <div class="row-actions">
+          <button class="branch-btn" title="Create branch for this issue">🌿</button>
+          <button class="browser-btn" title="Open in browser">↗</button>
+        </div>
       </div>`;
         }).join('');
         listEl.querySelectorAll('.issue-row').forEach(row => {
+            var _a, _b;
+            const number = Number(row.dataset.number);
             row.addEventListener('click', () => {
-                selectedNumber = Number(row.dataset.number);
-                vscode.postMessage({ type: 'selectIssue', number: selectedNumber });
+                selectedNumber = number;
+                vscode.postMessage({ type: 'selectIssue', number });
                 listEl.querySelectorAll('.issue-row').forEach(r => r.classList.remove('selected'));
                 row.classList.add('selected');
+            });
+            (_a = row.querySelector('.branch-btn')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', ev => {
+                ev.stopPropagation();
+                vscode.postMessage({ type: 'createBranchForIssue', number });
+            });
+            (_b = row.querySelector('.browser-btn')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', ev => {
+                ev.stopPropagation();
+                vscode.postMessage({ type: 'openIssueInBrowser', number });
             });
         });
     }

@@ -4,7 +4,9 @@ import * as https from 'https';
 import { GithubComment, GithubIssue, IssueState } from './types';
 import { stripPullRequests } from './issueFilter';
 
-function requestJson<T>(path: string, token: string | null): Promise<T> {
+function requestJson<T>(
+  path: string, token: string | null, method: 'GET' | 'PATCH' | 'POST' = 'GET', body?: unknown,
+): Promise<T> {
   return new Promise((resolve, reject) => {
     const headers: Record<string, string> = {
       Accept: 'application/vnd.github+json',
@@ -12,8 +14,10 @@ function requestJson<T>(path: string, token: string | null): Promise<T> {
       'User-Agent': 'Null-IDE',
     };
     if (token) headers.Authorization = `Bearer ${token}`;
+    const payload = body !== undefined ? JSON.stringify(body) : undefined;
+    if (payload) headers['Content-Type'] = 'application/json';
 
-    const req = https.get(`https://api.github.com${path}`, { headers }, res => {
+    const req = https.request(`https://api.github.com${path}`, { method, headers }, res => {
       if (!res.statusCode || res.statusCode < 200 || res.statusCode >= 300) {
         res.resume();
         reject(new Error(`GitHub API ${res.statusCode ?? 'error'}: ${path}`));
@@ -29,6 +33,8 @@ function requestJson<T>(path: string, token: string | null): Promise<T> {
     });
     req.on('error', reject);
     req.setTimeout(10000, () => req.destroy(new Error('GitHub API request timed out')));
+    if (payload) req.write(payload);
+    req.end();
   });
 }
 
@@ -48,5 +54,20 @@ export function fetchComments(
 ): Promise<GithubComment[]> {
   return requestJson<GithubComment[]>(
     `/repos/${owner}/${repo}/issues/${issueNumber}/comments?per_page=100`, token,
+  );
+}
+
+export function updateIssue(
+  owner: string, repo: string, issueNumber: number,
+  patch: { title?: string; body?: string; state?: 'open' | 'closed' }, token: string | null,
+): Promise<GithubIssue> {
+  return requestJson<GithubIssue>(`/repos/${owner}/${repo}/issues/${issueNumber}`, token, 'PATCH', patch);
+}
+
+export function createComment(
+  owner: string, repo: string, issueNumber: number, body: string, token: string | null,
+): Promise<GithubComment> {
+  return requestJson<GithubComment>(
+    `/repos/${owner}/${repo}/issues/${issueNumber}/comments`, token, 'POST', { body },
   );
 }

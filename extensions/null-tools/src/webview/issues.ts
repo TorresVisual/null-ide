@@ -18,6 +18,22 @@ declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
   const labelInput       = document.getElementById('label-input') as HTMLInputElement;
   const searchInput      = document.getElementById('search-input') as HTMLInputElement;
   const listEl           = document.getElementById('list') as HTMLDivElement;
+  const refreshBtn       = document.getElementById('refresh-btn') as HTMLButtonElement;
+  const searchToggleBtn  = document.getElementById('search-toggle-btn') as HTMLButtonElement;
+  const filterToggleBtn  = document.getElementById('filter-toggle-btn') as HTMLButtonElement;
+  const searchBar        = document.getElementById('search-bar') as HTMLDivElement;
+  const filterPopover    = document.getElementById('filter-popover') as HTMLDivElement;
+
+  refreshBtn.addEventListener('click', () => vscode.postMessage({ type: 'refresh' }));
+  searchToggleBtn.addEventListener('click', () => {
+    searchBar.classList.toggle('hidden');
+    searchToggleBtn.classList.toggle('active');
+    if (!searchBar.classList.contains('hidden')) searchInput.focus();
+  });
+  filterToggleBtn.addEventListener('click', () => {
+    filterPopover.classList.toggle('hidden');
+    filterToggleBtn.classList.toggle('active');
+  });
 
   let assignee: 'me' | 'everyone' = 'everyone';
   let selectedNumber: number | null = null;
@@ -72,14 +88,27 @@ declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
             ${issue.comments} comments · updated ${issue.updated_at.slice(0, 10)}
           </div>
         </div>
+        <div class="row-actions">
+          <button class="branch-btn" title="Create branch for this issue">🌿</button>
+          <button class="browser-btn" title="Open in browser">↗</button>
+        </div>
       </div>`;
     }).join('');
     listEl.querySelectorAll<HTMLDivElement>('.issue-row').forEach(row => {
+      const number = Number(row.dataset.number);
       row.addEventListener('click', () => {
-        selectedNumber = Number(row.dataset.number);
-        vscode.postMessage({ type: 'selectIssue', number: selectedNumber });
+        selectedNumber = number;
+        vscode.postMessage({ type: 'selectIssue', number });
         listEl.querySelectorAll('.issue-row').forEach(r => r.classList.remove('selected'));
         row.classList.add('selected');
+      });
+      row.querySelector('.branch-btn')?.addEventListener('click', ev => {
+        ev.stopPropagation();
+        vscode.postMessage({ type: 'createBranchForIssue', number });
+      });
+      row.querySelector('.browser-btn')?.addEventListener('click', ev => {
+        ev.stopPropagation();
+        vscode.postMessage({ type: 'openIssueInBrowser', number });
       });
     });
   }

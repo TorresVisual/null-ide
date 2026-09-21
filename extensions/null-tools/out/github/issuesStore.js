@@ -40,6 +40,20 @@ class IssuesStore {
             return Promise.resolve([]);
         return (0, githubApi_1.fetchComments)(this.repo.owner, this.repo.repo, issueNumber, this.token);
     }
+    async updateIssue(issueNumber, patch) {
+        if (!this.repo)
+            return null;
+        const updated = await (0, githubApi_1.updateIssue)(this.repo.owner, this.repo.repo, issueNumber, patch, this.token);
+        this.issues = this.issues.map(issue => (issue.number === issueNumber ? updated : issue));
+        return updated;
+    }
+    async addComment(issueNumber, body) {
+        if (!this.repo)
+            return null;
+        const comment = await (0, githubApi_1.createComment)(this.repo.owner, this.repo.repo, issueNumber, body, this.token);
+        this.issues = this.issues.map(issue => issue.number === issueNumber ? { ...issue, comments: issue.comments + 1 } : issue);
+        return comment;
+    }
 }
 exports.IssuesStore = IssuesStore;
 //# sourceMappingURL=issuesStore.js.map

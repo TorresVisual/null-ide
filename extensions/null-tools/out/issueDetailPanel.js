@@ -37,6 +37,7 @@ exports.IssueDetailPanel = void 0;
 const vscode = __importStar(require("vscode"));
 const webviewUtils_1 = require("./webviewUtils");
 const promptFormat_1 = require("./github/promptFormat");
+const gitBranch_1 = require("./github/gitBranch");
 class IssueDetailPanel {
     extensionUri;
     store;
@@ -98,6 +99,48 @@ class IssueDetailPanel {
                     await vscode.env.openExternal(vscode.Uri.parse(issue.html_url));
                 break;
             }
+            case 'setState': {
+                try {
+                    await this.store.updateIssue(this.issueNumber, { state: msg.state });
+                    await this._sendDetail();
+                }
+                catch (err) {
+                    void vscode.window.showErrorMessage(`Failed to update issue: ${err.message}`);
+                }
+                break;
+            }
+            case 'saveEdit': {
+                try {
+                    await this.store.updateIssue(this.issueNumber, { title: msg.title, body: msg.body });
+                    await this._sendDetail();
+                }
+                catch (err) {
+                    void vscode.window.showErrorMessage(`Failed to save issue: ${err.message}`);
+                }
+                break;
+            }
+            case 'createBranch': {
+                const issue = this.store.getByNumber(this.issueNumber);
+                const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+                if (!issue || !cwd)
+                    break;
+                const result = (0, gitBranch_1.createIssueBranch)(cwd, issue.number, issue.title);
+                if (result.ok)
+                    void vscode.window.showInformationMessage(`Switched to branch ${result.branch}`);
+                else
+                    void vscode.window.showErrorMessage(`Failed to create branch: ${result.message}`);
+                break;
+            }
+            case 'postComment': {
+                try {
+                    await this.store.addComment(this.issueNumber, msg.body);
+                    await this._sendDetail();
+                }
+                catch (err) {
+                    void vscode.window.showErrorMessage(`Failed to post comment: ${err.message}`);
+                }
+                break;
+            }
         }
     }
     _buildHtml() {
@@ -111,7 +154,7 @@ class IssueDetailPanel {
   html,body { margin:0; padding:0; height:100%; background:var(--vscode-editor-background); color:var(--vscode-foreground);
               font:13px/1.6 var(--vscode-font-family); }
   #detail { max-width:900px; margin:0 auto; padding:24px; }
-  h2 { color:var(--vscode-foreground); display:flex; align-items:center; gap:8px; }
+  h2 { color:var(--vscode-foreground); display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
   .state-badge {
     font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.04em;
     padding:2px 8px; border-radius:10px; color:#fff; background:var(--vscode-charts-green,#89d185);
@@ -119,11 +162,46 @@ class IssueDetailPanel {
   .state-badge.closed { background:var(--vscode-charts-purple,#b180d7); }
   .label-chip { display:inline-block; padding:0 5px; border-radius:8px; font-size:10px; margin-right:4px; color:#111; }
   .issue-meta { color:var(--vscode-descriptionForeground); font-size:11px; margin:6px 0; }
-  #detail-body { white-space:pre-wrap; margin:16px 0; }
+  .meta-row { display:flex; align-items:center; gap:6px; flex-wrap:wrap; color:var(--vscode-descriptionForeground); font-size:12px; margin:8px 0; }
+  .avatar {
+    width:20px; height:20px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center;
+    font-size:9px; font-weight:700; color:#fff; flex-shrink:0;
+  }
+  .assignees-row { display:flex; align-items:center; gap:6px; margin:10px 0; }
+  .assignees-label { text-transform:uppercase; letter-spacing:.06em; color:var(--vscode-descriptionForeground); font-size:10px; }
+  .assignee-chip {
+    display:inline-flex; align-items:center; gap:5px; background:var(--vscode-badge-background); color:var(--vscode-badge-foreground);
+    border-radius:12px; padding:2px 8px 2px 2px; font-size:11px;
+  }
+  .body-card {
+    border:1px solid var(--vscode-widget-border,rgba(128,128,128,.2)); border-radius:6px; padding:14px; margin:14px 0;
+    white-space:pre-wrap; background:var(--vscode-editorWidget-background,rgba(128,128,128,.03));
+  }
+  .btn-row { display:flex; gap:8px; margin:14px 0; flex-wrap:wrap; }
+  button.btn { border:none; padding:6px 14px; border-radius:4px; cursor:pointer; font:inherit; font-weight:500; }
+  button.btn-primary { background:var(--vscode-button-background); color:var(--vscode-button-foreground); }
+  button.btn-primary:hover { background:var(--vscode-button-hoverBackground); }
+  button.btn-secondary { background:var(--vscode-button-secondaryBackground); color:var(--vscode-button-secondaryForeground); }
+  button.btn-secondary:hover { background:var(--vscode-button-secondaryHoverBackground); }
+  button.btn-danger { background:var(--vscode-errorForeground,#f14c4c); color:#fff; }
+  button.btn-danger:hover { filter:brightness(1.1); }
+  button.btn:disabled { opacity:.5; cursor:default; }
+  .edit-form input, .edit-form textarea {
+    width:100%; box-sizing:border-box; background:var(--vscode-input-background); color:var(--vscode-input-foreground);
+    border:1px solid var(--vscode-input-border,transparent); border-radius:4px; padding:8px; font:inherit; margin-bottom:8px;
+  }
+  .edit-form input:focus, .edit-form textarea:focus, #comment-input:focus { outline:none; border-color:var(--vscode-focusBorder); }
+  .edit-form textarea { min-height:160px; resize:vertical; }
+  h3 { font-size:13px; margin:22px 0 8px; }
   .comment { border-top:1px solid var(--vscode-widget-border,rgba(128,128,128,.2)); padding:10px 0; }
   .comment-author { color:var(--vscode-textLink-foreground); font-weight:600; }
-  button.action { background:var(--vscode-button-background); color:var(--vscode-button-foreground); border:none; padding:6px 12px; border-radius:2px; cursor:pointer; margin-right:6px; font:inherit; }
-  button.action:hover { background:var(--vscode-button-hoverBackground); }
+  #composer { margin-top:10px; }
+  #comment-input {
+    width:100%; box-sizing:border-box; min-height:70px; resize:vertical; background:var(--vscode-input-background);
+    color:var(--vscode-input-foreground); border:1px solid var(--vscode-input-border,transparent); border-radius:4px;
+    padding:8px; font:inherit;
+  }
+  #composer .btn-row { justify-content:flex-end; }
   #empty { padding:20px; color:var(--vscode-descriptionForeground); }
 </style></head><body>
 <div id="detail"><div id="empty">Loading…</div></div>
