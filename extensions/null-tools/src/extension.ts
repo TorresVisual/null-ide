@@ -12,6 +12,7 @@ import { registerAutoGitignoreFeature } from './autoGitignore';
 import { registerPortsFeature } from './portsIntegration';
 import { registerDiscordPresenceFeature } from './discordPresenceIntegration';
 import { registerAgentsPanelFeature } from './agentsPanelIntegration';
+import { registerIssuesPanelFeature } from './issuesPanelIntegration';
 import { SoundManager } from './soundManager';
 import { NullCodeActionsProvider } from './codeActions';
 import { getStagedDiff, runClaude } from './commitMessage';
@@ -281,6 +282,7 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(plansWatcher);
 
   registerPortsFeature(context);
+  registerIssuesPanelFeature(context);
   registerDiscordPresenceFeature(context);
   registerOpenInNullNotesFeature(context);
 }
