@@ -21,6 +21,16 @@ declare const DOMPurify: { sanitize(html: string): string };
 (function () {
   const vscode = acquireVsCodeApi();
   const detailEl = document.getElementById('detail') as HTMLDivElement;
+  const lightbox = document.getElementById('lightbox') as HTMLDivElement;
+  const lightboxImg = document.getElementById('lightbox-img') as HTMLImageElement;
+  lightbox?.addEventListener('click', () => lightbox.classList.add('hidden'));
+  detailEl.addEventListener('click', e => {
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'IMG' && target.closest('.body-card, .comment-body')) {
+      lightboxImg.src = (target as HTMLImageElement).src;
+      lightbox.classList.remove('hidden');
+    }
+  });
 
   let editing = false;
   let currentIssue: GithubIssue | null = null;
@@ -30,6 +40,22 @@ declare const DOMPurify: { sanitize(html: string): string };
   let assignableUsers: GithubUser[] = [];
   let viewerLogin: string | null = null;
   let editingCommentId: number | null = null;
+  let labelOpen = false;
+  let assigneeOpen = false;
+  let refreshLabelPicker: (() => void) | null = null;
+  let refreshAssigneePicker: (() => void) | null = null;
+  let editFormSelectedLabels: Set<string> | null = null;
+  let editFormSelectedAssignees: Set<string> | null = null;
+
+  document.addEventListener('click', e => {
+    const target = e.target as HTMLElement;
+    if (target.closest('.dropdown-container')) return;
+    if (!labelOpen && !assigneeOpen) return;
+    labelOpen = false;
+    assigneeOpen = false;
+    refreshLabelPicker?.();
+    refreshAssigneePicker?.();
+  });
 
   function escapeHtml(s: string): string {
     const map: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
@@ -44,6 +70,51 @@ declare const DOMPurify: { sanitize(html: string): string };
 
   function renderMarkdown(text: string): string {
     return DOMPurify.sanitize(marked.parse(text));
+  }
+
+  interface PickerItem { value: string; label: string; color?: string; }
+
+  function renderPicker(
+    containerId: string, items: PickerItem[], selected: Set<string>,
+    isOpen: () => boolean, toggleOpen: () => void, placeholder: string,
+  ): () => void {
+    const refresh = () => {
+      const container = document.getElementById(containerId) as HTMLDivElement | null;
+      if (!container) return;
+      const open = isOpen();
+      const selectedItems = items.filter(i => selected.has(i.value));
+      container.innerHTML = `
+        <button type="button" class="dropdown-trigger">
+          ${selectedItems.length > 0 ? `<span class="selected-tags">${selectedItems.map(i => `
+            <span class="tag"${i.color ? ` style="${labelChipStyle(i.color)}"` : ''}>${escapeHtml(i.label)}<span class="tag-remove" data-value="${escapeHtml(i.value)}">&times;</span></span>`).join('')}</span>`
+            : `<span class="dropdown-placeholder">${escapeHtml(placeholder)}</span>`}
+          <span class="dropdown-arrow">${open ? '▲' : '▼'}</span>
+        </button>
+        <div class="dropdown-list${open ? '' : ' hidden'}">
+          ${items.length === 0 ? '<span class="issue-meta">None available.</span>' : items.map(i => `
+            <button type="button" class="dropdown-item${selected.has(i.value) ? ' selected' : ''}" data-value="${escapeHtml(i.value)}">
+              <span class="checkbox">${selected.has(i.value) ? '☑' : '☐'}</span>
+              ${i.color ? `<span class="color-dot" style="background:#${i.color}"></span>` : ''}
+              ${escapeHtml(i.label)}
+            </button>`).join('')}
+        </div>`;
+      container.querySelector('.dropdown-trigger')?.addEventListener('click', () => {
+        toggleOpen();
+        refresh();
+      });
+      container.querySelectorAll<HTMLElement>('.tag-remove').forEach(el => el.addEventListener('mousedown', e => {
+        e.preventDefault();
+        selected.delete(el.dataset.value!);
+        refresh();
+      }));
+      container.querySelectorAll<HTMLElement>('.dropdown-item').forEach(el => el.addEventListener('click', () => {
+        const v = el.dataset.value!;
+        if (selected.has(v)) selected.delete(v); else selected.add(v);
+        refresh();
+      }));
+    };
+    refresh();
+    return refresh;
   }
 
   const AVATAR_COLORS = ['#e57373', '#ba68c8', '#64b5f6', '#4db6ac', '#81c784', '#ffb74d', '#a1887f', '#90a4ae'];
@@ -119,6 +190,10 @@ declare const DOMPurify: { sanitize(html: string): string };
 
   function renderCreateForm(): void {
     currentIssue = null;
+    labelOpen = false;
+    assigneeOpen = false;
+    const selectedLabels = new Set<string>();
+    const selectedAssignees = new Set<string>();
     detailEl.innerHTML = `
       <h2>New Issue</h2>
       <div class="edit-form">
@@ -126,40 +201,33 @@ declare const DOMPurify: { sanitize(html: string): string };
         <textarea id="edit-body" placeholder="Description"></textarea>
         <div class="picker-group">
           <span class="assignees-label">Labels:</span>
-          <div class="chip-picker" id="label-picker">
-            ${repoLabels.length === 0 ? '<span class="issue-meta">No labels in this repo.</span>' : repoLabels.map(l => `
-              <label class="chip-check">
-                <input type="checkbox" value="${escapeHtml(l.name)}">
-                <span class="label-chip" style="${labelChipStyle(l.color)}">${escapeHtml(l.name)}</span>
-              </label>`).join('')}
-          </div>
+          <div class="dropdown-container" id="label-picker"></div>
         </div>
         <div class="picker-group">
           <span class="assignees-label">Assignees:</span>
-          <div class="chip-picker" id="assignee-picker">
-            ${assignableUsers.length === 0 ? '<span class="issue-meta">No assignable users.</span>' : assignableUsers.map(u => `
-              <label class="chip-check">
-                <input type="checkbox" value="${escapeHtml(u.login)}">
-                ${escapeHtml(u.login)}
-              </label>`).join('')}
-          </div>
+          <div class="dropdown-container" id="assignee-picker"></div>
         </div>
         <div class="btn-row">
           <button class="btn btn-primary" id="save-btn">Create</button>
           <button class="btn btn-secondary" id="cancel-btn">Cancel</button>
         </div>
       </div>`;
+    refreshLabelPicker = renderPicker(
+      'label-picker', repoLabels.map(l => ({ value: l.name, label: l.name, color: l.color })), selectedLabels,
+      () => labelOpen, () => { labelOpen = !labelOpen; }, 'Select labels…',
+    );
+    refreshAssigneePicker = renderPicker(
+      'assignee-picker', assignableUsers.map(u => ({ value: u.login, label: u.login })), selectedAssignees,
+      () => assigneeOpen, () => { assigneeOpen = !assigneeOpen; }, 'Select assignees…',
+    );
     document.getElementById('save-btn')?.addEventListener('click', () => {
       const title = (document.getElementById('edit-title') as HTMLInputElement).value.trim();
       const body = (document.getElementById('edit-body') as HTMLTextAreaElement).value;
       if (!title) return;
-      const labels = Array.from(
-        document.querySelectorAll<HTMLInputElement>('#label-picker input:checked'),
-      ).map(el => el.value);
-      const assignees = Array.from(
-        document.querySelectorAll<HTMLInputElement>('#assignee-picker input:checked'),
-      ).map(el => el.value);
-      vscode.postMessage({ type: 'submitCreate', title, body, labels, assignees });
+      vscode.postMessage({
+        type: 'submitCreate', title, body,
+        labels: Array.from(selectedLabels), assignees: Array.from(selectedAssignees),
+      });
     });
     document.getElementById('cancel-btn')?.addEventListener('click', () =>
       vscode.postMessage({ type: 'cancelCreate' }));
@@ -184,23 +252,11 @@ declare const DOMPurify: { sanitize(html: string): string };
         <textarea id="edit-body">${escapeHtml(issue.body || '')}</textarea>
         <div class="picker-group">
           <span class="assignees-label">Labels:</span>
-          <div class="chip-picker" id="label-picker">
-            ${repoLabels.length === 0 ? '<span class="issue-meta">No labels in this repo.</span>' : repoLabels.map(l => `
-              <label class="chip-check">
-                <input type="checkbox" value="${escapeHtml(l.name)}" ${issue.labels.some(il => il.name === l.name) ? 'checked' : ''}>
-                <span class="label-chip" style="${labelChipStyle(l.color)}">${escapeHtml(l.name)}</span>
-              </label>`).join('')}
-          </div>
+          <div class="dropdown-container" id="label-picker"></div>
         </div>
         <div class="picker-group">
           <span class="assignees-label">Assignees:</span>
-          <div class="chip-picker" id="assignee-picker">
-            ${assignableUsers.length === 0 ? '<span class="issue-meta">No assignable users.</span>' : assignableUsers.map(u => `
-              <label class="chip-check">
-                <input type="checkbox" value="${escapeHtml(u.login)}" ${issue.assignees.some(a => a.login === u.login) ? 'checked' : ''}>
-                ${escapeHtml(u.login)}
-              </label>`).join('')}
-          </div>
+          <div class="dropdown-container" id="assignee-picker"></div>
         </div>
         <div class="btn-row">
           <button class="btn btn-primary" id="save-btn">Save</button>
@@ -209,10 +265,10 @@ declare const DOMPurify: { sanitize(html: string): string };
       </div>` : `
       <div class="btn-row">
         <button class="btn btn-primary" id="edit-btn">Edit</button>
-        <button class="btn btn-secondary" id="branch-btn">Branch</button>
-        <button class="btn btn-secondary" id="browser-btn">Browser ↗</button>
-        <button class="btn btn-secondary" id="copy-btn">Copy as prompt</button>
-        <button class="btn btn-danger" id="state-btn">${closed ? 'Reopen' : 'Close'}</button>
+        <button class="btn btn-ghost" id="branch-btn">Branch</button>
+        <button class="btn btn-ghost" id="browser-btn">Browser ↗</button>
+        <button class="btn btn-ghost" id="copy-btn">Copy as prompt</button>
+        <button class="btn ${closed ? 'btn-reopen' : 'btn-close'}" id="state-btn">${closed ? 'Reopen' : 'Close'}</button>
       </div>
       <div class="body-card">${issue.body ? renderMarkdown(issue.body) : '(no description)'}</div>`}
       <h3>Comments (${comments.length})</h3>
@@ -220,11 +276,15 @@ declare const DOMPurify: { sanitize(html: string): string };
         ${buildFeed(comments, timeline).map(item => item.kind === 'event' ? `
           <div class="timeline-event">${item.text} · <span class="issue-meta">${item.created_at.slice(0, 10)}</span></div>` : `
           <div class="comment">
-            <span class="comment-author">${avatar(item.comment.user)} ${escapeHtml(item.comment.user.login)}</span>
-            <span class="issue-meta">${item.comment.created_at.slice(0, 10)}</span>
-            ${viewerLogin === item.comment.user.login && editingCommentId !== item.comment.id ? `
-            <button class="btn btn-secondary comment-edit-btn" data-id="${item.comment.id}">Edit</button>
-            <button class="btn btn-danger comment-delete-btn" data-id="${item.comment.id}">Delete</button>` : ''}
+            <div class="comment-header">
+              <span class="comment-author-group">${avatar(item.comment.user)} <span class="comment-author">${escapeHtml(item.comment.user.login)}</span></span>
+              <span class="comment-actions">
+                <span class="issue-meta">${item.comment.created_at.slice(0, 10)}</span>
+                ${viewerLogin === item.comment.user.login && editingCommentId !== item.comment.id ? `
+                <button class="comment-link-btn comment-edit-btn" data-id="${item.comment.id}">Edit</button>
+                <button class="comment-link-btn danger comment-delete-btn" data-id="${item.comment.id}">Delete</button>` : ''}
+              </span>
+            </div>
             ${editingCommentId === item.comment.id ? `
             <div class="edit-form">
               <textarea class="comment-edit-input">${escapeHtml(item.comment.body)}</textarea>
@@ -241,6 +301,23 @@ declare const DOMPurify: { sanitize(html: string): string };
           <button class="btn btn-primary" id="comment-btn" disabled>Comment</button>
         </div>
       </div>`;
+    if (editing) {
+      editFormSelectedLabels = new Set(issue.labels.map(l => l.name));
+      editFormSelectedAssignees = new Set(issue.assignees.map(a => a.login));
+      refreshLabelPicker = renderPicker(
+        'label-picker', repoLabels.map(l => ({ value: l.name, label: l.name, color: l.color })), editFormSelectedLabels,
+        () => labelOpen, () => { labelOpen = !labelOpen; }, 'Select labels…',
+      );
+      refreshAssigneePicker = renderPicker(
+        'assignee-picker', assignableUsers.map(u => ({ value: u.login, label: u.login })), editFormSelectedAssignees,
+        () => assigneeOpen, () => { assigneeOpen = !assigneeOpen; }, 'Select assignees…',
+      );
+    } else {
+      refreshLabelPicker = null;
+      refreshAssigneePicker = null;
+      editFormSelectedLabels = null;
+      editFormSelectedAssignees = null;
+    }
     bindEvents(issue);
     bindAvatarFallbacks();
   }
@@ -266,12 +343,8 @@ declare const DOMPurify: { sanitize(html: string): string };
       const title = (document.getElementById('edit-title') as HTMLInputElement).value.trim();
       const body = (document.getElementById('edit-body') as HTMLTextAreaElement).value;
       if (!title) return;
-      const labels = Array.from(
-        document.querySelectorAll<HTMLInputElement>('#label-picker input:checked'),
-      ).map(el => el.value);
-      const assignees = Array.from(
-        document.querySelectorAll<HTMLInputElement>('#assignee-picker input:checked'),
-      ).map(el => el.value);
+      const labels = Array.from(editFormSelectedLabels ?? []);
+      const assignees = Array.from(editFormSelectedAssignees ?? []);
       vscode.postMessage({ type: 'saveEdit', title, body, labels, assignees });
     });
     const commentInput = document.getElementById('comment-input') as HTMLTextAreaElement;

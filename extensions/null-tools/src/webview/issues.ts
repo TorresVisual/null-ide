@@ -42,6 +42,16 @@ declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
   let selectedNumber: number | null = null;
   let viewerLogin: string | null = null;
   const selectedLabels = new Set<string>();
+  let labelDropdownOpen = false;
+  let lastRepoLabels: GithubLabel[] = [];
+
+  document.addEventListener('click', e => {
+    const target = e.target as HTMLElement;
+    if (target.closest('.dropdown-container')) return;
+    if (!labelDropdownOpen) return;
+    labelDropdownOpen = false;
+    renderLabelPicker(lastRepoLabels);
+  });
 
   function escapeHtml(s: string): string {
     const map: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
@@ -64,22 +74,41 @@ declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
   }
 
   function renderLabelPicker(labels: GithubLabel[]): void {
+    lastRepoLabels = labels;
     if (labels.length === 0) {
       labelPicker.innerHTML = '<span class="issue-meta">No labels in this repo.</span>';
       return;
     }
-    labelPicker.innerHTML = labels.map(l => `
-      <label class="chip-check">
-        <input type="checkbox" value="${escapeHtml(l.name)}" ${selectedLabels.has(l.name) ? 'checked' : ''}>
-        <span class="label-chip" style="${labelChipStyle(l.color)}">${escapeHtml(l.name)}</span>
-      </label>`).join('');
-    labelPicker.querySelectorAll<HTMLInputElement>('input').forEach(cb => {
-      cb.addEventListener('change', () => {
-        if (cb.checked) selectedLabels.add(cb.value);
-        else selectedLabels.delete(cb.value);
-        sendFilters();
-      });
+    const selected = labels.filter(l => selectedLabels.has(l.name));
+    labelPicker.innerHTML = `
+      <button type="button" class="dropdown-trigger">
+        ${selected.length > 0 ? `<span class="selected-tags">${selected.map(l => `
+          <span class="tag" style="${labelChipStyle(l.color)}">${escapeHtml(l.name)}<span class="tag-remove" data-value="${escapeHtml(l.name)}">&times;</span></span>`).join('')}</span>`
+          : '<span class="dropdown-placeholder">Filter by label…</span>'}
+        <span class="dropdown-arrow">${labelDropdownOpen ? '▲' : '▼'}</span>
+      </button>
+      <div class="dropdown-list${labelDropdownOpen ? '' : ' hidden'}">
+        ${labels.map(l => `
+          <button type="button" class="dropdown-item${selectedLabels.has(l.name) ? ' selected' : ''}" data-value="${escapeHtml(l.name)}">
+            <span class="label-chip" style="${labelChipStyle(l.color)}">${escapeHtml(l.name)}</span>
+          </button>`).join('')}
+      </div>`;
+    labelPicker.querySelector('.dropdown-trigger')?.addEventListener('click', () => {
+      labelDropdownOpen = !labelDropdownOpen;
+      renderLabelPicker(labels);
     });
+    labelPicker.querySelectorAll<HTMLElement>('.tag-remove').forEach(el => el.addEventListener('mousedown', e => {
+      e.preventDefault();
+      selectedLabels.delete(el.dataset.value!);
+      renderLabelPicker(labels);
+      sendFilters();
+    }));
+    labelPicker.querySelectorAll<HTMLElement>('.dropdown-item').forEach(el => el.addEventListener('click', () => {
+      const v = el.dataset.value!;
+      if (selectedLabels.has(v)) selectedLabels.delete(v); else selectedLabels.add(v);
+      renderLabelPicker(labels);
+      sendFilters();
+    }));
   }
 
   stateSelect.addEventListener('change', () => {

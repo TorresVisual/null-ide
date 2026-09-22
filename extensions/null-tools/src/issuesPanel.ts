@@ -168,7 +168,7 @@ export class IssuesViewProvider implements vscode.WebviewViewProvider {
     background:transparent; border:none; color:var(--vscode-foreground); cursor:pointer;
     padding:4px 6px; border-radius:3px; font-size:13px; line-height:1;
   }
-  .icon-btn:hover, .icon-btn.active { background:var(--vscode-toolbar-hoverBackground,var(--vscode-list-hoverBackground)); }
+  .icon-btn:hover, .icon-btn.active { background:var(--vscode-toolbar-hoverBackground,color-mix(in srgb, var(--vscode-foreground) 8%, transparent)); }
   .icon-btn svg { vertical-align:middle; }
   .hidden { display:none !important; }
   #search-bar, #filter-popover {
@@ -199,26 +199,48 @@ export class IssuesViewProvider implements vscode.WebviewViewProvider {
   .issue-num { color:var(--vscode-descriptionForeground); }
   .issue-title { font-weight:600; }
   .you-badge {
-    display:inline-block; margin-left:5px; padding:0 5px; border-radius:8px; font-size:10px;
+    display:inline-block; margin-left:5px; padding:0 6px; border-radius:999px; font-size:.85em;
     background:var(--vscode-badge-background); color:var(--vscode-badge-foreground);
   }
   .closes-badge {
-    display:inline-block; margin-left:5px; padding:0 5px; border-radius:8px; font-size:10px;
+    display:inline-block; margin-left:5px; padding:0 6px; border-radius:999px; font-size:.85em;
     background:var(--vscode-charts-purple,#b180d7); color:#fff;
   }
-  .issue-meta { color:var(--vscode-descriptionForeground); font-size:11px; margin-top:2px; }
-  .label-chip { display:inline-block; padding:0 5px; border-radius:8px; font-size:10px; margin-right:4px; color:#111; }
+  .issue-meta { color:var(--vscode-descriptionForeground); font-size:.9em; margin-top:2px; }
+  .label-chip { display:inline-block; padding:0 6px; border-radius:999px; font-size:.85em; margin-right:4px; color:#111; }
   .row-actions { display:flex; gap:2px; opacity:0; flex-shrink:0; }
   .issue-row:hover .row-actions { opacity:1; }
   .row-actions button {
-    background:transparent; border:none; cursor:pointer; font-size:12px; padding:2px 4px; border-radius:3px; color:inherit;
+    background:transparent; border:none; cursor:pointer; font-size:1em; padding:2px 4px; border-radius:3px; color:inherit;
   }
-  .row-actions button:hover { background:var(--vscode-toolbar-hoverBackground,rgba(128,128,128,.2)); }
-  .chip-picker { display:flex; flex-wrap:wrap; gap:6px; }
-  .chip-check { display:inline-flex; align-items:center; gap:4px; font-size:11px; cursor:pointer; }
-  .chip-check input { margin:0; }
-  button.action { background:var(--vscode-button-background); color:var(--vscode-button-foreground); border:none; padding:5px 10px; border-radius:2px; cursor:pointer; margin-right:6px; font:inherit; }
-  button.action:hover { background:var(--vscode-button-hoverBackground); }
+  .row-actions button:hover { background:var(--vscode-toolbar-hoverBackground,color-mix(in srgb, var(--vscode-foreground) 8%, transparent)); }
+  .dropdown-container { position:relative; }
+  .dropdown-trigger {
+    width:100%; min-height:26px; padding:3px 26px 3px 6px; border:1px solid var(--vscode-input-border,transparent);
+    background:var(--vscode-input-background); color:var(--vscode-input-foreground); border-radius:2px; cursor:pointer;
+    display:flex; align-items:center; text-align:left; position:relative; box-sizing:border-box; font:inherit;
+  }
+  .dropdown-trigger:hover { border-color:var(--vscode-focusBorder); }
+  .dropdown-arrow { position:absolute; right:6px; top:50%; transform:translateY(-50%); font-size:.7em; color:var(--vscode-descriptionForeground); pointer-events:none; }
+  .dropdown-placeholder { color:var(--vscode-input-placeholderForeground); font-size:.9em; }
+  .selected-tags { display:flex; flex-wrap:wrap; gap:4px; }
+  .tag { display:inline-flex; align-items:center; gap:4px; padding:2px 6px; border-radius:999px; background:var(--vscode-badge-background); color:var(--vscode-badge-foreground); font-size:.85em; }
+  .tag-remove { cursor:pointer; font-size:1.1em; line-height:1; opacity:.7; }
+  .tag-remove:hover { opacity:1; }
+  .dropdown-list {
+    position:absolute; top:100%; left:0; right:0; margin-top:2px; border:1px solid var(--vscode-input-border,transparent);
+    background:var(--vscode-dropdown-background,var(--vscode-input-background)); border-radius:2px; max-height:180px;
+    overflow-y:auto; z-index:10; box-shadow:0 4px 12px rgba(0,0,0,.3);
+  }
+  .dropdown-list.hidden { display:none; }
+  .dropdown-item {
+    width:100%; padding:5px 8px; border:none; background:transparent; color:var(--vscode-foreground); cursor:pointer;
+    display:flex; align-items:center; gap:6px; font-size:.9em; text-align:left; font:inherit;
+  }
+  .dropdown-item:hover { background:color-mix(in srgb, var(--vscode-foreground) 8%, transparent); }
+  .dropdown-item.selected { background:var(--vscode-list-activeSelectionBackground); color:var(--vscode-list-activeSelectionForeground); }
+  button.action { background:var(--vscode-button-background); color:var(--vscode-button-foreground); border:none; padding:5px 10px; border-radius:4px; cursor:pointer; margin-right:6px; font:inherit; transition:filter .15s; }
+  button.action:hover { background:var(--vscode-button-hoverBackground); filter:brightness(1.08); }
   #empty { padding:20px; color:var(--vscode-descriptionForeground); text-align:center; }
 </style></head><body>
 <div id="app">
@@ -242,7 +264,7 @@ export class IssuesViewProvider implements vscode.WebviewViewProvider {
       <button class="assignee-btn active" id="assignee-everyone">Everyone</button>
       <button class="assignee-btn" id="assignee-me">Assigned to me</button>
     </div>
-    <div id="label-picker" class="chip-picker"><span class="issue-meta">Loading labels…</span></div>
+    <div id="label-picker" class="dropdown-container"><span class="issue-meta">Loading labels…</span></div>
   </div>
   <div id="list"><div id="empty">Loading…</div></div>
 </div>
