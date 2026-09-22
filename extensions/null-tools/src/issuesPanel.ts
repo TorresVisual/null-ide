@@ -7,6 +7,7 @@ import { getGithubSession } from './github/githubAuth';
 import { IssueDetailPanel } from './issueDetailPanel';
 import { IssueFilterOptions, IssueState } from './github/types';
 import { createIssueBranch } from './github/gitBranch';
+import { formatIssueAsPrompt } from './github/promptFormat';
 
 type InboundMessage =
   | { type: 'ready' }
@@ -16,7 +17,8 @@ type InboundMessage =
   | { type: 'signIn' }
   | { type: 'refresh' }
   | { type: 'openIssueInBrowser'; number: number }
-  | { type: 'createBranchForIssue'; number: number };
+  | { type: 'createBranchForIssue'; number: number }
+  | { type: 'copyAsPromptForIssue'; number: number };
 
 export class IssuesViewProvider implements vscode.WebviewViewProvider {
   private _view?: vscode.Webview;
@@ -115,6 +117,13 @@ export class IssuesViewProvider implements vscode.WebviewViewProvider {
         const result = createIssueBranch(cwd, issue.number, issue.title);
         if (result.ok) void vscode.window.showInformationMessage(`Switched to branch ${result.branch}`);
         else void vscode.window.showErrorMessage(`Failed to create branch: ${result.message}`);
+        break;
+      }
+      case 'copyAsPromptForIssue': {
+        const issue = this._store.getByNumber(msg.number);
+        if (!issue) break;
+        await vscode.env.clipboard.writeText(formatIssueAsPrompt(issue));
+        this._view?.postMessage({ type: 'copiedIssue', number: msg.number });
         break;
       }
     }

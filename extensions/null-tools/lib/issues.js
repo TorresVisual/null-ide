@@ -93,7 +93,7 @@
           </div>
         </div>
         <div class="row-actions">
-          <button class="branch-btn" title="Create branch for this issue">🌿</button>
+          <button class="copy-btn" title="Copy as prompt">📋</button>
           <button class="browser-btn" title="Open in browser">↗</button>
         </div>
       </div>`;
@@ -107,9 +107,9 @@
                 listEl.querySelectorAll('.issue-row').forEach(r => r.classList.remove('selected'));
                 row.classList.add('selected');
             });
-            (_a = row.querySelector('.branch-btn')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', ev => {
+            (_a = row.querySelector('.copy-btn')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', ev => {
                 ev.stopPropagation();
-                vscode.postMessage({ type: 'createBranchForIssue', number });
+                vscode.postMessage({ type: 'copyAsPromptForIssue', number });
             });
             (_b = row.querySelector('.browser-btn')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', ev => {
                 ev.stopPropagation();
@@ -143,6 +143,14 @@
                     (_b = document.getElementById('signin-btn')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', () => vscode.postMessage({ type: 'signIn' }));
                 }
                 break;
+            case 'copiedIssue': {
+                const btn = listEl.querySelector(`.issue-row[data-number="${msg.number}"] .copy-btn`);
+                if (btn) {
+                    btn.textContent = '✓';
+                    setTimeout(() => { btn.textContent = '📋'; }, 1200);
+                }
+                break;
+            }
         }
     });
     vscode.postMessage({ type: 'ready' });

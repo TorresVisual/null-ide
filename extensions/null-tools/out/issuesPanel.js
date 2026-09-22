@@ -39,6 +39,7 @@ const webviewUtils_1 = require("./webviewUtils");
 const githubAuth_1 = require("./github/githubAuth");
 const issueDetailPanel_1 = require("./issueDetailPanel");
 const gitBranch_1 = require("./github/gitBranch");
+const promptFormat_1 = require("./github/promptFormat");
 class IssuesViewProvider {
     _extensionUri;
     _store;
@@ -140,6 +141,14 @@ class IssuesViewProvider {
                     void vscode.window.showInformationMessage(`Switched to branch ${result.branch}`);
                 else
                     void vscode.window.showErrorMessage(`Failed to create branch: ${result.message}`);
+                break;
+            }
+            case 'copyAsPromptForIssue': {
+                const issue = this._store.getByNumber(msg.number);
+                if (!issue)
+                    break;
+                await vscode.env.clipboard.writeText((0, promptFormat_1.formatIssueAsPrompt)(issue));
+                this._view?.postMessage({ type: 'copiedIssue', number: msg.number });
                 break;
             }
         }

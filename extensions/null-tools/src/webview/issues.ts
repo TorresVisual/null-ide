@@ -108,7 +108,7 @@ declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
           </div>
         </div>
         <div class="row-actions">
-          <button class="branch-btn" title="Create branch for this issue">🌿</button>
+          <button class="copy-btn" title="Copy as prompt">📋</button>
           <button class="browser-btn" title="Open in browser">↗</button>
         </div>
       </div>`;
@@ -121,9 +121,9 @@ declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
         listEl.querySelectorAll('.issue-row').forEach(r => r.classList.remove('selected'));
         row.classList.add('selected');
       });
-      row.querySelector('.branch-btn')?.addEventListener('click', ev => {
+      row.querySelector('.copy-btn')?.addEventListener('click', ev => {
         ev.stopPropagation();
-        vscode.postMessage({ type: 'createBranchForIssue', number });
+        vscode.postMessage({ type: 'copyAsPromptForIssue', number });
       });
       row.querySelector('.browser-btn')?.addEventListener('click', ev => {
         ev.stopPropagation();
@@ -158,6 +158,14 @@ declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
             vscode.postMessage({ type: 'signIn' }));
         }
         break;
+      case 'copiedIssue': {
+        const btn = listEl.querySelector<HTMLButtonElement>(`.issue-row[data-number="${msg.number}"] .copy-btn`);
+        if (btn) {
+          btn.textContent = '✓';
+          setTimeout(() => { btn.textContent = '📋'; }, 1200);
+        }
+        break;
+      }
     }
   });
 
