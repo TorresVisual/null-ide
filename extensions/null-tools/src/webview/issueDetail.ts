@@ -30,6 +30,12 @@ declare const DOMPurify: { sanitize(html: string): string };
     return s.replace(/[&<>"']/g, c => map[c]);
   }
 
+  function labelChipStyle(hex: string): string {
+    const r = parseInt(hex.slice(0, 2), 16), g = parseInt(hex.slice(2, 4), 16), b = parseInt(hex.slice(4, 6), 16);
+    const luminance = (r * 299 + g * 587 + b * 114) / 1000;
+    return `background:#${hex};color:${luminance > 128 ? '#111' : '#fff'}`;
+  }
+
   function renderMarkdown(text: string): string {
     return DOMPurify.sanitize(marked.parse(text));
   }
@@ -63,7 +69,7 @@ declare const DOMPurify: { sanitize(html: string): string };
     detailEl.innerHTML = `
       <h2><span class="state-badge${closed ? ' closed' : ''}">${issue.state}</span>${issue.closedLocally ? '<span class="closes-badge" title="An unpushed local commit will close this issue">closes on push</span>' : ''} #${issue.number} ${editing ? '' : escapeHtml(issue.title)}</h2>
       <div class="meta-row">
-        ${issue.labels.map(l => `<span class="label-chip" style="background:#${l.color}">${escapeHtml(l.name)}</span>`).join('')}
+        ${issue.labels.map(l => `<span class="label-chip" style="${labelChipStyle(l.color)}">${escapeHtml(l.name)}</span>`).join('')}
         ${avatar(issue.user)} opened by ${escapeHtml(issue.user.login)} · ${issue.comments} comments · updated ${issue.updated_at.slice(0, 10)}
       </div>
       ${issue.assignees.length > 0 ? `
@@ -81,7 +87,7 @@ declare const DOMPurify: { sanitize(html: string): string };
             ${repoLabels.length === 0 ? '<span class="issue-meta">No labels in this repo.</span>' : repoLabels.map(l => `
               <label class="chip-check">
                 <input type="checkbox" value="${escapeHtml(l.name)}" ${issue.labels.some(il => il.name === l.name) ? 'checked' : ''}>
-                <span class="label-chip" style="background:#${l.color}">${escapeHtml(l.name)}</span>
+                <span class="label-chip" style="${labelChipStyle(l.color)}">${escapeHtml(l.name)}</span>
               </label>`).join('')}
           </div>
         </div>

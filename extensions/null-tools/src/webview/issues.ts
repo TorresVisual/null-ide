@@ -46,6 +46,12 @@ declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
     return s.replace(/[&<>"']/g, c => map[c]);
   }
 
+  function labelChipStyle(hex: string): string {
+    const r = parseInt(hex.slice(0, 2), 16), g = parseInt(hex.slice(2, 4), 16), b = parseInt(hex.slice(4, 6), 16);
+    const luminance = (r * 299 + g * 587 + b * 114) / 1000;
+    return `background:#${hex};color:${luminance > 128 ? '#111' : '#fff'}`;
+  }
+
   function sendFilters(): void {
     vscode.postMessage({
       type: 'setFilters',
@@ -63,7 +69,7 @@ declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
     labelPicker.innerHTML = labels.map(l => `
       <label class="chip-check">
         <input type="checkbox" value="${escapeHtml(l.name)}" ${selectedLabels.has(l.name) ? 'checked' : ''}>
-        <span class="label-chip" style="background:#${l.color}">${escapeHtml(l.name)}</span>
+        <span class="label-chip" style="${labelChipStyle(l.color)}">${escapeHtml(l.name)}</span>
       </label>`).join('');
     labelPicker.querySelectorAll<HTMLInputElement>('input').forEach(cb => {
       cb.addEventListener('change', () => {
@@ -104,7 +110,7 @@ declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
         <div class="issue-main">
           <div><span class="issue-num">#${issue.number}</span> <span class="issue-title">${escapeHtml(issue.title)}</span>${you ? '<span class="you-badge">@you</span>' : ''}${issue.closedLocally ? '<span class="closes-badge" title="An unpushed local commit will close this issue">closes on push</span>' : ''}</div>
           <div class="issue-meta">
-            ${issue.labels.map(l => `<span class="label-chip" style="background:#${l.color}">${escapeHtml(l.name)}</span>`).join('')}
+            ${issue.labels.map(l => `<span class="label-chip" style="${labelChipStyle(l.color)}">${escapeHtml(l.name)}</span>`).join('')}
             ${issue.comments} comments · updated ${issue.updated_at.slice(0, 10)}
           </div>
         </div>
