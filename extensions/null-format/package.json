@@ -1,0 +1,116 @@
+{
+  "name": "null-format",
+  "displayName": "Null Formatter",
+  "description": "In-box code formatting with Prettier, rustfmt, and clang-format for Null IDE",
+  "version": "1.0.0",
+  "publisher": "null",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onLanguage:javascript",
+    "onLanguage:javascriptreact",
+    "onLanguage:typescript",
+    "onLanguage:typescriptreact",
+    "onLanguage:json",
+    "onLanguage:jsonc",
+    "onLanguage:css",
+    "onLanguage:scss",
+    "onLanguage:less",
+    "onLanguage:html",
+    "onLanguage:yaml",
+    "onLanguage:markdown",
+    "onLanguage:rust",
+    "onLanguage:c",
+    "onLanguage:cpp",
+    "onLanguage:cuda-cpp",
+    "onLanguage:objective-c",
+    "onLanguage:objective-cpp"
+  ],
+  "scripts": {
+    "compile": "tsc -p tsconfig.json",
+    "test": "tsc -p tsconfig.json && node --test out/diffUtils.test.js out/configResolver.test.js out/toolchainDiscovery.test.js out/prettier.test.js"
+  },
+  "dependencies": {
+    "prettier": "^3.5.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.8.0"
+  },
+  "contributes": {
+    "configuration": {
+      "title": "Null Formatter",
+      "properties": {
+        "null-format.prettier.enable": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable Prettier formatting for JS, TS, JSON, CSS, HTML, YAML, and Markdown."
+        },
+        "null-format.prettier.configPath": {
+          "type": "string",
+          "default": "",
+          "description": "Optional path to a Prettier config file. If empty and no project config is found, 'null-format.prettier.defaultConfig' is used."
+        },
+        "null-format.prettier.defaultConfig": {
+          "type": "object",
+          "default": {
+            "semi": true,
+            "singleQuote": false,
+            "tabWidth": 2,
+            "useTabs": false,
+            "trailingComma": "all",
+            "printWidth": 100,
+            "bracketSpacing": true,
+            "arrowParens": "always",
+            "endOfLine": "lf"
+          },
+          "description": "Default Prettier configuration applied when no workspace config file (.prettierrc, package.json) or custom configPath is found."
+        },
+        "null-format.clangFormat.enable": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable clang-format for C, C++, and CUDA."
+        },
+        "null-format.clangFormat.path": {
+          "type": "string",
+          "default": "",
+          "description": "Optional path to the clang-format executable. If empty, clang-format is auto-detected from bundled binaries, LLVM, Visual Studio, or PATH."
+        },
+        "null-format.clangFormat.configPath": {
+          "type": "string",
+          "default": "",
+          "description": "Optional path to a .clang-format file. If empty and no workspace .clang-format is found, 'null-format.clangFormat.defaultConfig' is used."
+        },
+        "null-format.clangFormat.defaultConfig": {
+          "type": "string",
+          "default": "BasedOnStyle: LLVM\nIndentWidth: 4\nTabWidth: 4\nUseTab: Never\nColumnLimit: 100\nAccessModifierOffset: -4\nAllowShortFunctionsOnASingleLine: Inline\nBreakBeforeBraces: Attach\nStandard: Latest",
+          "description": "Default clang-format configuration (in YAML or style string format) applied when no workspace .clang-format is found."
+        },
+        "null-format.rustfmt.enable": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable rustfmt for Rust."
+        },
+        "null-format.rustfmt.path": {
+          "type": "string",
+          "default": "",
+          "description": "Optional path to the rustfmt executable. If empty, rustfmt is auto-detected from bundled binaries, Cargo (~/.cargo/bin), or PATH."
+        },
+        "null-format.rustfmt.configPath": {
+          "type": "string",
+          "default": "",
+          "description": "Optional path to a rustfmt.toml file. If empty and no workspace rustfmt.toml is found, 'null-format.rustfmt.defaultConfig' is used."
+        },
+        "null-format.rustfmt.defaultConfig": {
+          "type": "string",
+          "default": "edition = \"2021\"\nmax_width = 100\ntab_spaces = 4\nnewline_style = \"Unix\"\nuse_small_heuristics = \"Default\"",
+          "description": "Default rustfmt configuration (in TOML format) applied when no workspace rustfmt.toml is found."
+        }
+      }
+    }
+  }
+}

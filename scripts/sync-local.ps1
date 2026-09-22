@@ -251,6 +251,17 @@ $Extensions = [ordered]@{
         )
     }
 
+    "null-format" = @{
+        Compile       = $true
+        CompileScript = "compile"
+        Copy          = @(
+            "package.json",
+            "out",
+            "defaults",
+            "node_modules"
+        )
+    }
+
     "wooting-analog" = @{
         Compile       = $true
         CompileScript = "build"

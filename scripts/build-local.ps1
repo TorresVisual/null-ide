@@ -346,7 +346,7 @@ Invoke-Native "merge-json.js" {
 Write-Step "Installing null-markdown dependencies"
 Invoke-Native "npm ci (null-markdown)" { npm ci --prefix (Join-Path $RepoRoot "extensions/null-markdown") }
 
-foreach ($ext in @("null-tools", "null-cpp", "null-actions")) {
+foreach ($ext in @("null-tools", "null-cpp", "null-actions", "null-format")) {
     Write-Step "Compiling $ext"
     Push-Location (Join-Path $RepoRoot "extensions/$ext")
     try {
@@ -382,7 +382,7 @@ finally {
 # ============================================================
 
 Write-Step "Copying built-in extensions"
-foreach ($ext in @("null-theme", "null-tools", "null-icons", "null-markdown", "wooting-analog", "null-cpp", "null-actions")) {
+foreach ($ext in @("null-theme", "null-tools", "null-icons", "null-markdown", "wooting-analog", "null-cpp", "null-actions", "null-format")) {
     Copy-Item -Recurse -Force (Join-Path $RepoRoot "extensions/$ext") (Join-Path $VscodeSrc "extensions/")
 }
 

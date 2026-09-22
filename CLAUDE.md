@@ -9,8 +9,8 @@ This file provides guidance to Claude Code when working with code in this reposi
 Key characteristics:
 - Binary name: `null.exe` — accessible from the terminal as `null .`
 - Built on VSCodium, which strips Microsoft telemetry from VS Code
-- Seven built-in extensions bundled at build time: `null-theme`, `null-icons`, `null-tools`, `null-markdown`, `null-cpp`, `wooting-analog`, `null-actions`
-- **Code Spell Checker** (`streetsidesoftware.code-spell-checker`) bundled as an eighth built-in extension; version pinned via `CSPELL_TAG` env var in `build.yml`
+- Eight built-in extensions bundled at build time: `null-theme`, `null-icons`, `null-tools`, `null-markdown`, `null-cpp`, `wooting-analog`, `null-actions`, `null-format`
+- **Code Spell Checker** (`streetsidesoftware.code-spell-checker`) bundled as a ninth built-in extension; version pinned via `CSPELL_TAG` env var in `build.yml`
 - CI builds on `windows-2022`; the developer authors source changes locally
 - Releases publish a portable ZIP and an Inno Setup installer to GitHub Releases
 - The in-app updater (`null-tools`) checks GitHub Releases on startup and can self-update
@@ -25,6 +25,7 @@ Key characteristics:
 │   ├── null-icons/            # Built-in file icon theme (null-icons)
 │   ├── null-theme/            # Built-in color theme (Null Dark)
 │   ├── null-markdown/         # Enhanced markdown preview (GFM, Mermaid, KaTeX, GitHub Alerts)
+│   ├── null-format/           # Built-in code formatter (Prettier in-process, rustfmt, clang-format)
 │   ├── null-tools/             # Built-in productivity extension
 │   │   ├── src/                # TypeScript source (extension.ts, ollama.ts, claudeHistory.ts)
 │   │   ├── out/                # Compiled JS output (extension.js — built during CI)
@@ -87,21 +88,22 @@ The entire build runs in GitHub Actions on a `windows-2022` runner — do **not*
 6. Compile `null-tools` TypeScript (`npm ci && npm run compile` in `extensions/null-tools/`).
 7. Compile `null-cpp` TypeScript (`npm ci && npm run compile` in `extensions/null-cpp/`).
 8. Compile `null-actions` TypeScript (`npm ci && npm run compile` in `extensions/null-actions/`).
-9. Build `wooting-analog`'s native Rust addon (`napi build --platform --release` in `extensions/wooting-analog/native/`), then compile its TypeScript.
-10. Copy all seven built-in extensions (`null-theme`, `null-icons`, `null-tools`, `null-markdown`, `null-cpp`, `null-actions`, `wooting-analog`) into `vscode-src/extensions/`.
-11. Replace upstream icons with files from `icons/`.
-12. Copy `workbench/custom.css` → `null-custom.css` and `workbench/splash.js` → `null-splash.js` into the source tree.
-13. Inject `<link>` and `<script>` tags into `workbench.html` pointing at those files.
-14. `npm ci && npx gulp vscode-win32-x64` produces `VSCode-win32-x64/`.
-15. Bundle `node-pty` from `vscode-src/node_modules/node-pty` into the built `null-tools` output (bypasses VS Code native module checks).
-16. Build Win11 shell extension: fetch WIL headers, compile DLL with CMake + MSVC, pack and sign sparse APPX (`null-shell-ext.appx`).
-17. Stamp version, commit hash, and server URL into the build output's `product.json`.
-18. Replace letterpress SVGs in the build output with the null-symbol versions.
-19. Run `rcedit` to stamp the custom icon into `null.exe`.
-20. Bundle `install-null-ide.ps1` and `update-null-ide.ps1` into `resources/app/null-updater/`.
-21. `Compress-Archive` → `null-ide-win32-x64.zip`.
-22. Inno Setup → `NullIDESetup-<version>.exe`.
-23. Both artifacts are uploaded to the GitHub Release (tag builds) and as workflow artifacts.
+9. Compile `null-format` TypeScript (`npm ci && npm run compile` in `extensions/null-format/`).
+10. Build `wooting-analog`'s native Rust addon (`napi build --platform --release` in `extensions/wooting-analog/native/`), then compile its TypeScript.
+11. Copy all eight built-in extensions (`null-theme`, `null-icons`, `null-tools`, `null-markdown`, `null-cpp`, `null-actions`, `null-format`, `wooting-analog`) into `vscode-src/extensions/`.
+12. Replace upstream icons with files from `icons/`.
+13. Copy `workbench/custom.css` → `null-custom.css` and `workbench/splash.js` → `null-splash.js` into the source tree.
+14. Inject `<link>` and `<script>` tags into `workbench.html` pointing at those files.
+15. `npm ci && npx gulp vscode-win32-x64` produces `VSCode-win32-x64/`.
+16. Bundle `node-pty` from `vscode-src/node_modules/node-pty` into the built `null-tools` output (bypasses VS Code native module checks).
+17. Build Win11 shell extension: fetch WIL headers, compile DLL with CMake + MSVC, pack and sign sparse APPX (`null-shell-ext.appx`).
+18. Stamp version, commit hash, and server URL into the build output's `product.json`.
+19. Replace letterpress SVGs in the build output with the null-symbol versions.
+20. Run `rcedit` to stamp the custom icon into `null.exe`.
+21. Bundle `install-null-ide.ps1` and `update-null-ide.ps1` into `resources/app/null-updater/`.
+22. `Compress-Archive` → `null-ide-win32-x64.zip`.
+23. Inno Setup → `NullIDESetup-<version>.exe`.
+24. Both artifacts are uploaded to the GitHub Release (tag builds) and as workflow artifacts.
 
 ## Built-in Extensions
 
@@ -125,6 +127,13 @@ Enhanced markdown preview activated on `onLanguage:markdown`. Provides:
 - GitHub-style alert blocks (`> [!NOTE]`, `> [!WARNING]`, etc.)
 
 Keybindings: `Ctrl+Shift+V` and `Ctrl+K V` open the preview (same as VS Code default).
+
+### null-format (`extensions/null-format/`)
+In-box code formatting provider for JS/TS/web, Rust, and C/C++. Activated per language.
+- **Prettier (in-process)**: Formats JavaScript, TypeScript, JSX, TSX, JSON, JSONC, CSS, SCSS, Less, HTML, YAML, and Markdown.
+- **rustfmt**: Formats Rust source files (`rustfmt --emit stdout`).
+- **clang-format**: Formats C, C++, and CUDA source files.
+- **Editable Default Configs**: Exposes editable fallback configurations directly in settings (`null-format.prettier.defaultConfig`, `null-format.rustfmt.defaultConfig`, `null-format.clangFormat.defaultConfig`). If a project contains its own configuration file (`.prettierrc`, `rustfmt.toml`, `.clang-format`), project-level config takes precedence automatically.
 
 ### null-tools (`extensions/null-tools/`)
 Written in TypeScript (`src/`), compiled to `out/` during CI. Activated on `onStartupFinished`. Provides:

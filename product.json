@@ -96,6 +96,39 @@
 		"markdown.preview.scrollPreviewWithEditor": true,
 		"markdown.preview.scrollEditorWithPreview": false,
 		"cSpell.showStatus": true,
-		"C_Cpp.intelliSenseEngine": "disabled"
+		"C_Cpp.intelliSenseEngine": "disabled",
+		"[javascript]": {
+			"editor.defaultFormatter": "null.null-format"
+		},
+		"[javascriptreact]": {
+			"editor.defaultFormatter": "null.null-format"
+		},
+		"[typescript]": {
+			"editor.defaultFormatter": "null.null-format"
+		},
+		"[typescriptreact]": {
+			"editor.defaultFormatter": "null.null-format"
+		},
+		"[json]": {
+			"editor.defaultFormatter": "null.null-format"
+		},
+		"[jsonc]": {
+			"editor.defaultFormatter": "null.null-format"
+		},
+		"[html]": {
+			"editor.defaultFormatter": "null.null-format"
+		},
+		"[css]": {
+			"editor.defaultFormatter": "null.null-format"
+		},
+		"[rust]": {
+			"editor.defaultFormatter": "null.null-format"
+		},
+		"[cpp]": {
+			"editor.defaultFormatter": "null.null-format"
+		},
+		"[c]": {
+			"editor.defaultFormatter": "null.null-format"
+		}
 	}
 }
