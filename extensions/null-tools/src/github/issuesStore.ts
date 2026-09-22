@@ -4,10 +4,13 @@ import { getWorkspaceGithubRepo } from './githubRemote';
 import { getGithubSession } from './githubAuth';
 import {
   createComment, deleteComment, fetchAssignableUsers, fetchComments, fetchIssues, fetchRepoLabels,
-  updateComment, updateIssue,
+  fetchTimeline, updateComment, updateIssue,
 } from './githubApi';
 import { filterIssues } from './issueFilter';
-import { GithubComment, GithubIssue, GithubLabel, GithubRepoRef, GithubUser, IssueFilterOptions, IssueState } from './types';
+import {
+  GithubComment, GithubIssue, GithubLabel, GithubRepoRef, GithubTimelineEvent, GithubUser, IssueFilterOptions,
+  IssueState,
+} from './types';
 
 export type IssuesResult =
   | { status: 'no-workspace' }
@@ -79,6 +82,11 @@ export class IssuesStore {
   getComments(issueNumber: number): Promise<GithubComment[]> {
     if (!this.repo) return Promise.resolve([]);
     return fetchComments(this.repo.owner, this.repo.repo, issueNumber, this.token);
+  }
+
+  getTimeline(issueNumber: number): Promise<GithubTimelineEvent[]> {
+    if (!this.repo) return Promise.resolve([]);
+    return fetchTimeline(this.repo.owner, this.repo.repo, issueNumber, this.token);
   }
 
   async updateIssue(

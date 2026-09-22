@@ -8,6 +8,11 @@ interface GithubIssue {
   closedLocally?: boolean;
 }
 interface GithubComment { id: number; user: GithubUser; body: string; created_at: string; }
+interface GithubTimelineEvent {
+  event: string; actor: GithubUser | null; created_at: string; commit_id?: string | null;
+  label?: { name: string; color: string }; assignee?: GithubUser; rename?: { from: string; to: string };
+  source?: { issue?: { number: number; title: string; html_url: string } };
+}
 
 declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
 declare const marked: { parse(src: string): string };
@@ -20,6 +25,7 @@ declare const DOMPurify: { sanitize(html: string): string };
   let editing = false;
   let currentIssue: GithubIssue | null = null;
   let lastComments: GithubComment[] = [];
+  let lastTimeline: GithubTimelineEvent[] = [];
   let repoLabels: GithubLabel[] = [];
   let assignableUsers: GithubUser[] = [];
   let viewerLogin: string | null = null;
@@ -57,14 +63,61 @@ declare const DOMPurify: { sanitize(html: string): string };
       img.addEventListener('error', () => { img.style.display = 'none'; }, { once: true }));
   }
 
-  function renderDetail(issue: GithubIssue, comments: GithubComment[]): void {
+  function shortSha(sha: string): string {
+    return sha.slice(0, 7);
+  }
+
+  function timelineEventText(ev: GithubTimelineEvent): string | null {
+    const actorName = ev.actor ? escapeHtml(ev.actor.login) : 'someone';
+    switch (ev.event) {
+      case 'closed':
+        return `${actorName} closed this${ev.commit_id ? ` via commit <code>${shortSha(ev.commit_id)}</code>` : ''}`;
+      case 'reopened':
+        return `${actorName} reopened this`;
+      case 'labeled':
+        return ev.label
+          ? `${actorName} added the <span class="label-chip" style="${labelChipStyle(ev.label.color)}">${escapeHtml(ev.label.name)}</span> label` : null;
+      case 'unlabeled':
+        return ev.label
+          ? `${actorName} removed the <span class="label-chip" style="${labelChipStyle(ev.label.color)}">${escapeHtml(ev.label.name)}</span> label` : null;
+      case 'assigned':
+        return ev.assignee ? `${actorName} assigned ${escapeHtml(ev.assignee.login)}` : null;
+      case 'unassigned':
+        return ev.assignee ? `${actorName} unassigned ${escapeHtml(ev.assignee.login)}` : null;
+      case 'renamed':
+        return ev.rename
+          ? `${actorName} changed the title from "${escapeHtml(ev.rename.from)}" to "${escapeHtml(ev.rename.to)}"` : null;
+      case 'cross-referenced':
+        return ev.source?.issue
+          ? `${actorName} referenced this in <a href="${escapeHtml(ev.source.issue.html_url)}">#${ev.source.issue.number}</a>` : null;
+      case 'referenced':
+        return ev.commit_id ? `${actorName} referenced this in commit <code>${shortSha(ev.commit_id)}</code>` : null;
+      default:
+        return null;
+    }
+  }
+
+  type FeedItem =
+    | { kind: 'comment'; created_at: string; comment: GithubComment }
+    | { kind: 'event'; created_at: string; text: string };
+
+  function buildFeed(comments: GithubComment[], timeline: GithubTimelineEvent[]): FeedItem[] {
+    const items: FeedItem[] = comments.map(c => ({ kind: 'comment', created_at: c.created_at, comment: c }));
+    for (const ev of timeline) {
+      const text = timelineEventText(ev);
+      if (text) items.push({ kind: 'event', created_at: ev.created_at, text });
+    }
+    return items.sort((a, b) => a.created_at.localeCompare(b.created_at));
+  }
+
+  function renderDetail(issue: GithubIssue, comments: GithubComment[], timeline: GithubTimelineEvent[]): void {
     currentIssue = issue;
     editing = false;
     editingCommentId = null;
-    render(issue, comments);
+    render(issue, comments, timeline);
   }
 
-  function render(issue: GithubIssue, comments: GithubComment[]): void {
+  function render(issue: GithubIssue, comments: GithubComment[], timeline: GithubTimelineEvent[]): void {
     const closed = issue.state === 'closed';
     detailEl.innerHTML = `
       <h2><span class="state-badge${closed ? ' closed' : ''}">${issue.state}</span>${issue.closedLocally ? '<span class="closes-badge" title="An unpushed local commit will close this issue">closes on push</span>' : ''} #${issue.number} ${editing ? '' : escapeHtml(issue.title)}</h2>
@@ -116,21 +169,22 @@ declare const DOMPurify: { sanitize(html: string): string };
       <div class="body-card">${issue.body ? renderMarkdown(issue.body) : '(no description)'}</div>`}
       <h3>Comments (${comments.length})</h3>
       <div id="comments">
-        ${comments.map(c => `
+        ${buildFeed(comments, timeline).map(item => item.kind === 'event' ? `
+          <div class="timeline-event">${item.text} · <span class="issue-meta">${item.created_at.slice(0, 10)}</span></div>` : `
           <div class="comment">
-            <span class="comment-author">${avatar(c.user)} ${escapeHtml(c.user.login)}</span>
-            <span class="issue-meta">${c.created_at.slice(0, 10)}</span>
-            ${viewerLogin === c.user.login && editingCommentId !== c.id ? `
-            <button class="btn btn-secondary comment-edit-btn" data-id="${c.id}">Edit</button>
-            <button class="btn btn-danger comment-delete-btn" data-id="${c.id}">Delete</button>` : ''}
-            ${editingCommentId === c.id ? `
+            <span class="comment-author">${avatar(item.comment.user)} ${escapeHtml(item.comment.user.login)}</span>
+            <span class="issue-meta">${item.comment.created_at.slice(0, 10)}</span>
+            ${viewerLogin === item.comment.user.login && editingCommentId !== item.comment.id ? `
+            <button class="btn btn-secondary comment-edit-btn" data-id="${item.comment.id}">Edit</button>
+            <button class="btn btn-danger comment-delete-btn" data-id="${item.comment.id}">Delete</button>` : ''}
+            ${editingCommentId === item.comment.id ? `
             <div class="edit-form">
-              <textarea class="comment-edit-input">${escapeHtml(c.body)}</textarea>
+              <textarea class="comment-edit-input">${escapeHtml(item.comment.body)}</textarea>
               <div class="btn-row">
-                <button class="btn btn-primary comment-save-btn" data-id="${c.id}">Save</button>
-                <button class="btn btn-secondary comment-cancel-btn" data-id="${c.id}">Cancel</button>
+                <button class="btn btn-primary comment-save-btn" data-id="${item.comment.id}">Save</button>
+                <button class="btn btn-secondary comment-cancel-btn" data-id="${item.comment.id}">Cancel</button>
               </div>
-            </div>` : `<div class="comment-body">${renderMarkdown(c.body)}</div>`}
+            </div>` : `<div class="comment-body">${renderMarkdown(item.comment.body)}</div>`}
           </div>`).join('') || '<div class="issue-meta">No comments yet.</div>'}
       </div>
       <div id="composer">
@@ -154,11 +208,11 @@ declare const DOMPurify: { sanitize(html: string): string };
       vscode.postMessage({ type: 'setState', state: issue.state === 'closed' ? 'open' : 'closed' }));
     document.getElementById('edit-btn')?.addEventListener('click', () => {
       editing = true;
-      if (currentIssue) render(currentIssue, lastComments);
+      if (currentIssue) render(currentIssue, lastComments, lastTimeline);
     });
     document.getElementById('cancel-btn')?.addEventListener('click', () => {
       editing = false;
-      if (currentIssue) render(currentIssue, lastComments);
+      if (currentIssue) render(currentIssue, lastComments, lastTimeline);
     });
     document.getElementById('save-btn')?.addEventListener('click', () => {
       const title = (document.getElementById('edit-title') as HTMLInputElement).value.trim();
@@ -188,10 +242,10 @@ declare const DOMPurify: { sanitize(html: string): string };
       const id = Number(target.dataset.id);
       if (target.classList.contains('comment-edit-btn')) {
         editingCommentId = id;
-        if (currentIssue) render(currentIssue, lastComments);
+        if (currentIssue) render(currentIssue, lastComments, lastTimeline);
       } else if (target.classList.contains('comment-cancel-btn')) {
         editingCommentId = null;
-        if (currentIssue) render(currentIssue, lastComments);
+        if (currentIssue) render(currentIssue, lastComments, lastTimeline);
       } else if (target.classList.contains('comment-save-btn')) {
         const textarea = target.closest('.comment')?.querySelector('.comment-edit-input') as HTMLTextAreaElement;
         const body = textarea.value.trim();
@@ -208,10 +262,11 @@ declare const DOMPurify: { sanitize(html: string): string };
     switch (msg.type) {
       case 'issueDetail':
         lastComments = msg.comments;
+        lastTimeline = msg.timeline;
         repoLabels = msg.repoLabels;
         assignableUsers = msg.assignableUsers;
         viewerLogin = msg.viewerLogin;
-        renderDetail(msg.issue, msg.comments);
+        renderDetail(msg.issue, msg.comments, msg.timeline);
         break;
       case 'copied': {
         const btn = detailEl.querySelector('#copy-btn');

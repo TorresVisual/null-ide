@@ -1,7 +1,7 @@
 'use strict';
 
 import * as https from 'https';
-import { GithubComment, GithubIssue, GithubLabel, GithubUser, IssueState } from './types';
+import { GithubComment, GithubIssue, GithubLabel, GithubTimelineEvent, GithubUser, IssueState } from './types';
 import { stripPullRequests } from './issueFilter';
 
 function requestJson<T>(
@@ -55,6 +55,14 @@ export function fetchComments(
 ): Promise<GithubComment[]> {
   return requestJson<GithubComment[]>(
     `/repos/${owner}/${repo}/issues/${issueNumber}/comments?per_page=100`, token,
+  );
+}
+
+export function fetchTimeline(
+  owner: string, repo: string, issueNumber: number, token: string | null,
+): Promise<GithubTimelineEvent[]> {
+  return requestJson<GithubTimelineEvent[]>(
+    `/repos/${owner}/${repo}/issues/${issueNumber}/timeline?per_page=100`, token,
   );
 }
 

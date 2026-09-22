@@ -64,8 +64,9 @@ export class IssueDetailPanel {
   private async _sendDetail(): Promise<void> {
     const issue = this.store.getByNumber(this.issueNumber);
     if (!issue) return;
-    const [comments, repoLabels, assignableUsers] = await Promise.all([
+    const [comments, timeline, repoLabels, assignableUsers] = await Promise.all([
       this.store.getComments(this.issueNumber),
+      this.store.getTimeline(this.issueNumber),
       this.store.getRepoLabels(),
       this.store.getAssignableUsers(),
     ]);
@@ -74,7 +75,7 @@ export class IssueDetailPanel {
     this.panel.webview.postMessage({
       type: 'issueDetail',
       issue: closedLocally ? { ...issue, closedLocally } : issue,
-      comments, repoLabels, assignableUsers,
+      comments, timeline, repoLabels, assignableUsers,
       viewerLogin: this.store.getViewerLogin(),
     });
   }
@@ -247,6 +248,8 @@ export class IssueDetailPanel {
   .chip-check input { margin:0; }
   h3 { font-size:13px; margin:22px 0 8px; }
   .comment { border-top:1px solid var(--vscode-widget-border,rgba(128,128,128,.2)); padding:10px 0; }
+  .timeline-event { color:var(--vscode-descriptionForeground); font-size:12px; padding:6px 0; }
+  .timeline-event code { background:var(--vscode-textCodeBlock-background,rgba(128,128,128,.08)); padding:1px 4px; border-radius:3px; }
   .comment-author { color:var(--vscode-textLink-foreground); font-weight:600; }
   #composer { margin-top:10px; }
   #comment-input {

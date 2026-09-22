@@ -40,6 +40,18 @@ export interface GithubComment {
   created_at: string;
 }
 
+/** A GitHub issue timeline event (labeled, closed-via-commit, cross-referenced, etc). Fields vary by `event`. */
+export interface GithubTimelineEvent {
+  event: string;
+  actor: GithubUser | null;
+  created_at: string;
+  commit_id?: string | null;
+  label?: { name: string; color: string };
+  assignee?: GithubUser;
+  rename?: { from: string; to: string };
+  source?: { issue?: { number: number; title: string; html_url: string; repository?: { full_name: string } } };
+}
+
 export interface IssueFilterOptions {
   labels: string[];
   assignee: 'me' | 'everyone';
