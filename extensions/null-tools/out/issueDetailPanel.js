@@ -88,6 +88,7 @@ class IssueDetailPanel {
             type: 'issueDetail',
             issue: closedLocally ? { ...issue, closedLocally } : issue,
             comments, repoLabels, assignableUsers,
+            viewerLogin: this.store.getViewerLogin(),
         });
     }
     async _handleMessage(msg) {
@@ -150,6 +151,26 @@ class IssueDetailPanel {
                 }
                 catch (err) {
                     void vscode.window.showErrorMessage(`Failed to post comment: ${err.message}`);
+                }
+                break;
+            }
+            case 'editComment': {
+                try {
+                    await this.store.updateComment(msg.commentId, msg.body);
+                    await this._sendDetail();
+                }
+                catch (err) {
+                    void vscode.window.showErrorMessage(`Failed to update comment: ${err.message}`);
+                }
+                break;
+            }
+            case 'deleteComment': {
+                try {
+                    await this.store.deleteComment(this.issueNumber, msg.commentId);
+                    await this._sendDetail();
+                }
+                catch (err) {
+                    void vscode.window.showErrorMessage(`Failed to delete comment: ${err.message}`);
                 }
                 break;
             }

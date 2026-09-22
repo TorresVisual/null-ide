@@ -11,6 +11,7 @@ class IssuesStore {
     token = null;
     repoLabels = null;
     assignableUsers = null;
+    viewerLogin = null;
     async refresh(cwd, state) {
         if (!cwd)
             return { status: 'no-workspace' };
@@ -29,6 +30,7 @@ class IssuesStore {
             this.issues = issues;
             this.repo = repo;
             this.token = session.accessToken;
+            this.viewerLogin = session.account.label;
             return { status: 'ok', repo, issues, viewerLogin: session.account.label };
         }
         catch (err) {
@@ -56,6 +58,9 @@ class IssuesStore {
     getByNumber(number) {
         return this.issues.find(issue => issue.number === number);
     }
+    getViewerLogin() {
+        return this.viewerLogin;
+    }
     getComments(issueNumber) {
         if (!this.repo)
             return Promise.resolve([]);
@@ -74,6 +79,17 @@ class IssuesStore {
         const comment = await (0, githubApi_1.createComment)(this.repo.owner, this.repo.repo, issueNumber, body, this.token);
         this.issues = this.issues.map(issue => issue.number === issueNumber ? { ...issue, comments: issue.comments + 1 } : issue);
         return comment;
+    }
+    async updateComment(commentId, body) {
+        if (!this.repo)
+            return null;
+        return (0, githubApi_1.updateComment)(this.repo.owner, this.repo.repo, commentId, body, this.token);
+    }
+    async deleteComment(issueNumber, commentId) {
+        if (!this.repo)
+            return;
+        await (0, githubApi_1.deleteComment)(this.repo.owner, this.repo.repo, commentId, this.token);
+        this.issues = this.issues.map(issue => issue.number === issueNumber ? { ...issue, comments: Math.max(0, issue.comments - 1) } : issue);
     }
 }
 exports.IssuesStore = IssuesStore;

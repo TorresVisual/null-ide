@@ -13,7 +13,9 @@ type InboundMessage =
   | { type: 'setState'; state: 'open' | 'closed' }
   | { type: 'saveEdit'; title: string; body: string; labels: string[]; assignees: string[] }
   | { type: 'createBranch' }
-  | { type: 'postComment'; body: string };
+  | { type: 'postComment'; body: string }
+  | { type: 'editComment'; commentId: number; body: string }
+  | { type: 'deleteComment'; commentId: number };
 
 export class IssueDetailPanel {
   private static current: IssueDetailPanel | undefined;
@@ -73,6 +75,7 @@ export class IssueDetailPanel {
       type: 'issueDetail',
       issue: closedLocally ? { ...issue, closedLocally } : issue,
       comments, repoLabels, assignableUsers,
+      viewerLogin: this.store.getViewerLogin(),
     });
   }
 
@@ -128,6 +131,24 @@ export class IssueDetailPanel {
           await this._sendDetail();
         } catch (err) {
           void vscode.window.showErrorMessage(`Failed to post comment: ${(err as Error).message}`);
+        }
+        break;
+      }
+      case 'editComment': {
+        try {
+          await this.store.updateComment(msg.commentId, msg.body);
+          await this._sendDetail();
+        } catch (err) {
+          void vscode.window.showErrorMessage(`Failed to update comment: ${(err as Error).message}`);
+        }
+        break;
+      }
+      case 'deleteComment': {
+        try {
+          await this.store.deleteComment(this.issueNumber, msg.commentId);
+          await this._sendDetail();
+        } catch (err) {
+          void vscode.window.showErrorMessage(`Failed to delete comment: ${(err as Error).message}`);
         }
         break;
       }

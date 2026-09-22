@@ -7,6 +7,8 @@
     let lastComments = [];
     let repoLabels = [];
     let assignableUsers = [];
+    let viewerLogin = null;
+    let editingCommentId = null;
     function escapeHtml(s) {
         const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
         return s.replace(/[&<>"']/g, c => map[c]);
@@ -32,6 +34,7 @@
     function renderDetail(issue, comments) {
         currentIssue = issue;
         editing = false;
+        editingCommentId = null;
         render(issue, comments);
     }
     function render(issue, comments) {
@@ -90,7 +93,17 @@
           <div class="comment">
             <span class="comment-author">${avatar(c.user)} ${escapeHtml(c.user.login)}</span>
             <span class="issue-meta">${c.created_at.slice(0, 10)}</span>
-            <div class="comment-body">${renderMarkdown(c.body)}</div>
+            ${viewerLogin === c.user.login && editingCommentId !== c.id ? `
+            <button class="btn btn-secondary comment-edit-btn" data-id="${c.id}">Edit</button>
+            <button class="btn btn-danger comment-delete-btn" data-id="${c.id}">Delete</button>` : ''}
+            ${editingCommentId === c.id ? `
+            <div class="edit-form">
+              <textarea class="comment-edit-input">${escapeHtml(c.body)}</textarea>
+              <div class="btn-row">
+                <button class="btn btn-primary comment-save-btn" data-id="${c.id}">Save</button>
+                <button class="btn btn-secondary comment-cancel-btn" data-id="${c.id}">Cancel</button>
+              </div>
+            </div>` : `<div class="comment-body">${renderMarkdown(c.body)}</div>`}
           </div>`).join('') || '<div class="issue-meta">No comments yet.</div>'}
       </div>
       <div id="composer">
@@ -103,7 +116,7 @@
         bindAvatarFallbacks();
     }
     function bindEvents(issue) {
-        var _a, _b, _c, _d, _e, _f, _g;
+        var _a, _b, _c, _d, _e, _f, _g, _h;
         (_a = document.getElementById('copy-btn')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', () => vscode.postMessage({ type: 'copyAsPrompt' }));
         (_b = document.getElementById('browser-btn')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', () => vscode.postMessage({ type: 'openInBrowser' }));
         (_c = document.getElementById('branch-btn')) === null || _c === void 0 ? void 0 : _c.addEventListener('click', () => vscode.postMessage({ type: 'createBranch' }));
@@ -139,6 +152,32 @@
             commentBtn.disabled = true;
             vscode.postMessage({ type: 'postComment', body });
         });
+        (_h = document.getElementById('comments')) === null || _h === void 0 ? void 0 : _h.addEventListener('click', e => {
+            var _a;
+            const target = e.target;
+            const id = Number(target.dataset.id);
+            if (target.classList.contains('comment-edit-btn')) {
+                editingCommentId = id;
+                if (currentIssue)
+                    render(currentIssue, lastComments);
+            }
+            else if (target.classList.contains('comment-cancel-btn')) {
+                editingCommentId = null;
+                if (currentIssue)
+                    render(currentIssue, lastComments);
+            }
+            else if (target.classList.contains('comment-save-btn')) {
+                const textarea = (_a = target.closest('.comment')) === null || _a === void 0 ? void 0 : _a.querySelector('.comment-edit-input');
+                const body = textarea.value.trim();
+                if (!body)
+                    return;
+                vscode.postMessage({ type: 'editComment', commentId: id, body });
+            }
+            else if (target.classList.contains('comment-delete-btn')) {
+                if (confirm('Delete this comment?'))
+                    vscode.postMessage({ type: 'deleteComment', commentId: id });
+            }
+        });
     }
     window.addEventListener('message', event => {
         const msg = event.data;
@@ -147,6 +186,7 @@
                 lastComments = msg.comments;
                 repoLabels = msg.repoLabels;
                 assignableUsers = msg.assignableUsers;
+                viewerLogin = msg.viewerLogin;
                 renderDetail(msg.issue, msg.comments);
                 break;
             case 'copied': {

@@ -5,7 +5,7 @@ import { GithubComment, GithubIssue, GithubLabel, GithubUser, IssueState } from 
 import { stripPullRequests } from './issueFilter';
 
 function requestJson<T>(
-  path: string, token: string | null, method: 'GET' | 'PATCH' | 'POST' = 'GET', body?: unknown,
+  path: string, token: string | null, method: 'GET' | 'PATCH' | 'POST' | 'DELETE' = 'GET', body?: unknown,
 ): Promise<T> {
   return new Promise((resolve, reject) => {
     const headers: Record<string, string> = {
@@ -27,6 +27,7 @@ function requestJson<T>(
       res.setEncoding('utf8');
       res.on('data', chunk => (data += chunk));
       res.on('end', () => {
+        if (!data) { resolve(undefined as T); return; }
         try { resolve(JSON.parse(data) as T); }
         catch (err) { reject(err as Error); }
       });
@@ -71,6 +72,20 @@ export function createComment(
   return requestJson<GithubComment>(
     `/repos/${owner}/${repo}/issues/${issueNumber}/comments`, token, 'POST', { body },
   );
+}
+
+export function updateComment(
+  owner: string, repo: string, commentId: number, body: string, token: string | null,
+): Promise<GithubComment> {
+  return requestJson<GithubComment>(
+    `/repos/${owner}/${repo}/issues/comments/${commentId}`, token, 'PATCH', { body },
+  );
+}
+
+export function deleteComment(
+  owner: string, repo: string, commentId: number, token: string | null,
+): Promise<void> {
+  return requestJson<void>(`/repos/${owner}/${repo}/issues/comments/${commentId}`, token, 'DELETE');
 }
 
 export function fetchRepoLabels(owner: string, repo: string, token: string | null): Promise<GithubLabel[]> {

@@ -37,6 +37,8 @@ exports.fetchIssues = fetchIssues;
 exports.fetchComments = fetchComments;
 exports.updateIssue = updateIssue;
 exports.createComment = createComment;
+exports.updateComment = updateComment;
+exports.deleteComment = deleteComment;
 exports.fetchRepoLabels = fetchRepoLabels;
 exports.fetchAssignableUsers = fetchAssignableUsers;
 const https = __importStar(require("https"));
@@ -63,6 +65,10 @@ function requestJson(path, token, method = 'GET', body) {
             res.setEncoding('utf8');
             res.on('data', chunk => (data += chunk));
             res.on('end', () => {
+                if (!data) {
+                    resolve(undefined);
+                    return;
+                }
                 try {
                     resolve(JSON.parse(data));
                 }
@@ -92,6 +98,12 @@ function updateIssue(owner, repo, issueNumber, patch, token) {
 }
 function createComment(owner, repo, issueNumber, body, token) {
     return requestJson(`/repos/${owner}/${repo}/issues/${issueNumber}/comments`, token, 'POST', { body });
+}
+function updateComment(owner, repo, commentId, body, token) {
+    return requestJson(`/repos/${owner}/${repo}/issues/comments/${commentId}`, token, 'PATCH', { body });
+}
+function deleteComment(owner, repo, commentId, token) {
+    return requestJson(`/repos/${owner}/${repo}/issues/comments/${commentId}`, token, 'DELETE');
 }
 function fetchRepoLabels(owner, repo, token) {
     return requestJson(`/repos/${owner}/${repo}/labels?per_page=100`, token);
