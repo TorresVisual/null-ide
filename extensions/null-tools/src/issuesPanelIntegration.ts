@@ -36,7 +36,7 @@ export function registerIssuesPanelFeature(context: vscode.ExtensionContext): vo
     vscode.commands.registerCommand('null.issues.linkFromCommitMessage', linkFromCommitMessage),
   );
 
-  const countBar = vscode.window.createStatusBarItem('null.issuesCount', vscode.StatusBarAlignment.Left, 0);
+  const countBar = vscode.window.createStatusBarItem('null.issuesCount', vscode.StatusBarAlignment.Left, 4);
   countBar.command = 'null.issuesView.focus';
   context.subscriptions.push(countBar);
 
