@@ -5,12 +5,14 @@ import { getNonce } from './webviewUtils';
 import { IssuesStore } from './github/issuesStore';
 import { formatIssueAsPrompt } from './github/promptFormat';
 import { createIssueBranch, getLocallyClosedIssueNumbers } from './github/gitBranch';
+import { toggleTaskCheckbox } from './github/taskList';
 
 type InboundMessage =
   | { type: 'ready' }
   | { type: 'copyAsPrompt' }
   | { type: 'openInBrowser' }
   | { type: 'setState'; state: 'open' | 'closed' }
+  | { type: 'toggleTask'; index: number; checked: boolean }
   | { type: 'saveEdit'; title: string; body: string; labels: string[]; assignees: string[] }
   | { type: 'createBranch' }
   | { type: 'postComment'; body: string }
@@ -137,6 +139,18 @@ export class IssueDetailPanel {
         } catch (err) {
           void vscode.window.showErrorMessage(`Failed to update issue: ${(err as Error).message}`);
         }
+        break;
+      }
+      case 'toggleTask': {
+        const issue = this.store.getByNumber(this.issueNumber);
+        const newBody = issue?.body ? toggleTaskCheckbox(issue.body, msg.index, msg.checked) : null;
+        if (newBody === null) break;
+        try {
+          await this.store.updateIssue(this.issueNumber, { body: newBody });
+        } catch (err) {
+          void vscode.window.showErrorMessage(`Failed to update checkbox: ${(err as Error).message}`);
+        }
+        await this._sendDetail();
         break;
       }
       case 'saveEdit': {
@@ -281,6 +295,7 @@ export class IssueDetailPanel {
     border:1px solid var(--vscode-widget-border,rgba(128,128,128,.2)); padding:4px 8px;
   }
   .body-card ul.contains-task-list, .comment-body ul.contains-task-list { list-style:none; padding-left:.5em; }
+  .body-card input[type=checkbox] { cursor:pointer; }
   .body-card img, .comment-body img { max-height:400px; object-fit:contain; cursor:zoom-in; display:block; }
   #lightbox {
     position:fixed; inset:0; background:rgba(0,0,0,.85); display:flex; align-items:center; justify-content:center;

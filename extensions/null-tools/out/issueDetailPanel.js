@@ -38,6 +38,7 @@ const vscode = __importStar(require("vscode"));
 const webviewUtils_1 = require("./webviewUtils");
 const promptFormat_1 = require("./github/promptFormat");
 const gitBranch_1 = require("./github/gitBranch");
+const taskList_1 = require("./github/taskList");
 class IssueDetailPanel {
     extensionUri;
     store;
@@ -147,6 +148,20 @@ class IssueDetailPanel {
                 catch (err) {
                     void vscode.window.showErrorMessage(`Failed to update issue: ${err.message}`);
                 }
+                break;
+            }
+            case 'toggleTask': {
+                const issue = this.store.getByNumber(this.issueNumber);
+                const newBody = issue?.body ? (0, taskList_1.toggleTaskCheckbox)(issue.body, msg.index, msg.checked) : null;
+                if (newBody === null)
+                    break;
+                try {
+                    await this.store.updateIssue(this.issueNumber, { body: newBody });
+                }
+                catch (err) {
+                    void vscode.window.showErrorMessage(`Failed to update checkbox: ${err.message}`);
+                }
+                await this._sendDetail();
                 break;
             }
             case 'saveEdit': {
@@ -293,6 +308,7 @@ class IssueDetailPanel {
     border:1px solid var(--vscode-widget-border,rgba(128,128,128,.2)); padding:4px 8px;
   }
   .body-card ul.contains-task-list, .comment-body ul.contains-task-list { list-style:none; padding-left:.5em; }
+  .body-card input[type=checkbox] { cursor:pointer; }
   .body-card img, .comment-body img { max-height:400px; object-fit:contain; cursor:zoom-in; display:block; }
   #lightbox {
     position:fixed; inset:0; background:rgba(0,0,0,.85); display:flex; align-items:center; justify-content:center;

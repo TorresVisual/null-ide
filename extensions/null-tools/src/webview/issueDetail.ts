@@ -134,6 +134,15 @@ declare const DOMPurify: { sanitize(html: string): string };
       img.addEventListener('error', () => { img.style.display = 'none'; }, { once: true }));
   }
 
+  function bindTaskCheckboxes(): void {
+    const boxes = detailEl.querySelectorAll<HTMLInputElement>('.body-card input[type=checkbox]');
+    boxes.forEach((box, index) => {
+      box.disabled = false;
+      box.addEventListener('change', () =>
+        vscode.postMessage({ type: 'toggleTask', index, checked: box.checked }));
+    });
+  }
+
   function shortSha(sha: string): string {
     return sha.slice(0, 7);
   }
@@ -320,6 +329,7 @@ declare const DOMPurify: { sanitize(html: string): string };
     }
     bindEvents(issue);
     bindAvatarFallbacks();
+    if (!editing) bindTaskCheckboxes();
   }
 
   function bindEvents(issue: GithubIssue): void {

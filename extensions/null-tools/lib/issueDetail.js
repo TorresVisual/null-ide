@@ -108,6 +108,13 @@
     function bindAvatarFallbacks() {
         detailEl.querySelectorAll('.avatar img').forEach(img => img.addEventListener('error', () => { img.style.display = 'none'; }, { once: true }));
     }
+    function bindTaskCheckboxes() {
+        const boxes = detailEl.querySelectorAll('.body-card input[type=checkbox]');
+        boxes.forEach((box, index) => {
+            box.disabled = false;
+            box.addEventListener('change', () => vscode.postMessage({ type: 'toggleTask', index, checked: box.checked }));
+        });
+    }
     function shortSha(sha) {
         return sha.slice(0, 7);
     }
@@ -277,6 +284,8 @@
         }
         bindEvents(issue);
         bindAvatarFallbacks();
+        if (!editing)
+            bindTaskCheckboxes();
     }
     function bindEvents(issue) {
         var _a, _b, _c, _d, _e, _f, _g, _h;
