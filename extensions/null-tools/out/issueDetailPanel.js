@@ -152,6 +152,8 @@ class IssueDetailPanel {
     _buildHtml() {
         const nonce = (0, webviewUtils_1.getNonce)();
         const scriptUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'lib', 'issueDetail.js'));
+        const markedUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'lib', 'marked.js'));
+        const purifyUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'lib', 'purify.min.js'));
         return `<!DOCTYPE html><html lang="en"><head>
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy"
@@ -181,8 +183,31 @@ class IssueDetailPanel {
   }
   .body-card {
     border:1px solid var(--vscode-widget-border,rgba(128,128,128,.2)); border-radius:6px; padding:14px; margin:14px 0;
-    white-space:pre-wrap; background:var(--vscode-editorWidget-background,rgba(128,128,128,.03));
+    background:var(--vscode-editorWidget-background,rgba(128,128,128,.03));
   }
+  .body-card, .comment-body { line-height:1.5; word-wrap:break-word; }
+  .body-card > *:first-child, .comment-body > *:first-child { margin-top:0; }
+  .body-card > *:last-child, .comment-body > *:last-child { margin-bottom:0; }
+  .body-card h1, .body-card h2, .body-card h3, .comment-body h1, .comment-body h2, .comment-body h3 {
+    border-bottom:1px solid var(--vscode-widget-border,rgba(128,128,128,.2)); padding-bottom:.3em;
+  }
+  .body-card pre, .comment-body pre {
+    background:var(--vscode-textCodeBlock-background,rgba(128,128,128,.08)); padding:10px; border-radius:4px; overflow-x:auto;
+  }
+  .body-card code, .comment-body code {
+    background:var(--vscode-textCodeBlock-background,rgba(128,128,128,.08)); padding:1px 4px; border-radius:3px;
+    font-family:var(--vscode-editor-font-family,monospace);
+  }
+  .body-card pre code, .comment-body pre code { background:none; padding:0; }
+  .body-card blockquote, .comment-body blockquote {
+    border-left:3px solid var(--vscode-widget-border,rgba(128,128,128,.3)); margin:0; padding:2px 12px; color:var(--vscode-descriptionForeground);
+  }
+  .body-card a, .comment-body a { color:var(--vscode-textLink-foreground); }
+  .body-card table, .comment-body table { border-collapse:collapse; }
+  .body-card th, .body-card td, .comment-body th, .comment-body td {
+    border:1px solid var(--vscode-widget-border,rgba(128,128,128,.2)); padding:4px 8px;
+  }
+  .body-card ul.contains-task-list, .comment-body ul.contains-task-list { list-style:none; padding-left:.5em; }
   .btn-row { display:flex; gap:8px; margin:14px 0; flex-wrap:wrap; }
   button.btn { border:none; padding:6px 14px; border-radius:4px; cursor:pointer; font:inherit; font-weight:500; }
   button.btn-primary { background:var(--vscode-button-background); color:var(--vscode-button-foreground); }
@@ -215,6 +240,8 @@ class IssueDetailPanel {
   #empty { padding:20px; color:var(--vscode-descriptionForeground); }
 </style></head><body>
 <div id="detail"><div id="empty">Loading…</div></div>
+<script nonce="${nonce}" src="${markedUri}"></script>
+<script nonce="${nonce}" src="${purifyUri}"></script>
 <script nonce="${nonce}" src="${scriptUri}"></script>
 </body></html>`;
     }

@@ -9,6 +9,8 @@ interface GithubIssue {
 interface GithubComment { id: number; user: GithubUser; body: string; created_at: string; }
 
 declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
+declare const marked: { parse(src: string): string };
+declare const DOMPurify: { sanitize(html: string): string };
 
 (function () {
   const vscode = acquireVsCodeApi();
@@ -23,6 +25,10 @@ declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
   function escapeHtml(s: string): string {
     const map: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
     return s.replace(/[&<>"']/g, c => map[c]);
+  }
+
+  function renderMarkdown(text: string): string {
+    return DOMPurify.sanitize(marked.parse(text));
   }
 
   const AVATAR_COLORS = ['#e57373', '#ba68c8', '#64b5f6', '#4db6ac', '#81c784', '#ffb74d', '#a1887f', '#90a4ae'];
@@ -91,14 +97,14 @@ declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
         <button class="btn btn-secondary" id="copy-btn">Copy as prompt</button>
         <button class="btn btn-danger" id="state-btn">${closed ? 'Reopen' : 'Close'}</button>
       </div>
-      <div class="body-card">${escapeHtml(issue.body || '(no description)')}</div>`}
+      <div class="body-card">${issue.body ? renderMarkdown(issue.body) : '(no description)'}</div>`}
       <h3>Comments (${comments.length})</h3>
       <div id="comments">
         ${comments.map(c => `
           <div class="comment">
             <span class="comment-author">${avatar(c.user.login)} ${escapeHtml(c.user.login)}</span>
             <span class="issue-meta">${c.created_at.slice(0, 10)}</span>
-            <div>${escapeHtml(c.body)}</div>
+            <div class="comment-body">${renderMarkdown(c.body)}</div>
           </div>`).join('') || '<div class="issue-meta">No comments yet.</div>'}
       </div>
       <div id="composer">
