@@ -56,6 +56,7 @@ function registerIssuesPanelFeature(context) {
         await refreshIssueCountBar();
     }));
     context.subscriptions.push(vscode.commands.registerCommand('null.issues.linkFromCommitMessage', linkFromCommitMessage));
+    context.subscriptions.push(vscode.commands.registerCommand('null.issues.insertReference', insertIssueReference));
     const countBar = vscode.window.createStatusBarItem('null.issuesCount', vscode.StatusBarAlignment.Left, 4);
     countBar.command = 'null.issuesView.focus';
     context.subscriptions.push(countBar);
@@ -103,14 +104,10 @@ async function linkFromCommitMessage() {
         void vscode.window.showInformationMessage('This folder has no GitHub remote.');
         return;
     }
-    const gitExt = vscode.extensions.getExtension('vscode.git');
-    if (!gitExt) {
-        void vscode.window.showErrorMessage('Built-in git extension not found.');
+    const scmRepo = await getScmRepo(cwd);
+    if (!scmRepo)
         return;
-    }
-    const git = gitExt.isActive ? gitExt.exports.getAPI(1) : (await gitExt.activate()).getAPI(1);
-    const scmRepo = git.repositories.find((r) => r.rootUri.fsPath === cwd) ?? git.repositories[0];
-    const message = scmRepo?.inputBox.value ?? '';
+    const message = scmRepo.inputBox.value ?? '';
     const numbers = [...new Set([...message.matchAll(/#(\d+)/g)].map(m => Number(m[1])))];
     if (numbers.length === 0) {
         void vscode.window.showInformationMessage('No issue references (#N) found in the commit message.');
@@ -124,5 +121,60 @@ async function linkFromCommitMessage() {
     if (number === undefined)
         return;
     await vscode.env.openExternal(vscode.Uri.parse(`https://github.com/${repo.owner}/${repo.repo}/issues/${number}`));
+}
+// Reverse of linkFromCommitMessage: pick an open issue and a reference style,
+// then insert it into the SCM input box instead of parsing it back out.
+async function insertIssueReference() {
+    const folders = vscode.workspace.workspaceFolders;
+    if (!folders?.length) {
+        void vscode.window.showErrorMessage('Open a folder first.');
+        return;
+    }
+    const cwd = folders[0].uri.fsPath;
+    const repo = (0, githubRemote_1.getWorkspaceGithubRepo)(cwd);
+    if (!repo) {
+        void vscode.window.showInformationMessage('This folder has no GitHub remote.');
+        return;
+    }
+    const scmRepo = await getScmRepo(cwd);
+    if (!scmRepo)
+        return;
+    const session = await (0, githubAuth_1.getGithubSession)(true);
+    if (!session)
+        return;
+    let issues;
+    try {
+        issues = await (0, githubApi_1.fetchIssues)(repo.owner, repo.repo, 'open', session.accessToken);
+    }
+    catch (err) {
+        void vscode.window.showErrorMessage(`Failed to fetch issues: ${err.message}`);
+        return;
+    }
+    if (issues.length === 0) {
+        void vscode.window.showInformationMessage('No open issues found.');
+        return;
+    }
+    const pickedIssue = await vscode.window.showQuickPick(issues.map(issue => ({ label: `#${issue.number}`, description: issue.title, issue })), { placeHolder: 'Reference which issue?' });
+    if (!pickedIssue)
+        return;
+    const n = pickedIssue.issue.number;
+    const style = await vscode.window.showQuickPick([
+        { label: `#${n}`, description: 'Reference only' },
+        { label: `Closes #${n}`, description: 'Closes the issue once this commit reaches the default branch' },
+        { label: `Fixes #${n}`, description: 'Fixes the issue once this commit reaches the default branch' },
+    ], { placeHolder: 'Reference style?' });
+    if (!style)
+        return;
+    const current = scmRepo.inputBox.value;
+    scmRepo.inputBox.value = current ? `${current}\n\n${style.label}` : style.label;
+}
+async function getScmRepo(cwd) {
+    const gitExt = vscode.extensions.getExtension('vscode.git');
+    if (!gitExt) {
+        void vscode.window.showErrorMessage('Built-in git extension not found.');
+        return undefined;
+    }
+    const git = gitExt.isActive ? gitExt.exports.getAPI(1) : (await gitExt.activate()).getAPI(1);
+    return git.repositories.find((r) => r.rootUri.fsPath === cwd) ?? git.repositories[0];
 }
 //# sourceMappingURL=issuesPanelIntegration.js.map
