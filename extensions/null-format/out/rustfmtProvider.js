@@ -60,8 +60,8 @@ class RustfmtFormattingEditProvider {
         const filePath = document.isUntitled ? undefined : document.fileName;
         const workspaceFolder = filePath ? vscode.workspace.getWorkspaceFolder(document.uri)?.uri.fsPath : undefined;
         const customConfigPath = config.get('configPath');
-        const defaultConfigToml = config.get('defaultConfig');
-        const configResolution = (0, configResolver_1.resolveRustfmtConfig)(filePath || 'untitled.rs', customConfigPath, defaultConfigToml, workspaceFolder);
+        const defaultConfig = config.get('defaultConfig');
+        const configResolution = (0, configResolver_1.resolveRustfmtConfig)(filePath || 'untitled.rs', customConfigPath, defaultConfig, workspaceFolder);
         const args = ['--emit', 'stdout'];
         if (configResolution.configPath) {
             args.push('--config-path', configResolution.configPath);

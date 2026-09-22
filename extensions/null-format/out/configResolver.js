@@ -66,7 +66,7 @@ function findConfigFileUpwards(startDir, candidateNames, stopDir) {
     }
     return null;
 }
-function resolveClangFormatStyle(targetFilePath, customConfigPath, defaultConfigYaml, workspaceRoot) {
+function resolveClangFormatStyle(targetFilePath, customConfigPath, defaultConfig, workspaceRoot) {
     // 1. Custom config path specified in settings
     if (customConfigPath && customConfigPath.trim().length > 0) {
         const resolvedCustom = path.isAbsolute(customConfigPath)
@@ -93,20 +93,28 @@ function resolveClangFormatStyle(targetFilePath, customConfigPath, defaultConfig
         };
     }
     // 3. Fallback to settings defaultConfig
-    const fallbackYaml = (defaultConfigYaml && defaultConfigYaml.trim().length > 0)
-        ? defaultConfigYaml
-        : 'BasedOnStyle: LLVM\nIndentWidth: 4\nTabWidth: 4\nUseTab: Never\nColumnLimit: 100';
-    // Convert YAML / key-value lines into single-line JSON/YAML style dictionary for -style argument
-    const styleArg = formatYamlToClangFormatStyleArg(fallbackYaml);
+    const styleArg = formatYamlToClangFormatStyleArg(defaultConfig || '');
     return {
         styleArg,
         source: 'default',
     };
 }
 /**
- * Converts a multi-line YAML config string into clang-format's inline `-style={...}` format.
+ * Converts a multi-line YAML config string or object dictionary into clang-format's inline `-style={...}` format.
  */
-function formatYamlToClangFormatStyleArg(yamlStr) {
+function formatYamlToClangFormatStyleArg(input) {
+    if (typeof input === 'object' && input !== null) {
+        const entries = Object.entries(input)
+            .filter(([_, v]) => v !== undefined && v !== null && v !== '')
+            .map(([k, v]) => `${k}: ${v}`);
+        if (entries.length === 0) {
+            return '{BasedOnStyle: LLVM}';
+        }
+        return `{${entries.join(', ')}}`;
+    }
+    const yamlStr = (typeof input === 'string' && input.trim().length > 0)
+        ? input
+        : 'BasedOnStyle: LLVM\nIndentWidth: 4\nTabWidth: 4\nUseTab: Never\nColumnLimit: 100';
     const lines = yamlStr.split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
     const entries = [];
     for (const line of lines) {
@@ -124,7 +132,7 @@ function formatYamlToClangFormatStyleArg(yamlStr) {
     }
     return `{${entries.join(', ')}}`;
 }
-function resolveRustfmtConfig(targetFilePath, customConfigPath, defaultConfigToml, workspaceRoot) {
+function resolveRustfmtConfig(targetFilePath, customConfigPath, defaultConfig, workspaceRoot) {
     // 1. Custom config path
     if (customConfigPath && customConfigPath.trim().length > 0) {
         const resolvedCustom = path.isAbsolute(customConfigPath)
@@ -148,18 +156,31 @@ function resolveRustfmtConfig(targetFilePath, customConfigPath, defaultConfigTom
             source: 'workspace',
         };
     }
-    // 3. Fallback to settings defaultConfig TOML parsed into CLI options
-    const fallbackToml = defaultConfigToml || 'edition = "2021"\nmax_width = 100\ntab_spaces = 4';
-    const inlineOptions = formatTomlToRustfmtConfigArg(fallbackToml);
+    // 3. Fallback to settings defaultConfig TOML or object parsed into CLI options
+    const inlineOptions = formatTomlToRustfmtConfigArg(defaultConfig || '');
     return {
         inlineOptions,
         source: 'default',
     };
 }
 /**
- * Converts simple TOML key = value lines into rustfmt's `--config key=value,key=value` format.
+ * Converts simple TOML key = value lines or object key-values into rustfmt's `--config key=value,key=value` format.
  */
-function formatTomlToRustfmtConfigArg(tomlStr) {
+function formatTomlToRustfmtConfigArg(input) {
+    if (typeof input === 'object' && input !== null) {
+        const entries = Object.entries(input)
+            .filter(([_, v]) => v !== undefined && v !== null && v !== '')
+            .map(([k, v]) => {
+            if (typeof v === 'string' && !v.startsWith('"')) {
+                return `${k}="${v}"`;
+            }
+            return `${k}=${v}`;
+        });
+        return entries.join(',');
+    }
+    const tomlStr = (typeof input === 'string' && input.trim().length > 0)
+        ? input
+        : 'edition = "2021"\nmax_width = 100\ntab_spaces = 4';
     const lines = tomlStr.split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
     const entries = [];
     for (const line of lines) {

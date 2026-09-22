@@ -66,8 +66,8 @@ class ClangFormatFormattingEditProvider {
         const filePath = document.isUntitled ? undefined : document.fileName;
         const workspaceFolder = filePath ? vscode.workspace.getWorkspaceFolder(document.uri)?.uri.fsPath : undefined;
         const customConfigPath = config.get('configPath');
-        const defaultConfigYaml = config.get('defaultConfig');
-        const configResolution = (0, configResolver_1.resolveClangFormatStyle)(filePath || 'untitled.cpp', customConfigPath, defaultConfigYaml, workspaceFolder);
+        const defaultConfig = config.get('defaultConfig');
+        const configResolution = (0, configResolver_1.resolveClangFormatStyle)(filePath || 'untitled.cpp', customConfigPath, defaultConfig, workspaceFolder);
         const assumeFileName = filePath || (document.languageId === 'c' ? 'main.c' : 'main.cpp');
         const args = [
             `-assume-filename=${assumeFileName}`,

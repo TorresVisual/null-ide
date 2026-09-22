@@ -45,7 +45,7 @@ export interface ClangFormatConfigResolution {
 export function resolveClangFormatStyle(
   targetFilePath: string,
   customConfigPath?: string,
-  defaultConfigYaml?: string,
+  defaultConfig?: string | Record<string, unknown>,
   workspaceRoot?: string
 ): ClangFormatConfigResolution {
   // 1. Custom config path specified in settings
@@ -77,12 +77,7 @@ export function resolveClangFormatStyle(
   }
 
   // 3. Fallback to settings defaultConfig
-  const fallbackYaml = (defaultConfigYaml && defaultConfigYaml.trim().length > 0)
-    ? defaultConfigYaml
-    : 'BasedOnStyle: LLVM\nIndentWidth: 4\nTabWidth: 4\nUseTab: Never\nColumnLimit: 100';
-
-  // Convert YAML / key-value lines into single-line JSON/YAML style dictionary for -style argument
-  const styleArg = formatYamlToClangFormatStyleArg(fallbackYaml);
+  const styleArg = formatYamlToClangFormatStyleArg(defaultConfig || '');
   return {
     styleArg,
     source: 'default',
@@ -90,9 +85,23 @@ export function resolveClangFormatStyle(
 }
 
 /**
- * Converts a multi-line YAML config string into clang-format's inline `-style={...}` format.
+ * Converts a multi-line YAML config string or object dictionary into clang-format's inline `-style={...}` format.
  */
-export function formatYamlToClangFormatStyleArg(yamlStr: string): string {
+export function formatYamlToClangFormatStyleArg(input: string | Record<string, unknown>): string {
+  if (typeof input === 'object' && input !== null) {
+    const entries = Object.entries(input)
+      .filter(([_, v]) => v !== undefined && v !== null && v !== '')
+      .map(([k, v]) => `${k}: ${v}`);
+    if (entries.length === 0) {
+      return '{BasedOnStyle: LLVM}';
+    }
+    return `{${entries.join(', ')}}`;
+  }
+
+  const yamlStr = (typeof input === 'string' && input.trim().length > 0)
+    ? input
+    : 'BasedOnStyle: LLVM\nIndentWidth: 4\nTabWidth: 4\nUseTab: Never\nColumnLimit: 100';
+
   const lines = yamlStr.split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
   const entries: string[] = [];
 
@@ -123,7 +132,7 @@ export interface RustfmtConfigResolution {
 export function resolveRustfmtConfig(
   targetFilePath: string,
   customConfigPath?: string,
-  defaultConfigToml?: string,
+  defaultConfig?: string | Record<string, unknown>,
   workspaceRoot?: string
 ): RustfmtConfigResolution {
   // 1. Custom config path
@@ -152,9 +161,8 @@ export function resolveRustfmtConfig(
     };
   }
 
-  // 3. Fallback to settings defaultConfig TOML parsed into CLI options
-  const fallbackToml = defaultConfigToml || 'edition = "2021"\nmax_width = 100\ntab_spaces = 4';
-  const inlineOptions = formatTomlToRustfmtConfigArg(fallbackToml);
+  // 3. Fallback to settings defaultConfig TOML or object parsed into CLI options
+  const inlineOptions = formatTomlToRustfmtConfigArg(defaultConfig || '');
 
   return {
     inlineOptions,
@@ -163,9 +171,25 @@ export function resolveRustfmtConfig(
 }
 
 /**
- * Converts simple TOML key = value lines into rustfmt's `--config key=value,key=value` format.
+ * Converts simple TOML key = value lines or object key-values into rustfmt's `--config key=value,key=value` format.
  */
-export function formatTomlToRustfmtConfigArg(tomlStr: string): string {
+export function formatTomlToRustfmtConfigArg(input: string | Record<string, unknown>): string {
+  if (typeof input === 'object' && input !== null) {
+    const entries = Object.entries(input)
+      .filter(([_, v]) => v !== undefined && v !== null && v !== '')
+      .map(([k, v]) => {
+        if (typeof v === 'string' && !v.startsWith('"')) {
+          return `${k}="${v}"`;
+        }
+        return `${k}=${v}`;
+      });
+    return entries.join(',');
+  }
+
+  const tomlStr = (typeof input === 'string' && input.trim().length > 0)
+    ? input
+    : 'edition = "2021"\nmax_width = 100\ntab_spaces = 4';
+
   const lines = tomlStr.split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
   const entries: string[] = [];
 

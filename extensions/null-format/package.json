@@ -32,6 +32,18 @@
       {
         "command": "null-format.openSettings",
         "title": "Null Formatter: Open Settings"
+      },
+      {
+        "command": "null-format.createPrettierConfig",
+        "title": "Null Formatter: Create Prettier Config (.prettierrc.json)"
+      },
+      {
+        "command": "null-format.createClangFormatConfig",
+        "title": "Null Formatter: Create Clang-Format Config (.clang-format)"
+      },
+      {
+        "command": "null-format.createRustfmtConfig",
+        "title": "Null Formatter: Create Rustfmt Config (rustfmt.toml)"
       }
     ],
     "configuration": {
@@ -60,6 +72,68 @@
             "arrowParens": "always",
             "endOfLine": "lf"
           },
+          "properties": {
+            "semi": {
+              "type": "boolean",
+              "default": true,
+              "description": "Print semicolons at the ends of statements."
+            },
+            "singleQuote": {
+              "type": "boolean",
+              "default": false,
+              "description": "Use single quotes instead of double quotes."
+            },
+            "tabWidth": {
+              "type": "integer",
+              "default": 2,
+              "description": "Specify the number of spaces per indentation level."
+            },
+            "useTabs": {
+              "type": "boolean",
+              "default": false,
+              "description": "Indent lines with tabs instead of spaces."
+            },
+            "trailingComma": {
+              "type": "string",
+              "enum": [
+                "all",
+                "es5",
+                "none"
+              ],
+              "default": "all",
+              "description": "Print trailing commas wherever possible in multi-line comma-separated syntactic structures."
+            },
+            "printWidth": {
+              "type": "integer",
+              "default": 100,
+              "description": "Specify the line length that the printer will wrap on."
+            },
+            "bracketSpacing": {
+              "type": "boolean",
+              "default": true,
+              "description": "Print spaces between brackets in object literals."
+            },
+            "arrowParens": {
+              "type": "string",
+              "enum": [
+                "always",
+                "avoid"
+              ],
+              "default": "always",
+              "description": "Include parentheses around a sole arrow function parameter."
+            },
+            "endOfLine": {
+              "type": "string",
+              "enum": [
+                "lf",
+                "crlf",
+                "cr",
+                "auto"
+              ],
+              "default": "lf",
+              "description": "Specify the end of line character."
+            }
+          },
           "description": "Default Prettier configuration applied when no workspace config file (.prettierrc, package.json) or custom configPath is found."
         },
         "null-format.clangFormat.enable": {
@@ -79,6 +153,7 @@
         },
         "null-format.clangFormat.defaultConfig": {
           "type": "string",
+          "editPresentation": "multilineText",
           "default": "BasedOnStyle: LLVM\nIndentWidth: 4\nTabWidth: 4\nUseTab: Never\nColumnLimit: 100\nAccessModifierOffset: -4\nAllowShortFunctionsOnASingleLine: Inline\nBreakBeforeBraces: Attach\nStandard: Latest",
           "description": "Default clang-format configuration (in YAML or style string format) applied when no workspace .clang-format is found."
         },
@@ -99,6 +174,7 @@
         },
         "null-format.rustfmt.defaultConfig": {
           "type": "string",
+          "editPresentation": "multilineText",
           "default": "edition = \"2021\"\nmax_width = 100\ntab_spaces = 4\nnewline_style = \"Unix\"\nuse_small_heuristics = \"Default\"",
           "description": "Default rustfmt configuration (in TOML format) applied when no workspace rustfmt.toml is found."
         }

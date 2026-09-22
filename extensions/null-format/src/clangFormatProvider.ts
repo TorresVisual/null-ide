@@ -50,12 +50,12 @@ export class ClangFormatFormattingEditProvider
     const filePath = document.isUntitled ? undefined : document.fileName;
     const workspaceFolder = filePath ? vscode.workspace.getWorkspaceFolder(document.uri)?.uri.fsPath : undefined;
     const customConfigPath = config.get<string>('configPath');
-    const defaultConfigYaml = config.get<string>('defaultConfig');
+    const defaultConfig = config.get<string | Record<string, unknown>>('defaultConfig');
 
     const configResolution = resolveClangFormatStyle(
       filePath || 'untitled.cpp',
       customConfigPath,
-      defaultConfigYaml,
+      defaultConfig,
       workspaceFolder
     );
 

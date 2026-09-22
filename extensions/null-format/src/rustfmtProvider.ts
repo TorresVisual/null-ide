@@ -31,12 +31,12 @@ export class RustfmtFormattingEditProvider implements vscode.DocumentFormattingE
     const filePath = document.isUntitled ? undefined : document.fileName;
     const workspaceFolder = filePath ? vscode.workspace.getWorkspaceFolder(document.uri)?.uri.fsPath : undefined;
     const customConfigPath = config.get<string>('configPath');
-    const defaultConfigToml = config.get<string>('defaultConfig');
+    const defaultConfig = config.get<string | Record<string, unknown>>('defaultConfig');
 
     const configResolution = resolveRustfmtConfig(
       filePath || 'untitled.rs',
       customConfigPath,
-      defaultConfigToml,
+      defaultConfig,
       workspaceFolder
     );
 

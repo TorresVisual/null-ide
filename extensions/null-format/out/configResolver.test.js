@@ -50,6 +50,16 @@ const configResolver_1 = require("./configResolver");
         const arg = (0, configResolver_1.formatYamlToClangFormatStyleArg)(yaml);
         assert.strictEqual(arg, '{BasedOnStyle: LLVM, IndentWidth: 4, TabWidth: 4, UseTab: Never}');
     });
+    (0, node_test_1.it)('formats YAML object dictionary to clang-format inline style argument', () => {
+        const obj = {
+            BasedOnStyle: 'LLVM',
+            IndentWidth: 4,
+            TabWidth: 4,
+            UseTab: 'Never',
+        };
+        const arg = (0, configResolver_1.formatYamlToClangFormatStyleArg)(obj);
+        assert.strictEqual(arg, '{BasedOnStyle: LLVM, IndentWidth: 4, TabWidth: 4, UseTab: Never}');
+    });
     (0, node_test_1.it)('formats TOML to rustfmt config argument', () => {
         const toml = `
       edition = "2021"
@@ -57,6 +67,15 @@ const configResolver_1 = require("./configResolver");
       tab_spaces = 4
     `;
         const arg = (0, configResolver_1.formatTomlToRustfmtConfigArg)(toml);
+        assert.strictEqual(arg, 'edition="2021",max_width=100,tab_spaces=4');
+    });
+    (0, node_test_1.it)('formats TOML object dictionary to rustfmt config argument', () => {
+        const obj = {
+            edition: '2021',
+            max_width: 100,
+            tab_spaces: 4,
+        };
+        const arg = (0, configResolver_1.formatTomlToRustfmtConfigArg)(obj);
         assert.strictEqual(arg, 'edition="2021",max_width=100,tab_spaces=4');
     });
     (0, node_test_1.it)('finds config files upwards in folder structure', () => {

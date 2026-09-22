@@ -23,6 +23,17 @@ describe('configResolver', () => {
     assert.strictEqual(arg, '{BasedOnStyle: LLVM, IndentWidth: 4, TabWidth: 4, UseTab: Never}');
   });
 
+  it('formats YAML object dictionary to clang-format inline style argument', () => {
+    const obj = {
+      BasedOnStyle: 'LLVM',
+      IndentWidth: 4,
+      TabWidth: 4,
+      UseTab: 'Never',
+    };
+    const arg = formatYamlToClangFormatStyleArg(obj);
+    assert.strictEqual(arg, '{BasedOnStyle: LLVM, IndentWidth: 4, TabWidth: 4, UseTab: Never}');
+  });
+
   it('formats TOML to rustfmt config argument', () => {
     const toml = `
       edition = "2021"
@@ -30,6 +41,16 @@ describe('configResolver', () => {
       tab_spaces = 4
     `;
     const arg = formatTomlToRustfmtConfigArg(toml);
+    assert.strictEqual(arg, 'edition="2021",max_width=100,tab_spaces=4');
+  });
+
+  it('formats TOML object dictionary to rustfmt config argument', () => {
+    const obj = {
+      edition: '2021',
+      max_width: 100,
+      tab_spaces: 4,
+    };
+    const arg = formatTomlToRustfmtConfigArg(obj);
     assert.strictEqual(arg, 'edition="2021",max_width=100,tab_spaces=4');
   });
 
