@@ -69,6 +69,8 @@ function activate(context) {
     for (const lang of clangLanguages) {
         context.subscriptions.push(vscode.languages.registerDocumentFormattingEditProvider(lang, clangFormatProvider), vscode.languages.registerDocumentRangeFormattingEditProvider(lang, clangFormatProvider));
     }
+    // 4. Register Commands
+    context.subscriptions.push(vscode.commands.registerCommand('null-format.openSettings', () => vscode.commands.executeCommand('workbench.action.openSettings', '@ext:null null-format')));
 }
 function deactivate() { }
 //# sourceMappingURL=extension.js.map

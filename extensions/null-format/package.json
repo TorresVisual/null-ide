@@ -5,29 +5,15 @@
   "version": "1.0.0",
   "publisher": "null",
   "license": "MIT",
+  "categories": [
+    "Formatters"
+  ],
   "engines": {
     "vscode": "^1.85.0"
   },
   "main": "./out/extension.js",
   "activationEvents": [
-    "onLanguage:javascript",
-    "onLanguage:javascriptreact",
-    "onLanguage:typescript",
-    "onLanguage:typescriptreact",
-    "onLanguage:json",
-    "onLanguage:jsonc",
-    "onLanguage:css",
-    "onLanguage:scss",
-    "onLanguage:less",
-    "onLanguage:html",
-    "onLanguage:yaml",
-    "onLanguage:markdown",
-    "onLanguage:rust",
-    "onLanguage:c",
-    "onLanguage:cpp",
-    "onLanguage:cuda-cpp",
-    "onLanguage:objective-c",
-    "onLanguage:objective-cpp"
+    "onStartupFinished"
   ],
   "scripts": {
     "compile": "tsc -p tsconfig.json",
@@ -42,6 +28,12 @@
     "typescript": "^5.8.0"
   },
   "contributes": {
+    "commands": [
+      {
+        "command": "null-format.openSettings",
+        "title": "Null Formatter: Open Settings"
+      }
+    ],
     "configuration": {
       "title": "Null Formatter",
       "properties": {
