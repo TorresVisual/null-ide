@@ -8,6 +8,7 @@ interface GithubIssue {
   closedLocally?: boolean;
 }
 interface GithubComment { id: number; user: GithubUser; body: string; created_at: string; }
+interface IssueTemplate { name: string; title: string; body: string; labels: string[]; }
 interface GithubTimelineEvent {
   event: string; actor: GithubUser | null; created_at: string; commit_id?: string | null;
   label?: { name: string; color: string }; assignee?: GithubUser; rename?: { from: string; to: string };
@@ -38,6 +39,7 @@ declare const DOMPurify: { sanitize(html: string): string };
   let lastTimeline: GithubTimelineEvent[] = [];
   let repoLabels: GithubLabel[] = [];
   let assignableUsers: GithubUser[] = [];
+  let issueTemplates: IssueTemplate[] = [];
   let viewerLogin: string | null = null;
   let editingCommentId: number | null = null;
   let labelOpen = false;
@@ -206,6 +208,11 @@ declare const DOMPurify: { sanitize(html: string): string };
     detailEl.innerHTML = `
       <h2>New Issue</h2>
       <div class="edit-form">
+        ${issueTemplates.length > 0 ? `
+        <select id="template-picker">
+          <option value="">Blank issue</option>
+          ${issueTemplates.map((t, i) => `<option value="${i}">${escapeHtml(t.name)}</option>`).join('')}
+        </select>` : ''}
         <input id="edit-title" placeholder="Title">
         <textarea id="edit-body" placeholder="Description"></textarea>
         <div class="picker-group">
@@ -229,6 +236,18 @@ declare const DOMPurify: { sanitize(html: string): string };
       'assignee-picker', assignableUsers.map(u => ({ value: u.login, label: u.login })), selectedAssignees,
       () => assigneeOpen, () => { assigneeOpen = !assigneeOpen; }, 'Select assignees…',
     );
+    document.getElementById('template-picker')?.addEventListener('change', e => {
+      const index = (e.target as HTMLSelectElement).value;
+      const template = index ? issueTemplates[Number(index)] : null;
+      (document.getElementById('edit-title') as HTMLInputElement).value = template?.title ?? '';
+      (document.getElementById('edit-body') as HTMLTextAreaElement).value = template?.body ?? '';
+      selectedLabels.clear();
+      template?.labels.forEach(l => {
+        const match = repoLabels.find(rl => rl.name.toLowerCase() === l.toLowerCase());
+        if (match) selectedLabels.add(match.name);
+      });
+      refreshLabelPicker?.();
+    });
     document.getElementById('save-btn')?.addEventListener('click', () => {
       const title = (document.getElementById('edit-title') as HTMLInputElement).value.trim();
       const body = (document.getElementById('edit-body') as HTMLTextAreaElement).value;
@@ -396,6 +415,7 @@ declare const DOMPurify: { sanitize(html: string): string };
         lastTimeline = msg.timeline;
         repoLabels = msg.repoLabels;
         assignableUsers = msg.assignableUsers;
+        issueTemplates = msg.templates ?? [];
         viewerLogin = msg.viewerLogin;
         if (msg.issue) renderDetail(msg.issue, msg.comments, msg.timeline);
         else renderCreateForm();

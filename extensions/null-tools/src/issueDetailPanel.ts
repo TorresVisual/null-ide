@@ -6,6 +6,7 @@ import { IssuesStore } from './github/issuesStore';
 import { formatIssueAsPrompt } from './github/promptFormat';
 import { createIssueBranch, getLocallyClosedIssueNumbers } from './github/gitBranch';
 import { toggleTaskCheckbox } from './github/taskList';
+import { loadIssueTemplates } from './github/issueTemplates';
 
 type InboundMessage =
   | { type: 'ready' }
@@ -90,9 +91,11 @@ export class IssueDetailPanel {
         this.store.getRepoLabels(),
         this.store.getAssignableUsers(),
       ]);
+      const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      const templates = cwd ? loadIssueTemplates(cwd) : [];
       this.panel.webview.postMessage({
         type: 'issueDetail',
-        issue: null, comments: [], timeline: [], repoLabels, assignableUsers,
+        issue: null, comments: [], timeline: [], repoLabels, assignableUsers, templates,
         viewerLogin: this.store.getViewerLogin(),
       });
       return;
@@ -318,7 +321,7 @@ export class IssueDetailPanel {
   button.btn-reopen { background:var(--vscode-charts-green,#89d185); color:#111; }
   button.btn-reopen:hover { filter:brightness(1.08); }
   button.btn:disabled { opacity:.5; cursor:default; }
-  .edit-form input, .edit-form textarea {
+  .edit-form input, .edit-form textarea, .edit-form select {
     width:100%; box-sizing:border-box; background:var(--vscode-input-background); color:var(--vscode-input-foreground);
     border:1px solid var(--vscode-input-border,transparent); border-radius:4px; padding:8px; font:inherit; margin-bottom:8px;
   }

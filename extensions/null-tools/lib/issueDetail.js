@@ -18,6 +18,7 @@
     let lastTimeline = [];
     let repoLabels = [];
     let assignableUsers = [];
+    let issueTemplates = [];
     let viewerLogin = null;
     let editingCommentId = null;
     let labelOpen = false;
@@ -164,7 +165,7 @@
         render(issue, comments, timeline);
     }
     function renderCreateForm() {
-        var _a, _b;
+        var _a, _b, _c;
         currentIssue = null;
         labelOpen = false;
         assigneeOpen = false;
@@ -173,6 +174,11 @@
         detailEl.innerHTML = `
       <h2>New Issue</h2>
       <div class="edit-form">
+        ${issueTemplates.length > 0 ? `
+        <select id="template-picker">
+          <option value="">Blank issue</option>
+          ${issueTemplates.map((t, i) => `<option value="${i}">${escapeHtml(t.name)}</option>`).join('')}
+        </select>` : ''}
         <input id="edit-title" placeholder="Title">
         <textarea id="edit-body" placeholder="Description"></textarea>
         <div class="picker-group">
@@ -190,7 +196,21 @@
       </div>`;
         refreshLabelPicker = renderPicker('label-picker', repoLabels.map(l => ({ value: l.name, label: l.name, color: l.color })), selectedLabels, () => labelOpen, () => { labelOpen = !labelOpen; }, 'Select labels…');
         refreshAssigneePicker = renderPicker('assignee-picker', assignableUsers.map(u => ({ value: u.login, label: u.login })), selectedAssignees, () => assigneeOpen, () => { assigneeOpen = !assigneeOpen; }, 'Select assignees…');
-        (_a = document.getElementById('save-btn')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', () => {
+        (_a = document.getElementById('template-picker')) === null || _a === void 0 ? void 0 : _a.addEventListener('change', e => {
+            var _a, _b;
+            const index = e.target.value;
+            const template = index ? issueTemplates[Number(index)] : null;
+            document.getElementById('edit-title').value = (_a = template === null || template === void 0 ? void 0 : template.title) !== null && _a !== void 0 ? _a : '';
+            document.getElementById('edit-body').value = (_b = template === null || template === void 0 ? void 0 : template.body) !== null && _b !== void 0 ? _b : '';
+            selectedLabels.clear();
+            template === null || template === void 0 ? void 0 : template.labels.forEach(l => {
+                const match = repoLabels.find(rl => rl.name.toLowerCase() === l.toLowerCase());
+                if (match)
+                    selectedLabels.add(match.name);
+            });
+            refreshLabelPicker === null || refreshLabelPicker === void 0 ? void 0 : refreshLabelPicker();
+        });
+        (_b = document.getElementById('save-btn')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', () => {
             const title = document.getElementById('edit-title').value.trim();
             const body = document.getElementById('edit-body').value;
             if (!title)
@@ -200,7 +220,7 @@
                 labels: Array.from(selectedLabels), assignees: Array.from(selectedAssignees),
             });
         });
-        (_b = document.getElementById('cancel-btn')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', () => vscode.postMessage({ type: 'cancelCreate' }));
+        (_c = document.getElementById('cancel-btn')) === null || _c === void 0 ? void 0 : _c.addEventListener('click', () => vscode.postMessage({ type: 'cancelCreate' }));
     }
     function render(issue, comments, timeline) {
         const closed = issue.state === 'closed';
@@ -352,6 +372,7 @@
         });
     }
     window.addEventListener('message', event => {
+        var _a;
         const msg = event.data;
         switch (msg.type) {
             case 'issueDetail':
@@ -359,6 +380,7 @@
                 lastTimeline = msg.timeline;
                 repoLabels = msg.repoLabels;
                 assignableUsers = msg.assignableUsers;
+                issueTemplates = (_a = msg.templates) !== null && _a !== void 0 ? _a : [];
                 viewerLogin = msg.viewerLogin;
                 if (msg.issue)
                     renderDetail(msg.issue, msg.comments, msg.timeline);

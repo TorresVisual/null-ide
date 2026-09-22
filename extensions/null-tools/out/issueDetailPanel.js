@@ -39,6 +39,7 @@ const webviewUtils_1 = require("./webviewUtils");
 const promptFormat_1 = require("./github/promptFormat");
 const gitBranch_1 = require("./github/gitBranch");
 const taskList_1 = require("./github/taskList");
+const issueTemplates_1 = require("./github/issueTemplates");
 class IssueDetailPanel {
     extensionUri;
     store;
@@ -96,9 +97,11 @@ class IssueDetailPanel {
                 this.store.getRepoLabels(),
                 this.store.getAssignableUsers(),
             ]);
+            const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+            const templates = cwd ? (0, issueTemplates_1.loadIssueTemplates)(cwd) : [];
             this.panel.webview.postMessage({
                 type: 'issueDetail',
-                issue: null, comments: [], timeline: [], repoLabels, assignableUsers,
+                issue: null, comments: [], timeline: [], repoLabels, assignableUsers, templates,
                 viewerLogin: this.store.getViewerLogin(),
             });
             return;
@@ -331,7 +334,7 @@ class IssueDetailPanel {
   button.btn-reopen { background:var(--vscode-charts-green,#89d185); color:#111; }
   button.btn-reopen:hover { filter:brightness(1.08); }
   button.btn:disabled { opacity:.5; cursor:default; }
-  .edit-form input, .edit-form textarea {
+  .edit-form input, .edit-form textarea, .edit-form select {
     width:100%; box-sizing:border-box; background:var(--vscode-input-background); color:var(--vscode-input-foreground);
     border:1px solid var(--vscode-input-border,transparent); border-radius:4px; padding:8px; font:inherit; margin-bottom:8px;
   }

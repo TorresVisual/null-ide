@@ -58,3 +58,10 @@ export interface IssueFilterOptions {
   query: string;
   viewerLogin: string | null;
 }
+
+export interface IssueTemplate {
+  name: string;
+  title: string;
+  body: string;
+  labels: string[];
+}
