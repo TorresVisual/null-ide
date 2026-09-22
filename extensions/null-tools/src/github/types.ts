@@ -29,6 +29,8 @@ export interface GithubIssue {
   comments: number;
   updated_at: string;
   pull_request?: unknown;
+  /** True when an unpushed local commit will close this issue on push. Computed client-side, never sent to GitHub. */
+  closedLocally?: boolean;
 }
 
 export interface GithubComment {

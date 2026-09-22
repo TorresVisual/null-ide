@@ -5,8 +5,8 @@ import { getNonce } from './webviewUtils';
 import { IssuesStore } from './github/issuesStore';
 import { getGithubSession } from './github/githubAuth';
 import { IssueDetailPanel } from './issueDetailPanel';
-import { IssueFilterOptions, IssueState } from './github/types';
-import { createIssueBranch } from './github/gitBranch';
+import { GithubIssue, IssueFilterOptions, IssueState } from './github/types';
+import { createIssueBranch, getLocallyClosedIssueNumbers } from './github/gitBranch';
 import { formatIssueAsPrompt } from './github/promptFormat';
 
 type InboundMessage =
@@ -51,6 +51,15 @@ export class IssuesViewProvider implements vscode.WebviewViewProvider {
     return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? null;
   }
 
+  private _withClosedLocally(issues: GithubIssue[]): GithubIssue[] {
+    const cwd = this._cwd();
+    if (!cwd) return issues;
+    const closedNumbers = getLocallyClosedIssueNumbers(cwd);
+    if (closedNumbers.size === 0) return issues;
+    return issues.map(issue =>
+      issue.state === 'open' && closedNumbers.has(issue.number) ? { ...issue, closedLocally: true } : issue);
+  }
+
   private async _sendIssues(): Promise<void> {
     if (!this._view) return;
     const result = await this._store.refresh(this._cwd(), this._state);
@@ -67,7 +76,7 @@ export class IssuesViewProvider implements vscode.WebviewViewProvider {
     this._view.postMessage({
       type: 'issues',
       status: 'ok',
-      issues: this._store.getFiltered(this._filters),
+      issues: this._withClosedLocally(this._store.getFiltered(this._filters)),
       viewerLogin: result.viewerLogin,
       repoLabels,
     });
@@ -88,7 +97,7 @@ export class IssuesViewProvider implements vscode.WebviewViewProvider {
         this._view?.postMessage({
           type: 'issues',
           status: 'ok',
-          issues: this._store.getFiltered(this._filters),
+          issues: this._withClosedLocally(this._store.getFiltered(this._filters)),
           viewerLogin: this._filters.viewerLogin,
           repoLabels: await this._store.getRepoLabels(),
         });
@@ -184,6 +193,10 @@ export class IssuesViewProvider implements vscode.WebviewViewProvider {
   .you-badge {
     display:inline-block; margin-left:5px; padding:0 5px; border-radius:8px; font-size:10px;
     background:var(--vscode-badge-background); color:var(--vscode-badge-foreground);
+  }
+  .closes-badge {
+    display:inline-block; margin-left:5px; padding:0 5px; border-radius:8px; font-size:10px;
+    background:var(--vscode-charts-purple,#b180d7); color:#fff;
   }
   .issue-meta { color:var(--vscode-descriptionForeground); font-size:11px; margin-top:2px; }
   .label-chip { display:inline-block; padding:0 5px; border-radius:8px; font-size:10px; margin-right:4px; color:#111; }

@@ -82,7 +82,13 @@ class IssueDetailPanel {
             this.store.getRepoLabels(),
             this.store.getAssignableUsers(),
         ]);
-        this.panel.webview.postMessage({ type: 'issueDetail', issue, comments, repoLabels, assignableUsers });
+        const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        const closedLocally = issue.state === 'open' && !!cwd && (0, gitBranch_1.getLocallyClosedIssueNumbers)(cwd).has(issue.number);
+        this.panel.webview.postMessage({
+            type: 'issueDetail',
+            issue: closedLocally ? { ...issue, closedLocally } : issue,
+            comments, repoLabels, assignableUsers,
+        });
     }
     async _handleMessage(msg) {
         switch (msg.type) {
@@ -168,6 +174,10 @@ class IssueDetailPanel {
     padding:2px 8px; border-radius:10px; color:#fff; background:var(--vscode-charts-green,#89d185);
   }
   .state-badge.closed { background:var(--vscode-charts-purple,#b180d7); }
+  .closes-badge {
+    font-size:11px; font-weight:600; padding:2px 8px; border-radius:10px; color:#fff;
+    background:var(--vscode-charts-purple,#b180d7);
+  }
   .label-chip { display:inline-block; padding:0 5px; border-radius:8px; font-size:10px; margin-right:4px; color:#111; }
   .issue-meta { color:var(--vscode-descriptionForeground); font-size:11px; margin:6px 0; }
   .meta-row { display:flex; align-items:center; gap:6px; flex-wrap:wrap; color:var(--vscode-descriptionForeground); font-size:12px; margin:8px 0; }

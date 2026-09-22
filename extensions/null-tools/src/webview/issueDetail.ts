@@ -5,6 +5,7 @@ interface GithubUser { login: string; avatar_url: string; }
 interface GithubIssue {
   number: number; title: string; body: string; state: string; html_url: string;
   labels: GithubLabel[]; assignees: GithubUser[]; user: GithubUser; comments: number; updated_at: string;
+  closedLocally?: boolean;
 }
 interface GithubComment { id: number; user: GithubUser; body: string; created_at: string; }
 
@@ -57,7 +58,7 @@ declare const DOMPurify: { sanitize(html: string): string };
   function render(issue: GithubIssue, comments: GithubComment[]): void {
     const closed = issue.state === 'closed';
     detailEl.innerHTML = `
-      <h2><span class="state-badge${closed ? ' closed' : ''}">${issue.state}</span> #${issue.number} ${editing ? '' : escapeHtml(issue.title)}</h2>
+      <h2><span class="state-badge${closed ? ' closed' : ''}">${issue.state}</span>${issue.closedLocally ? '<span class="closes-badge" title="An unpushed local commit will close this issue">closes on push</span>' : ''} #${issue.number} ${editing ? '' : escapeHtml(issue.title)}</h2>
       <div class="meta-row">
         ${issue.labels.map(l => `<span class="label-chip" style="background:#${l.color}">${escapeHtml(l.name)}</span>`).join('')}
         ${avatar(issue.user)} opened by ${escapeHtml(issue.user.login)} · ${issue.comments} comments · updated ${issue.updated_at.slice(0, 10)}

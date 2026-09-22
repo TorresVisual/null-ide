@@ -70,6 +70,15 @@ class IssuesViewProvider {
     _cwd() {
         return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? null;
     }
+    _withClosedLocally(issues) {
+        const cwd = this._cwd();
+        if (!cwd)
+            return issues;
+        const closedNumbers = (0, gitBranch_1.getLocallyClosedIssueNumbers)(cwd);
+        if (closedNumbers.size === 0)
+            return issues;
+        return issues.map(issue => issue.state === 'open' && closedNumbers.has(issue.number) ? { ...issue, closedLocally: true } : issue);
+    }
     async _sendIssues() {
         if (!this._view)
             return;
@@ -87,7 +96,7 @@ class IssuesViewProvider {
         this._view.postMessage({
             type: 'issues',
             status: 'ok',
-            issues: this._store.getFiltered(this._filters),
+            issues: this._withClosedLocally(this._store.getFiltered(this._filters)),
             viewerLogin: result.viewerLogin,
             repoLabels,
         });
@@ -107,7 +116,7 @@ class IssuesViewProvider {
                 this._view?.postMessage({
                     type: 'issues',
                     status: 'ok',
-                    issues: this._store.getFiltered(this._filters),
+                    issues: this._withClosedLocally(this._store.getFiltered(this._filters)),
                     viewerLogin: this._filters.viewerLogin,
                     repoLabels: await this._store.getRepoLabels(),
                 });
@@ -208,6 +217,10 @@ class IssuesViewProvider {
   .you-badge {
     display:inline-block; margin-left:5px; padding:0 5px; border-radius:8px; font-size:10px;
     background:var(--vscode-badge-background); color:var(--vscode-badge-foreground);
+  }
+  .closes-badge {
+    display:inline-block; margin-left:5px; padding:0 5px; border-radius:8px; font-size:10px;
+    background:var(--vscode-charts-purple,#b180d7); color:#fff;
   }
   .issue-meta { color:var(--vscode-descriptionForeground); font-size:11px; margin-top:2px; }
   .label-chip { display:inline-block; padding:0 5px; border-radius:8px; font-size:10px; margin-right:4px; color:#111; }
