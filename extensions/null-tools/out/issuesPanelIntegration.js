@@ -38,6 +38,8 @@ const vscode = __importStar(require("vscode"));
 const issuesStore_1 = require("./github/issuesStore");
 const issuesPanel_1 = require("./issuesPanel");
 const githubRemote_1 = require("./github/githubRemote");
+const githubAuth_1 = require("./github/githubAuth");
+const githubApi_1 = require("./github/githubApi");
 function registerIssuesPanelFeature(context) {
     const store = new issuesStore_1.IssuesStore();
     const provider = new issuesPanel_1.IssuesViewProvider(context.extensionUri, store);
@@ -45,9 +47,44 @@ function registerIssuesPanelFeature(context) {
         webviewOptions: { retainContextWhenHidden: true },
     }));
     context.subscriptions.push(vscode.commands.registerCommand('null.issues.create', () => provider.createIssue()));
-    context.subscriptions.push(vscode.commands.registerCommand('null.issues.refresh', () => provider.refresh()));
-    context.subscriptions.push(vscode.commands.registerCommand('null.issues.signIn', () => provider.signIn()));
+    context.subscriptions.push(vscode.commands.registerCommand('null.issues.refresh', async () => {
+        await provider.refresh();
+        await refreshIssueCountBar();
+    }));
+    context.subscriptions.push(vscode.commands.registerCommand('null.issues.signIn', async () => {
+        await provider.signIn();
+        await refreshIssueCountBar();
+    }));
     context.subscriptions.push(vscode.commands.registerCommand('null.issues.linkFromCommitMessage', linkFromCommitMessage));
+    const countBar = vscode.window.createStatusBarItem('null.issuesCount', vscode.StatusBarAlignment.Right, -3);
+    countBar.command = 'null.issuesView.focus';
+    context.subscriptions.push(countBar);
+    async function refreshIssueCountBar() {
+        const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        const repo = cwd ? (0, githubRemote_1.getWorkspaceGithubRepo)(cwd) : null;
+        if (!repo) {
+            countBar.hide();
+            return;
+        }
+        const session = await (0, githubAuth_1.getGithubSession)(false);
+        if (!session) {
+            countBar.hide();
+            return;
+        }
+        try {
+            const issues = await (0, githubApi_1.fetchIssues)(repo.owner, repo.repo, 'open', session.accessToken);
+            const mine = issues.filter(issue => issue.assignees.some(a => a.login === session.account.label)).length;
+            countBar.text = mine > 0 ? `$(issues) ${issues.length} (${mine} mine)` : `$(issues) ${issues.length}`;
+            countBar.tooltip = `${issues.length} open issue${issues.length === 1 ? '' : 's'} in ${repo.owner}/${repo.repo}`
+                + (mine > 0 ? ` (${mine} assigned to you)` : '');
+            countBar.show();
+        }
+        catch {
+            countBar.hide();
+        }
+    }
+    context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(() => refreshIssueCountBar()));
+    void refreshIssueCountBar();
 }
 // ponytail: VS Code's SCM input box exposes only `.value` (a string) to
 // third-party extensions — there's no public document/URI to register a
