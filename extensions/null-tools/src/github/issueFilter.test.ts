@@ -2,7 +2,7 @@
 
 import assert from 'node:assert';
 import test from 'node:test';
-import { filterIssues, stripPullRequests } from './issueFilter';
+import { filterIssues, newestUpdateTime, relevantToViewer, stripPullRequests } from './issueFilter';
 import { GithubIssue } from './types';
 
 function makeIssue(overrides: Partial<GithubIssue>): GithubIssue {
@@ -59,4 +59,19 @@ test('filterIssues with no filters returns everything unchanged', () => {
   const issues = [makeIssue({ number: 1 }), makeIssue({ number: 2 })];
   const opts = { labels: [], assignee: 'everyone' as const, query: '', viewerLogin: null };
   assert.deepStrictEqual(filterIssues(issues, opts), issues);
+});
+
+test('relevantToViewer matches authored or assigned issues, and nothing without a viewer', () => {
+  const authored = makeIssue({ number: 1, user: { login: 'octocat', avatar_url: '' } });
+  const assigned = makeIssue({ number: 2, assignees: [{ login: 'octocat', avatar_url: '' }] });
+  const other = makeIssue({ number: 3 });
+  assert.deepStrictEqual(relevantToViewer([authored, assigned, other], 'octocat'), [authored, assigned]);
+  assert.deepStrictEqual(relevantToViewer([authored, assigned, other], null), []);
+});
+
+test('newestUpdateTime returns the max updated_at, or 0 for an empty list', () => {
+  const older = makeIssue({ number: 1, updated_at: '2026-01-01T00:00:00Z' });
+  const newer = makeIssue({ number: 2, updated_at: '2026-06-01T00:00:00Z' });
+  assert.strictEqual(newestUpdateTime([older, newer]), new Date('2026-06-01T00:00:00Z').getTime());
+  assert.strictEqual(newestUpdateTime([]), 0);
 });

@@ -40,28 +40,83 @@ const githubAuth_1 = require("./github/githubAuth");
 const issueDetailPanel_1 = require("./issueDetailPanel");
 const gitBranch_1 = require("./github/gitBranch");
 const promptFormat_1 = require("./github/promptFormat");
+const issueFilter_1 = require("./github/issueFilter");
 class IssuesViewProvider {
     _extensionUri;
     _store;
+    _globalState;
     _view;
+    _webviewView;
     _state = 'open';
     _filters = { labels: [], assignee: 'everyone', query: '', viewerLogin: null };
-    constructor(_extensionUri, _store) {
+    constructor(_extensionUri, _store, _globalState) {
         this._extensionUri = _extensionUri;
         this._store = _store;
+        this._globalState = _globalState;
     }
     resolveWebviewView(webviewView) {
         const webview = webviewView.webview;
         this._view = webview;
+        this._webviewView = webviewView;
         webview.options = {
             enableScripts: true,
             localResourceRoots: [vscode.Uri.joinPath(this._extensionUri, 'lib')],
         };
         webview.html = this._buildHtml(webview);
         webview.onDidReceiveMessage((msg) => this._handleMessage(msg));
+        webviewView.onDidChangeVisibility(() => {
+            if (webviewView.visible)
+                this.markRead();
+        });
+        if (webviewView.visible)
+            this.markRead();
     }
     async refresh() {
         await this._sendIssues();
+    }
+    /** Advances the per-repo "last seen" watermark to now (or the newest known issue) and clears the badge. */
+    markRead() {
+        const repo = this._store.getRepo();
+        if (!repo)
+            return;
+        const lastSeen = (0, issueFilter_1.newestUpdateTime)(this._store.getAllIssues()) || Date.now();
+        void this._globalState.update(this._lastSeenKey(repo), lastSeen);
+        if (this._webviewView)
+            this._webviewView.badge = undefined;
+    }
+    _lastSeenKey(repo) {
+        return `null.issues.lastSeen:${repo.owner}/${repo.repo}`;
+    }
+    // ponytail: resolveWebviewView only fires once the panel has actually been
+    // opened (or was left open last session), so the badge can't appear before
+    // that first open in a cold session — VS Code gives webview views no way to
+    // badge an unresolved container. No workaround worth the UX cost of forcing
+    // the panel open.
+    _updateUnreadBadge() {
+        if (!this._webviewView)
+            return;
+        const repo = this._store.getRepo();
+        if (!repo) {
+            this._webviewView.badge = undefined;
+            return;
+        }
+        if (this._webviewView.visible) {
+            this.markRead();
+            return;
+        }
+        const key = this._lastSeenKey(repo);
+        const lastSeen = this._globalState.get(key, 0);
+        const issues = this._store.getAllIssues();
+        if (lastSeen === 0) {
+            void this._globalState.update(key, (0, issueFilter_1.newestUpdateTime)(issues) || Date.now());
+            this._webviewView.badge = undefined;
+            return;
+        }
+        const unread = (0, issueFilter_1.relevantToViewer)(issues, this._filters.viewerLogin)
+            .filter(issue => new Date(issue.updated_at).getTime() > lastSeen);
+        this._webviewView.badge = unread.length > 0
+            ? { value: unread.length, tooltip: `${unread.length} unread issue${unread.length === 1 ? '' : 's'}` }
+            : undefined;
     }
     async createIssue() {
         await issueDetailPanel_1.IssueDetailPanel.showCreate(this._extensionUri, this._store, () => this._sendIssues());
@@ -103,6 +158,7 @@ class IssuesViewProvider {
             viewerLogin: result.viewerLogin,
             repoLabels,
         });
+        this._updateUnreadBadge();
     }
     async _handleMessage(msg) {
         switch (msg.type) {
@@ -139,6 +195,9 @@ class IssuesViewProvider {
                 break;
             case 'refresh':
                 await this._sendIssues();
+                break;
+            case 'markRead':
+                this.markRead();
                 break;
             case 'openIssueInBrowser': {
                 const issue = this._store.getByNumber(msg.number);
@@ -275,6 +334,7 @@ class IssuesViewProvider {
     </select>
     <button class="icon-btn" id="new-issue-btn" title="New issue">+</button>
     <button class="icon-btn" id="refresh-btn" title="Refresh">↻</button>
+    <button class="icon-btn" id="mark-read-btn" title="Mark Issues as Read"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M1 8l3.5 3.5L9 6.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 8l3.5 3.5L15 6.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     <button class="icon-btn" id="search-toggle-btn" title="Search"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="6.5" cy="6.5" r="4.5"/><path d="M10 10L14 14" stroke-linecap="round"/></svg></button>
     <button class="icon-btn" id="filter-toggle-btn" title="Filter">⚙</button>
   </div>

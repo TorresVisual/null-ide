@@ -42,7 +42,7 @@ const githubAuth_1 = require("./github/githubAuth");
 const githubApi_1 = require("./github/githubApi");
 function registerIssuesPanelFeature(context) {
     const store = new issuesStore_1.IssuesStore();
-    const provider = new issuesPanel_1.IssuesViewProvider(context.extensionUri, store);
+    const provider = new issuesPanel_1.IssuesViewProvider(context.extensionUri, store, context.globalState);
     context.subscriptions.push(vscode.window.registerWebviewViewProvider('null.issuesView', provider, {
         webviewOptions: { retainContextWhenHidden: true },
     }));
@@ -55,6 +55,7 @@ function registerIssuesPanelFeature(context) {
         await provider.signIn();
         await refreshIssueCountBar();
     }));
+    context.subscriptions.push(vscode.commands.registerCommand('null.issues.markRead', () => provider.markRead()));
     context.subscriptions.push(vscode.commands.registerCommand('null.issues.linkFromCommitMessage', linkFromCommitMessage));
     context.subscriptions.push(vscode.commands.registerCommand('null.issues.insertReference', insertIssueReference));
     const countBar = vscode.window.createStatusBarItem('null.issuesCount', vscode.StatusBarAlignment.Left, 4);

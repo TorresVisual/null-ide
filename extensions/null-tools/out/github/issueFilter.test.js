@@ -55,4 +55,17 @@ function makeIssue(overrides) {
     const opts = { labels: [], assignee: 'everyone', query: '', viewerLogin: null };
     node_assert_1.default.deepStrictEqual((0, issueFilter_1.filterIssues)(issues, opts), issues);
 });
+(0, node_test_1.default)('relevantToViewer matches authored or assigned issues, and nothing without a viewer', () => {
+    const authored = makeIssue({ number: 1, user: { login: 'octocat', avatar_url: '' } });
+    const assigned = makeIssue({ number: 2, assignees: [{ login: 'octocat', avatar_url: '' }] });
+    const other = makeIssue({ number: 3 });
+    node_assert_1.default.deepStrictEqual((0, issueFilter_1.relevantToViewer)([authored, assigned, other], 'octocat'), [authored, assigned]);
+    node_assert_1.default.deepStrictEqual((0, issueFilter_1.relevantToViewer)([authored, assigned, other], null), []);
+});
+(0, node_test_1.default)('newestUpdateTime returns the max updated_at, or 0 for an empty list', () => {
+    const older = makeIssue({ number: 1, updated_at: '2026-01-01T00:00:00Z' });
+    const newer = makeIssue({ number: 2, updated_at: '2026-06-01T00:00:00Z' });
+    node_assert_1.default.strictEqual((0, issueFilter_1.newestUpdateTime)([older, newer]), new Date('2026-06-01T00:00:00Z').getTime());
+    node_assert_1.default.strictEqual((0, issueFilter_1.newestUpdateTime)([]), 0);
+});
 //# sourceMappingURL=issueFilter.test.js.map

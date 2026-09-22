@@ -171,6 +171,10 @@
         "title": "Null: Sign in to GitHub"
       },
       {
+        "command": "null.issues.markRead",
+        "title": "Null: Mark Issues as Read"
+      },
+      {
         "command": "null.issues.linkFromCommitMessage",
         "title": "Null: Open Issue Referenced in Commit Message",
         "icon": "$(issues)"
@@ -386,6 +390,7 @@
         { "command": "null.issues.create" },
         { "command": "null.issues.refresh" },
         { "command": "null.issues.signIn" },
+        { "command": "null.issues.markRead" },
         { "command": "null.issues.linkFromCommitMessage" },
         { "command": "null.issues.insertReference" }
       ]

@@ -10,7 +10,7 @@ import { GithubIssue } from './github/types';
 
 export function registerIssuesPanelFeature(context: vscode.ExtensionContext): void {
   const store = new IssuesStore();
-  const provider = new IssuesViewProvider(context.extensionUri, store);
+  const provider = new IssuesViewProvider(context.extensionUri, store, context.globalState);
 
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider('null.issuesView', provider, {
@@ -32,6 +32,9 @@ export function registerIssuesPanelFeature(context: vscode.ExtensionContext): vo
       await provider.signIn();
       await refreshIssueCountBar();
     }),
+  );
+  context.subscriptions.push(
+    vscode.commands.registerCommand('null.issues.markRead', () => provider.markRead()),
   );
   context.subscriptions.push(
     vscode.commands.registerCommand('null.issues.linkFromCommitMessage', linkFromCommitMessage),

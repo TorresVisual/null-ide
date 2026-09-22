@@ -58,6 +58,12 @@ class IssuesStore {
     getByNumber(number) {
         return this.issues.find(issue => issue.number === number);
     }
+    getAllIssues() {
+        return this.issues;
+    }
+    getRepo() {
+        return this.repo;
+    }
     getViewerLogin() {
         return this.viewerLogin;
     }

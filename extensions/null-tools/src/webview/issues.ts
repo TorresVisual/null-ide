@@ -21,6 +21,7 @@ declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
   const listEl           = document.getElementById('list') as HTMLDivElement;
   const newIssueBtn      = document.getElementById('new-issue-btn') as HTMLButtonElement;
   const refreshBtn       = document.getElementById('refresh-btn') as HTMLButtonElement;
+  const markReadBtn      = document.getElementById('mark-read-btn') as HTMLButtonElement;
   const searchToggleBtn  = document.getElementById('search-toggle-btn') as HTMLButtonElement;
   const filterToggleBtn  = document.getElementById('filter-toggle-btn') as HTMLButtonElement;
   const searchBar        = document.getElementById('search-bar') as HTMLDivElement;
@@ -28,6 +29,7 @@ declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
 
   newIssueBtn.addEventListener('click', () => vscode.postMessage({ type: 'createIssue' }));
   refreshBtn.addEventListener('click', () => vscode.postMessage({ type: 'refresh' }));
+  markReadBtn.addEventListener('click', () => vscode.postMessage({ type: 'markRead' }));
   searchToggleBtn.addEventListener('click', () => {
     searchBar.classList.toggle('hidden');
     searchToggleBtn.classList.toggle('active');

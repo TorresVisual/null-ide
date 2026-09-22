@@ -75,6 +75,14 @@ export class IssuesStore {
     return this.issues.find(issue => issue.number === number);
   }
 
+  getAllIssues(): GithubIssue[] {
+    return this.issues;
+  }
+
+  getRepo(): GithubRepoRef | null {
+    return this.repo;
+  }
+
   getViewerLogin(): string | null {
     return this.viewerLogin;
   }
