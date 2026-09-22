@@ -37,6 +37,7 @@ exports.IssuesViewProvider = void 0;
 const vscode = __importStar(require("vscode"));
 const webviewUtils_1 = require("./webviewUtils");
 const githubAuth_1 = require("./github/githubAuth");
+const githubRemote_1 = require("./github/githubRemote");
 const issueDetailPanel_1 = require("./issueDetailPanel");
 const gitBranch_1 = require("./github/gitBranch");
 const promptFormat_1 = require("./github/promptFormat");
@@ -86,6 +87,30 @@ class IssuesViewProvider {
     }
     _lastSeenKey(repo) {
         return `null.issues.lastSeen:${repo.owner}/${repo.repo}`;
+    }
+    _cacheKey(repo, state) {
+        return `null.issues.cache:${repo.owner}/${repo.repo}:${state}`;
+    }
+    /** Paints the last successfully-fetched issue list for this repo/state, if any, before the network call resolves. */
+    _paintFromCache(cwd) {
+        if (!this._view || !cwd)
+            return false;
+        const repo = (0, githubRemote_1.getWorkspaceGithubRepo)(cwd);
+        if (!repo)
+            return false;
+        const cached = this._globalState.get(this._cacheKey(repo, this._state));
+        if (!cached)
+            return false;
+        this._store.hydrateFromCache(repo, cached.issues, cached.viewerLogin);
+        this._filters = { ...this._filters, viewerLogin: cached.viewerLogin };
+        this._view.postMessage({
+            type: 'issues',
+            status: 'ok',
+            issues: this._withClosedLocally(this._store.getFiltered(this._filters)),
+            viewerLogin: cached.viewerLogin,
+            repoLabels: cached.repoLabels,
+        });
+        return true;
     }
     // ponytail: resolveWebviewView only fires once the panel has actually been
     // opened (or was left open last session), so the badge can't appear before
@@ -140,13 +165,18 @@ class IssuesViewProvider {
     async _sendIssues() {
         if (!this._view)
             return;
-        const result = await this._store.refresh(this._cwd(), this._state);
+        const cwd = this._cwd();
+        const hadCache = this._paintFromCache(cwd);
+        const result = await this._store.refresh(cwd, this._state);
         if (result.status !== 'ok') {
-            this._view.postMessage({
-                type: 'issues',
-                status: result.status,
-                message: 'message' in result ? result.message : undefined,
-            });
+            // Offline/rate-limited: leave the cached list on screen rather than replacing it with an error.
+            if (!hadCache) {
+                this._view.postMessage({
+                    type: 'issues',
+                    status: result.status,
+                    message: 'message' in result ? result.message : undefined,
+                });
+            }
             return;
         }
         this._filters = { ...this._filters, viewerLogin: result.viewerLogin };
@@ -157,6 +187,9 @@ class IssuesViewProvider {
             issues: this._withClosedLocally(this._store.getFiltered(this._filters)),
             viewerLogin: result.viewerLogin,
             repoLabels,
+        });
+        void this._globalState.update(this._cacheKey(result.repo, this._state), {
+            issues: this._store.getAllIssues(), viewerLogin: result.viewerLogin, repoLabels,
         });
         this._updateUnreadBadge();
     }

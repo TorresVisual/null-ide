@@ -27,6 +27,13 @@ export class IssuesStore {
   private assignableUsers: GithubUser[] | null = null;
   private viewerLogin: string | null = null;
 
+  /** Seeds in-memory state from a persisted cache, without a network call. */
+  hydrateFromCache(repo: GithubRepoRef, issues: GithubIssue[], viewerLogin: string | null): void {
+    this.repo = repo;
+    this.issues = issues;
+    this.viewerLogin = viewerLogin;
+  }
+
   async refresh(cwd: string | null, state: IssueState): Promise<IssuesResult> {
     if (!cwd) return { status: 'no-workspace' };
 

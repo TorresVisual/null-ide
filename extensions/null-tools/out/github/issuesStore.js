@@ -12,6 +12,12 @@ class IssuesStore {
     repoLabels = null;
     assignableUsers = null;
     viewerLogin = null;
+    /** Seeds in-memory state from a persisted cache, without a network call. */
+    hydrateFromCache(repo, issues, viewerLogin) {
+        this.repo = repo;
+        this.issues = issues;
+        this.viewerLogin = viewerLogin;
+    }
     async refresh(cwd, state) {
         if (!cwd)
             return { status: 'no-workspace' };

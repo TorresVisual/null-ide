@@ -4,11 +4,18 @@ import * as vscode from 'vscode';
 import { getNonce } from './webviewUtils';
 import { IssuesStore } from './github/issuesStore';
 import { getGithubSession } from './github/githubAuth';
+import { getWorkspaceGithubRepo } from './github/githubRemote';
 import { IssueDetailPanel } from './issueDetailPanel';
-import { GithubIssue, GithubRepoRef, IssueFilterOptions, IssueState } from './github/types';
+import { GithubIssue, GithubLabel, GithubRepoRef, IssueFilterOptions, IssueState } from './github/types';
 import { createIssueBranch, getLocallyClosedIssueNumbers } from './github/gitBranch';
 import { formatIssueAsPrompt } from './github/promptFormat';
 import { newestUpdateTime, relevantToViewer } from './github/issueFilter';
+
+interface IssuesCacheEntry {
+  issues: GithubIssue[];
+  viewerLogin: string | null;
+  repoLabels: GithubLabel[];
+}
 
 type InboundMessage =
   | { type: 'ready' }
@@ -68,6 +75,29 @@ export class IssuesViewProvider implements vscode.WebviewViewProvider {
     return `null.issues.lastSeen:${repo.owner}/${repo.repo}`;
   }
 
+  private _cacheKey(repo: GithubRepoRef, state: IssueState): string {
+    return `null.issues.cache:${repo.owner}/${repo.repo}:${state}`;
+  }
+
+  /** Paints the last successfully-fetched issue list for this repo/state, if any, before the network call resolves. */
+  private _paintFromCache(cwd: string | null): boolean {
+    if (!this._view || !cwd) return false;
+    const repo = getWorkspaceGithubRepo(cwd);
+    if (!repo) return false;
+    const cached = this._globalState.get<IssuesCacheEntry>(this._cacheKey(repo, this._state));
+    if (!cached) return false;
+    this._store.hydrateFromCache(repo, cached.issues, cached.viewerLogin);
+    this._filters = { ...this._filters, viewerLogin: cached.viewerLogin };
+    this._view.postMessage({
+      type: 'issues',
+      status: 'ok',
+      issues: this._withClosedLocally(this._store.getFiltered(this._filters)),
+      viewerLogin: cached.viewerLogin,
+      repoLabels: cached.repoLabels,
+    });
+    return true;
+  }
+
   // ponytail: resolveWebviewView only fires once the panel has actually been
   // opened (or was left open last session), so the badge can't appear before
   // that first open in a cold session — VS Code gives webview views no way to
@@ -119,13 +149,18 @@ export class IssuesViewProvider implements vscode.WebviewViewProvider {
 
   private async _sendIssues(): Promise<void> {
     if (!this._view) return;
-    const result = await this._store.refresh(this._cwd(), this._state);
+    const cwd = this._cwd();
+    const hadCache = this._paintFromCache(cwd);
+    const result = await this._store.refresh(cwd, this._state);
     if (result.status !== 'ok') {
-      this._view.postMessage({
-        type: 'issues',
-        status: result.status,
-        message: 'message' in result ? result.message : undefined,
-      });
+      // Offline/rate-limited: leave the cached list on screen rather than replacing it with an error.
+      if (!hadCache) {
+        this._view.postMessage({
+          type: 'issues',
+          status: result.status,
+          message: 'message' in result ? result.message : undefined,
+        });
+      }
       return;
     }
     this._filters = { ...this._filters, viewerLogin: result.viewerLogin };
@@ -137,6 +172,9 @@ export class IssuesViewProvider implements vscode.WebviewViewProvider {
       viewerLogin: result.viewerLogin,
       repoLabels,
     });
+    void this._globalState.update(this._cacheKey(result.repo, this._state), {
+      issues: this._store.getAllIssues(), viewerLogin: result.viewerLogin, repoLabels,
+    } satisfies IssuesCacheEntry);
     this._updateUnreadBadge();
   }
 
