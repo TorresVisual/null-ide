@@ -14,7 +14,7 @@ function makeIssue(overrides: Partial<GithubIssue>): GithubIssue {
     html_url: 'https://github.com/o/r/issues/1',
     labels: [],
     assignees: [],
-    user: { login: 'author' },
+    user: { login: 'author', avatar_url: '' },
     comments: 0,
     updated_at: '2026-01-01T00:00:00Z',
     ...overrides,
@@ -35,14 +35,14 @@ test('filterIssues requires ALL selected labels to be present (AND)', () => {
 });
 
 test('filterIssues "me" never falls back to showing everyone when signed out', () => {
-  const a = makeIssue({ number: 1, assignees: [{ login: 'octocat' }] });
+  const a = makeIssue({ number: 1, assignees: [{ login: 'octocat', avatar_url: '' }] });
   const opts = { labels: [], assignee: 'me' as const, query: '', viewerLogin: null };
   assert.deepStrictEqual(filterIssues([a], opts), []);
 });
 
 test('filterIssues "me" matches the viewer\'s own assigned issues', () => {
-  const mine = makeIssue({ number: 1, assignees: [{ login: 'octocat' }] });
-  const other = makeIssue({ number: 2, assignees: [{ login: 'someoneelse' }] });
+  const mine = makeIssue({ number: 1, assignees: [{ login: 'octocat', avatar_url: '' }] });
+  const other = makeIssue({ number: 2, assignees: [{ login: 'someoneelse', avatar_url: '' }] });
   const opts = { labels: [], assignee: 'me' as const, query: '', viewerLogin: 'octocat' };
   assert.deepStrictEqual(filterIssues([mine, other], opts), [mine]);
 });

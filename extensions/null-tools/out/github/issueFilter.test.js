@@ -15,7 +15,7 @@ function makeIssue(overrides) {
         html_url: 'https://github.com/o/r/issues/1',
         labels: [],
         assignees: [],
-        user: { login: 'author' },
+        user: { login: 'author', avatar_url: '' },
         comments: 0,
         updated_at: '2026-01-01T00:00:00Z',
         ...overrides,
@@ -33,13 +33,13 @@ function makeIssue(overrides) {
     node_assert_1.default.deepStrictEqual((0, issueFilter_1.filterIssues)([a, b], opts), [b]);
 });
 (0, node_test_1.default)('filterIssues "me" never falls back to showing everyone when signed out', () => {
-    const a = makeIssue({ number: 1, assignees: [{ login: 'octocat' }] });
+    const a = makeIssue({ number: 1, assignees: [{ login: 'octocat', avatar_url: '' }] });
     const opts = { labels: [], assignee: 'me', query: '', viewerLogin: null };
     node_assert_1.default.deepStrictEqual((0, issueFilter_1.filterIssues)([a], opts), []);
 });
 (0, node_test_1.default)('filterIssues "me" matches the viewer\'s own assigned issues', () => {
-    const mine = makeIssue({ number: 1, assignees: [{ login: 'octocat' }] });
-    const other = makeIssue({ number: 2, assignees: [{ login: 'someoneelse' }] });
+    const mine = makeIssue({ number: 1, assignees: [{ login: 'octocat', avatar_url: '' }] });
+    const other = makeIssue({ number: 2, assignees: [{ login: 'someoneelse', avatar_url: '' }] });
     const opts = { labels: [], assignee: 'me', query: '', viewerLogin: 'octocat' };
     node_assert_1.default.deepStrictEqual((0, issueFilter_1.filterIssues)([mine, other], opts), [mine]);
 });

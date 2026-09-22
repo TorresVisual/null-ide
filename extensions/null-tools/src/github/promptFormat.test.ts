@@ -14,7 +14,7 @@ function makeIssue(overrides: Partial<GithubIssue>): GithubIssue {
     html_url: 'https://github.com/o/r/issues/1',
     labels: [],
     assignees: [],
-    user: { login: 'author' },
+    user: { login: 'author', avatar_url: '' },
     comments: 0,
     updated_at: '2026-01-01T00:00:00Z',
     ...overrides,

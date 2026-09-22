@@ -157,7 +157,7 @@ class IssueDetailPanel {
         return `<!DOCTYPE html><html lang="en"><head>
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy"
-      content="default-src 'none'; script-src ${this.panel.webview.cspSource} 'nonce-${nonce}'; style-src ${this.panel.webview.cspSource} 'unsafe-inline';">
+      content="default-src 'none'; script-src ${this.panel.webview.cspSource} 'nonce-${nonce}'; style-src ${this.panel.webview.cspSource} 'unsafe-inline'; img-src ${this.panel.webview.cspSource} https://avatars.githubusercontent.com;">
 <style>
   html,body { margin:0; padding:0; height:100%; background:var(--vscode-editor-background); color:var(--vscode-foreground);
               font:13px/1.6 var(--vscode-font-family); }
@@ -172,9 +172,11 @@ class IssueDetailPanel {
   .issue-meta { color:var(--vscode-descriptionForeground); font-size:11px; margin:6px 0; }
   .meta-row { display:flex; align-items:center; gap:6px; flex-wrap:wrap; color:var(--vscode-descriptionForeground); font-size:12px; margin:8px 0; }
   .avatar {
-    width:20px; height:20px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center;
-    font-size:9px; font-weight:700; color:#fff; flex-shrink:0;
+    position:relative; overflow:hidden; width:20px; height:20px; border-radius:50%; display:inline-flex;
+    align-items:center; justify-content:center; font-size:9px; font-weight:700; color:#fff; flex-shrink:0;
   }
+  .avatar::before { content: attr(data-initials); }
+  .avatar img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
   .assignees-row { display:flex; align-items:center; gap:6px; margin:10px 0; }
   .assignees-label { text-transform:uppercase; letter-spacing:.06em; color:var(--vscode-descriptionForeground); font-size:10px; }
   .assignee-chip {

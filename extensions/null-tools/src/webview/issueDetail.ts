@@ -1,7 +1,7 @@
 'use strict';
 
 interface GithubLabel { name: string; color: string; }
-interface GithubUser { login: string; }
+interface GithubUser { login: string; avatar_url: string; }
 interface GithubIssue {
   number: number; title: string; body: string; state: string; html_url: string;
   labels: GithubLabel[]; assignees: GithubUser[]; user: GithubUser; comments: number; updated_at: string;
@@ -37,9 +37,15 @@ declare const DOMPurify: { sanitize(html: string): string };
     for (let i = 0; i < login.length; i++) hash = (hash * 31 + login.charCodeAt(i)) >>> 0;
     return AVATAR_COLORS[hash % AVATAR_COLORS.length];
   }
-  function avatar(login: string): string {
-    const initials = escapeHtml(login.slice(0, 2).toUpperCase());
-    return `<span class="avatar" style="background:${avatarColor(login)}">${initials}</span>`;
+  function avatar(user: GithubUser): string {
+    const initials = escapeHtml(user.login.slice(0, 2).toUpperCase());
+    return `<span class="avatar" style="background:${avatarColor(user.login)}" data-initials="${initials}">` +
+      `${user.avatar_url ? `<img src="${escapeHtml(user.avatar_url)}" alt="">` : ''}</span>`;
+  }
+
+  function bindAvatarFallbacks(): void {
+    detailEl.querySelectorAll<HTMLImageElement>('.avatar img').forEach(img =>
+      img.addEventListener('error', () => { img.style.display = 'none'; }, { once: true }));
   }
 
   function renderDetail(issue: GithubIssue, comments: GithubComment[]): void {
@@ -54,12 +60,12 @@ declare const DOMPurify: { sanitize(html: string): string };
       <h2><span class="state-badge${closed ? ' closed' : ''}">${issue.state}</span> #${issue.number} ${editing ? '' : escapeHtml(issue.title)}</h2>
       <div class="meta-row">
         ${issue.labels.map(l => `<span class="label-chip" style="background:#${l.color}">${escapeHtml(l.name)}</span>`).join('')}
-        ${avatar(issue.user.login)} opened by ${escapeHtml(issue.user.login)} · ${issue.comments} comments · updated ${issue.updated_at.slice(0, 10)}
+        ${avatar(issue.user)} opened by ${escapeHtml(issue.user.login)} · ${issue.comments} comments · updated ${issue.updated_at.slice(0, 10)}
       </div>
       ${issue.assignees.length > 0 ? `
       <div class="assignees-row">
         <span class="assignees-label">Assignees:</span>
-        ${issue.assignees.map(a => `<span class="assignee-chip">${avatar(a.login)} ${escapeHtml(a.login)}</span>`).join('')}
+        ${issue.assignees.map(a => `<span class="assignee-chip">${avatar(a)} ${escapeHtml(a.login)}</span>`).join('')}
       </div>` : ''}
       ${editing ? `
       <div class="edit-form">
@@ -102,7 +108,7 @@ declare const DOMPurify: { sanitize(html: string): string };
       <div id="comments">
         ${comments.map(c => `
           <div class="comment">
-            <span class="comment-author">${avatar(c.user.login)} ${escapeHtml(c.user.login)}</span>
+            <span class="comment-author">${avatar(c.user)} ${escapeHtml(c.user.login)}</span>
             <span class="issue-meta">${c.created_at.slice(0, 10)}</span>
             <div class="comment-body">${renderMarkdown(c.body)}</div>
           </div>`).join('') || '<div class="issue-meta">No comments yet.</div>'}
@@ -114,6 +120,7 @@ declare const DOMPurify: { sanitize(html: string): string };
         </div>
       </div>`;
     bindEvents(issue);
+    bindAvatarFallbacks();
   }
 
   function bindEvents(issue: GithubIssue): void {

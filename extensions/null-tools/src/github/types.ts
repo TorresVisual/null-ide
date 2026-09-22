@@ -14,6 +14,7 @@ export interface GithubLabel {
 
 export interface GithubUser {
   login: string;
+  avatar_url: string;
 }
 
 export interface GithubIssue {
