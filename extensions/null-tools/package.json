@@ -157,6 +157,11 @@
         "icon": "media/null-notes.svg"
       },
       {
+        "command": "null.issues.create",
+        "title": "Null: New GitHub Issue",
+        "icon": "$(add)"
+      },
+      {
         "command": "null.issues.refresh",
         "title": "Null: Refresh GitHub Issues",
         "icon": "$(refresh)"
@@ -298,6 +303,11 @@
           "group": "navigation"
         },
         {
+          "command": "null.issues.create",
+          "when": "view == null.issuesView",
+          "group": "navigation"
+        },
+        {
           "command": "null.issues.refresh",
           "when": "view == null.issuesView",
           "group": "navigation"
@@ -363,6 +373,7 @@
         { "command": "null.ports.copyUrl" },
         { "command": "null.toggleDiscordPresence" },
         { "command": "null.discord.testConnection" },
+        { "command": "null.issues.create" },
         { "command": "null.issues.refresh" },
         { "command": "null.issues.signIn" },
         { "command": "null.issues.linkFromCommitMessage" }

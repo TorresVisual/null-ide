@@ -66,12 +66,24 @@ class IssuesStore {
             return Promise.resolve([]);
         return (0, githubApi_1.fetchComments)(this.repo.owner, this.repo.repo, issueNumber, this.token);
     }
+    getTimeline(issueNumber) {
+        if (!this.repo)
+            return Promise.resolve([]);
+        return (0, githubApi_1.fetchTimeline)(this.repo.owner, this.repo.repo, issueNumber, this.token);
+    }
     async updateIssue(issueNumber, patch) {
         if (!this.repo)
             return null;
         const updated = await (0, githubApi_1.updateIssue)(this.repo.owner, this.repo.repo, issueNumber, patch, this.token);
         this.issues = this.issues.map(issue => (issue.number === issueNumber ? updated : issue));
         return updated;
+    }
+    async createIssue(data) {
+        if (!this.repo)
+            return null;
+        const created = await (0, githubApi_1.createIssue)(this.repo.owner, this.repo.repo, data, this.token);
+        this.issues = [created, ...this.issues];
+        return created;
     }
     async addComment(issueNumber, body) {
         if (!this.repo)

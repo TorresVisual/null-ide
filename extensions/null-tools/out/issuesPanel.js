@@ -63,6 +63,9 @@ class IssuesViewProvider {
     async refresh() {
         await this._sendIssues();
     }
+    async createIssue() {
+        await issueDetailPanel_1.IssueDetailPanel.showCreate(this._extensionUri, this._store, () => this._sendIssues());
+    }
     async signIn() {
         await (0, githubAuth_1.getGithubSession)(true);
         await this._sendIssues();
@@ -128,6 +131,9 @@ class IssuesViewProvider {
                 await issueDetailPanel_1.IssueDetailPanel.show(this._extensionUri, this._store, msg.number);
                 break;
             }
+            case 'createIssue':
+                await this.createIssue();
+                break;
             case 'signIn':
                 await this.signIn();
                 break;
@@ -245,6 +251,7 @@ class IssuesViewProvider {
       <option value="closed">Closed</option>
       <option value="all">All</option>
     </select>
+    <button class="icon-btn" id="new-issue-btn" title="New issue">+</button>
     <button class="icon-btn" id="refresh-btn" title="Refresh">↻</button>
     <button class="icon-btn" id="search-toggle-btn" title="Search"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="6.5" cy="6.5" r="4.5"/><path d="M10 10L14 14" stroke-linecap="round"/></svg></button>
     <button class="icon-btn" id="filter-toggle-btn" title="Filter">⚙</button>

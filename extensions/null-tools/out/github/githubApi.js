@@ -35,7 +35,9 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.fetchIssues = fetchIssues;
 exports.fetchComments = fetchComments;
+exports.fetchTimeline = fetchTimeline;
 exports.updateIssue = updateIssue;
+exports.createIssue = createIssue;
 exports.createComment = createComment;
 exports.updateComment = updateComment;
 exports.deleteComment = deleteComment;
@@ -93,8 +95,14 @@ async function fetchIssues(owner, repo, state, token) {
 function fetchComments(owner, repo, issueNumber, token) {
     return requestJson(`/repos/${owner}/${repo}/issues/${issueNumber}/comments?per_page=100`, token);
 }
+function fetchTimeline(owner, repo, issueNumber, token) {
+    return requestJson(`/repos/${owner}/${repo}/issues/${issueNumber}/timeline?per_page=100`, token);
+}
 function updateIssue(owner, repo, issueNumber, patch, token) {
     return requestJson(`/repos/${owner}/${repo}/issues/${issueNumber}`, token, 'PATCH', patch);
+}
+function createIssue(owner, repo, data, token) {
+    return requestJson(`/repos/${owner}/${repo}/issues`, token, 'POST', data);
 }
 function createComment(owner, repo, issueNumber, body, token) {
     return requestJson(`/repos/${owner}/${repo}/issues/${issueNumber}/comments`, token, 'POST', { body });

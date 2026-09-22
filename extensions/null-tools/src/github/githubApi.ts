@@ -74,6 +74,14 @@ export function updateIssue(
   return requestJson<GithubIssue>(`/repos/${owner}/${repo}/issues/${issueNumber}`, token, 'PATCH', patch);
 }
 
+export function createIssue(
+  owner: string, repo: string,
+  data: { title: string; body?: string; labels?: string[]; assignees?: string[] },
+  token: string | null,
+): Promise<GithubIssue> {
+  return requestJson<GithubIssue>(`/repos/${owner}/${repo}/issues`, token, 'POST', data);
+}
+
 export function createComment(
   owner: string, repo: string, issueNumber: number, body: string, token: string | null,
 ): Promise<GithubComment> {

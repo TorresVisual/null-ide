@@ -3,7 +3,7 @@
 import { getWorkspaceGithubRepo } from './githubRemote';
 import { getGithubSession } from './githubAuth';
 import {
-  createComment, deleteComment, fetchAssignableUsers, fetchComments, fetchIssues, fetchRepoLabels,
+  createComment, createIssue, deleteComment, fetchAssignableUsers, fetchComments, fetchIssues, fetchRepoLabels,
   fetchTimeline, updateComment, updateIssue,
 } from './githubApi';
 import { filterIssues } from './issueFilter';
@@ -97,6 +97,15 @@ export class IssuesStore {
     const updated = await updateIssue(this.repo.owner, this.repo.repo, issueNumber, patch, this.token);
     this.issues = this.issues.map(issue => (issue.number === issueNumber ? updated : issue));
     return updated;
+  }
+
+  async createIssue(
+    data: { title: string; body?: string; labels?: string[]; assignees?: string[] },
+  ): Promise<GithubIssue | null> {
+    if (!this.repo) return null;
+    const created = await createIssue(this.repo.owner, this.repo.repo, data, this.token);
+    this.issues = [created, ...this.issues];
+    return created;
   }
 
   async addComment(issueNumber: number, body: string): Promise<GithubComment | null> {

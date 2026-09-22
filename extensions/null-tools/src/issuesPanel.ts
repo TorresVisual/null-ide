@@ -14,6 +14,7 @@ type InboundMessage =
   | { type: 'setState'; state: IssueState }
   | { type: 'setFilters'; labels: string[]; assignee: 'me' | 'everyone'; query: string }
   | { type: 'selectIssue'; number: number }
+  | { type: 'createIssue' }
   | { type: 'signIn' }
   | { type: 'refresh' }
   | { type: 'openIssueInBrowser'; number: number }
@@ -40,6 +41,10 @@ export class IssuesViewProvider implements vscode.WebviewViewProvider {
 
   async refresh(): Promise<void> {
     await this._sendIssues();
+  }
+
+  async createIssue(): Promise<void> {
+    await IssueDetailPanel.showCreate(this._extensionUri, this._store, () => this._sendIssues());
   }
 
   async signIn(): Promise<void> {
@@ -108,6 +113,9 @@ export class IssuesViewProvider implements vscode.WebviewViewProvider {
         await IssueDetailPanel.show(this._extensionUri, this._store, msg.number);
         break;
       }
+      case 'createIssue':
+        await this.createIssue();
+        break;
       case 'signIn':
         await this.signIn();
         break;
@@ -221,6 +229,7 @@ export class IssuesViewProvider implements vscode.WebviewViewProvider {
       <option value="closed">Closed</option>
       <option value="all">All</option>
     </select>
+    <button class="icon-btn" id="new-issue-btn" title="New issue">+</button>
     <button class="icon-btn" id="refresh-btn" title="Refresh">↻</button>
     <button class="icon-btn" id="search-toggle-btn" title="Search"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="6.5" cy="6.5" r="4.5"/><path d="M10 10L14 14" stroke-linecap="round"/></svg></button>
     <button class="icon-btn" id="filter-toggle-btn" title="Filter">⚙</button>

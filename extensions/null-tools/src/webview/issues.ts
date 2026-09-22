@@ -19,12 +19,14 @@ declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
   const labelPicker      = document.getElementById('label-picker') as HTMLDivElement;
   const searchInput      = document.getElementById('search-input') as HTMLInputElement;
   const listEl           = document.getElementById('list') as HTMLDivElement;
+  const newIssueBtn      = document.getElementById('new-issue-btn') as HTMLButtonElement;
   const refreshBtn       = document.getElementById('refresh-btn') as HTMLButtonElement;
   const searchToggleBtn  = document.getElementById('search-toggle-btn') as HTMLButtonElement;
   const filterToggleBtn  = document.getElementById('filter-toggle-btn') as HTMLButtonElement;
   const searchBar        = document.getElementById('search-bar') as HTMLDivElement;
   const filterPopover    = document.getElementById('filter-popover') as HTMLDivElement;
 
+  newIssueBtn.addEventListener('click', () => vscode.postMessage({ type: 'createIssue' }));
   refreshBtn.addEventListener('click', () => vscode.postMessage({ type: 'refresh' }));
   searchToggleBtn.addEventListener('click', () => {
     searchBar.classList.toggle('hidden');

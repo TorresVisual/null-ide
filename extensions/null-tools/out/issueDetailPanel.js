@@ -44,19 +44,28 @@ class IssueDetailPanel {
     static current;
     panel;
     issueNumber = 0;
+    creating = false;
+    onCreated;
     static async show(extensionUri, store, issueNumber) {
+        IssueDetailPanel.open(extensionUri, store);
+        await IssueDetailPanel.current.openIssue(issueNumber);
+    }
+    static async showCreate(extensionUri, store, onCreated) {
+        IssueDetailPanel.open(extensionUri, store);
+        await IssueDetailPanel.current.openCreate(onCreated);
+    }
+    static open(extensionUri, store) {
         if (IssueDetailPanel.current) {
             IssueDetailPanel.current.panel.reveal(vscode.ViewColumn.Active);
         }
         else {
-            const panel = vscode.window.createWebviewPanel('null-tools.issueDetail', `Issue #${issueNumber}`, vscode.ViewColumn.Active, {
+            const panel = vscode.window.createWebviewPanel('null-tools.issueDetail', 'Issue', vscode.ViewColumn.Active, {
                 enableScripts: true,
                 retainContextWhenHidden: true,
                 localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'lib')],
             });
             IssueDetailPanel.current = new IssueDetailPanel(panel, extensionUri, store);
         }
-        await IssueDetailPanel.current.open(issueNumber);
     }
     constructor(panel, extensionUri, store) {
         this.extensionUri = extensionUri;
@@ -68,17 +77,37 @@ class IssueDetailPanel {
             IssueDetailPanel.current = undefined;
         });
     }
-    async open(issueNumber) {
+    async openIssue(issueNumber) {
+        this.creating = false;
         this.issueNumber = issueNumber;
         this.panel.title = `Issue #${issueNumber}`;
         await this._sendDetail();
     }
+    async openCreate(onCreated) {
+        this.creating = true;
+        this.onCreated = onCreated;
+        this.panel.title = 'New Issue';
+        await this._sendDetail();
+    }
     async _sendDetail() {
+        if (this.creating) {
+            const [repoLabels, assignableUsers] = await Promise.all([
+                this.store.getRepoLabels(),
+                this.store.getAssignableUsers(),
+            ]);
+            this.panel.webview.postMessage({
+                type: 'issueDetail',
+                issue: null, comments: [], timeline: [], repoLabels, assignableUsers,
+                viewerLogin: this.store.getViewerLogin(),
+            });
+            return;
+        }
         const issue = this.store.getByNumber(this.issueNumber);
         if (!issue)
             return;
-        const [comments, repoLabels, assignableUsers] = await Promise.all([
+        const [comments, timeline, repoLabels, assignableUsers] = await Promise.all([
             this.store.getComments(this.issueNumber),
+            this.store.getTimeline(this.issueNumber),
             this.store.getRepoLabels(),
             this.store.getAssignableUsers(),
         ]);
@@ -87,7 +116,7 @@ class IssueDetailPanel {
         this.panel.webview.postMessage({
             type: 'issueDetail',
             issue: closedLocally ? { ...issue, closedLocally } : issue,
-            comments, repoLabels, assignableUsers,
+            comments, timeline, repoLabels, assignableUsers,
             viewerLogin: this.store.getViewerLogin(),
         });
     }
@@ -174,6 +203,24 @@ class IssueDetailPanel {
                 }
                 break;
             }
+            case 'submitCreate': {
+                try {
+                    const created = await this.store.createIssue({
+                        title: msg.title, body: msg.body, labels: msg.labels, assignees: msg.assignees,
+                    });
+                    if (!created)
+                        break;
+                    this.onCreated?.();
+                    await this.openIssue(created.number);
+                }
+                catch (err) {
+                    void vscode.window.showErrorMessage(`Failed to create issue: ${err.message}`);
+                }
+                break;
+            }
+            case 'cancelCreate':
+                this.panel.dispose();
+                break;
         }
     }
     _buildHtml() {
@@ -262,6 +309,8 @@ class IssueDetailPanel {
   .chip-check input { margin:0; }
   h3 { font-size:13px; margin:22px 0 8px; }
   .comment { border-top:1px solid var(--vscode-widget-border,rgba(128,128,128,.2)); padding:10px 0; }
+  .timeline-event { color:var(--vscode-descriptionForeground); font-size:12px; padding:6px 0; }
+  .timeline-event code { background:var(--vscode-textCodeBlock-background,rgba(128,128,128,.08)); padding:1px 4px; border-radius:3px; }
   .comment-author { color:var(--vscode-textLink-foreground); font-weight:600; }
   #composer { margin-top:10px; }
   #comment-input {

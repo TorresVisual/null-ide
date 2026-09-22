@@ -44,6 +44,7 @@ function registerIssuesPanelFeature(context) {
     context.subscriptions.push(vscode.window.registerWebviewViewProvider('null.issuesView', provider, {
         webviewOptions: { retainContextWhenHidden: true },
     }));
+    context.subscriptions.push(vscode.commands.registerCommand('null.issues.create', () => provider.createIssue()));
     context.subscriptions.push(vscode.commands.registerCommand('null.issues.refresh', () => provider.refresh()));
     context.subscriptions.push(vscode.commands.registerCommand('null.issues.signIn', () => provider.signIn()));
     context.subscriptions.push(vscode.commands.registerCommand('null.issues.linkFromCommitMessage', linkFromCommitMessage));

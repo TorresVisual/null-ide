@@ -117,6 +117,54 @@ declare const DOMPurify: { sanitize(html: string): string };
     render(issue, comments, timeline);
   }
 
+  function renderCreateForm(): void {
+    currentIssue = null;
+    detailEl.innerHTML = `
+      <h2>New Issue</h2>
+      <div class="edit-form">
+        <input id="edit-title" placeholder="Title">
+        <textarea id="edit-body" placeholder="Description"></textarea>
+        <div class="picker-group">
+          <span class="assignees-label">Labels:</span>
+          <div class="chip-picker" id="label-picker">
+            ${repoLabels.length === 0 ? '<span class="issue-meta">No labels in this repo.</span>' : repoLabels.map(l => `
+              <label class="chip-check">
+                <input type="checkbox" value="${escapeHtml(l.name)}">
+                <span class="label-chip" style="${labelChipStyle(l.color)}">${escapeHtml(l.name)}</span>
+              </label>`).join('')}
+          </div>
+        </div>
+        <div class="picker-group">
+          <span class="assignees-label">Assignees:</span>
+          <div class="chip-picker" id="assignee-picker">
+            ${assignableUsers.length === 0 ? '<span class="issue-meta">No assignable users.</span>' : assignableUsers.map(u => `
+              <label class="chip-check">
+                <input type="checkbox" value="${escapeHtml(u.login)}">
+                ${escapeHtml(u.login)}
+              </label>`).join('')}
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="save-btn">Create</button>
+          <button class="btn btn-secondary" id="cancel-btn">Cancel</button>
+        </div>
+      </div>`;
+    document.getElementById('save-btn')?.addEventListener('click', () => {
+      const title = (document.getElementById('edit-title') as HTMLInputElement).value.trim();
+      const body = (document.getElementById('edit-body') as HTMLTextAreaElement).value;
+      if (!title) return;
+      const labels = Array.from(
+        document.querySelectorAll<HTMLInputElement>('#label-picker input:checked'),
+      ).map(el => el.value);
+      const assignees = Array.from(
+        document.querySelectorAll<HTMLInputElement>('#assignee-picker input:checked'),
+      ).map(el => el.value);
+      vscode.postMessage({ type: 'submitCreate', title, body, labels, assignees });
+    });
+    document.getElementById('cancel-btn')?.addEventListener('click', () =>
+      vscode.postMessage({ type: 'cancelCreate' }));
+  }
+
   function render(issue: GithubIssue, comments: GithubComment[], timeline: GithubTimelineEvent[]): void {
     const closed = issue.state === 'closed';
     detailEl.innerHTML = `
@@ -266,7 +314,8 @@ declare const DOMPurify: { sanitize(html: string): string };
         repoLabels = msg.repoLabels;
         assignableUsers = msg.assignableUsers;
         viewerLogin = msg.viewerLogin;
-        renderDetail(msg.issue, msg.comments, msg.timeline);
+        if (msg.issue) renderDetail(msg.issue, msg.comments, msg.timeline);
+        else renderCreateForm();
         break;
       case 'copied': {
         const btn = detailEl.querySelector('#copy-btn');

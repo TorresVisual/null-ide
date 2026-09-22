@@ -15,21 +15,35 @@ type InboundMessage =
   | { type: 'createBranch' }
   | { type: 'postComment'; body: string }
   | { type: 'editComment'; commentId: number; body: string }
-  | { type: 'deleteComment'; commentId: number };
+  | { type: 'deleteComment'; commentId: number }
+  | { type: 'submitCreate'; title: string; body: string; labels: string[]; assignees: string[] }
+  | { type: 'cancelCreate' };
 
 export class IssueDetailPanel {
   private static current: IssueDetailPanel | undefined;
 
   private readonly panel: vscode.WebviewPanel;
   private issueNumber = 0;
+  private creating = false;
+  private onCreated?: () => void;
 
   static async show(extensionUri: vscode.Uri, store: IssuesStore, issueNumber: number): Promise<void> {
+    IssueDetailPanel.open(extensionUri, store);
+    await IssueDetailPanel.current!.openIssue(issueNumber);
+  }
+
+  static async showCreate(extensionUri: vscode.Uri, store: IssuesStore, onCreated?: () => void): Promise<void> {
+    IssueDetailPanel.open(extensionUri, store);
+    await IssueDetailPanel.current!.openCreate(onCreated);
+  }
+
+  private static open(extensionUri: vscode.Uri, store: IssuesStore): void {
     if (IssueDetailPanel.current) {
       IssueDetailPanel.current.panel.reveal(vscode.ViewColumn.Active);
     } else {
       const panel = vscode.window.createWebviewPanel(
         'null-tools.issueDetail',
-        `Issue #${issueNumber}`,
+        'Issue',
         vscode.ViewColumn.Active,
         {
           enableScripts: true,
@@ -39,7 +53,6 @@ export class IssueDetailPanel {
       );
       IssueDetailPanel.current = new IssueDetailPanel(panel, extensionUri, store);
     }
-    await IssueDetailPanel.current.open(issueNumber);
   }
 
   private constructor(
@@ -55,13 +68,33 @@ export class IssueDetailPanel {
     });
   }
 
-  private async open(issueNumber: number): Promise<void> {
+  private async openIssue(issueNumber: number): Promise<void> {
+    this.creating = false;
     this.issueNumber = issueNumber;
     this.panel.title = `Issue #${issueNumber}`;
     await this._sendDetail();
   }
 
+  private async openCreate(onCreated?: () => void): Promise<void> {
+    this.creating = true;
+    this.onCreated = onCreated;
+    this.panel.title = 'New Issue';
+    await this._sendDetail();
+  }
+
   private async _sendDetail(): Promise<void> {
+    if (this.creating) {
+      const [repoLabels, assignableUsers] = await Promise.all([
+        this.store.getRepoLabels(),
+        this.store.getAssignableUsers(),
+      ]);
+      this.panel.webview.postMessage({
+        type: 'issueDetail',
+        issue: null, comments: [], timeline: [], repoLabels, assignableUsers,
+        viewerLogin: this.store.getViewerLogin(),
+      });
+      return;
+    }
     const issue = this.store.getByNumber(this.issueNumber);
     if (!issue) return;
     const [comments, timeline, repoLabels, assignableUsers] = await Promise.all([
@@ -153,6 +186,22 @@ export class IssueDetailPanel {
         }
         break;
       }
+      case 'submitCreate': {
+        try {
+          const created = await this.store.createIssue({
+            title: msg.title, body: msg.body, labels: msg.labels, assignees: msg.assignees,
+          });
+          if (!created) break;
+          this.onCreated?.();
+          await this.openIssue(created.number);
+        } catch (err) {
+          void vscode.window.showErrorMessage(`Failed to create issue: ${(err as Error).message}`);
+        }
+        break;
+      }
+      case 'cancelCreate':
+        this.panel.dispose();
+        break;
     }
   }
 

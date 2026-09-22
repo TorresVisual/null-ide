@@ -16,6 +16,9 @@ export function registerIssuesPanelFeature(context: vscode.ExtensionContext): vo
   );
 
   context.subscriptions.push(
+    vscode.commands.registerCommand('null.issues.create', () => provider.createIssue()),
+  );
+  context.subscriptions.push(
     vscode.commands.registerCommand('null.issues.refresh', () => provider.refresh()),
   );
   context.subscriptions.push(

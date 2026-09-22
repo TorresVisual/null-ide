@@ -5,6 +5,7 @@
     let editing = false;
     let currentIssue = null;
     let lastComments = [];
+    let lastTimeline = [];
     let repoLabels = [];
     let assignableUsers = [];
     let viewerLogin = null;
@@ -36,13 +37,99 @@
     function bindAvatarFallbacks() {
         detailEl.querySelectorAll('.avatar img').forEach(img => img.addEventListener('error', () => { img.style.display = 'none'; }, { once: true }));
     }
-    function renderDetail(issue, comments) {
+    function shortSha(sha) {
+        return sha.slice(0, 7);
+    }
+    function timelineEventText(ev) {
+        var _a;
+        const actorName = ev.actor ? escapeHtml(ev.actor.login) : 'someone';
+        switch (ev.event) {
+            case 'closed':
+                return `${actorName} closed this${ev.commit_id ? ` via commit <code>${shortSha(ev.commit_id)}</code>` : ''}`;
+            case 'reopened':
+                return `${actorName} reopened this`;
+            case 'labeled':
+                return ev.label
+                    ? `${actorName} added the <span class="label-chip" style="${labelChipStyle(ev.label.color)}">${escapeHtml(ev.label.name)}</span> label` : null;
+            case 'unlabeled':
+                return ev.label
+                    ? `${actorName} removed the <span class="label-chip" style="${labelChipStyle(ev.label.color)}">${escapeHtml(ev.label.name)}</span> label` : null;
+            case 'assigned':
+                return ev.assignee ? `${actorName} assigned ${escapeHtml(ev.assignee.login)}` : null;
+            case 'unassigned':
+                return ev.assignee ? `${actorName} unassigned ${escapeHtml(ev.assignee.login)}` : null;
+            case 'renamed':
+                return ev.rename
+                    ? `${actorName} changed the title from "${escapeHtml(ev.rename.from)}" to "${escapeHtml(ev.rename.to)}"` : null;
+            case 'cross-referenced':
+                return ((_a = ev.source) === null || _a === void 0 ? void 0 : _a.issue)
+                    ? `${actorName} referenced this in <a href="${escapeHtml(ev.source.issue.html_url)}">#${ev.source.issue.number}</a>` : null;
+            case 'referenced':
+                return ev.commit_id ? `${actorName} referenced this in commit <code>${shortSha(ev.commit_id)}</code>` : null;
+            default:
+                return null;
+        }
+    }
+    function buildFeed(comments, timeline) {
+        const items = comments.map(c => ({ kind: 'comment', created_at: c.created_at, comment: c }));
+        for (const ev of timeline) {
+            const text = timelineEventText(ev);
+            if (text)
+                items.push({ kind: 'event', created_at: ev.created_at, text });
+        }
+        return items.sort((a, b) => a.created_at.localeCompare(b.created_at));
+    }
+    function renderDetail(issue, comments, timeline) {
         currentIssue = issue;
         editing = false;
         editingCommentId = null;
-        render(issue, comments);
+        render(issue, comments, timeline);
     }
-    function render(issue, comments) {
+    function renderCreateForm() {
+        var _a, _b;
+        currentIssue = null;
+        detailEl.innerHTML = `
+      <h2>New Issue</h2>
+      <div class="edit-form">
+        <input id="edit-title" placeholder="Title">
+        <textarea id="edit-body" placeholder="Description"></textarea>
+        <div class="picker-group">
+          <span class="assignees-label">Labels:</span>
+          <div class="chip-picker" id="label-picker">
+            ${repoLabels.length === 0 ? '<span class="issue-meta">No labels in this repo.</span>' : repoLabels.map(l => `
+              <label class="chip-check">
+                <input type="checkbox" value="${escapeHtml(l.name)}">
+                <span class="label-chip" style="${labelChipStyle(l.color)}">${escapeHtml(l.name)}</span>
+              </label>`).join('')}
+          </div>
+        </div>
+        <div class="picker-group">
+          <span class="assignees-label">Assignees:</span>
+          <div class="chip-picker" id="assignee-picker">
+            ${assignableUsers.length === 0 ? '<span class="issue-meta">No assignable users.</span>' : assignableUsers.map(u => `
+              <label class="chip-check">
+                <input type="checkbox" value="${escapeHtml(u.login)}">
+                ${escapeHtml(u.login)}
+              </label>`).join('')}
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="save-btn">Create</button>
+          <button class="btn btn-secondary" id="cancel-btn">Cancel</button>
+        </div>
+      </div>`;
+        (_a = document.getElementById('save-btn')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', () => {
+            const title = document.getElementById('edit-title').value.trim();
+            const body = document.getElementById('edit-body').value;
+            if (!title)
+                return;
+            const labels = Array.from(document.querySelectorAll('#label-picker input:checked')).map(el => el.value);
+            const assignees = Array.from(document.querySelectorAll('#assignee-picker input:checked')).map(el => el.value);
+            vscode.postMessage({ type: 'submitCreate', title, body, labels, assignees });
+        });
+        (_b = document.getElementById('cancel-btn')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', () => vscode.postMessage({ type: 'cancelCreate' }));
+    }
+    function render(issue, comments, timeline) {
         const closed = issue.state === 'closed';
         detailEl.innerHTML = `
       <h2><span class="state-badge${closed ? ' closed' : ''}">${issue.state}</span>${issue.closedLocally ? '<span class="closes-badge" title="An unpushed local commit will close this issue">closes on push</span>' : ''} #${issue.number} ${editing ? '' : escapeHtml(issue.title)}</h2>
@@ -94,21 +181,22 @@
       <div class="body-card">${issue.body ? renderMarkdown(issue.body) : '(no description)'}</div>`}
       <h3>Comments (${comments.length})</h3>
       <div id="comments">
-        ${comments.map(c => `
+        ${buildFeed(comments, timeline).map(item => item.kind === 'event' ? `
+          <div class="timeline-event">${item.text} · <span class="issue-meta">${item.created_at.slice(0, 10)}</span></div>` : `
           <div class="comment">
-            <span class="comment-author">${avatar(c.user)} ${escapeHtml(c.user.login)}</span>
-            <span class="issue-meta">${c.created_at.slice(0, 10)}</span>
-            ${viewerLogin === c.user.login && editingCommentId !== c.id ? `
-            <button class="btn btn-secondary comment-edit-btn" data-id="${c.id}">Edit</button>
-            <button class="btn btn-danger comment-delete-btn" data-id="${c.id}">Delete</button>` : ''}
-            ${editingCommentId === c.id ? `
+            <span class="comment-author">${avatar(item.comment.user)} ${escapeHtml(item.comment.user.login)}</span>
+            <span class="issue-meta">${item.comment.created_at.slice(0, 10)}</span>
+            ${viewerLogin === item.comment.user.login && editingCommentId !== item.comment.id ? `
+            <button class="btn btn-secondary comment-edit-btn" data-id="${item.comment.id}">Edit</button>
+            <button class="btn btn-danger comment-delete-btn" data-id="${item.comment.id}">Delete</button>` : ''}
+            ${editingCommentId === item.comment.id ? `
             <div class="edit-form">
-              <textarea class="comment-edit-input">${escapeHtml(c.body)}</textarea>
+              <textarea class="comment-edit-input">${escapeHtml(item.comment.body)}</textarea>
               <div class="btn-row">
-                <button class="btn btn-primary comment-save-btn" data-id="${c.id}">Save</button>
-                <button class="btn btn-secondary comment-cancel-btn" data-id="${c.id}">Cancel</button>
+                <button class="btn btn-primary comment-save-btn" data-id="${item.comment.id}">Save</button>
+                <button class="btn btn-secondary comment-cancel-btn" data-id="${item.comment.id}">Cancel</button>
               </div>
-            </div>` : `<div class="comment-body">${renderMarkdown(c.body)}</div>`}
+            </div>` : `<div class="comment-body">${renderMarkdown(item.comment.body)}</div>`}
           </div>`).join('') || '<div class="issue-meta">No comments yet.</div>'}
       </div>
       <div id="composer">
@@ -129,12 +217,12 @@
         (_e = document.getElementById('edit-btn')) === null || _e === void 0 ? void 0 : _e.addEventListener('click', () => {
             editing = true;
             if (currentIssue)
-                render(currentIssue, lastComments);
+                render(currentIssue, lastComments, lastTimeline);
         });
         (_f = document.getElementById('cancel-btn')) === null || _f === void 0 ? void 0 : _f.addEventListener('click', () => {
             editing = false;
             if (currentIssue)
-                render(currentIssue, lastComments);
+                render(currentIssue, lastComments, lastTimeline);
         });
         (_g = document.getElementById('save-btn')) === null || _g === void 0 ? void 0 : _g.addEventListener('click', () => {
             const title = document.getElementById('edit-title').value.trim();
@@ -164,12 +252,12 @@
             if (target.classList.contains('comment-edit-btn')) {
                 editingCommentId = id;
                 if (currentIssue)
-                    render(currentIssue, lastComments);
+                    render(currentIssue, lastComments, lastTimeline);
             }
             else if (target.classList.contains('comment-cancel-btn')) {
                 editingCommentId = null;
                 if (currentIssue)
-                    render(currentIssue, lastComments);
+                    render(currentIssue, lastComments, lastTimeline);
             }
             else if (target.classList.contains('comment-save-btn')) {
                 const textarea = (_a = target.closest('.comment')) === null || _a === void 0 ? void 0 : _a.querySelector('.comment-edit-input');
@@ -189,10 +277,14 @@
         switch (msg.type) {
             case 'issueDetail':
                 lastComments = msg.comments;
+                lastTimeline = msg.timeline;
                 repoLabels = msg.repoLabels;
                 assignableUsers = msg.assignableUsers;
                 viewerLogin = msg.viewerLogin;
-                renderDetail(msg.issue, msg.comments);
+                if (msg.issue)
+                    renderDetail(msg.issue, msg.comments, msg.timeline);
+                else
+                    renderCreateForm();
                 break;
             case 'copied': {
                 const btn = detailEl.querySelector('#copy-btn');

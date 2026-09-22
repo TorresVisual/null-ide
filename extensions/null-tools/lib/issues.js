@@ -7,11 +7,13 @@
     const labelPicker = document.getElementById('label-picker');
     const searchInput = document.getElementById('search-input');
     const listEl = document.getElementById('list');
+    const newIssueBtn = document.getElementById('new-issue-btn');
     const refreshBtn = document.getElementById('refresh-btn');
     const searchToggleBtn = document.getElementById('search-toggle-btn');
     const filterToggleBtn = document.getElementById('filter-toggle-btn');
     const searchBar = document.getElementById('search-bar');
     const filterPopover = document.getElementById('filter-popover');
+    newIssueBtn.addEventListener('click', () => vscode.postMessage({ type: 'createIssue' }));
     refreshBtn.addEventListener('click', () => vscode.postMessage({ type: 'refresh' }));
     searchToggleBtn.addEventListener('click', () => {
         searchBar.classList.toggle('hidden');
