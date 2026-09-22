@@ -69,7 +69,7 @@ function findVswherePath(): string {
   return path.join(programFilesX86, 'Microsoft Visual Studio', 'Installer', 'vswhere.exe');
 }
 
-async function pathExists(candidate: string): Promise<boolean> {
+export async function pathExists(candidate: string): Promise<boolean> {
   try {
     await fs.access(candidate);
     return true;
@@ -145,7 +145,7 @@ function pathDirs(): string[] {
   return (process.env.PATH ?? process.env.Path ?? '').split(path.delimiter).filter(Boolean);
 }
 
-async function findOnPath(exeName: string): Promise<string | undefined> {
+export async function findOnPath(exeName: string): Promise<string | undefined> {
   for (const dir of pathDirs()) {
     const candidate = path.join(dir, exeName);
     if (await pathExists(candidate)) {
@@ -188,6 +188,13 @@ async function detectClang(): Promise<Toolchain[]> {
       toolchains.push(t);
     }
   }
+  const clangxx = await findOnPath('clang++.exe');
+  if (clangxx) {
+    const t = await detectClangAt(clangxx, 'llvm-clangxx', 'Clang++');
+    if (t) {
+      toolchains.push(t);
+    }
+  }
   const clang = await findOnPath('clang.exe');
   if (clang) {
     const t = await detectClangAt(clang, 'llvm-clang', 'Clang');
@@ -196,6 +203,28 @@ async function detectClang(): Promise<Toolchain[]> {
     }
   }
   return toolchains;
+}
+
+export async function findClangxx(): Promise<{ compilerPath: string; isWsl: boolean; wslDistro?: string } | undefined> {
+  const clangxx = (await findOnPath('clang++.exe')) ?? (await findOnPath('clang++'));
+  if (clangxx) {
+    return { compilerPath: clangxx, isWsl: false };
+  }
+  const clang = await findOnPath('clang.exe');
+  if (clang) {
+    const siblingClangxx = path.join(path.dirname(clang), 'clang++.exe');
+    if (await pathExists(siblingClangxx)) {
+      return { compilerPath: siblingClangxx, isWsl: false };
+    }
+  }
+  const clangCl = await findOnPath('clang-cl.exe');
+  if (clangCl) {
+    const siblingClangxx = path.join(path.dirname(clangCl), 'clang++.exe');
+    if (await pathExists(siblingClangxx)) {
+      return { compilerPath: siblingClangxx, isWsl: false };
+    }
+  }
+  return undefined;
 }
 
 // ---- WSL ----

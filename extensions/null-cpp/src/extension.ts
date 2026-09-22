@@ -7,6 +7,7 @@ import { registerInitMakeProject } from './makeScaffold';
 import { initializeProjectDetection, refreshProjectDetection } from './projectDetection';
 import { registerCmakeToolbar } from './cmakeToolbar';
 import { registerMakeToolbar } from './makeToolbar';
+import { registerSingleFileCompile } from './singleFileCompile';
 
 async function syncCppProjectContext(): Promise<boolean> {
   const enabled = await refreshProjectDetection();
@@ -51,6 +52,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   registerInitMakeProject(context);
   registerCmakeToolbar(context);
   registerMakeToolbar(context);
+  registerSingleFileCompile(context);
 }
 
 export function deactivate(): void {}

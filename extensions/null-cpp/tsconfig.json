@@ -53,6 +53,9 @@
     "src/makeScaffold.test.ts",
     "src/makeToolbar.ts",
     "src/makefileParser.ts",
-    "src/makefileParser.test.ts"
+    "src/makefileParser.test.ts",
+    "src/singleFileCompileArgs.ts",
+    "src/singleFileCompile.ts",
+    "src/singleFileCompile.test.ts"
   ]
 }

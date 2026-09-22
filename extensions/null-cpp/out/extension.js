@@ -44,6 +44,7 @@ const makeScaffold_1 = require("./makeScaffold");
 const projectDetection_1 = require("./projectDetection");
 const cmakeToolbar_1 = require("./cmakeToolbar");
 const makeToolbar_1 = require("./makeToolbar");
+const singleFileCompile_1 = require("./singleFileCompile");
 async function syncCppProjectContext() {
     const enabled = await (0, projectDetection_1.refreshProjectDetection)();
     await vscode.commands.executeCommand('setContext', 'null-cpp.isCppProject', enabled);
@@ -76,6 +77,7 @@ async function activate(context) {
     (0, makeScaffold_1.registerInitMakeProject)(context);
     (0, cmakeToolbar_1.registerCmakeToolbar)(context);
     (0, makeToolbar_1.registerMakeToolbar)(context);
+    (0, singleFileCompile_1.registerSingleFileCompile)(context);
 }
 function deactivate() { }
 //# sourceMappingURL=extension.js.map

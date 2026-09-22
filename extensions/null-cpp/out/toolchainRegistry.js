@@ -37,7 +37,10 @@ exports.list = list;
 exports.refresh = refresh;
 exports.parseVswhereInstallPaths = parseVswhereInstallPaths;
 exports.pickLatestMsvcVersion = pickLatestMsvcVersion;
+exports.pathExists = pathExists;
 exports.parseClangVersion = parseClangVersion;
+exports.findOnPath = findOnPath;
+exports.findClangxx = findClangxx;
 exports.parseWslDistroList = parseWslDistroList;
 exports.parseSetOutput = parseSetOutput;
 exports.getMsvcDevEnvironment = getMsvcDevEnvironment;
@@ -200,6 +203,13 @@ async function detectClang() {
             toolchains.push(t);
         }
     }
+    const clangxx = await findOnPath('clang++.exe');
+    if (clangxx) {
+        const t = await detectClangAt(clangxx, 'llvm-clangxx', 'Clang++');
+        if (t) {
+            toolchains.push(t);
+        }
+    }
     const clang = await findOnPath('clang.exe');
     if (clang) {
         const t = await detectClangAt(clang, 'llvm-clang', 'Clang');
@@ -208,6 +218,27 @@ async function detectClang() {
         }
     }
     return toolchains;
+}
+async function findClangxx() {
+    const clangxx = (await findOnPath('clang++.exe')) ?? (await findOnPath('clang++'));
+    if (clangxx) {
+        return { compilerPath: clangxx, isWsl: false };
+    }
+    const clang = await findOnPath('clang.exe');
+    if (clang) {
+        const siblingClangxx = path.join(path.dirname(clang), 'clang++.exe');
+        if (await pathExists(siblingClangxx)) {
+            return { compilerPath: siblingClangxx, isWsl: false };
+        }
+    }
+    const clangCl = await findOnPath('clang-cl.exe');
+    if (clangCl) {
+        const siblingClangxx = path.join(path.dirname(clangCl), 'clang++.exe');
+        if (await pathExists(siblingClangxx)) {
+            return { compilerPath: siblingClangxx, isWsl: false };
+        }
+    }
+    return undefined;
 }
 // ---- WSL ----
 function parseWslDistroList(raw) {

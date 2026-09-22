@@ -10,7 +10,7 @@
   "activationEvents": ["onStartupFinished"],
   "scripts": {
     "compile": "tsc -p tsconfig.json",
-    "test": "tsc -p tsconfig.json && node --test out/symbolTree.test.js out/pairRegistry.test.js out/scaffoldNaming.test.js out/wslPath.test.js out/toolchainRegistry.test.js out/presetsModel.test.js out/cmakeReply.test.js out/clangdConfigText.test.js out/buildDiagnostics.test.js out/projectDetection.test.js out/debugConfigSynth.test.js out/cmakeScaffold.test.js out/makeScaffold.test.js out/makefileParser.test.js"
+    "test": "tsc -p tsconfig.json && node --test out/symbolTree.test.js out/pairRegistry.test.js out/scaffoldNaming.test.js out/wslPath.test.js out/toolchainRegistry.test.js out/presetsModel.test.js out/cmakeReply.test.js out/clangdConfigText.test.js out/buildDiagnostics.test.js out/projectDetection.test.js out/debugConfigSynth.test.js out/cmakeScaffold.test.js out/makeScaffold.test.js out/makefileParser.test.js out/singleFileCompile.test.js"
   },
   "devDependencies": {
     "typescript": "^5.8.0",
@@ -22,6 +22,10 @@
       {
         "command": "null-cpp.switchSourceHeader",
         "title": "Null C++: Switch Header/Source (Symbol-Aware)"
+      },
+      {
+        "command": "null-cpp.compileActiveFile",
+        "title": "Null C++: Compile Active File with clang++"
       },
       {
         "command": "null-cpp.newClass",
@@ -128,6 +132,19 @@
           "default": true,
           "description": "Show the CMake build/run/debug status bar buttons (preset, target, configure, build, run, debug)."
         },
+        "null-cpp.compile.clangArgs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": ["-std=c++20", "-Wall", "-Wextra"],
+          "description": "Command-line arguments passed to clang++ when compiling a single file."
+        },
+        "null-cpp.compile.clangPath": {
+          "type": "string",
+          "default": "",
+          "description": "Optional path to the clang++ compiler. If empty, clang++ is detected automatically on PATH or via WSL."
+        },
         "null-cpp.projectDetection.override": {
           "type": "string",
           "enum": ["auto", "always", "never"],
@@ -154,7 +171,18 @@
           "group": "navigation"
         }
       ],
+      "editor/context": [
+        {
+          "command": "null-cpp.compileActiveFile",
+          "when": "(editorLangId == cpp || editorLangId == c) && null-cpp.isCppProject",
+          "group": "1_modification"
+        }
+      ],
       "commandPalette": [
+        {
+          "command": "null-cpp.compileActiveFile",
+          "when": "(editorLangId == cpp || editorLangId == c) && null-cpp.isCppProject"
+        },
         {
           "command": "null-cpp.switchSourceHeader",
           "when": "(editorLangId == cpp || editorLangId == c) && null-cpp.isCppProject"
