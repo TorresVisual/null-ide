@@ -9,12 +9,14 @@
     const listEl = document.getElementById('list');
     const newIssueBtn = document.getElementById('new-issue-btn');
     const refreshBtn = document.getElementById('refresh-btn');
+    const markReadBtn = document.getElementById('mark-read-btn');
     const searchToggleBtn = document.getElementById('search-toggle-btn');
     const filterToggleBtn = document.getElementById('filter-toggle-btn');
     const searchBar = document.getElementById('search-bar');
     const filterPopover = document.getElementById('filter-popover');
     newIssueBtn.addEventListener('click', () => vscode.postMessage({ type: 'createIssue' }));
     refreshBtn.addEventListener('click', () => vscode.postMessage({ type: 'refresh' }));
+    markReadBtn.addEventListener('click', () => vscode.postMessage({ type: 'markRead' }));
     searchToggleBtn.addEventListener('click', () => {
         searchBar.classList.toggle('hidden');
         searchToggleBtn.classList.toggle('active');
