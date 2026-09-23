@@ -257,8 +257,8 @@ this.clientScript() +
       '  return /^#[0-9a-fA-F]{6}$/.test(color || "") ? color : "#ffffff";' +
       '}' +
       '' +
-      'function fieldRow(label, inputHtml) {' +
-      '  return "<div class=row><label>" + label + "</label>" + inputHtml + "</div>";' +
+      'function fieldRow(label, inputHtml, id) {' +
+      '  return "<div class=row><label for=" + id + ">" + label + "</label>" + inputHtml + "</div>";' +
       '}' +
       '' +
       'function renderCard(btn, index) {' +
@@ -276,20 +276,20 @@ this.clientScript() +
       '' +
       '  const argsDisplay = btn.type === "vscode-command" ? "flex" : "none";' +
       '  const body =' +
-      '    fieldRow("Label", "<input type=text data-field=label data-index=" + index + " value=\\"" + (btn.label || "").replace(/\\"/g, "&quot;") + "\\">") +' +
+      '    fieldRow("Label", "<input type=text id=field-label-" + index + " data-field=label data-index=" + index + " value=\\"" + (btn.label || "").replace(/\\"/g, "&quot;") + "\\">", "field-label-" + index) +' +
       '    "<div class=field-section>Behavior</div>" +' +
-      '    fieldRow("Command", "<input type=text data-field=command data-index=" + index + " value=\\"" + (btn.command || "").replace(/\\"/g, "&quot;") + "\\"><button data-action=browse data-index=" + index + ">Browse a file...</button>") +' +
-      '    fieldRow("Type", "<select data-field=type data-index=" + index + "><option value=terminal" + (btn.type === "terminal" ? " selected" : "") + ">terminal</option><option value=vscode-command" + (btn.type === "vscode-command" ? " selected" : "") + ">vscode-command</option></select>") +' +
-      '    "<div class=\\"row args-row\\" data-index=" + index + " style=\\"display:" + argsDisplay + "\\"><label>Args</label><input type=text data-field=args data-index=" + index + " value=\\"" + ((btn.args || []).join(",")) + "\\" placeholder=arg1,arg2></div>" +' +
-      '    fieldRow("Cwd", "<input type=text data-field=cwd data-index=" + index + " value=\\"" + (btn.cwd || "") + "\\" placeholder=${workspaceFolder}>") +' +
-      '    fieldRow("Save all", "<input type=checkbox data-field=saveAll data-index=" + index + (btn.saveAll ? " checked" : "") + ">") +' +
-      '    fieldRow("Focus", "<input type=checkbox data-field=focus data-index=" + index + (btn.focus !== false ? " checked" : "") + ">") +' +
+      '    fieldRow("Command", "<input type=text id=field-command-" + index + " data-field=command data-index=" + index + " value=\\"" + (btn.command || "").replace(/\\"/g, "&quot;") + "\\"><button data-action=browse data-index=" + index + ">Browse a file...</button>", "field-command-" + index) +' +
+      '    fieldRow("Type", "<select id=field-type-" + index + " data-field=type data-index=" + index + "><option value=terminal" + (btn.type === "terminal" ? " selected" : "") + ">terminal</option><option value=vscode-command" + (btn.type === "vscode-command" ? " selected" : "") + ">vscode-command</option></select>", "field-type-" + index) +' +
+      '    "<div class=\\"row args-row\\" data-index=" + index + " style=\\"display:" + argsDisplay + "\\"><label for=field-args-" + index + ">Args</label><input type=text id=field-args-" + index + " data-field=args data-index=" + index + " value=\\"" + ((btn.args || []).join(",")) + "\\" placeholder=arg1,arg2></div>" +' +
+      '    fieldRow("Cwd", "<input type=text id=field-cwd-" + index + " data-field=cwd data-index=" + index + " value=\\"" + (btn.cwd || "") + "\\" placeholder=${workspaceFolder}>", "field-cwd-" + index) +' +
+      '    fieldRow("Save all", "<input type=checkbox id=field-saveAll-" + index + " data-field=saveAll data-index=" + index + (btn.saveAll ? " checked" : "") + ">", "field-saveAll-" + index) +' +
+      '    fieldRow("Focus", "<input type=checkbox id=field-focus-" + index + " data-field=focus data-index=" + index + (btn.focus !== false ? " checked" : "") + ">", "field-focus-" + index) +' +
       '    "<div class=field-section>Appearance</div>" +' +
-      '    fieldRow("Icon", "<input type=text list=icon-list-" + index + " data-field=icon data-index=" + index + " value=\\"" + (btn.icon || "") + "\\" placeholder=tools><datalist id=icon-list-" + index + ">" + ICON_OPTIONS_HTML + "</datalist>") +' +
-      '    fieldRow("Color", "<button type=button class=color-swatch data-action=swatch data-index=" + index + " style=\\"background:" + colorSwatchValue(btn.color) + "\\" title=\\"Open color picker\\"></button><input type=text data-field=color data-index=" + index + " value=\\"" + (btn.color || "") + "\\" placeholder=#ffcc00>") +' +
-      '    fieldRow("Background", "<select data-field=background data-index=" + index + "><option value=none" + (btn.background === "none" ? " selected" : "") + ">none</option><option value=warning" + (btn.background === "warning" ? " selected" : "") + ">warning</option><option value=error" + (btn.background === "error" ? " selected" : "") + ">error</option></select>") +' +
-      '    fieldRow("Tooltip", "<input type=text data-field=tooltip data-index=" + index + " value=\\"" + (btn.tooltip || "") + "\\">") +' +
-      '    fieldRow("Priority", "<input type=number data-field=priority data-index=" + index + " value=" + (btn.priority || 0) + ">") +' +
+      '    fieldRow("Icon", "<input type=text id=field-icon-" + index + " list=icon-list-" + index + " data-field=icon data-index=" + index + " value=\\"" + (btn.icon || "") + "\\" placeholder=tools><datalist id=icon-list-" + index + ">" + ICON_OPTIONS_HTML + "</datalist>", "field-icon-" + index) +' +
+      '    fieldRow("Color", "<button type=button class=color-swatch data-action=swatch data-index=" + index + " style=\\"background:" + colorSwatchValue(btn.color) + "\\" title=\\"Open color picker\\"></button><input type=text id=field-color-" + index + " data-field=color data-index=" + index + " value=\\"" + (btn.color || "") + "\\" placeholder=#ffcc00>", "field-color-" + index) +' +
+      '    fieldRow("Background", "<select id=field-background-" + index + " data-field=background data-index=" + index + "><option value=none" + (btn.background === "none" ? " selected" : "") + ">none</option><option value=warning" + (btn.background === "warning" ? " selected" : "") + ">warning</option><option value=error" + (btn.background === "error" ? " selected" : "") + ">error</option></select>", "field-background-" + index) +' +
+      '    fieldRow("Tooltip", "<input type=text id=field-tooltip-" + index + " data-field=tooltip data-index=" + index + " value=\\"" + (btn.tooltip || "") + "\\">", "field-tooltip-" + index) +' +
+      '    fieldRow("Priority", "<input type=number id=field-priority-" + index + " data-field=priority data-index=" + index + " value=" + (btn.priority || 0) + ">", "field-priority-" + index) +' +
       '    "<div class=card-footer>" +' +
       '    "<button data-action=up data-index=" + index + ">Up</button>" +' +
       '    "<button data-action=down data-index=" + index + ">Down</button>" +' +
