@@ -10,6 +10,10 @@ interface GithubIssue {
 
 declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
 
+const COPY_ICON = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="5.5" y="5.5" width="8" height="8" rx="1"/><path d="M3.5 10.5h-1a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v1" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const OPEN_ICON = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M6.5 2.5h-3a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-3" stroke-linecap="round" stroke-linejoin="round"/><path d="M9.5 2.5h4v4M13 3l-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const CHECK_ICON = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 8.5l4 4 8-9" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
 (function () {
   const vscode = acquireVsCodeApi();
 
@@ -148,8 +152,8 @@ declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
           </div>
         </div>
         <div class="row-actions">
-          <button class="copy-btn" title="Copy as prompt">📋</button>
-          <button class="browser-btn" title="Open in browser">↗</button>
+          <button class="copy-btn" title="Copy as prompt">${COPY_ICON}</button>
+          <button class="browser-btn" title="Open in browser">${OPEN_ICON}</button>
         </div>
       </div>`;
     }).join('');
@@ -201,8 +205,8 @@ declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
       case 'copiedIssue': {
         const btn = listEl.querySelector<HTMLButtonElement>(`.issue-row[data-number="${msg.number}"] .copy-btn`);
         if (btn) {
-          btn.textContent = '✓';
-          setTimeout(() => { btn.textContent = '📋'; }, 1200);
+          btn.innerHTML = CHECK_ICON;
+          setTimeout(() => { btn.innerHTML = COPY_ICON; }, 1200);
         }
         break;
       }

@@ -365,11 +365,11 @@ class IssuesViewProvider {
       <option value="closed">Closed</option>
       <option value="all">All</option>
     </select>
-    <button class="icon-btn" id="new-issue-btn" title="New issue">+</button>
-    <button class="icon-btn" id="refresh-btn" title="Refresh">↻</button>
+    <button class="icon-btn" id="new-issue-btn" title="New issue"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 2v12M2 8h12" stroke-linecap="round"/></svg></button>
+    <button class="icon-btn" id="refresh-btn" title="Refresh"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M13 4v3h-3M3 12v-3h3" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.5 6.5a5 5 0 0 1 9-2M12.5 9.5a5 5 0 0 1-9 2" stroke-linecap="round"/></svg></button>
     <button class="icon-btn" id="mark-read-btn" title="Mark Issues as Read"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M1 8l3.5 3.5L9 6.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 8l3.5 3.5L15 6.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     <button class="icon-btn" id="search-toggle-btn" title="Search"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="6.5" cy="6.5" r="4.5"/><path d="M10 10L14 14" stroke-linecap="round"/></svg></button>
-    <button class="icon-btn" id="filter-toggle-btn" title="Filter">⚙</button>
+    <button class="icon-btn" id="filter-toggle-btn" title="Filter"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2 3h12L9.5 8v4.5L6.5 14V8L2 3z" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
   </div>
   <div id="search-bar" class="hidden">
     <input id="search-input" placeholder="Search title &amp; body">
