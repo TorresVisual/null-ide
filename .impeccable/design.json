@@ -1,0 +1,101 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-23T12:11:11Z",
+  "title": "Design System: Null IDE",
+  "extensions": {
+    "colorMeta": {
+      "signal-blue": { "role": "primary", "displayName": "Signal Blue", "canonical": "#0078D4", "tonalRamp": ["#001B33", "#002E52", "#0066AC", "#0078D4", "#2489DB", "#4DAAFC", "#8FC7FF", "#D6ECFF"] },
+      "bg-canvas": { "role": "neutral", "displayName": "Canvas Gray", "canonical": "#181818", "tonalRamp": ["#000000", "#0A0A0A", "#181818", "#1F1F1F", "#202020", "#2B2B2B", "#313131", "#3C3C3C"] }
+    },
+    "typographyMeta": {
+      "code": { "displayName": "Code", "purpose": "Editor content — the roomiest line-height in the system." },
+      "terminal": { "displayName": "Terminal", "purpose": "Terminal output — tighter line-height for scanning." },
+      "ui": { "displayName": "UI Label", "purpose": "Sidebar, status bar, title bar, panels, menus, notifications." }
+    },
+    "shadows": [
+      { "name": "command-palette-float", "value": "0 12px 40px rgba(0,0,0,0.55)", "purpose": "The system's one floating overlay — the quick-input/command palette widget." }
+    ],
+    "motion": [
+      { "name": "tab-close-reveal", "value": "opacity 0.15s ease", "purpose": "Tab close button fades in on hover/active rather than sitting permanently visible." },
+      { "name": "sash-hover-reveal", "value": "opacity 150ms ease", "purpose": "Resize handles are invisible until hovered, then fade to a Signal Blue line." }
+    ],
+    "breakpoints": []
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Signal Blue action button — install, save, confirm.",
+      "html": "<button class=\"ds-btn-primary\">Install</button>",
+      "css": ".ds-btn-primary { background: #0078D4; color: #ffffff; padding: 4px 14px; font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", system-ui, sans-serif; font-size: 13px; border: 1px solid rgba(255,255,255,0.07); border-radius: 2px; cursor: pointer; transition: background 0.1s ease; } .ds-btn-primary:hover { background: #026EC1; } .ds-btn-primary:focus-visible { outline: 1px solid #0078D4; outline-offset: 2px; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Neutral action button — cancel, secondary choice.",
+      "html": "<button class=\"ds-btn-secondary\">Cancel</button>",
+      "css": ".ds-btn-secondary { background: #313131; color: #CCCCCC; padding: 4px 14px; font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", system-ui, sans-serif; font-size: 13px; border: none; border-radius: 2px; cursor: pointer; transition: background 0.1s ease; } .ds-btn-secondary:hover { background: #3C3C3C; } .ds-btn-secondary:focus-visible { outline: 1px solid #0078D4; outline-offset: 2px; }"
+    },
+    {
+      "name": "Input Field",
+      "kind": "input",
+      "refersTo": "input-field",
+      "description": "Standard text input — settings, search, filters.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"Search files\" />",
+      "css": ".ds-input { background: #313131; color: #CCCCCC; border: 1px solid #3C3C3C; border-radius: 4px; padding: 4px 8px; font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", system-ui, sans-serif; font-size: 13px; } .ds-input::placeholder { color: #989898; } .ds-input:focus { outline: 1px solid #0078D4; outline-offset: -1px; border-color: transparent; }"
+    },
+    {
+      "name": "Command Palette",
+      "kind": "custom",
+      "refersTo": "command-palette",
+      "description": "The system's one floating, blurred surface — the quick-input overlay.",
+      "html": "<div class=\"ds-palette\"><input class=\"ds-palette-filter\" type=\"text\" placeholder=\"Type a command\" /><div class=\"ds-palette-row ds-active\">Go to File...</div><div class=\"ds-palette-row\">Open Recent</div></div>",
+      "css": ".ds-palette { background: #222222; color: #CCCCCC; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; box-shadow: 0 12px 40px rgba(0,0,0,0.55); backdrop-filter: blur(20px); overflow: hidden; width: 320px; font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", system-ui, sans-serif; font-size: 13px; } .ds-palette-filter { width: 100%; box-sizing: border-box; margin: 6px 8px; padding: 4px 8px; background: #313131; color: #CCCCCC; border: 1px solid #3C3C3C; border-radius: 6px; } .ds-palette-row { padding: 6px 12px; margin: 0 4px; border-radius: 4px; } .ds-palette-row.ds-active, .ds-palette-row:hover { background: rgba(0,120,212,0.2); }"
+    },
+    {
+      "name": "Activity Bar Icon",
+      "kind": "nav",
+      "refersTo": "activity-bar-icon",
+      "description": "Translucent glyph that brightens on hover/active, with a centered rounded-square highlight replacing VS Code's default edge indicator.",
+      "html": "<div class=\"ds-activity-bar\"><div class=\"ds-ab-icon ds-checked\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 16 16\"><path fill=\"currentColor\" d=\"M1 2h14v2H1V2zm0 5h14v2H1V7zm0 5h14v2H1v-2z\"/></svg></div><div class=\"ds-ab-icon\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 16 16\"><circle cx=\"8\" cy=\"8\" r=\"6\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\"/></svg></div></div>",
+      "css": ".ds-activity-bar { background: #181818; display: flex; flex-direction: column; gap: 8px; padding: 8px 0 0; width: 48px; } .ds-ab-icon { height: 36px; display: flex; align-items: center; justify-content: center; position: relative; color: rgba(255,255,255,0.55); cursor: pointer; } .ds-ab-icon:hover, .ds-ab-icon.ds-checked { color: rgba(255,255,255,0.95); } .ds-ab-icon.ds-checked::after { content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 34px; height: 34px; background: rgba(255,255,255,0.10); border-radius: 6px; pointer-events: none; z-index: -1; }"
+    },
+    {
+      "name": "Editor Tab",
+      "kind": "custom",
+      "refersTo": "editor-tab-active",
+      "description": "Compact 30px tab; active tab carries a Signal Blue top border, close button reveals on hover.",
+      "html": "<div class=\"ds-tabs\"><div class=\"ds-tab ds-active\"><span>extension.ts</span><span class=\"ds-tab-close\">×</span></div><div class=\"ds-tab\"><span>package.json</span><span class=\"ds-tab-close\">×</span></div></div>",
+      "css": ".ds-tabs { display: flex; background: #181818; font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", system-ui, sans-serif; font-size: 13px; } .ds-tab { height: 30px; line-height: 30px; padding: 0 10px; display: flex; align-items: center; gap: 6px; color: #9D9D9D; border-right: 1px solid #2B2B2B; cursor: pointer; } .ds-tab.ds-active { background: #1F1F1F; color: #ffffff; border-top: 2px solid #0078D4; } .ds-tab-close { opacity: 0; transition: opacity 0.15s ease; } .ds-tab:hover .ds-tab-close, .ds-tab.ds-active .ds-tab-close { opacity: 1; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Void Workbench",
+    "overview": "Null IDE is a VS Code fork with the ornament sanded off, not a new visual language bolted on. The chrome sits in near-black grays (#181818 down to #000000 on the OLED variant) with a single accent — Signal Blue (#0078D4), stock VS Code blue kept deliberately rather than replaced — used only where the UI needs to say \"this is active, this is focused, this is progress.\" The mark itself, the ∅ symbol, is monochrome: white stroke on a near-black gradient badge, no color at all. Emptiness is the aesthetic, not an absence of polish.\n\nThis is a personal daily-driver, not a marketing surface — PRODUCT.md is explicit that the only user who matters is the developer running it. That shows up as restraint everywhere: no gradients, no decorative color, no shadow except where a floating surface genuinely needs to separate itself from the canvas beneath it. The workbench stays close to upstream VS Code conventions on purpose — familiar control shapes, default paddings, standard iconography — with edits concentrated on density (30px tabs, 36px activity-bar rows, a 6px scrollbar) and on removing default chrome that competed with the content (the activity bar's left-edge active-indicator is explicitly hidden in favor of a centered highlight square).\n\nEarlier project notes described a teal/indigo brand palette. That palette does not exist anywhere in the shipped theme, icon set, or workbench CSS — the real, implemented accent is VS Code blue, and the app icon is achromatic. This file documents what is actually built.",
+    "keyCharacteristics": [
+      "Near-black, borderless-feeling chrome with 1px dividers, never a filled panel-on-panel look",
+      "One accent color, used sparingly for state (focus, active, progress, links) — never decoratively",
+      "Monospace everywhere code or terminal output appears; system UI font everywhere else — the two never mix",
+      "Flat by default; the command palette is the system's one deliberate floating, blurred surface",
+      "A separate, wide semantic color set (9 hues) exists only inside the file/folder icon theme — it never bleeds into the UI accent"
+    ],
+    "rules": [
+      { "name": "The One Accent Rule", "body": "Signal Blue is the only color allowed to mean \"interactive\" or \"active.\" Success/warning/error are reserved for git and diagnostic state and must never be reused as a UI accent, and no second brand color (teal, indigo, or otherwise) gets introduced — the accent stays singular.", "section": "colors" },
+      { "name": "The Two-Font Rule", "body": "Exactly two font roles exist: monospace for code/terminal, system UI font for chrome. Nothing else — no serif, no display weight, no third face — is introduced anywhere in the workbench.", "section": "typography" },
+      { "name": "The Flat-By-Default Rule", "body": "Surfaces are flat at rest, separated only by 1px Divider borders. The command palette is the system's single deliberate exception, justified because it's an ephemeral overlay, not a docked panel — no other surface should adopt its shadow/blur treatment.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do treat Signal Blue (#0078D4) as the only UI accent — focus, active, progress, links, primary actions.",
+      "Do keep code/terminal on the monospace stack and chrome on the system UI font; never let one bleed into the other's surfaces.",
+      "Do keep new surfaces flat with a 1px Divider border; reserve shadow + blur for genuinely transient floating overlays, matching the command palette's justification.",
+      "Do color folder/file icons only from the established 9-hue semantic set on the slate-gray base — don't invent a new hue for a new folder pattern."
+    ],
+    "donts": [
+      "Don't introduce teal or indigo (or any second brand color) as a UI accent — despite older project notes, nothing in the shipped theme, icon set, or workbench CSS uses them; the mark itself is monochrome.",
+      "Don't restore VS Code's default left-edge activity-bar active-indicator — it's deliberately replaced by the centered rounded-square highlight.",
+      "Don't add drop shadows to docked, permanent panels (sidebar, bottom panel, status bar) — shadow is reserved for the command palette's transient-overlay case."
+    ]
+  }
+}
