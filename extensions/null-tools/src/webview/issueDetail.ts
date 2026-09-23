@@ -25,6 +25,9 @@ declare const DOMPurify: { sanitize(html: string): string };
   const lightbox = document.getElementById('lightbox') as HTMLDivElement;
   const lightboxImg = document.getElementById('lightbox-img') as HTMLImageElement;
   lightbox?.addEventListener('click', () => lightbox.classList.add('hidden'));
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !lightbox?.classList.contains('hidden')) lightbox.classList.add('hidden');
+  });
   detailEl.addEventListener('click', e => {
     const target = e.target as HTMLElement;
     if (target.tagName === 'IMG' && target.closest('.body-card, .comment-body')) {
