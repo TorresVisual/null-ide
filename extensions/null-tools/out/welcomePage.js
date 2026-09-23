@@ -91,7 +91,6 @@ function showWelcomePage(context) {
 </div>
 <div class="shortcuts">
   <div class="shortcut"><span class="shortcut-label">Command palette</span><span class="shortcut-key">Ctrl+Shift+P</span></div>
-  <div class="shortcut"><span class="shortcut-label">Open AI Agents</span><span class="shortcut-key">Ctrl+Shift+Alt+A</span></div>
   <div class="shortcut"><span class="shortcut-label">Generate commit</span><span class="shortcut-key">Ctrl+Shift+Alt+G</span></div>
   <div class="shortcut"><span class="shortcut-label">Toggle terminal</span><span class="shortcut-key">Ctrl+\`</span></div>
   <div class="shortcut"><span class="shortcut-label">Quick open file</span><span class="shortcut-key">Ctrl+P</span></div>
