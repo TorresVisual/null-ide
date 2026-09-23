@@ -150,6 +150,9 @@
             this.root.style.display = 'none';
             this.canvas = document.createElement('canvas');
             this.canvas.className = 'null-color-canvas';
+            this.canvas.tabIndex = 0;
+            this.canvas.setAttribute('role', 'application');
+            this.canvas.setAttribute('aria-label', 'Color picker: left/right arrows adjust hue, up/down adjust lightness, page up/down adjust saturation, hold shift for larger steps');
             this.root.appendChild(this.canvas);
             this.ctx = this.canvas.getContext('2d');
             this.triBase = document.createElement('canvas');
@@ -360,6 +363,39 @@
             };
             this.canvas.addEventListener('pointerup', endDrag);
             this.canvas.addEventListener('pointercancel', endDrag);
+            this.canvas.addEventListener('keydown', (e) => this.handleKeyDown(e));
+        }
+        handleKeyDown(e) {
+            const step = e.shiftKey ? 10 : 1;
+            switch (e.key) {
+                case 'ArrowLeft':
+                    this.state.h = ((this.state.h - step) % 360 + 360) % 360;
+                    this.redraw(true);
+                    break;
+                case 'ArrowRight':
+                    this.state.h = (this.state.h + step) % 360;
+                    this.redraw(true);
+                    break;
+                case 'ArrowUp':
+                    this.state.l = Math.max(0, Math.min(1, this.state.l + step / 100));
+                    this.redraw(false);
+                    break;
+                case 'ArrowDown':
+                    this.state.l = Math.max(0, Math.min(1, this.state.l - step / 100));
+                    this.redraw(false);
+                    break;
+                case 'PageUp':
+                    this.state.s = Math.max(0, Math.min(1, this.state.s + step / 100));
+                    this.redraw(false);
+                    break;
+                case 'PageDown':
+                    this.state.s = Math.max(0, Math.min(1, this.state.s - step / 100));
+                    this.redraw(false);
+                    break;
+                default: return;
+            }
+            e.preventDefault();
+            this.emitChange();
         }
         pointerPos(e) {
             const rect = this.canvas.getBoundingClientRect();

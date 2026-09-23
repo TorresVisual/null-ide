@@ -224,6 +224,7 @@ this.clientScript() +
       '' +
       '.null-color-popover{position:fixed;z-index:1000;background:#1c1c22;border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:14px;box-shadow:0 8px 28px rgba(0,0,0,.5);}' +
       '.null-color-canvas{display:block;cursor:crosshair;touch-action:none;}' +
+      '.null-color-canvas:focus-visible{outline:2px solid var(--vscode-focusBorder);outline-offset:2px;}' +
       '' +
       '.card-footer{display:flex;gap:6px;justify-content:flex-end;margin-top:9px;padding-top:9px;border-top:1px solid var(--vscode-widget-border,rgba(255,255,255,.06));}' +
       '.card-footer button[data-action=delete]{color:#f2a3a3;}' +
