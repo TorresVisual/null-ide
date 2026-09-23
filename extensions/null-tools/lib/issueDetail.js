@@ -5,6 +5,10 @@
     const lightbox = document.getElementById('lightbox');
     const lightboxImg = document.getElementById('lightbox-img');
     lightbox === null || lightbox === void 0 ? void 0 : lightbox.addEventListener('click', () => lightbox.classList.add('hidden'));
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && !(lightbox === null || lightbox === void 0 ? void 0 : lightbox.classList.contains('hidden')))
+            lightbox.classList.add('hidden');
+    });
     detailEl.addEventListener('click', e => {
         const target = e.target;
         if (target.tagName === 'IMG' && target.closest('.body-card, .comment-body')) {
