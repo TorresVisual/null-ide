@@ -191,18 +191,59 @@ bool LaunchNullIde(const std::filesystem::path& exe,
   std::vector<wchar_t> mutable_command(command_line.begin(), command_line.end());
   mutable_command.push_back(L'\0');
 
-  STARTUPINFOW startup_info{};
-  startup_info.cb = sizeof(startup_info);
+  // This DLL runs inside a COM surrogate activated under the sparse APPX
+  // identity NullIDE.ExplorerCommand (see AppxManifest.xml). Without
+  // detaching, a cold-started null.exe inherits that package identity and
+  // gets a different AUMID/icon than one launched from the Start
+  // Menu/taskbar shortcut, so it shows the wrong icon and doesn't dock into
+  // the pinned taskbar slot (issue #42). Passing an empty
+  // PROC_THREAD_ATTRIBUTE_PACKAGE_FULL_NAME detaches the child.
+  SIZE_T attr_list_size = 0;
+  InitializeProcThreadAttributeList(nullptr, 1, 0, &attr_list_size);
+  std::vector<BYTE> attr_list_buffer(attr_list_size);
+  auto* attr_list =
+      reinterpret_cast<LPPROC_THREAD_ATTRIBUTE_LIST>(attr_list_buffer.data());
+  bool have_attr_list = attr_list_size > 0 &&
+      InitializeProcThreadAttributeList(attr_list, 1, 0, &attr_list_size);
+  static wchar_t kUnpackaged[] = L"";
+  if (have_attr_list &&
+      !UpdateProcThreadAttribute(attr_list, 0,
+                                 PROC_THREAD_ATTRIBUTE_PACKAGE_FULL_NAME,
+                                 kUnpackaged, sizeof(kUnpackaged), nullptr,
+                                 nullptr)) {
+    DeleteProcThreadAttributeList(attr_list);
+    have_attr_list = false;
+  }
+
+  STARTUPINFOEXW startup_info{};
+  startup_info.StartupInfo.cb = sizeof(startup_info);
+  if (have_attr_list) {
+    startup_info.lpAttributeList = attr_list;
+  }
   PROCESS_INFORMATION process_info{};
 
-  if (CreateProcessW(nullptr, mutable_command.data(), nullptr, nullptr, FALSE,
-                     CREATE_DEFAULT_ERROR_MODE, nullptr,
-                     install_root.c_str(), &startup_info, &process_info)) {
+  DWORD flags = CREATE_DEFAULT_ERROR_MODE;
+  if (have_attr_list) {
+    flags |= EXTENDED_STARTUPINFO_PRESENT;
+  }
+
+  BOOL created = CreateProcessW(
+      nullptr, mutable_command.data(), nullptr, nullptr, FALSE, flags,
+      nullptr, install_root.c_str(),
+      reinterpret_cast<STARTUPINFOW*>(&startup_info), &process_info);
+
+  if (have_attr_list) {
+    DeleteProcThreadAttributeList(attr_list);
+  }
+
+  if (created) {
     CloseHandle(process_info.hThread);
     CloseHandle(process_info.hProcess);
     return true;
   }
 
+  // ponytail: fallback path keeps package identity (ShellExecuteEx has no
+  // equivalent detach knob); only hit if CreateProcessW itself fails.
   SHELLEXECUTEINFOW execute_info{};
   execute_info.cbSize = sizeof(execute_info);
   execute_info.fMask = SEE_MASK_FLAG_NO_UI;
