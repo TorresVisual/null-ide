@@ -197,7 +197,7 @@ this.clientScript() +
       '#empty-state{display:none;text-align:center;padding:30px 18px;color:var(--vscode-descriptionForeground);font-size:12px;border:1px dashed var(--vscode-widget-border,rgba(255,255,255,.14));border-radius:8px;}' +
       '#empty-state.visible{display:block;}' +
       '' +
-      '.card{background:var(--vscode-editorWidget-background,rgba(255,255,255,.02));border:1px solid var(--vscode-widget-border,rgba(255,255,255,.08));border-left:3px solid var(--vscode-focusBorder);border-radius:7px;margin-bottom:9px;overflow:hidden;animation:card-in .22s ease both;}' +
+      '.card{background:var(--vscode-editorWidget-background,rgba(255,255,255,.02));border:1px solid var(--vscode-widget-border,rgba(255,255,255,.08));border-radius:7px;margin-bottom:9px;overflow:hidden;animation:card-in .22s ease both;}' +
       '@keyframes card-in{from{opacity:0;transform:translateY(3px);}to{opacity:1;transform:translateY(0);}}' +
       '' +
       '.card-header{display:flex;align-items:center;gap:9px;padding:9px 12px;cursor:pointer;user-select:none;}' +
