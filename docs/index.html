@@ -17,19 +17,19 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg:        #0d0d1a;
-      --surface:   #12121f;
-      --raised:    #161628;
-      --border:    #1e1e30;
-      --border-hi: #2a2a42;
-      --text:      #ddddf0;
-      --muted:     #50507a;
-      --dim:       #333355;
-      --teal:      #00b4d8;
-      --teal-glow: #00b4d824;
-      --indigo:    #4361ee;
-      --indigo-glow: #4361ee22;
-      --font:      'Geist Mono', 'JetBrains Mono', 'Cascadia Code', monospace;
+      --bg:          #181818;
+      --surface:     #1f1f1f;
+      --raised:      #202020;
+      --border:      #2b2b2b;
+      --border-hi:   #3c3c3c;
+      --text:        #cccccc;
+      --muted:       #9d9d9d;
+      --dim:         #6e7681;
+      --accent:      #0078d4;
+      --accent-hover: #026ec1;
+      --accent-glow: #0078d424;
+      --link:        #4daafc;
+      --font:        'Geist Mono', 'JetBrains Mono', 'Cascadia Code', monospace;
     }
 
     html { scroll-behavior: smooth; }
@@ -64,9 +64,9 @@
       position: absolute;
       inset: 0;
       background-image:
-        radial-gradient(ellipse 70% 55% at 50% -5%, var(--indigo-glow) 0%, transparent 70%),
-        repeating-linear-gradient(0deg,   transparent, transparent 39px, #1a1a2c 40px),
-        repeating-linear-gradient(90deg,  transparent, transparent 39px, #1a1a2c 40px);
+        radial-gradient(ellipse 70% 55% at 50% -5%, var(--accent-glow) 0%, transparent 70%),
+        repeating-linear-gradient(0deg,   transparent, transparent 39px, #202020 40px),
+        repeating-linear-gradient(90deg,  transparent, transparent 39px, #202020 40px);
       animation: glow-breathe 9s ease-in-out infinite;
     }
 
@@ -100,7 +100,7 @@
       width: 88px;
       height: 88px;
       border-radius: 20px;
-      background: linear-gradient(145deg, #1e1e2e, #111118);
+      background: linear-gradient(145deg, #202020, #141414);
       border: 1px solid #ffffff08;
       display: flex;
       align-items: center;
@@ -110,11 +110,11 @@
 
     @keyframes logo-pulse {
       0%, 100% {
-        box-shadow: 0 0 24px var(--indigo-glow), 0 0 0 0 transparent;
+        box-shadow: 0 0 24px var(--accent-glow), 0 0 0 0 transparent;
         transform: scale(1);
       }
       50% {
-        box-shadow: 0 0 48px #4361ee38, 0 0 80px var(--teal-glow);
+        box-shadow: 0 0 48px var(--accent-glow), 0 0 80px var(--accent-glow);
         transform: scale(1.04);
       }
     }
@@ -134,7 +134,7 @@
       color: var(--text);
     }
 
-    .hero-title .accent { color: var(--teal); }
+    .hero-title .accent { color: var(--accent); }
 
     .hero-sub {
       font-size: clamp(.8rem, 2.5vw, .95rem);
@@ -168,14 +168,13 @@
     }
 
     .btn-primary {
-      background: var(--teal);
-      color: #060610;
-      border: 1px solid var(--teal);
+      background: var(--accent);
+      color: #ffffff;
+      border: 1px solid var(--accent);
     }
     .btn-primary:hover {
-      background: #14caf2;
-      border-color: #14caf2;
-      box-shadow: 0 0 24px #00b4d838;
+      background: var(--accent-hover);
+      border-color: var(--accent-hover);
     }
 
     .btn-ghost {
@@ -196,7 +195,7 @@
     }
 
     .terminal-shell {
-      background: #080812;
+      background: #0a0a0a;
       border: 1px solid var(--border);
       border-radius: 6px;
       overflow: hidden;
@@ -222,7 +221,7 @@
       font-size: 13px;
     }
 
-    .prompt { color: var(--teal); user-select: none; }
+    .prompt { color: var(--link); user-select: none; }
     .cmd    { color: var(--text); }
 
     .snippet-label {
@@ -257,7 +256,7 @@
       font-size: 11px;
       font-weight: 600;
       letter-spacing: .14em;
-      color: var(--teal);
+      color: var(--accent);
       text-transform: uppercase;
       margin-bottom: 10px;
     }
@@ -294,7 +293,7 @@
     .feat-icon {
       width: 28px;
       height: 28px;
-      color: var(--teal);
+      color: var(--accent);
       flex-shrink: 0;
     }
 
@@ -313,8 +312,8 @@
 
     .feat-desc code {
       font-family: var(--font);
-      color: var(--teal);
-      background: var(--teal-glow);
+      color: var(--accent);
+      background: var(--accent-glow);
       padding: 1px 5px;
       border-radius: 3px;
     }
@@ -383,7 +382,7 @@
 
     /* code block */
     .codeblock {
-      background: #080812;
+      background: #0a0a0a;
       border: 1px solid var(--border);
       border-radius: 4px;
       padding: 14px 16px;
@@ -396,7 +395,7 @@
     }
 
     .cb-kw   { color: #7eb8f7; }
-    .cb-flag { color: var(--teal); }
+    .cb-flag { color: var(--accent); }
     .cb-cont { color: var(--dim); }
 
     /* ─────────────────────────────────────────────────────────
@@ -430,7 +429,7 @@
       width: 26px;
       height: 26px;
       border-radius: 6px;
-      background: #1a1a28;
+      background: #202020;
       border: 1px solid var(--border-hi);
       display: flex;
       align-items: center;
@@ -530,7 +529,7 @@
           <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
         </svg>
         <div class="feat-name">Null Dark</div>
-        <div class="feat-desc">Deep navy backgrounds with teal and indigo accents. Designed for long sessions.</div>
+        <div class="feat-desc">Near-black backgrounds with a single Signal Blue accent. Designed for long sessions.</div>
       </div>
 
       <!-- 2 · AI Agents -->
