@@ -178,7 +178,7 @@ this.clientScript() +
       '' +
       '#page-header{margin-bottom:22px;}' +
       '#page-header h1{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:19px;font-weight:600;letter-spacing:.01em;margin:0 0 5px;}' +
-      '#page-header .dot{width:8px;height:8px;flex-shrink:0;border-radius:50%;background:var(--vscode-textLink-foreground);box-shadow:0 0 10px var(--vscode-textLink-foreground);}' +
+      '#page-header .dot{width:8px;height:8px;flex-shrink:0;border-radius:50%;background:var(--vscode-focusBorder);box-shadow:0 0 10px var(--vscode-focusBorder);}' +
       '#page-header .subtitle{margin:0;color:var(--vscode-descriptionForeground);font-size:12px;}' +
       '' +
       '#toolbar{display:flex;gap:8px;align-items:center;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--vscode-widget-border,rgba(255,255,255,.08));}' +
@@ -197,7 +197,7 @@ this.clientScript() +
       '#empty-state{display:none;text-align:center;padding:30px 18px;color:var(--vscode-descriptionForeground);font-size:12px;border:1px dashed var(--vscode-widget-border,rgba(255,255,255,.14));border-radius:8px;}' +
       '#empty-state.visible{display:block;}' +
       '' +
-      '.card{background:var(--vscode-editorWidget-background,rgba(255,255,255,.02));border:1px solid var(--vscode-widget-border,rgba(255,255,255,.08));border-left:3px solid var(--vscode-textLink-foreground);border-radius:7px;margin-bottom:9px;overflow:hidden;animation:card-in .22s ease both;}' +
+      '.card{background:var(--vscode-editorWidget-background,rgba(255,255,255,.02));border:1px solid var(--vscode-widget-border,rgba(255,255,255,.08));border-left:3px solid var(--vscode-focusBorder);border-radius:7px;margin-bottom:9px;overflow:hidden;animation:card-in .22s ease both;}' +
       '@keyframes card-in{from{opacity:0;transform:translateY(3px);}to{opacity:1;transform:translateY(0);}}' +
       '' +
       '.card-header{display:flex;align-items:center;gap:9px;padding:9px 12px;cursor:pointer;user-select:none;}' +
@@ -210,7 +210,7 @@ this.clientScript() +
       '.card-body{max-height:960px;opacity:1;padding:2px 13px 13px;transition:max-height .22s ease,opacity .16s ease,padding .22s ease;}' +
       '.card.collapsed .card-body{max-height:0;opacity:0;padding-top:0;padding-bottom:0;pointer-events:none;}' +
       '' +
-      '.field-section{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--vscode-textLink-foreground);opacity:.85;margin:14px 0 6px;}' +
+      '.field-section{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--vscode-focusBorder);opacity:.85;margin:14px 0 6px;}' +
       '.field-section:first-of-type{margin-top:2px;}' +
       '' +
       '.row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:7px;align-items:center;}' +
