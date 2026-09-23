@@ -264,7 +264,7 @@ this.clientScript() +
       'function renderCard(btn, index) {' +
       '  const collapsed = collapsedIds.has(btn.id);' +
       '  const header =' +
-      '    "<div class=card-header data-action=toggle data-index=" + index + ">" +' +
+      '    "<div class=card-header data-action=toggle data-index=" + index + " tabindex=0 role=button aria-expanded=" + (!collapsed) + ">" +' +
       '    "<span class=chevron>\\u25BC</span>" +' +
       '    "<span class=card-title>" + escapeHtml(btn.label || "(untitled)") + "</span>" +' +
       '    "<span class=card-summary>" + escapeHtml(btn.command || "") + "</span>" +' +
@@ -372,6 +372,14 @@ this.clientScript() +
       '      render();' +
       '    }' +
       '  }' +
+      '});' +
+      '' +
+      'document.addEventListener("keydown", function(e) {' +
+      '  if (e.key !== "Enter" && e.key !== " ") { return; }' +
+      '  const t = e.target.closest("[data-action=toggle]");' +
+      '  if (!t) { return; }' +
+      '  e.preventDefault();' +
+      '  t.click();' +
       '});' +
       '' +
       'document.getElementById("add-btn").addEventListener("click", function() {' +
