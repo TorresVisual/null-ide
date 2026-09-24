@@ -205,6 +205,7 @@ class IssueDetailPanel {
                 }
                 catch (err) {
                     void vscode.window.showErrorMessage(`Failed to post comment: ${err.message}`);
+                    this.panel.webview.postMessage({ type: 'commentPostFailed' });
                 }
                 break;
             }
@@ -219,6 +220,9 @@ class IssueDetailPanel {
                 break;
             }
             case 'deleteComment': {
+                const confirmed = await vscode.window.showWarningMessage('Delete this comment?', { modal: true }, 'Delete');
+                if (confirmed !== 'Delete')
+                    break;
                 try {
                     await this.store.deleteComment(this.issueNumber, msg.commentId);
                     await this._sendDetail();

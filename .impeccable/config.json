@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "broken-image",
+        "value": "*",
+        "files": [
+          "extensions/null-tools/src/issueDetailPanel.ts"
+        ],
+        "createdAt": "2026-09-24T21:52:53.854Z",
+        "reason": "lightbox img is a static placeholder, display:none until JS populates src on click (confirmed false positive in 2026-09-24 critique report)"
+      }
+    ]
+  }
+}

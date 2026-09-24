@@ -405,7 +405,7 @@ declare const DOMPurify: { sanitize(html: string): string };
         if (!body) return;
         vscode.postMessage({ type: 'editComment', commentId: id, body });
       } else if (target.classList.contains('comment-delete-btn')) {
-        if (confirm('Delete this comment?')) vscode.postMessage({ type: 'deleteComment', commentId: id });
+        vscode.postMessage({ type: 'deleteComment', commentId: id });
       }
     });
   }
@@ -426,6 +426,11 @@ declare const DOMPurify: { sanitize(html: string): string };
       case 'issueDetailError':
         detailEl.innerHTML = `<div id="empty">Failed to load issue: ${escapeHtml(msg.message)}</div>`;
         break;
+      case 'commentPostFailed': {
+        const btn = detailEl.querySelector<HTMLButtonElement>('#comment-btn');
+        if (btn) btn.disabled = false;
+        break;
+      }
       case 'copied': {
         const btn = detailEl.querySelector('#copy-btn');
         if (btn) {
