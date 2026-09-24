@@ -677,7 +677,7 @@ function Set-DefaultSettings {
         "workbench.colorTheme"                       = "Null Dark"
         "workbench.iconTheme"                        = "null-icons"
         "window.titleBarStyle"                       = "custom"
-        "window.menuBarVisibility"                   = "compact"
+        "window.menuBarVisibility"                   = "classic"
         "telemetry.telemetryLevel"                   = "off"
         "update.mode"                                = "none"
         "update.showReleaseNotes"                    = $false

@@ -82,7 +82,7 @@
 		"workbench.colorTheme": "Null Dark",
 		"workbench.iconTheme": "null-icons",
 		"window.titleBarStyle": "custom",
-		"window.menuBarVisibility": "compact",
+		"window.menuBarVisibility": "classic",
 		"window.title": "${dirty}${rootName} - ${activeEditorShort}",
 		"telemetry.telemetryLevel": "off",
 		"update.mode": "none",
