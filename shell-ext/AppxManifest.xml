@@ -25,7 +25,7 @@
     <DisplayName>Null IDE</DisplayName>
     <PublisherDisplayName>Null IDE</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
-    <!-- DLL and null.exe live outside the .appx (ExternalLocation install root) -->
+    <!-- DLL and the (never-launched) Application stub live outside the .appx (ExternalLocation install root) -->
     <uap10:AllowExternalContent>true</uap10:AllowExternalContent>
     <desktop6:RegistryWriteVirtualization>disabled</desktop6:RegistryWriteVirtualization>
     <desktop6:FileSystemWriteVirtualization>disabled</desktop6:FileSystemWriteVirtualization>
@@ -50,13 +50,26 @@
 
   <Applications>
   <!--
-      Executable is relative to ExternalLocation (= the Null IDE install root).
-      null.exe must be present there; this entry makes Windows aware of the app
-      so it can display the correct name/icon in the Win11 context menu.
+      Executable is relative to ExternalLocation (= the Null IDE install root)
+      and is never actually launched - Invoke() in explorer_command.cc asks
+      explorer.exe to start the real null.exe. It deliberately does NOT point
+      at null.exe: this element declares the package's identity-bearing app,
+      and naming the real editor binary there makes Windows treat null.exe as
+      this package's Application (AppsFolder entry, "Open with" list, package
+      AUMID). identity_stub.exe (see CMakeLists.txt) exists solely to satisfy
+      this required element.
+
+      Note this is NOT what caused issue #42, despite an earlier theory that
+      Windows fuses package identity onto whatever file this path names.
+      Measured with GetApplicationUserModelId: an unrelated exe copied into
+      the install root gets no package identity, and null.exe launched from an
+      unpackaged parent gets none either - even back when this pointed at
+      null.exe. Identity came from the *creating* process (the packaged
+      dllhost surrogate), which is what LaunchViaExplorer fixes.
     -->
     <Application
       Id="NullIDE"
-      Executable="null.exe"
+      Executable="shell-ext\null_identity_stub.exe"
       uap10:TrustLevel="mediumIL"
       uap10:RuntimeBehavior="win32App">
 

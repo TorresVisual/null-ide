@@ -67,4 +67,14 @@ target_link_libraries(null_explorer_command PRIVATE
     runtimeobject
     shlwapi
     onecore
+    # LaunchViaExplorer: CoCreateInstance / SysAllocString / shell interfaces
+    ole32
+    oleaut32
+    shell32
 )
+
+# Never executed - exists only so AppxManifest.xml's <Application Executable>
+# can point at something other than null.exe. See src/identity_stub.cc.
+add_executable(null_identity_stub src/identity_stub.cc)
+set_property(TARGET null_identity_stub PROPERTY CXX_STANDARD 17)
+set_property(TARGET null_identity_stub PROPERTY CXX_STANDARD_REQUIRED ON)

@@ -516,6 +516,8 @@ jobs:
           cmake --build shell-ext-build --config Release
           Copy-Item "shell-ext-build/Release/null_explorer_command.dll" $dllDest -Force
           Write-Host "DLL built: $(Get-Item "$dllDest/null_explorer_command.dll" | Select-Object -Expand Length) bytes"
+          # Never executed - see AppxManifest.xml for why this exists instead of null.exe.
+          Copy-Item "shell-ext-build/Release/null_identity_stub.exe" $pkgDir -Force
 
           # ── 3. Prepare icon assets ───────────────────────────────────────────
           New-Item -ItemType Directory -Path $assetDest -Force | Out-Null

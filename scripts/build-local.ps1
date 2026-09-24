@@ -695,6 +695,8 @@ if (-not $SkipShellExt) {
     }
     Invoke-Native "cmake build (shell-ext)" { cmake --build $shellExtBuild --config Release }
     Copy-Item (Join-Path $shellExtBuild "Release/null_explorer_command.dll") $dllDest -Force
+    # Never executed - see AppxManifest.xml for why this exists instead of null.exe.
+    Copy-Item (Join-Path $shellExtBuild "Release/null_identity_stub.exe") $pkgDir -Force
 
     New-Item -ItemType Directory -Path $assetDest -Force | Out-Null
     Add-Type -AssemblyName System.Drawing

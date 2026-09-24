@@ -15,6 +15,13 @@
 #include <shlwapi.h>
 #include <shobjidl_core.h>
 #include <userenv.h>
+// IShellWindows/IShellDispatch2 (LaunchViaExplorer). <oleauto.h> must precede
+// the wil includes below - wil/resource.h only defines wil::make_bstr_nothrow
+// when _OLEAUTO_H_ is already set.
+#include <exdisp.h>
+#include <oleauto.h>
+#include <shldisp.h>
+#include <shlobj.h>
 #include <wrl/module.h>
 #include <wrl/implements.h>
 #include <wrl/client.h>
@@ -183,10 +190,134 @@ std::filesystem::path GetMainExecutable(const std::filesystem::path& root) {
   return root / L"null.exe";
 }
 
+// Ask the running explorer.exe to do the launch on our behalf (issue #42).
+//
+// This DLL runs inside a COM surrogate (dllhost.exe) that Explorer activates
+// under the sparse package identity declared in AppxManifest.xml, and Windows
+// fuses that package identity onto every process the surrogate creates.
+// Measured with GetApplicationUserModelId: a cold-started null.exe reports
+// "NullIDE.ExplorerCommand_<hash>!NullIDE" whereas a Start Menu / taskbar
+// launch reports no package identity at all. A packaged process cannot
+// override its own AUMID, so the cold-started window gets the package's logo
+// and its own taskbar slot instead of the pinned one.
+//
+// No CreateProcessW option fixes this, because the identity is applied from
+// the *calling* process:
+//   - PROC_THREAD_ATTRIBUTE_DESKTOP_APP_POLICY is documented as applying to
+//     the child's own descendants, and its ENABLE_PROCESS_TREE value is
+//     already the default ("no policy set"), so setting it is a no-op.
+//   - PROC_THREAD_ATTRIBUTE_PARENT_PROCESS does not move package identity
+//     either (measured: a child reparented onto the packaged surrogate from
+//     an unpackaged creator still comes out with no package identity).
+// So the spawn has to be performed by a process that has no package identity.
+// explorer.exe is always running in the user's session and is the same user
+// at the same integrity level, so marshalling to its Shell.Application and
+// calling ShellExecute there produces exactly the process a shortcut launch
+// would.
+HRESULT LaunchViaExplorer(const std::filesystem::path& exe,
+                          const std::filesystem::path& install_root,
+                          const std::wstring& args) {
+  ComPtr<IShellWindows> shell_windows;
+  HRESULT hr = CoCreateInstance(CLSID_ShellWindows, nullptr,
+                                CLSCTX_LOCAL_SERVER,
+                                IID_PPV_ARGS(&shell_windows));
+  if (FAILED(hr)) {
+    return hr;
+  }
+
+  // The desktop shell view exists whenever explorer.exe is running, so this
+  // does not depend on an Explorer window being open.
+  VARIANT location{};
+  V_VT(&location) = VT_I4;
+  V_I4(&location) = CSIDL_DESKTOP;
+  VARIANT unused{};
+  long hwnd = 0;
+  ComPtr<IDispatch> desktop;
+  hr = shell_windows->FindWindowSW(&location, &unused, SWC_DESKTOP, &hwnd,
+                                   SWFO_NEEDDISPATCH, &desktop);
+  if (FAILED(hr)) {
+    return hr;
+  }
+  if (!desktop) {
+    return E_NOINTERFACE;
+  }
+
+  ComPtr<IServiceProvider> provider;
+  hr = desktop.As(&provider);
+  if (FAILED(hr)) {
+    return hr;
+  }
+
+  ComPtr<IShellBrowser> browser;
+  hr = provider->QueryService(SID_STopLevelBrowser, IID_PPV_ARGS(&browser));
+  if (FAILED(hr)) {
+    return hr;
+  }
+
+  ComPtr<IShellView> view;
+  hr = browser->QueryActiveShellView(&view);
+  if (FAILED(hr)) {
+    return hr;
+  }
+
+  ComPtr<IDispatch> view_dispatch;
+  hr = view->GetItemObject(SVGIO_BACKGROUND, IID_PPV_ARGS(&view_dispatch));
+  if (FAILED(hr)) {
+    return hr;
+  }
+
+  ComPtr<IShellFolderViewDual> folder_view;
+  hr = view_dispatch.As(&folder_view);
+  if (FAILED(hr)) {
+    return hr;
+  }
+
+  ComPtr<IDispatch> application;
+  hr = folder_view->get_Application(&application);
+  if (FAILED(hr)) {
+    return hr;
+  }
+
+  ComPtr<IShellDispatch2> shell_dispatch;
+  hr = application.As(&shell_dispatch);
+  if (FAILED(hr)) {
+    return hr;
+  }
+
+  wil::unique_bstr file = wil::make_bstr_nothrow(exe.c_str());
+  wil::unique_bstr parameters = wil::make_bstr_nothrow(args.c_str());
+  wil::unique_bstr directory = wil::make_bstr_nothrow(install_root.c_str());
+  if (!file || !parameters || !directory) {
+    return E_OUTOFMEMORY;
+  }
+
+  VARIANT v_parameters{};
+  V_VT(&v_parameters) = VT_BSTR;
+  V_BSTR(&v_parameters) = parameters.get();
+  VARIANT v_directory{};
+  V_VT(&v_directory) = VT_BSTR;
+  V_BSTR(&v_directory) = directory.get();
+  VARIANT v_operation{};  // VT_EMPTY - default verb ("open")
+  VARIANT v_show{};
+  V_VT(&v_show) = VT_I4;
+  V_I4(&v_show) = SW_SHOWNORMAL;
+
+  return shell_dispatch->ShellExecute(file.get(), v_parameters, v_directory,
+                                      v_operation, v_show);
+}
+
 bool LaunchNullIde(const std::filesystem::path& exe,
                    const std::filesystem::path& install_root,
                    const std::wstring& target_path) {
   const std::wstring args = QuoteForCommandLineArg(target_path);
+
+  if (SUCCEEDED(LaunchViaExplorer(exe, install_root, args))) {
+    return true;
+  }
+
+  // Fallback: launch it ourselves. The window gets the package's icon and its
+  // own taskbar slot (see LaunchViaExplorer), but opening the folder at all
+  // beats doing nothing if Explorer is unavailable or refuses the request.
   std::wstring command_line = L"\"" + exe.wstring() + L"\" " + args;
   std::vector<wchar_t> mutable_command(command_line.begin(), command_line.end());
   mutable_command.push_back(L'\0');
@@ -195,23 +326,15 @@ bool LaunchNullIde(const std::filesystem::path& exe,
   startup_info.cb = sizeof(startup_info);
   PROCESS_INFORMATION process_info{};
 
-  if (CreateProcessW(nullptr, mutable_command.data(), nullptr, nullptr, FALSE,
-                     CREATE_DEFAULT_ERROR_MODE, nullptr,
-                     install_root.c_str(), &startup_info, &process_info)) {
-    CloseHandle(process_info.hThread);
-    CloseHandle(process_info.hProcess);
-    return true;
+  if (!CreateProcessW(nullptr, mutable_command.data(), nullptr, nullptr, FALSE,
+                      CREATE_DEFAULT_ERROR_MODE, nullptr,
+                      install_root.c_str(), &startup_info, &process_info)) {
+    return false;
   }
 
-  SHELLEXECUTEINFOW execute_info{};
-  execute_info.cbSize = sizeof(execute_info);
-  execute_info.fMask = SEE_MASK_FLAG_NO_UI;
-  execute_info.lpVerb = L"open";
-  execute_info.lpFile = exe.c_str();
-  execute_info.lpParameters = args.c_str();
-  execute_info.lpDirectory = install_root.c_str();
-  execute_info.nShow = SW_SHOW;
-  return ShellExecuteExW(&execute_info) != FALSE;
+  CloseHandle(process_info.hThread);
+  CloseHandle(process_info.hProcess);
+  return true;
 }
 
 }  // namespace
