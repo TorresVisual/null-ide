@@ -4,6 +4,7 @@ import * as vscode from 'vscode';
 import { getNonce } from './webviewUtils';
 import { getRecentProjectsFilePath, readRecentProjects, RecentProjectEntry } from './recentProjects';
 import { computeGitStatuses, GitStatus } from './dashboardGitStatus';
+import { runNewProjectFlow } from './dashboardActions';
 
 type OutboundMessage =
   | { type: 'projects'; projects: RecentProjectEntry[] }
@@ -48,7 +49,10 @@ export class DashboardEditorProvider implements vscode.CustomReadonlyEditorProvi
       case 'openProject':
         vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(msg.path));
         break;
-      // 'newProject' / 'cloneRepo' are handled by Task 4 / Task 5.
+      case 'newProject':
+        void runNewProjectFlow();
+        break;
+      // 'cloneRepo' is handled by Task 5.
     }
   }
 
