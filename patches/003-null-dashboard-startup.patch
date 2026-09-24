@@ -1,0 +1,26 @@
+From 9e9d76daf00ec056ed5af0df937fda7397b3032d Mon Sep 17 00:00:00 2001
+From: TorresVisual <torresvisuals1@gmx.at>
+Date: Fri, 25 Sep 2026 01:35:40 +0200
+Subject: [PATCH] feat: open null-dashboard scheme instead of
+ GettingStartedInput on startup
+
+---
+ .../contrib/welcomeGettingStarted/browser/startupPage.ts        | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/vs/workbench/contrib/welcomeGettingStarted/browser/startupPage.ts b/src/vs/workbench/contrib/welcomeGettingStarted/browser/startupPage.ts
+index 4172f07f..66b9576b 100644
+--- a/src/vs/workbench/contrib/welcomeGettingStarted/browser/startupPage.ts
++++ b/src/vs/workbench/contrib/welcomeGettingStarted/browser/startupPage.ts
+@@ -206,7 +206,7 @@ export class StartupPageRunnerContribution extends Disposable implements IWorkbe
+ 
+ 		if (startupEditorTypeID === gettingStartedInputTypeId) {
+ 			this.editorService.openEditor({
+-				resource: GettingStartedInput.RESOURCE,
++				resource: URI.from({ scheme: 'null-dashboard', path: '/Dashboard' }),
+ 				options: {
+ 					index: editor ? 0 : undefined,
+ 					pinned: false,
+-- 
+2.55.0.windows.5
+
