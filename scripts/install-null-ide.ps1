@@ -248,12 +248,15 @@ function Register-ContextMenu {
         @{ Key = 'HKCU:\Software\Classes\Directory\Background\shell\NullIDE'; Label = 'Open Folder in Null';   Cmd = $cmdBg }
     )
 
+    # -LiteralPath: the '*' in 'Classes\*\shell' is a real key name, but -Path
+    # globs it across every HKCU class key - minutes per call on machines with
+    # a few thousand ProgIDs (other editors register ~150 each).
     foreach ($entry in $entries) {
         New-Item -Path $entry.Key -Force | Out-Null
-        Set-ItemProperty -Path $entry.Key -Name '(default)' -Value $entry.Label
-        Set-ItemProperty -Path $entry.Key -Name 'Icon'      -Value "$ExePath,0"
+        Set-ItemProperty -LiteralPath $entry.Key -Name '(default)' -Value $entry.Label
+        Set-ItemProperty -LiteralPath $entry.Key -Name 'Icon'      -Value "$ExePath,0"
         New-Item -Path "$($entry.Key)\command" -Force | Out-Null
-        Set-ItemProperty -Path "$($entry.Key)\command" -Name '(default)' -Value $entry.Cmd
+        Set-ItemProperty -LiteralPath "$($entry.Key)\command" -Name '(default)' -Value $entry.Cmd
     }
 
     # Enable key read by the Win11 shell-extension DLL (IsContextMenuEnabled / GetTitle)
@@ -271,8 +274,8 @@ function Unregister-ContextMenu {
         'HKCU:\Software\Classes\NullIDEContextMenu'
     )
     foreach ($key in $keys) {
-        if (Test-Path $key) {
-            Remove-Item -Path $key -Recurse -Force
+        if (Test-Path -LiteralPath $key) {
+            Remove-Item -LiteralPath $key -Recurse -Force
         }
     }
 }
