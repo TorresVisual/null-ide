@@ -19,6 +19,7 @@ import { getStagedDiff, runClaude } from './commitMessage';
 import { registerUpdaterFeature } from './updaterIntegration';
 import { registerOpenInNullNotesFeature } from './nullNotes';
 import { showWelcomePage } from './welcomePage';
+import { registerDashboardFeature } from './dashboardIntegration';
 
 // ── Activation ─────────────────────────────────────────────────────────────
 
@@ -66,6 +67,7 @@ export function activate(context: vscode.ExtensionContext): void {
   registerRecentProjectsUriHandler(context);
   registerScratchAndNotesFeature(context);
   registerAutoGitignoreFeature(context);
+  registerDashboardFeature(context);
 
   registerUpdaterFeature(context);
 
