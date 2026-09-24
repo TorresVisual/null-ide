@@ -49,3 +49,4 @@ dist/
 .workspace.json
 .*.tmp
 .superpowers/
+*.log
