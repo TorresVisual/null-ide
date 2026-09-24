@@ -64,12 +64,6 @@ const CHECK_ICON = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" 
     return s.replace(/[&<>"']/g, c => map[c]);
   }
 
-  function labelChipStyle(hex: string): string {
-    const r = parseInt(hex.slice(0, 2), 16), g = parseInt(hex.slice(2, 4), 16), b = parseInt(hex.slice(4, 6), 16);
-    const luminance = (r * 299 + g * 587 + b * 114) / 1000;
-    return `background:#${hex};color:${luminance > 128 ? '#111' : '#fff'}`;
-  }
-
   function sendFilters(): void {
     vscode.postMessage({
       type: 'setFilters',

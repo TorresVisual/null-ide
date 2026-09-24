@@ -67,12 +67,6 @@ declare const DOMPurify: { sanitize(html: string): string };
     return s.replace(/[&<>"']/g, c => map[c]);
   }
 
-  function labelChipStyle(hex: string): string {
-    const r = parseInt(hex.slice(0, 2), 16), g = parseInt(hex.slice(2, 4), 16), b = parseInt(hex.slice(4, 6), 16);
-    const luminance = (r * 299 + g * 587 + b * 114) / 1000;
-    return `background:#${hex};color:${luminance > 128 ? '#111' : '#fff'}`;
-  }
-
   function renderMarkdown(text: string): string {
     return DOMPurify.sanitize(marked.parse(text));
   }
@@ -122,15 +116,9 @@ declare const DOMPurify: { sanitize(html: string): string };
     return refresh;
   }
 
-  const AVATAR_COLORS = ['#e57373', '#ba68c8', '#64b5f6', '#4db6ac', '#81c784', '#ffb74d', '#a1887f', '#90a4ae'];
-  function avatarColor(login: string): string {
-    let hash = 0;
-    for (let i = 0; i < login.length; i++) hash = (hash * 31 + login.charCodeAt(i)) >>> 0;
-    return AVATAR_COLORS[hash % AVATAR_COLORS.length];
-  }
   function avatar(user: GithubUser): string {
     const initials = escapeHtml(user.login.slice(0, 2).toUpperCase());
-    return `<span class="avatar" style="background:${avatarColor(user.login)}" data-initials="${initials}">` +
+    return `<span class="avatar" data-initials="${initials}">` +
       `${user.avatar_url ? `<img src="${escapeHtml(user.avatar_url)}" alt="">` : ''}</span>`;
   }
 
@@ -296,10 +284,11 @@ declare const DOMPurify: { sanitize(html: string): string };
       </div>` : `
       <div class="btn-row">
         <button class="btn btn-primary" id="edit-btn">Edit</button>
+        <button class="btn ${closed ? 'btn-reopen' : 'btn-close'}" id="state-btn">${closed ? 'Reopen' : 'Close'}</button>
+        <div class="btn-row-divider"></div>
         <button class="btn btn-ghost" id="branch-btn">Branch</button>
         <button class="btn btn-ghost" id="browser-btn">Browser ↗</button>
         <button class="btn btn-ghost" id="copy-btn">Copy as prompt</button>
-        <button class="btn ${closed ? 'btn-reopen' : 'btn-close'}" id="state-btn">${closed ? 'Reopen' : 'Close'}</button>
       </div>
       <div class="body-card">${issue.body ? renderMarkdown(issue.body) : '(no description)'}</div>`}
       <h3>Comments (${comments.length})</h3>

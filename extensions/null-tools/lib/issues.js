@@ -1,4 +1,23 @@
 'use strict';
+function relativeLuminance(r, g, b) {
+    const [rs, gs, bs] = [r, g, b].map(v => {
+        v /= 255;
+        return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs;
+}
+function contrastRatio(l1, l2) {
+    const lighter = Math.max(l1, l2);
+    const darker = Math.min(l1, l2);
+    return (lighter + 0.05) / (darker + 0.05);
+}
+/** Picks whichever of black/white text has the higher WCAG contrast ratio against a GitHub label hex color. */
+function labelChipStyle(hex) {
+    const r = parseInt(hex.slice(0, 2), 16), g = parseInt(hex.slice(2, 4), 16), b = parseInt(hex.slice(4, 6), 16);
+    const bgLuminance = relativeLuminance(r, g, b);
+    const color = contrastRatio(bgLuminance, 1) > contrastRatio(bgLuminance, 0) ? '#fff' : '#111';
+    return `background:#${hex};color:${color}`;
+}
 const COPY_ICON = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="5.5" y="5.5" width="8" height="8" rx="1"/><path d="M3.5 10.5h-1a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v1" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const OPEN_ICON = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M6.5 2.5h-3a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-3" stroke-linecap="round" stroke-linejoin="round"/><path d="M9.5 2.5h4v4M13 3l-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const CHECK_ICON = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 8.5l4 4 8-9" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -48,11 +67,6 @@ const CHECK_ICON = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" 
     function escapeHtml(s) {
         const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
         return s.replace(/[&<>"']/g, c => map[c]);
-    }
-    function labelChipStyle(hex) {
-        const r = parseInt(hex.slice(0, 2), 16), g = parseInt(hex.slice(2, 4), 16), b = parseInt(hex.slice(4, 6), 16);
-        const luminance = (r * 299 + g * 587 + b * 114) / 1000;
-        return `background:#${hex};color:${luminance > 128 ? '#111' : '#fff'}`;
     }
     function sendFilters() {
         vscode.postMessage({

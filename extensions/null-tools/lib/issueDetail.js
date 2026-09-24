@@ -1,4 +1,23 @@
 'use strict';
+function relativeLuminance(r, g, b) {
+    const [rs, gs, bs] = [r, g, b].map(v => {
+        v /= 255;
+        return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs;
+}
+function contrastRatio(l1, l2) {
+    const lighter = Math.max(l1, l2);
+    const darker = Math.min(l1, l2);
+    return (lighter + 0.05) / (darker + 0.05);
+}
+/** Picks whichever of black/white text has the higher WCAG contrast ratio against a GitHub label hex color. */
+function labelChipStyle(hex) {
+    const r = parseInt(hex.slice(0, 2), 16), g = parseInt(hex.slice(2, 4), 16), b = parseInt(hex.slice(4, 6), 16);
+    const bgLuminance = relativeLuminance(r, g, b);
+    const color = contrastRatio(bgLuminance, 1) > contrastRatio(bgLuminance, 0) ? '#fff' : '#111';
+    return `background:#${hex};color:${color}`;
+}
 (function () {
     const vscode = acquireVsCodeApi();
     const detailEl = document.getElementById('detail');
@@ -45,11 +64,6 @@
     function escapeHtml(s) {
         const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
         return s.replace(/[&<>"']/g, c => map[c]);
-    }
-    function labelChipStyle(hex) {
-        const r = parseInt(hex.slice(0, 2), 16), g = parseInt(hex.slice(2, 4), 16), b = parseInt(hex.slice(4, 6), 16);
-        const luminance = (r * 299 + g * 587 + b * 114) / 1000;
-        return `background:#${hex};color:${luminance > 128 ? '#111' : '#fff'}`;
     }
     function renderMarkdown(text) {
         return DOMPurify.sanitize(marked.parse(text));
@@ -98,16 +112,9 @@
         refresh();
         return refresh;
     }
-    const AVATAR_COLORS = ['#e57373', '#ba68c8', '#64b5f6', '#4db6ac', '#81c784', '#ffb74d', '#a1887f', '#90a4ae'];
-    function avatarColor(login) {
-        let hash = 0;
-        for (let i = 0; i < login.length; i++)
-            hash = (hash * 31 + login.charCodeAt(i)) >>> 0;
-        return AVATAR_COLORS[hash % AVATAR_COLORS.length];
-    }
     function avatar(user) {
         const initials = escapeHtml(user.login.slice(0, 2).toUpperCase());
-        return `<span class="avatar" style="background:${avatarColor(user.login)}" data-initials="${initials}">` +
+        return `<span class="avatar" data-initials="${initials}">` +
             `${user.avatar_url ? `<img src="${escapeHtml(user.avatar_url)}" alt="">` : ''}</span>`;
     }
     function bindAvatarFallbacks() {
@@ -258,10 +265,11 @@
       </div>` : `
       <div class="btn-row">
         <button class="btn btn-primary" id="edit-btn">Edit</button>
+        <button class="btn ${closed ? 'btn-reopen' : 'btn-close'}" id="state-btn">${closed ? 'Reopen' : 'Close'}</button>
+        <div class="btn-row-divider"></div>
         <button class="btn btn-ghost" id="branch-btn">Branch</button>
         <button class="btn btn-ghost" id="browser-btn">Browser ↗</button>
         <button class="btn btn-ghost" id="copy-btn">Copy as prompt</button>
-        <button class="btn ${closed ? 'btn-reopen' : 'btn-close'}" id="state-btn">${closed ? 'Reopen' : 'Close'}</button>
       </div>
       <div class="body-card">${issue.body ? renderMarkdown(issue.body) : '(no description)'}</div>`}
       <h3>Comments (${comments.length})</h3>

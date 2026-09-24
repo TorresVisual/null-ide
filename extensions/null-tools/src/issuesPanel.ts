@@ -258,6 +258,7 @@ export class IssuesViewProvider implements vscode.WebviewViewProvider {
     color:var(--vscode-input-foreground); padding:3px 4px; font:inherit; border-radius:2px;
   }
   #toolbar select:focus { outline:none; border-color:var(--vscode-focusBorder); }
+  .toolbar-divider { width:1px; align-self:stretch; margin:2px 4px; background:var(--vscode-widget-border,rgba(128,128,128,.2)); }
   .icon-btn {
     background:transparent; border:none; color:var(--vscode-foreground); cursor:pointer;
     padding:4px 6px; border-radius:3px; font-size:13px; line-height:1;
@@ -288,7 +289,7 @@ export class IssuesViewProvider implements vscode.WebviewViewProvider {
     flex-shrink:0; width:9px; height:9px; margin-top:4px; border-radius:50%;
     background:var(--vscode-charts-green,#89d185);
   }
-  .issue-row.closed .state-dot { background:var(--vscode-charts-purple,#b180d7); }
+  .issue-row.closed .state-dot { background:var(--vscode-charts-red,#f14c4c); }
   .issue-main { min-width:0; flex:1; }
   .issue-num { color:var(--vscode-descriptionForeground); }
   .issue-title { font-weight:600; }
@@ -298,7 +299,7 @@ export class IssuesViewProvider implements vscode.WebviewViewProvider {
   }
   .closes-badge {
     display:inline-block; margin-left:5px; padding:0 6px; border-radius:999px; font-size:.85em;
-    background:var(--vscode-charts-purple,#b180d7); color:#fff;
+    background:var(--vscode-charts-yellow,#cca700); color:#111;
   }
   .issue-meta { color:var(--vscode-descriptionForeground); font-size:.9em; margin-top:2px; }
   .label-chip { display:inline-block; padding:0 6px; border-radius:999px; font-size:.85em; margin-right:4px; color:#111; }
@@ -345,9 +346,11 @@ export class IssuesViewProvider implements vscode.WebviewViewProvider {
       <option value="closed">Closed</option>
       <option value="all">All</option>
     </select>
+    <div class="toolbar-divider"></div>
     <button class="icon-btn" id="new-issue-btn" title="New issue"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 2v12M2 8h12" stroke-linecap="round"/></svg></button>
     <button class="icon-btn" id="refresh-btn" title="Refresh"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M13 4v3h-3M3 12v-3h3" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.5 6.5a5 5 0 0 1 9-2M12.5 9.5a5 5 0 0 1-9 2" stroke-linecap="round"/></svg></button>
     <button class="icon-btn" id="mark-read-btn" title="Mark Issues as Read"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M1 8l3.5 3.5L9 6.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 8l3.5 3.5L15 6.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    <div class="toolbar-divider"></div>
     <button class="icon-btn" id="search-toggle-btn" title="Search"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="6.5" cy="6.5" r="4.5"/><path d="M10 10L14 14" stroke-linecap="round"/></svg></button>
     <button class="icon-btn" id="filter-toggle-btn" title="Filter"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2 3h12L9.5 8v4.5L6.5 14V8L2 3z" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
   </div>

@@ -8,5 +8,5 @@
     "sourceMap": false,
     "skipLibCheck": true
   },
-  "include": ["src/webview/issueDetail.ts"]
+  "include": ["src/webview/colorUtils.ts", "src/webview/issueDetail.ts"]
 }

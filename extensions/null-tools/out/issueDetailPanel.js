@@ -270,17 +270,18 @@ class IssueDetailPanel {
     font-size:.85em; font-weight:600; text-transform:uppercase; letter-spacing:.04em;
     padding:2px 8px; border-radius:999px; color:#fff; background:var(--vscode-charts-green,#89d185);
   }
-  .state-badge.closed { background:var(--vscode-charts-purple,#b180d7); }
+  .state-badge.closed { background:var(--vscode-charts-red,#f14c4c); }
   .closes-badge {
-    font-size:.85em; font-weight:600; padding:2px 8px; border-radius:999px; color:#fff;
-    background:var(--vscode-charts-purple,#b180d7);
+    font-size:.85em; font-weight:600; padding:2px 8px; border-radius:999px; color:#111;
+    background:var(--vscode-charts-yellow,#cca700);
   }
   .label-chip { display:inline-block; padding:0 6px; border-radius:999px; font-size:.8em; margin-right:4px; color:#111; }
   .issue-meta { color:var(--vscode-descriptionForeground); font-size:.85em; margin:6px 0; }
   .meta-row { display:flex; align-items:center; gap:6px; flex-wrap:wrap; color:var(--vscode-descriptionForeground); font-size:.9em; margin:8px 0; }
   .avatar {
     position:relative; overflow:hidden; width:20px; height:20px; border-radius:50%; display:inline-flex;
-    align-items:center; justify-content:center; font-size:.7em; font-weight:700; color:#fff; flex-shrink:0;
+    align-items:center; justify-content:center; font-size:.7em; font-weight:700; flex-shrink:0;
+    background:var(--vscode-badge-background); color:var(--vscode-badge-foreground);
   }
   .avatar::before { content: attr(data-initials); }
   .avatar img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
@@ -330,7 +331,8 @@ class IssueDetailPanel {
   }
   #lightbox.hidden { display:none; }
   #lightbox img { max-width:90vw; max-height:90vh; object-fit:contain; box-shadow:0 8px 32px rgba(0,0,0,.5); }
-  .btn-row { display:flex; gap:8px; margin:14px 0; flex-wrap:wrap; }
+  .btn-row { display:flex; align-items:center; gap:8px; margin:14px 0; flex-wrap:wrap; }
+  .btn-row-divider { width:1px; align-self:stretch; min-height:24px; background:var(--vscode-widget-border,rgba(128,128,128,.2)); }
   button.btn { border:none; padding:6px 14px; border-radius:4px; cursor:pointer; font:inherit; font-weight:500; transition:filter .15s,background .15s; }
   button.btn-primary { background:var(--vscode-button-background); color:var(--vscode-button-foreground); }
   button.btn-primary:hover { background:var(--vscode-button-hoverBackground); filter:brightness(1.08); }
