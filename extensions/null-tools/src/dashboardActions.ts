@@ -42,3 +42,54 @@ export async function runNewProjectFlow(): Promise<void> {
   }
   vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(target));
 }
+
+let cloneTerminal: vscode.Terminal | undefined;
+
+function getCloneTerminal(vscode: typeof import('vscode')): vscode.Terminal {
+  if (!cloneTerminal || cloneTerminal.exitStatus !== undefined) {
+    cloneTerminal = vscode.window.createTerminal({ name: 'Null: Clone Repo' });
+  }
+  return cloneTerminal;
+}
+
+export async function runCloneRepoFlow(context: vscode.ExtensionContext): Promise<void> {
+  const vscode: typeof import('vscode') = require('vscode');
+  const url = await vscode.window.showInputBox({
+    prompt: 'Repository URL to clone',
+    validateInput: value => (value.trim().length === 0 ? 'Enter a repository URL.' : undefined),
+  });
+  if (!url) return;
+
+  const parent = await vscode.window.showOpenDialog({
+    canSelectFiles: false,
+    canSelectFolders: true,
+    canSelectMany: false,
+    openLabel: 'Choose Parent Folder',
+  });
+  if (!parent || parent.length === 0) return;
+
+  const trimmedUrl = url.trim();
+  const folderName = path.basename(trimmedUrl, '.git');
+  const target = vscode.Uri.file(path.join(parent[0].fsPath, folderName));
+
+  const terminal = getCloneTerminal(vscode);
+  terminal.show();
+
+  // Auto-opens the cloned folder once the clone command exits 0, via the
+  // Shell Integration API (stable since VS Code 1.93; this repo targets
+  // VSCodium 1.135.06055, well past that). If the user's shell doesn't
+  // report shell-integration exit codes (an unusual shell, or the setting
+  // disabled), this listener simply never fires -- the clone still
+  // completes and the terminal shows the result, the user just needs to
+  // click Open Folder afterwards. Accepted degradation, not a bug.
+  const subscription = vscode.window.onDidEndTerminalShellExecution(event => {
+    if (event.terminal !== terminal) return;
+    subscription.dispose();
+    if (event.exitCode === 0) {
+      vscode.commands.executeCommand('vscode.openFolder', target);
+    }
+  });
+  context.subscriptions.push(subscription);
+
+  terminal.sendText(`git clone "${trimmedUrl}" "${target.fsPath}"`);
+}
