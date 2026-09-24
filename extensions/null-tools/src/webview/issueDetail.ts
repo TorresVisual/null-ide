@@ -423,6 +423,9 @@ declare const DOMPurify: { sanitize(html: string): string };
         if (msg.issue) renderDetail(msg.issue, msg.comments, msg.timeline);
         else renderCreateForm();
         break;
+      case 'issueDetailError':
+        detailEl.innerHTML = `<div id="empty">Failed to load issue: ${escapeHtml(msg.message)}</div>`;
+        break;
       case 'copied': {
         const btn = detailEl.querySelector('#copy-btn');
         if (btn) {

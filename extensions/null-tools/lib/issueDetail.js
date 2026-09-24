@@ -391,6 +391,9 @@
                 else
                     renderCreateForm();
                 break;
+            case 'issueDetailError':
+                detailEl.innerHTML = `<div id="empty">Failed to load issue: ${escapeHtml(msg.message)}</div>`;
+                break;
             case 'copied': {
                 const btn = detailEl.querySelector('#copy-btn');
                 if (btn) {

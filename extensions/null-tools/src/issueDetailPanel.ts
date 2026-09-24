@@ -102,12 +102,18 @@ export class IssueDetailPanel {
     }
     const issue = this.store.getByNumber(this.issueNumber);
     if (!issue) return;
-    const [comments, timeline, repoLabels, assignableUsers] = await Promise.all([
-      this.store.getComments(this.issueNumber),
-      this.store.getTimeline(this.issueNumber),
-      this.store.getRepoLabels(),
-      this.store.getAssignableUsers(),
-    ]);
+    let comments, timeline, repoLabels, assignableUsers;
+    try {
+      [comments, timeline, repoLabels, assignableUsers] = await Promise.all([
+        this.store.getComments(this.issueNumber),
+        this.store.getTimeline(this.issueNumber),
+        this.store.getRepoLabels(),
+        this.store.getAssignableUsers(),
+      ]);
+    } catch (err) {
+      this.panel.webview.postMessage({ type: 'issueDetailError', message: (err as Error).message });
+      return;
+    }
     const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     const closedLocally = issue.state === 'open' && !!cwd && getLocallyClosedIssueNumbers(cwd).has(issue.number);
     this.panel.webview.postMessage({
