@@ -375,6 +375,11 @@ function Register-Win11ContextMenu {
 
     $existing = Get-AppxPackage -Name 'NullIDE.ExplorerCommand' -ErrorAction SilentlyContinue
     if ($existing) {
+        # Explorer holds null_explorer_command.dll loaded in-process as long as it's
+        # running with the current package registered - removing/updating the package
+        # while that handle is open blocks Add-AppxPackage indefinitely. Restart Explorer
+        # first so the file is free before Windows tries to service the update.
+        Restart-FileExplorer
         Remove-AppxPackage -Package $existing.PackageFullName -ErrorAction SilentlyContinue
     }
 
