@@ -8,7 +8,7 @@
   "engines": { "vscode": "^1.85.0" },
   "main": "./out/extension.js",
   "scripts": {
-    "compile": "tsc -p tsconfig.json && tsc -p tsconfig.webview.json && tsc -p tsconfig.webview-issues.json && tsc -p tsconfig.webview-issue-detail.json",
+    "compile": "tsc -p tsconfig.json && tsc -p tsconfig.webview.json && tsc -p tsconfig.webview-issues.json && tsc -p tsconfig.webview-issue-detail.json && tsc -p tsconfig.webview-dashboard.json",
     "test": "tsc -p tsconfig.json && node --test out/recentProjects.test.js out/scratchNotesStorage.test.js out/autoGitignore.test.js out/versionComparison.test.js out/nullNotes.test.js out/github/githubRemote.test.js out/github/issueFilter.test.js out/github/promptFormat.test.js out/github/gitBranch.test.js out/github/taskList.test.js out/github/issueTemplates.test.js out/dashboardGitStatus.test.js"
   },
   "dependencies": {
@@ -20,8 +20,16 @@
     "@types/node": "^22.0.0",
     "@types/ws": "^8.18.1"
   },
-  "activationEvents": ["onStartupFinished"],
+  "activationEvents": ["onStartupFinished", "onCustomEditor:null.dashboard"],
   "contributes": {
+    "customEditors": [
+      {
+        "viewType": "null.dashboard",
+        "displayName": "Null Dashboard",
+        "selector": [{ "filenamePattern": "Dashboard" }],
+        "priority": "default"
+      }
+    ],
     "commands": [
       {
         "command": "null.generateCommitMessage",
