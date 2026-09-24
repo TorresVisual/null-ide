@@ -98,7 +98,19 @@ function Invoke-Native {
         [Parameter(Mandatory)][scriptblock]$Command
     )
 
-    & $Command
+    # Windows PowerShell 5.1 promotes every stderr line from a native command
+    # (e.g. git's routine "trailing whitespace" notes, git clean's warnings)
+    # to a terminating ErrorRecord under $ErrorActionPreference = "Stop" (set
+    # script-wide, above) - even though it's not a failure. $LASTEXITCODE
+    # below is the real signal; stderr text alone shouldn't abort the build.
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & $Command
+    }
+    finally {
+        $ErrorActionPreference = $previous
+    }
 
     if ($LASTEXITCODE -ne 0) {
         throw "$Description failed (exit $LASTEXITCODE)."
