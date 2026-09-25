@@ -170,7 +170,9 @@ class IssuesViewProvider {
         const result = await this._store.refresh(cwd, this._state);
         if (result.status !== 'ok') {
             // Offline/rate-limited: leave the cached list on screen rather than replacing it with an error.
-            if (!hadCache) {
+            // Deterministic state changes (signed out, remote removed, no workspace) must still update the
+            // UI even if a stale cache exists, or the panel would show issues forever with no way to notice.
+            if (!hadCache || result.status !== 'error') {
                 this._view.postMessage({
                     type: 'issues',
                     status: result.status,

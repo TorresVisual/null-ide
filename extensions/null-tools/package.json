@@ -323,16 +323,6 @@
           "command": "null.ports.refresh",
           "when": "view == null.portsView",
           "group": "navigation"
-        },
-        {
-          "command": "null.issues.create",
-          "when": "view == null.issuesView",
-          "group": "navigation"
-        },
-        {
-          "command": "null.issues.refresh",
-          "when": "view == null.issuesView",
-          "group": "navigation"
         }
       ],
       "view/item/context": [
