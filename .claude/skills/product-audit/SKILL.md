@@ -52,7 +52,9 @@ If a live inspection ever contradicts the knowledge base, the repository wins â€
 
 ## Creating GitHub issues
 
-Before filing anything: check `ISSUES.md`, search GitHub for duplicates, check related open issues and `ROADMAP.md`. Only create an issue if the work isn't already represented somewhere. Record the issue number in both `ISSUES.md` and `ROADMAP.md` immediately after creating it.
+Before filing anything: check `ISSUES.md`, search GitHub for duplicates, check related open issues and `ROADMAP.md`. Only create an issue if the work isn't already represented somewhere.
+
+Use the `file-issue` skill to actually draft and file each issue â€” it handles investigating the codebase for context, clarifying ambiguity with the user, and filing via `gh issue create`. Hand it the problem/opportunity found during the audit; don't duplicate its drafting logic here. Record the resulting issue number in both `ISSUES.md` and `ROADMAP.md` immediately after it's created.
 
 Every issue should cover: **Problem** (the developer problem), **Current State** (what NULL IDE does today), **Proposed Solution**, **User Experience** (how the workflow should feel), **Scope** (in/out), **Acceptance Criteria** (concrete and testable), **Technical Considerations** (only ones the architecture knowledge actually supports), **Dependencies** (related/prerequisite issues).
 
