@@ -26,7 +26,7 @@
       {
         "viewType": "null.dashboard",
         "displayName": "Null Dashboard",
-        "selector": [{ "filenamePattern": "Dashboard" }],
+        "selector": [{ "filenamePattern": "null-dashboard:/**" }],
         "priority": "default"
       }
     ],

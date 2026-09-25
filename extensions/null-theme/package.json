@@ -45,7 +45,7 @@
 
     "configurationDefaults": {
       "workbench.colorTheme": "Null Dark",
-      "workbench.startupEditor": "none",
+      "workbench.startupEditor": "welcomePage",
       "workbench.tree.indent": 14,
       "workbench.editor.tabSizing": "shrink",
       "workbench.editor.showIcons": true,
