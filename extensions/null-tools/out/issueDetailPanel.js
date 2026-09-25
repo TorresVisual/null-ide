@@ -66,6 +66,7 @@ class IssueDetailPanel {
                 retainContextWhenHidden: true,
                 localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'lib')],
             });
+            panel.iconPath = vscode.Uri.joinPath(extensionUri, 'media', 'github-issues.svg');
             IssueDetailPanel.current = new IssueDetailPanel(panel, extensionUri, store);
         }
     }
