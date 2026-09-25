@@ -75,21 +75,30 @@ export async function runCloneRepoFlow(context: vscode.ExtensionContext): Promis
   const terminal = getCloneTerminal(vscode);
   terminal.show();
 
-  // Auto-opens the cloned folder once the clone command exits 0, via the
-  // Shell Integration API (stable since VS Code 1.93; this repo targets
-  // VSCodium 1.135.06055, well past that). If the user's shell doesn't
-  // report shell-integration exit codes (an unusual shell, or the setting
-  // disabled), this listener simply never fires -- the clone still
-  // completes and the terminal shows the result, the user just needs to
-  // click Open Folder afterwards. Accepted degradation, not a bug.
-  const subscription = vscode.window.onDidEndTerminalShellExecution(event => {
-    if (event.terminal !== terminal) return;
-    subscription.dispose();
-    if (event.exitCode === 0) {
-      vscode.commands.executeCommand('vscode.openFolder', target);
-    }
-  });
-  context.subscriptions.push(subscription);
-
-  terminal.sendText(`git clone "${trimmedUrl}" "${target.fsPath}"`);
+  if (terminal.shellIntegration) {
+    // Args passed out-of-band (not interpolated into a shell string), so a
+    // clone URL containing shell metacharacters (", $(...), backticks, etc.)
+    // can't break out and execute arbitrary commands.
+    const execution = terminal.shellIntegration.executeCommand('git', ['clone', trimmedUrl, target.fsPath]);
+    const subscription = vscode.window.onDidEndTerminalShellExecution(event => {
+      if (event.execution !== execution) return;
+      subscription.dispose();
+      if (event.exitCode === 0) {
+        vscode.commands.executeCommand('vscode.openFolder', target);
+      }
+    });
+    context.subscriptions.push(subscription);
+  } else {
+    // No Shell Integration active (unusual shell, or the setting disabled):
+    // sendText goes straight to the shell as text, so there's no exit-code
+    // signal and no out-of-band args -- the clone still runs, it just can't
+    // auto-open the folder on completion. Accepted degradation per the
+    // design spec, not a bug.
+    // ponytail: single-quote escaping is safe for POSIX shells and
+    // PowerShell (both treat '...' as fully literal) but not cmd.exe, which
+    // isn't VS Code's default integrated shell on Windows. Upgrade path if
+    // that changes: detect terminal.shellPath and branch the escaping.
+    const singleQuote = (s: string) => `'${s.replace(/'/g, "''")}'`;
+    terminal.sendText(`git clone ${singleQuote(trimmedUrl)} ${singleQuote(target.fsPath)}`);
+  }
 }
