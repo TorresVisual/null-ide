@@ -9,6 +9,9 @@ Closed issues #1–#79 not listed individually unless still relevant; check
 
 | Issue | Title | Status | Area | Last Audited |
 |---|---|---|---|---|
+| #93 | Test Explorer integration for non-C++ projects (npm test, cargo test) | open | testing | 2026-09-25 |
+| #92 | GitHub Pull Requests in the Issues panel | open | git/issues | 2026-09-25 |
+| #91 | Rust development support: LSP recommendation + debug config synthesis | open | rust | 2026-09-25 |
 | #90 | Import settings/keybindings/snippets/extensions from VS Code / Cursor | open | configure | 2026-09-25 |
 | #89 | Environment check: companion extensions + toolchains | open | configure | 2026-09-25 |
 | #88 | Git worktree manager for parallel agent sessions | open | git | 2026-09-25 |

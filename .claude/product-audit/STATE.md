@@ -59,5 +59,6 @@ Corrections to project docs noticed:
   `sync-agent-docs`).
 
 Last created issues:
-- #89
-- #90
+- #91 (Rust development support)
+- #92 (GitHub Pull Requests in Issues panel)
+- #93 (Test Explorer for npm test / cargo test)

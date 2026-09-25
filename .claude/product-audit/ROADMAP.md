@@ -35,14 +35,13 @@ Status: issue exists (#85)
 ## Developer Workflow
 
 ### Pull requests in GitHub panel (list, checkout, review diff, comment)
-Status: candidate — overlaps marketplace "GitHub Pull Requests" extension;
-file only if user wants native parity with issues panel.
+Status: issue created (#92)
 
 ### Test explorer for non-C++ (cargo test, npm test)
-Status: candidate — CTest is #82; revisit after #39.
+Status: issue created (#93); CTest itself is #82.
 
 ### Rust run/debug (cargo + CodeLLDB) parity with null-cpp
-Status: candidate — depends on environment check.
+Status: issue created (#91)
 
 ### Git: graph #87, worktrees #88, hunk staging #7, secret scan #34
 Status: issues exist
