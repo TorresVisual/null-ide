@@ -54,6 +54,7 @@ const commitMessage_1 = require("./commitMessage");
 const updaterIntegration_1 = require("./updaterIntegration");
 const nullNotes_1 = require("./nullNotes");
 const welcomePage_1 = require("./welcomePage");
+const dashboardIntegration_1 = require("./dashboardIntegration");
 // ── Activation ─────────────────────────────────────────────────────────────
 async function disableRestrictedMode() {
     try {
@@ -99,6 +100,7 @@ function activate(context) {
     (0, recentProjectsIntegration_1.registerRecentProjectsUriHandler)(context);
     (0, scratchNotesIntegration_1.registerScratchAndNotesFeature)(context);
     (0, autoGitignore_1.registerAutoGitignoreFeature)(context);
+    (0, dashboardIntegration_1.registerDashboardFeature)(context);
     (0, updaterIntegration_1.registerUpdaterFeature)(context);
     const sounds = new soundManager_1.SoundManager();
     const soundBar = vscode.window.createStatusBarItem('null.sound', vscode.StatusBarAlignment.Right, -1);
