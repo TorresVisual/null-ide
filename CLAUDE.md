@@ -59,7 +59,7 @@ Key characteristics:
 ├── installer/
 │   ├── null-ide.iss           # Inno Setup script → NullIDESetup-<version>.exe
 │   └── Null.VisualElementsManifest.xml  # Win10 tile metadata
-├── patches/                   # Git-format patches — currently empty
+├── patches/                   # Git-format patches applied against the VS Code source tree
 ├── scripts/
 │   ├── convert-icons.js       # SVG → PNG/ICO/ICNS via sharp, to-ico, png2icons
 │   ├── merge-json.js          # Deep-merges product.json overlay (our values win)
@@ -140,6 +140,8 @@ Written in TypeScript (`src/`), compiled to `out/` during CI. Activated on `onSt
 
 | Feature | Details |
 |---|---|
+| **Project dashboard** | Custom editor (`null.dashboard`, `viewType`); opened on startup and via Help > Welcome (see `patches/003-*` and `004-*`); recent-project cards with async git status, New Project, Clone Repo |
+| **GitHub Issues panel** | Own activity-bar view (`null-issues`); browse/create/comment on repo issues, sign-in, mark-as-read, issue templates and filters, link/insert issue references in commit messages |
 | **AI Agents panel** | Secondary sidebar webview running xterm.js with node-pty; tabs for `claude`, `agy`, `codex`, `ollama` |
 | **Session history** | Reads Claude Code session JSONL files from `~/.claude/projects/`; browse and resume past conversations |
 | **Commit message generation** | `null.generateCommitMessage` (`Ctrl+Shift+Alt+G`) — runs `claude --print` with staged diff; sets SCM input box |
@@ -204,19 +206,16 @@ Inno Setup script that builds `NullIDESetup-<version>.exe`. The installer runs `
 
 ## Win11 Shell Extension (`shell-ext/`)
 
-A native C++ COM in-process server that implements `IExplorerCommand` for the Win11 Explorer context menu. The CI build:
-
-1. Fetches Microsoft WIL headers into `shell-ext/deps/wil/`.
-2. Compiles the DLL with CMake + Visual Studio 2022: `null_explorer_command.dll` (x64).
-3. Stages the DLL alongside icons and `AppxManifest.xml` under `VSCode-win32-x64/shell-ext/`.
-4. Packs a **sparse APPX** (`null-shell-ext.appx`) using `makeappx` — the manifest points `ExternalLocation` at the Null IDE install root, so the DLL and `null.exe` live outside the package.
-5. Signs the APPX with a self-signed cert (CN=Null IDE); the installer trusts the cert before calling `Add-AppxPackage`.
-
-The APPX registers three context menu verbs via `IFileExplorerContextMenus`: files (`*`), folders (`Directory`), and folder backgrounds (`Directory\Background`). This replaces the older HKCU registry approach on Windows 11+.
+Native C++ COM in-process server implementing `IExplorerCommand` for the Win11 Explorer context menu; packed as a self-signed sparse APPX. See [shell-ext/CLAUDE.md](shell-ext/CLAUDE.md) for the build sequence and the cold-start AUMID gotcha.
 
 ## Patches
 
-The `patches/` directory is currently **empty**. All workbench customisations are handled by direct file injection (CSS/JS copy + `workbench.html` string replacement) rather than git-format patches, which proved fragile across VS Code version bumps.
+Workbench chrome customisations (CSS/JS injection, icon swaps) are handled by direct file injection rather than patches — that proved fragile across VS Code version bumps. `patches/` is for changes that must touch VS Code's own source (a workbench.ts startup hook, a type fix upstream doesn't ship):
+
+- `001-jumplist-recent-projects.patch` — sources the Win taskbar jump list's Recent Projects from null-tools
+- `002-fix-claude-copilotapi-types.patch` — restores Anthropic SDK typing in `copilotApiService.ts`
+- `003-null-dashboard-startup.patch` — opens the Null Dashboard on startup
+- `004-null-dashboard-help-welcome.patch` — wires the dashboard into Help > Welcome
 
 To add a patch against the VS Code source:
 ```bash
