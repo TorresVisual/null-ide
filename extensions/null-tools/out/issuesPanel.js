@@ -325,7 +325,7 @@ class IssuesViewProvider {
   }
   .issue-meta { color:var(--vscode-descriptionForeground); font-size:.9em; margin-top:2px; }
   .label-chip { display:inline-block; padding:0 6px; border-radius:999px; font-size:.85em; margin-right:4px; color:#111; }
-  .row-actions { display:flex; gap:2px; opacity:0; margin-top:4px; }
+  .row-actions { display:flex; gap:2px; opacity:0; margin-top:8px; }
   .issue-row:hover .row-actions { opacity:1; }
   .row-actions button {
     background:transparent; border:none; cursor:pointer; font-size:1em; padding:2px 4px; border-radius:3px; color:inherit;
