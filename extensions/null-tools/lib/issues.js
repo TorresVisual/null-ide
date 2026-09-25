@@ -57,8 +57,7 @@ const BRANCH_ICON = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none"
     let labelDropdownOpen = false;
     let lastRepoLabels = [];
     document.addEventListener('click', e => {
-        const target = e.target;
-        if (target.closest('.dropdown-container'))
+        if (e.composedPath().some(n => n instanceof Element && n.classList.contains('dropdown-container')))
             return;
         if (!labelDropdownOpen)
             return;

@@ -53,8 +53,7 @@ const BRANCH_ICON = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none"
   let lastRepoLabels: GithubLabel[] = [];
 
   document.addEventListener('click', e => {
-    const target = e.target as HTMLElement;
-    if (target.closest('.dropdown-container')) return;
+    if (e.composedPath().some(n => n instanceof Element && n.classList.contains('dropdown-container'))) return;
     if (!labelDropdownOpen) return;
     labelDropdownOpen = false;
     renderLabelPicker(lastRepoLabels);

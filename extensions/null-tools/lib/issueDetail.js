@@ -51,8 +51,7 @@ function labelChipStyle(hex) {
     let editFormSelectedLabels = null;
     let editFormSelectedAssignees = null;
     document.addEventListener('click', e => {
-        const target = e.target;
-        if (target.closest('.dropdown-container'))
+        if (e.composedPath().some(n => n instanceof Element && n.classList.contains('dropdown-container')))
             return;
         if (!labelOpen && !assigneeOpen)
             return;

@@ -53,8 +53,7 @@ declare const DOMPurify: { sanitize(html: string): string };
   let editFormSelectedAssignees: Set<string> | null = null;
 
   document.addEventListener('click', e => {
-    const target = e.target as HTMLElement;
-    if (target.closest('.dropdown-container')) return;
+    if (e.composedPath().some(n => n instanceof Element && n.classList.contains('dropdown-container'))) return;
     if (!labelOpen && !assigneeOpen) return;
     labelOpen = false;
     assigneeOpen = false;
