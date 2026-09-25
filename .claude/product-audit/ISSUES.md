@@ -34,7 +34,7 @@ Closed issues #1–#79 not listed individually unless still relevant; check
 | #23 | Settings sync | open | configure | 2026-09-25 |
 | #18 #17 | Safe mode, crash recovery | open | reliability | 2026-09-25 |
 | #15 #14 #13 | Chocolatey, Scoop, Winget | open | install | 2026-09-25 |
-| #12 | Fix broken updater (unreproduced) | open | install | 2026-09-25 |
+| #12 | Fix broken updater (unreproduced) | open, likely stale | install | 2026-09-25 (commented — native fix already implemented, see ARCHITECTURE.md) |
 | #11 #10 | Floating terminal, distraction-free mode | open | polish | 2026-09-25 |
 | #9 #8 #7 #6 #5 | Conventional commits, dirty overview, hunk staging, commit templates, commit-gen fallback | open | git | 2026-09-25 |
 | #4 #3 | Terminal copy, terminal-mode diff | open bug | terminal/ai | 2026-09-25 |

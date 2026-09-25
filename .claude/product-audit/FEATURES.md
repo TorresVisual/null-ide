@@ -6,7 +6,7 @@
 |---|---|---|---|
 | Installer (Inno + portable ZIP) | Implemented | installer/, scripts/install-null-ide.ps1 | per-user, no elevation |
 | Package managers (winget/scoop/choco) | Missing | — | #13 #14 #15 |
-| In-app updater | Partial | null-tools/src/updater.ts | #12 reported broken |
+| In-app updater | Implemented | null-tools/src/updater.ts, updater/src/main.cpp | native EXE, checksum, rollback, retry UX — see ARCHITECTURE.md; #12 likely stale, commented |
 | Explorer context menu (Win11) | Implemented | shell-ext/ | sparse APPX |
 | File associations + preview handler | Implemented | install-null-ide.ps1 | |
 | Import from VS Code/Cursor | Missing | — | #90 |

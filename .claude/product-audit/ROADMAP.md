@@ -19,7 +19,10 @@ Why: trust fully disabled in product.json; dashboard "Clone Repo" + auto
 tasks (`runOn: folderOpen`) run untrusted code on open.
 
 ### Package managers / updater
-Status: issues exist (#12–#15)
+Status: winget/scoop/choco issues exist (#13–#15). Updater itself (#12) is
+likely already fixed by the native-EXE rewrite — see ARCHITECTURE.md
+"Updater" section; commented on #12 2026-09-25, not closed pending a
+real-install smoke test.
 
 ## Core IDE
 

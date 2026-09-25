@@ -63,7 +63,35 @@ removing it; #41 proposes a provider-agnostic native agent UI).
   `null-actions/src/projectDetector.ts` (duplicated heuristics; #39).
 - Toolchain discovery: `null-cpp/src/toolchainRegistry.ts`,
   `null-format/src/toolchainDiscovery.ts`.
-- Updater: `null-tools/src/updater.ts` (#12 reports broken, unreproduced).
+- Updater: two-part, native EXE + TS orchestration (corrected 2026-09-25 —
+  previously undocumented). See "Updater" section below.
+
+## Updater (native EXE + TS orchestration)
+Previously undocumented — a full rewrite (`docs/specs/native-updater-design.md`,
+`docs/plans/native-updater-fix.md`, commits `ff51581`..`ac4b54e`, 2026-09-19)
+replaced the old PowerShell-only flow. Confirmed live in code as of this audit:
+- `updater/` — standalone CMake C++17 project (`updater/src/main.cpp`, bundled
+  `miniz` for zip extraction), built by CI (`build.yml` "Build null-updater")
+  into `resources/app/null-updater/null-updater.exe`. WinHTTP download,
+  BCrypt SHA256 verification, Win32 TaskDialog progress UI with Retry/Close
+  buttons on failure, rollback-to-backup (`.null-ide-bak-*`) if the swap
+  fails partway, and a post-swap call into
+  `install-null-ide.ps1 -ReapplyRegistrations` to refresh context-menu/
+  file-assoc/preview-handler/default-settings.
+- `null-tools/src/updater.ts` resolves and invokes the EXE (passing
+  `--zip-path`/`--version` when it has already background-downloaded and
+  SHA256-verified the release zip via `stageUpdateInBackground`), only
+  falling back to the old `update-null-ide.ps1` PowerShell launcher if the
+  EXE truly isn't found. `versionComparison.ts` (extracted, unit-tested)
+  fixes a prerelease-suffix comparison bug (`v1.2.0-beta` vs `v1.2.0`).
+- `updaterIntegration.ts` status bar distinguishes "downloading" vs
+  "restart to update" (staged + verified) states.
+- `build.yml` publishes a `.sha256` sidecar alongside the release zip.
+- Issue #12 ("Fix broken updater") was filed as an unreproduced report and
+  the prior audit run never looked at `updater/` or `docs/plans/`/`docs/specs/`
+  — the fix appears to already be complete. Commented on #12 with this
+  finding (2026-09-25); not closed, since the native-EXE/registry paths are
+  only realistically testable against a live Windows install.
 
 ## Known Architectural Constraints
 - MS-licensed extensions (cppvsdbg, Remote-WSL/SSH, Pylance) unusable → use
