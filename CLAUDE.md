@@ -27,11 +27,10 @@ Key characteristics:
 │   ├── null-markdown/         # Enhanced markdown preview (GFM, Mermaid, KaTeX, GitHub Alerts)
 │   ├── null-format/           # Built-in code formatter (Prettier in-process, rustfmt, clang-format)
 │   ├── null-tools/             # Built-in productivity extension
-│   │   ├── src/                # TypeScript source (extension.ts, ollama.ts, claudeHistory.ts)
+│   │   ├── src/                # TypeScript source (extension.ts, commitMessage.ts, dashboard.ts, ...)
 │   │   ├── out/                # Compiled JS output (extension.js — built during CI)
 │   │   ├── package.json        # Contributes commands, views, keybindings, settings
-│   │   ├── setup.ps1           # Rebuilds node-pty for the installed Electron version (local dev)
-│   │   └── lib/                # xterm.js, xterm-addon-fit.js, agents.js (webview assets)
+│   │   └── lib/                # marked.js, dashboard.js, issues.js (webview assets)
 │   ├── null-cpp/               # Symbol-aware C++ header/source navigation, paired editors, scaffolding
 │   │   ├── src/                # TypeScript source (extension.ts, symbolSwitch.ts, pairedSplit.ts, scaffold.ts)
 │   │   └── out/                # Compiled JS output (built during CI)
@@ -95,15 +94,14 @@ The entire build runs in GitHub Actions on a `windows-2022` runner — do **not*
 13. Copy `workbench/custom.css` → `null-custom.css` and `workbench/splash.js` → `null-splash.js` into the source tree.
 14. Inject `<link>` and `<script>` tags into `workbench.html` pointing at those files.
 15. `npm ci && npx gulp vscode-win32-x64` produces `VSCode-win32-x64/`.
-16. Bundle `node-pty` from `vscode-src/node_modules/node-pty` into the built `null-tools` output (bypasses VS Code native module checks).
-17. Build Win11 shell extension: fetch WIL headers, compile DLL with CMake + MSVC, pack and sign sparse APPX (`null-shell-ext.appx`).
-18. Stamp version, commit hash, and server URL into the build output's `product.json`.
-19. Replace letterpress SVGs in the build output with the null-symbol versions.
-20. Run `rcedit` to stamp the custom icon into `null.exe`.
-21. Bundle `install-null-ide.ps1` and `update-null-ide.ps1` into `resources/app/null-updater/`.
-22. `Compress-Archive` → `null-ide-win32-x64.zip`.
-23. Inno Setup → `NullIDESetup-<version>.exe`.
-24. Both artifacts are uploaded to the GitHub Release (tag builds) and as workflow artifacts.
+16. Build Win11 shell extension: fetch WIL headers, compile DLL with CMake + MSVC, pack and sign sparse APPX (`null-shell-ext.appx`).
+17. Stamp version, commit hash, and server URL into the build output's `product.json`.
+18. Replace letterpress SVGs in the build output with the null-symbol versions.
+19. Run `rcedit` to stamp the custom icon into `null.exe`.
+20. Bundle `install-null-ide.ps1` and `update-null-ide.ps1` into `resources/app/null-updater/`.
+21. `Compress-Archive` → `null-ide-win32-x64.zip`.
+22. Inno Setup → `NullIDESetup-<version>.exe`.
+23. Both artifacts are uploaded to the GitHub Release (tag builds) and as workflow artifacts.
 
 ## Built-in Extensions
 
@@ -142,19 +140,9 @@ Written in TypeScript (`src/`), compiled to `out/` during CI. Activated on `onSt
 |---|---|
 | **Project dashboard** | Custom editor (`null.dashboard`, `viewType`); opened on startup and via Help > Welcome (see `patches/003-*` and `004-*`); recent-project cards with async git status, New Project, Clone Repo |
 | **GitHub Issues panel** | Own activity-bar view (`null-issues`); browse/create/comment on repo issues, sign-in, mark-as-read, issue templates and filters, link/insert issue references in commit messages |
-| **AI Agents panel** | Secondary sidebar webview running xterm.js with node-pty; tabs for `claude`, `agy`, `codex`, `ollama` |
-| **Session history** | Reads Claude Code session JSONL files from `~/.claude/projects/`; browse and resume past conversations |
 | **Commit message generation** | `null.generateCommitMessage` (`Ctrl+Shift+Alt+G`) — runs `claude --print` with staged diff; sets SCM input box |
-| **Ollama integration** | `null.ollamaChat` (`Ctrl+Shift+O`) inline chat; `null.ollamaReview` code review; `null.ollamaModel` to switch models |
-| **Prompt templates** | `null.insertPromptTemplate` — insert configurable snippets into the active agent terminal |
-| **File context injection** | `null.injectContext` (`Ctrl+Shift+K`) — sends the open file's content into the agent panel |
 | **In-app updater** | Checks GitHub Releases on startup; shows status bar button; self-updates via PowerShell |
-| **Scrollback persistence** | Terminal buffers (up to 300 KB each) saved to globalStorage, restored on reload |
-| **Context paste** | `null.agentsPaste` command and `Ctrl+V` keybinding inside the agents webview |
-| **Sound design** | Subtle UI sounds; toggle via `null.toggleSoundDesign`; configurable via `null.soundDesign.*` settings |
 | **Discord Rich Presence** | `discordRpcClient.ts` (IPC pipe / WebSocket transport), `discordPresence.ts` (activity building), `presenceOwnership.ts` (one window publishes), `discordAppInfo.ts` (Developer Portal diagnostics). Configured via `null.discord.*`; `null.discord.testConnection` reports setup problems |
-
-**node-pty note:** In CI, `node-pty` is bundled from `vscode-src/node_modules/node-pty` after the gulp build. For local development, run `setup.ps1` in `extensions/null-tools/` to rebuild for the installed Electron version.
 
 ### null-cpp (`extensions/null-cpp/`)
 Symbol-aware C/C++ header/source switching, auto-paired split editors with scroll sync, and `.hpp`/`.cpp` class scaffolding, layered on top of the (separately installed) `llvm-vs-code-extensions.vscode-clangd` extension. Activated on `onStartupFinished`; features gate on `null-cpp.isCppProject`, set by scanning for `CMakeLists.txt`, `compile_commands.json`, `.clangd`, or C/C++ source files (`null-cpp.projectDetection.override` can force this). `Alt+O` triggers symbol-aware header/source switching. See `docs/specs/null-cpp-extension-design.md`.

@@ -8,7 +8,7 @@
   "engines": { "vscode": "^1.85.0" },
   "main": "./out/extension.js",
   "scripts": {
-    "compile": "tsc -p tsconfig.json && tsc -p tsconfig.webview.json && tsc -p tsconfig.webview-issues.json && tsc -p tsconfig.webview-issue-detail.json && tsc -p tsconfig.webview-dashboard.json",
+    "compile": "tsc -p tsconfig.json && tsc -p tsconfig.webview-issues.json && tsc -p tsconfig.webview-issue-detail.json && tsc -p tsconfig.webview-dashboard.json",
     "test": "tsc -p tsconfig.json && node --test out/recentProjects.test.js out/scratchNotesStorage.test.js out/autoGitignore.test.js out/versionComparison.test.js out/nullNotes.test.js out/github/githubRemote.test.js out/github/issueFilter.test.js out/github/promptFormat.test.js out/github/gitBranch.test.js out/github/taskList.test.js out/github/issueTemplates.test.js out/dashboardGitStatus.test.js out/dashboardActions.test.js"
   },
   "dependencies": {
@@ -47,59 +47,12 @@
         "icon": "$(cloud-download)"
       },
       {
-        "command": "null.agentsPaste",
-        "title": "Null: Paste into AI Agents Terminal"
-      },
-      {
         "command": "null.clearWebviewCache",
         "title": "Null: Clear Webview Cache and Reload"
       },
       {
         "command": "null.showWelcome",
         "title": "Null: Show Welcome Page"
-      },
-      {
-        "command": "null.toggleSoundDesign",
-        "title": "Null: Toggle Sound Design"
-      },
-      {
-        "command": "null.ollamaModel",
-        "title": "Null: Switch Ollama Model",
-        "icon": "$(list-selection)"
-      },
-      {
-        "command": "null.ollamaChat",
-        "title": "Null: Ask Ollama (inline chat)",
-        "icon": "$(comment-discussion)"
-      },
-      {
-        "command": "null.ollamaReview",
-        "title": "Null: Ollama Code Review",
-        "icon": "$(search)"
-      },
-      {
-        "command": "null.insertPromptTemplate",
-        "title": "Null: Insert Prompt Template",
-        "icon": "$(library)"
-      },
-      {
-        "command": "null.injectContext",
-        "title": "Null: Inject File Context into Agent",
-        "icon": "$(file-code)"
-      },
-      {
-        "command": "null.revertAgentChange",
-        "title": "Null: Revert Agent Change"
-      },
-      {
-        "command": "null.acceptProposedDiff",
-        "title": "Accept Changes",
-        "icon": "$(check)"
-      },
-      {
-        "command": "null.rejectProposedDiff",
-        "title": "Reject Changes",
-        "icon": "$(discard)"
       },
       {
         "command": "null.newScratchFile",
@@ -205,24 +158,9 @@
           "title": "GitHub Issues",
           "icon": "media/github-issues.svg"
         }
-      ],
-      "secondarySidebar": [
-        {
-          "id": "null-agents",
-          "title": "AI Agents",
-          "icon": "media/null.svg"
-        }
       ]
     },
     "views": {
-      "null-agents": [
-        {
-          "type": "webview",
-          "id": "null.agentsView",
-          "name": "Claude Code",
-          "visibility": "visible"
-        }
-      ],
       "null-workspace": [
         {
           "id": "null.scratchView",
@@ -248,16 +186,6 @@
     },
     "menus": {
       "editor/title": [
-        {
-          "command": "null.acceptProposedDiff",
-          "when": "null.viewingProposedDiff",
-          "group": "navigation"
-        },
-        {
-          "command": "null.rejectProposedDiff",
-          "when": "null.viewingProposedDiff",
-          "group": "navigation"
-        },
         {
           "command": "null.runScratchFile",
           "when": "null.canRunScratchFile",
@@ -294,21 +222,6 @@
         }
       ],
       "view/title": [
-        {
-          "command": "null.injectContext",
-          "when": "view == null.agentsView",
-          "group": "navigation@1"
-        },
-        {
-          "command": "null.insertPromptTemplate",
-          "when": "view == null.agentsView",
-          "group": "navigation@2"
-        },
-        {
-          "command": "null.ollamaModel",
-          "when": "view == null.agentsView",
-          "group": "navigation@3"
-        },
         {
           "command": "null.newScratchFile",
           "when": "view == null.scratchView",
@@ -365,15 +278,8 @@
       "commandPalette": [
         { "command": "null.checkForUpdates" },
         { "command": "null.installUpdate", "when": "nullUpdateAvailable" },
-        { "command": "null.agentsPaste" },
         { "command": "null.clearWebviewCache" },
         { "command": "null.showWelcome" },
-        { "command": "null.toggleSoundDesign" },
-        { "command": "null.ollamaModel" },
-        { "command": "null.ollamaChat" },
-        { "command": "null.ollamaReview" },
-        { "command": "null.insertPromptTemplate" },
-        { "command": "null.injectContext" },
         { "command": "null.newScratchFile" },
         { "command": "null.newNote" },
         { "command": "null.renameScratchOrNoteItem", "when": "false" },
@@ -396,54 +302,15 @@
     "configuration": {
       "title": "Null IDE",
       "properties": {
-        "null.soundDesign.enabled": {
-          "type": "boolean",
-          "default": true,
-          "description": "Enable subtle UI sound effects (requires AI Agents panel to be open)."
-        },
-        "null.soundDesign.volume": {
-          "type": "number",
-          "default": 0.5,
-          "minimum": 0,
-          "maximum": 1,
-          "description": "Sound design volume (0–1)."
-        },
-        "null.ollama.model": {
-          "type": "string",
-          "default": "llama3.2",
-          "description": "Default Ollama model to use for the ollama agent tab and AI commands."
-        },
         "null.plans.autoOpen": {
           "type": "boolean",
           "default": false,
           "description": "Automatically open new Claude Code plan files as a Markdown preview."
         },
-        "null.agentFileWatch.enabled": {
-          "type": "boolean",
-          "default": false,
-          "description": "Show diffs and offer revert when an agent terminal modifies workspace files."
-        },
         "null.nullNotes.exePath": {
           "type": "string",
           "default": "",
           "description": "Path to null-notes.exe, used by \"Open in null-notes\". Leave empty to use the default per-user install location (%LOCALAPPDATA%\\null-notes\\null-notes.exe)."
-        },
-        "null.promptTemplates": {
-          "type": "array",
-          "default": [
-            { "label": "Explain this", "text": "Explain the following code:\n\n" },
-            { "label": "Write tests for", "text": "Write unit tests for:\n\n" },
-            { "label": "Review for bugs", "text": "Review this code carefully for bugs and improvements:\n\n" },
-            { "label": "Refactor", "text": "Refactor the following code for clarity and maintainability:\n\n" }
-          ],
-          "description": "Prompt templates available via the Insert Prompt Template command.",
-          "items": {
-            "type": "object",
-            "properties": {
-              "label": { "type": "string" },
-              "text":  { "type": "string" }
-            }
-          }
         },
         "null.gitignore.autoUpdate": {
           "type": "boolean",
@@ -525,20 +392,6 @@
       {
         "command": "null.generateCommitMessage",
         "key": "ctrl+shift+alt+g"
-      },
-      {
-        "command": "null.agentsPaste",
-        "key": "ctrl+v",
-        "when": "focusedView == 'null.agentsView'"
-      },
-      {
-        "command": "null.ollamaChat",
-        "key": "ctrl+shift+o"
-      },
-      {
-        "command": "null.injectContext",
-        "key": "ctrl+shift+k",
-        "when": "editorFocus || focusedView == 'null.agentsView'"
       }
     ]
   }

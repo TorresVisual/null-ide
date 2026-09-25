@@ -97,21 +97,16 @@ function showWelcomePage(context) {
   <div class="shortcut"><span class="shortcut-label">Close welcome</span><span class="shortcut-key">Ctrl+W</span></div>
 </div>
 <div class="actions">
-  <button class="btn-primary" id="open-agents">Open AI Agents</button>
-  <button class="btn-secondary" id="open-file">Open a folder</button>
+  <button class="btn-primary" id="open-file">Open a folder</button>
 </div>
 <script nonce="${nonce}">
   const vscode = acquireVsCodeApi();
-  document.getElementById('open-agents').addEventListener('click', () => vscode.postMessage({ command: 'openAgents' }));
   document.getElementById('open-file').addEventListener('click', () => vscode.postMessage({ command: 'openFolder' }));
 </script>
 </body>
 </html>`;
     panel.webview.onDidReceiveMessage((msg) => {
-        if (msg.command === 'openAgents') {
-            vscode.commands.executeCommand('workbench.view.extension.null-agents');
-        }
-        else if (msg.command === 'openFolder') {
+        if (msg.command === 'openFolder') {
             vscode.commands.executeCommand('workbench.action.files.openFolder');
         }
     }, undefined, context.subscriptions);
