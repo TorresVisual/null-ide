@@ -150,11 +150,11 @@ const BRANCH_ICON = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none"
             ${issue.labels.map(l => `<span class="label-chip" style="${labelChipStyle(l.color)}">${escapeHtml(l.name)}</span>`).join('')}
             ${issue.comments} comments · updated ${issue.updated_at.slice(0, 10)}
           </div>
-        </div>
-        <div class="row-actions">
-          <button class="branch-btn" title="Create branch for this issue">${BRANCH_ICON}</button>
-          <button class="copy-btn" title="Copy as prompt">${COPY_ICON}</button>
-          <button class="browser-btn" title="Open in browser">${OPEN_ICON}</button>
+          <div class="row-actions">
+            <button class="branch-btn" title="Create branch for this issue">${BRANCH_ICON}</button>
+            <button class="copy-btn" title="Copy as prompt">${COPY_ICON}</button>
+            <button class="browser-btn" title="Open in browser">${OPEN_ICON}</button>
+          </div>
         </div>
       </div>`;
         }).join('');
