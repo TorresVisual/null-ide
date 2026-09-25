@@ -87,7 +87,16 @@ async function runCloneRepoFlow(context) {
     const vscode = require('vscode');
     const url = await vscode.window.showInputBox({
         prompt: 'Repository URL to clone',
-        validateInput: value => (value.trim().length === 0 ? 'Enter a repository URL.' : undefined),
+        validateInput: value => {
+            const trimmed = value.trim();
+            if (trimmed.length === 0)
+                return 'Enter a repository URL.';
+            // A URL starting with "-" would be parsed by git as a flag (e.g.
+            // --upload-pack=...) rather than a positional argument.
+            if (trimmed.startsWith('-'))
+                return 'Repository URL cannot start with "-".';
+            return undefined;
+        },
     });
     if (!url)
         return;
@@ -108,7 +117,7 @@ async function runCloneRepoFlow(context) {
         // Args passed out-of-band (not interpolated into a shell string), so a
         // clone URL containing shell metacharacters (", $(...), backticks, etc.)
         // can't break out and execute arbitrary commands.
-        const execution = terminal.shellIntegration.executeCommand('git', ['clone', trimmedUrl, target.fsPath]);
+        const execution = terminal.shellIntegration.executeCommand('git', ['clone', '--', trimmedUrl, target.fsPath]);
         const subscription = vscode.window.onDidEndTerminalShellExecution(event => {
             if (event.execution !== execution)
                 return;
@@ -130,7 +139,7 @@ async function runCloneRepoFlow(context) {
         // isn't VS Code's default integrated shell on Windows. Upgrade path if
         // that changes: detect terminal.shellPath and branch the escaping.
         const singleQuote = (s) => `'${s.replace(/'/g, "''")}'`;
-        terminal.sendText(`git clone ${singleQuote(trimmedUrl)} ${singleQuote(target.fsPath)}`);
+        terminal.sendText(`git clone -- ${singleQuote(trimmedUrl)} ${singleQuote(target.fsPath)}`);
     }
 }
 //# sourceMappingURL=dashboardActions.js.map
