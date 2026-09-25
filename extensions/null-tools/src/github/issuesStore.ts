@@ -3,7 +3,7 @@
 import { getWorkspaceGithubRepo } from './githubRemote';
 import { getGithubSession } from './githubAuth';
 import {
-  createComment, createIssue, deleteComment, fetchAssignableUsers, fetchComments, fetchIssues, fetchRepoLabels,
+  createComment, createIssue, deleteComment, fetchAssignableUsers, fetchComments, fetchIssue, fetchIssues, fetchRepoLabels,
   fetchTimeline, updateComment, updateIssue,
 } from './githubApi';
 import { filterIssues } from './issueFilter';
@@ -102,6 +102,13 @@ export class IssuesStore {
   getTimeline(issueNumber: number): Promise<GithubTimelineEvent[]> {
     if (!this.repo) return Promise.resolve([]);
     return fetchTimeline(this.repo.owner, this.repo.repo, issueNumber, this.token);
+  }
+
+  /** Re-fetches one issue from GitHub and replaces it in the cache, without refetching the whole list. */
+  async reloadIssue(issueNumber: number): Promise<void> {
+    if (!this.repo) return;
+    const fresh = await fetchIssue(this.repo.owner, this.repo.repo, issueNumber, this.token);
+    this.issues = this.issues.map(issue => (issue.number === issueNumber ? fresh : issue));
   }
 
   async updateIssue(

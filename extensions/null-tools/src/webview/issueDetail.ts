@@ -288,6 +288,7 @@ declare const DOMPurify: { sanitize(html: string): string };
         <button class="btn btn-ghost" id="branch-btn">Branch</button>
         <button class="btn btn-ghost" id="browser-btn">Browser ↗</button>
         <button class="btn btn-ghost" id="copy-btn">Copy as prompt</button>
+        <button class="btn btn-ghost" id="refresh-btn" title="Reload this issue from GitHub">Refresh</button>
       </div>
       <div class="body-card">${issue.body ? renderMarkdown(issue.body) : '(no description)'}</div>`}
       <h3>Comments (${comments.length})</h3>
@@ -345,6 +346,8 @@ declare const DOMPurify: { sanitize(html: string): string };
   function bindEvents(issue: GithubIssue): void {
     document.getElementById('copy-btn')?.addEventListener('click', () =>
       vscode.postMessage({ type: 'copyAsPrompt' }));
+    document.getElementById('refresh-btn')?.addEventListener('click', () =>
+      vscode.postMessage({ type: 'refresh' }));
     document.getElementById('browser-btn')?.addEventListener('click', () =>
       vscode.postMessage({ type: 'openInBrowser' }));
     document.getElementById('branch-btn')?.addEventListener('click', () =>

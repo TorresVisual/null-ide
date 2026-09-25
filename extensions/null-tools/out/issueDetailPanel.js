@@ -137,6 +137,15 @@ class IssueDetailPanel {
             case 'ready':
                 await this._sendDetail();
                 break;
+            case 'refresh':
+                try {
+                    await this.store.reloadIssue(this.issueNumber);
+                }
+                catch (err) {
+                    void vscode.window.showErrorMessage(`Failed to refresh issue: ${err.message}`);
+                }
+                await this._sendDetail();
+                break;
             case 'copyAsPrompt': {
                 const issue = this.store.getByNumber(this.issueNumber);
                 if (!issue)

@@ -10,6 +10,7 @@ import { loadIssueTemplates } from './github/issueTemplates';
 
 type InboundMessage =
   | { type: 'ready' }
+  | { type: 'refresh' }
   | { type: 'copyAsPrompt' }
   | { type: 'openInBrowser' }
   | { type: 'setState'; state: 'open' | 'closed' }
@@ -128,6 +129,14 @@ export class IssueDetailPanel {
   private async _handleMessage(msg: InboundMessage): Promise<void> {
     switch (msg.type) {
       case 'ready':
+        await this._sendDetail();
+        break;
+      case 'refresh':
+        try {
+          await this.store.reloadIssue(this.issueNumber);
+        } catch (err) {
+          void vscode.window.showErrorMessage(`Failed to refresh issue: ${(err as Error).message}`);
+        }
         await this._sendDetail();
         break;
       case 'copyAsPrompt': {

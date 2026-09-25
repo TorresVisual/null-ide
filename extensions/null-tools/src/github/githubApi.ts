@@ -50,6 +50,12 @@ export async function fetchIssues(
   return stripPullRequests(raw);
 }
 
+export function fetchIssue(
+  owner: string, repo: string, issueNumber: number, token: string | null,
+): Promise<GithubIssue> {
+  return requestJson<GithubIssue>(`/repos/${owner}/${repo}/issues/${issueNumber}`, token);
+}
+
 export function fetchComments(
   owner: string, repo: string, issueNumber: number, token: string | null,
 ): Promise<GithubComment[]> {

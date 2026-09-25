@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.fetchIssues = fetchIssues;
+exports.fetchIssue = fetchIssue;
 exports.fetchComments = fetchComments;
 exports.fetchTimeline = fetchTimeline;
 exports.updateIssue = updateIssue;
@@ -91,6 +92,9 @@ function requestJson(path, token, method = 'GET', body) {
 async function fetchIssues(owner, repo, state, token) {
     const raw = await requestJson(`/repos/${owner}/${repo}/issues?state=${state}&per_page=100`, token);
     return (0, issueFilter_1.stripPullRequests)(raw);
+}
+function fetchIssue(owner, repo, issueNumber, token) {
+    return requestJson(`/repos/${owner}/${repo}/issues/${issueNumber}`, token);
 }
 function fetchComments(owner, repo, issueNumber, token) {
     return requestJson(`/repos/${owner}/${repo}/issues/${issueNumber}/comments?per_page=100`, token);

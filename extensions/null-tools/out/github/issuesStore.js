@@ -83,6 +83,13 @@ class IssuesStore {
             return Promise.resolve([]);
         return (0, githubApi_1.fetchTimeline)(this.repo.owner, this.repo.repo, issueNumber, this.token);
     }
+    /** Re-fetches one issue from GitHub and replaces it in the cache, without refetching the whole list. */
+    async reloadIssue(issueNumber) {
+        if (!this.repo)
+            return;
+        const fresh = await (0, githubApi_1.fetchIssue)(this.repo.owner, this.repo.repo, issueNumber, this.token);
+        this.issues = this.issues.map(issue => (issue.number === issueNumber ? fresh : issue));
+    }
     async updateIssue(issueNumber, patch) {
         if (!this.repo)
             return null;
