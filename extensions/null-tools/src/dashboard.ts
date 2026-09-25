@@ -29,6 +29,7 @@ export class DashboardEditorProvider implements vscode.CustomReadonlyEditorProvi
   }
 
   resolveCustomEditor(_document: vscode.CustomDocument, panel: vscode.WebviewPanel): void {
+    panel.iconPath = vscode.Uri.joinPath(this.extensionUri, 'media', 'app-icon.svg');
     panel.webview.options = {
       enableScripts: true,
       localResourceRoots: [vscode.Uri.joinPath(this.extensionUri, 'lib')],

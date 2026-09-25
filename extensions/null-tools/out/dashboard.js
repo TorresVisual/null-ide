@@ -50,6 +50,7 @@ class DashboardEditorProvider {
         return { uri, dispose: () => { } };
     }
     resolveCustomEditor(_document, panel) {
+        panel.iconPath = vscode.Uri.joinPath(this.extensionUri, 'media', 'app-icon.svg');
         panel.webview.options = {
             enableScripts: true,
             localResourceRoots: [vscode.Uri.joinPath(this.extensionUri, 'lib')],

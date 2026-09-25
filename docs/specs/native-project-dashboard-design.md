@@ -45,8 +45,10 @@ Out of scope for v1:
 - Pinned projects, project-type template picker for New Project — not
   requested for v1.
 - Unregistering/removing the stock `GettingStartedInput`/editor — it stays
-  registered and reachable via Command Palette ("Help: Welcome"); only what
-  auto-opens at startup changes.
+  registered; specific walkthroughs (e.g. opened via an extension's
+  recommendation) still resolve to `GettingStartedInput` as before. Only the
+  no-argument case — startup, and the bare Help > Welcome menu/Command
+  Palette action — now opens the dashboard instead (`patches/004-null-dashboard-help-welcome.patch`).
 
 ## Architecture & Data Flow
 
@@ -167,8 +169,9 @@ New module `extensions/null-tools/src/dashboard.ts`:
      opened.
   7. Run Clone Repo against a real URL; confirm the terminal clones and the
      folder opens on success.
-  8. Confirm "Help: Welcome" in the Command Palette still opens the stock
-     Getting Started page.
+  8. Confirm "Help: Welcome" in the Command Palette and Help menu now opens
+     the Null dashboard, and that opening a specific extension walkthrough
+     still opens the stock Getting Started page.
 
 ## Out of Scope
 
