@@ -9,6 +9,10 @@ Closed issues #1–#79 not listed individually unless still relevant; check
 
 | Issue | Title | Status | Area | Last Audited |
 |---|---|---|---|---|
+| #97 | Workspace Trust force-disabled on every startup (security) | open | security | 2026-09-26 |
+| #96 | GitHub Actions CI status for the current branch | open | git/ci | 2026-09-26 |
+| #95 | Action-button build output → Problems panel | open | build | 2026-09-26 |
+| #94 | New Project templates in the dashboard | open | dashboard | 2026-09-26 |
 | #93 | Test Explorer integration for non-C++ projects (npm test, cargo test) | open | testing | 2026-09-25 |
 | #92 | GitHub Pull Requests in the Issues panel | open | git/issues | 2026-09-25 |
 | #91 | Rust development support: LSP recommendation + debug config synthesis | open | rust | 2026-09-25 |

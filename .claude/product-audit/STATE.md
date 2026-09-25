@@ -62,3 +62,9 @@ Last created issues:
 - #91 (Rust development support)
 - #92 (GitHub Pull Requests in Issues panel)
 - #93 (Test Explorer for npm test / cargo test)
+- #94 (New Project templates) — 2026-09-26
+- #95 (action-button output → Problems) — 2026-09-26
+- #96 (GitHub Actions CI status) — 2026-09-26
+- #97 (Workspace Trust force-disabled) — 2026-09-26
+
+Note: repo has no `security` label; #97 filed as `enhancement` only.

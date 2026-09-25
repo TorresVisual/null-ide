@@ -14,9 +14,10 @@ Issue: #90
 Why: installer only seeds defaults; migration is the main acquisition path.
 
 ### Workspace trust hardening
-Status: candidate — needs user decision
-Why: trust fully disabled in product.json; dashboard "Clone Repo" + auto
-tasks (`runOn: folderOpen`) run untrusted code on open.
+Status: issue created (#97)
+Why: null-tools' `disableRestrictedMode()` re-disables trust on every
+activation, overriding a user's explicit opt-in; Clone Repo + `runOn:
+folderOpen` tasks run untrusted code on open.
 
 ### Package managers / updater
 Status: winget/scoop/choco issues exist (#13–#15). Updater itself (#12) is
@@ -45,6 +46,19 @@ Status: issue created (#91)
 
 ### Git: graph #87, worktrees #88, hunk staging #7, secret scan #34
 Status: issues exist
+
+### New Project templates wired to existing scaffolders
+Status: issue created (#94)
+Why: dashboard New Project = empty dir + git init; null-cpp scaffolders and
+autoGitignore exist but are disconnected from it.
+
+### Build output → Problems for non-C++ action buttons
+Status: issue created (#95)
+Why: buttons use sendText, so cargo/tsc/eslint errors never reach Problems.
+
+### CI status (GitHub Actions) for HEAD
+Status: issue created (#96)
+Why: Commit → Push → CI loop leaves the IDE.
 
 ## Advanced
 
