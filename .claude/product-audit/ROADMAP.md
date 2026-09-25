@@ -1,0 +1,55 @@
+# Product Opportunities
+
+## Foundation
+
+### Environment check: companion extensions + toolchains per project
+Status: issue created
+Issue: #89
+Why: null-cpp needs clangd/cpptools/CodeLLDB but no longer declares them
+(1f7c00b); fresh installs fail at Debug with no guidance. Rust has no LSP path.
+
+### Import settings/keybindings/snippets/extensions from VS Code / Cursor
+Status: issue created
+Issue: #90
+Why: installer only seeds defaults; migration is the main acquisition path.
+
+### Workspace trust hardening
+Status: candidate — needs user decision
+Why: trust fully disabled in product.json; dashboard "Clone Repo" + auto
+tasks (`runOn: folderOpen`) run untrusted code on open.
+
+### Package managers / updater
+Status: issues exist (#12–#15)
+
+## Core IDE
+
+### Project metadata as source of truth
+Status: issue exists (#39)
+
+### Remote WSL/SSH
+Status: issue exists (#85)
+
+## Developer Workflow
+
+### Pull requests in GitHub panel (list, checkout, review diff, comment)
+Status: candidate — overlaps marketplace "GitHub Pull Requests" extension;
+file only if user wants native parity with issues panel.
+
+### Test explorer for non-C++ (cargo test, npm test)
+Status: candidate — CTest is #82; revisit after #39.
+
+### Rust run/debug (cargo + CodeLLDB) parity with null-cpp
+Status: candidate — depends on environment check.
+
+### Git: graph #87, worktrees #88, hunk staging #7, secret scan #34
+Status: issues exist
+
+## Advanced
+
+### Native agent UI (#41), Compiler Explorer (#86), process panel (#37)
+Status: issues exist
+
+## Polish
+
+### Floating terminal #11, distraction-free #10, explorer redesign #29
+Status: issues exist
