@@ -1,22 +1,25 @@
 From a12a1d5c097596cf5a6299de438f0e1b5fe184dd Mon Sep 17 00:00:00 2001
 From: TorresVisual <junk@rohsmann.at>
-Date: Sat, 26 Sep 2026 02:28:04 +0200
+Date: Sat, 26 Sep 2026 03:22:40 +0200
 Subject: [PATCH] feat: add Claude Code split button to the title-bar command
  center
 
-Registers a split-button submenu (NullClaudeSubmenu) in both
-MenuId.CommandCenter and MenuId.TitleBar (fallback when the command
-center is disabled), gated on the claude-vscode extension's
-primaryEditorEnabled context key. Default action is
-claude-vscode.primaryEditor.open, gated by that same context key in
-the extension's own package.json. Mirrors the existing Agents control
-button registered earlier in this file.
+Registers a submenu (NullClaudeSubmenu) in both MenuId.CommandCenter
+and MenuId.TitleBar (fallback when the command center is disabled),
+gated on the claude-vscode extension's primaryEditorEnabled context
+key. Renders as a plain dropdown button (icon + chevron, no label)
+mirroring the existing Agents control registered earlier in this
+file — not a split button, since a split button renders its default
+submenu action's own (icon-less) label as the button face instead of
+the submenu's Claude icon. "Open in Primary Editor" is gated by that
+same context key in the extension's own package.json, so it leads
+the dropdown ahead of the plain editor.open tab.
 ---
- .../agentSessionsExperiments.contribution.ts  | 93 +++++++++++++++++++
- 1 file changed, 93 insertions(+)
+ .../agentSessionsExperiments.contribution.ts | 90 +++++++++++++++++++
+ 1 file changed, 90 insertions(+)
 
 diff --git a/src/vs/workbench/contrib/chat/browser/agentSessions/experiments/agentSessionsExperiments.contribution.ts b/src/vs/workbench/contrib/chat/browser/agentSessions/experiments/agentSessionsExperiments.contribution.ts
-index 0613afc0..5781298e 100644
+index 0613afc0..11f4f950 100644
 --- a/src/vs/workbench/contrib/chat/browser/agentSessions/experiments/agentSessionsExperiments.contribution.ts
 +++ b/src/vs/workbench/contrib/chat/browser/agentSessions/experiments/agentSessionsExperiments.contribution.ts
 @@ -11,6 +11,7 @@ import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase
@@ -27,9 +30,9 @@ index 0613afc0..5781298e 100644
  import { localize } from '../../../../../../nls.js';
  import { ContextKeyExpr } from '../../../../../../platform/contextkey/common/contextkey.js';
  import { ProductQualityContext } from '../../../../../../platform/contextkey/common/contextkeys.js';
-@@ -307,3 +308,95 @@ MenuRegistry.appendMenuItem(MenuId.AgentsTitleBarControlMenu, {
+@@ -307,3 +308,92 @@ MenuRegistry.appendMenuItem(MenuId.AgentsTitleBarControlMenu, {
  });
- 
+
  //#endregion
 +
 +// #region Null IDE — Claude Code command center button
@@ -38,12 +41,11 @@ index 0613afc0..5781298e 100644
 +const NullClaudeMenu = new MenuId('NullClaudeSubmenu');
 +const nullClaudeEnabled = ContextKeyExpr.has('claude-vscode.primaryEditorEnabled');
 +
-+// Command center — split button next to the Agents control
++// Command center — dropdown button next to the Agents control (mirrors its style)
 +MenuRegistry.appendMenuItem(MenuId.CommandCenter, {
 +	submenu: NullClaudeMenu,
 +	title: localize('nullClaudeCommandCenter', "Claude Code"),
 +	icon: nullClaudeCommandCenterIcon,
-+	isSplitButton: true,
 +	when: ContextKeyExpr.and(
 +		nullClaudeEnabled,
 +		InEditorZenModeContext.negate()
@@ -57,7 +59,6 @@ index 0613afc0..5781298e 100644
 +	title: localize('nullClaudeTitleBar', "Claude Code"),
 +	group: 'navigation',
 +	icon: nullClaudeCommandCenterIcon,
-+	isSplitButton: true,
 +	when: ContextKeyExpr.and(
 +		nullClaudeEnabled,
 +		ContextKeyExpr.has('config.window.commandCenter').negate(),
@@ -65,9 +66,8 @@ index 0613afc0..5781298e 100644
 +	order: 2
 +});
 +
-+// Submenu items — order 1 becomes the split button's default (primary) action.
-+// primaryEditor.open is gated by the same primaryEditorEnabled key as this
-+// button, so it's the intended default rather than the plain editor.open tab.
++// Submenu items — primaryEditor.open leads since it's gated by the same
++// primaryEditorEnabled key as this button, ahead of the plain editor.open tab.
 +MenuRegistry.appendMenuItem(NullClaudeMenu, {
 +	command: {
 +		id: 'claude-vscode.primaryEditor.open',
@@ -123,6 +123,6 @@ index 0613afc0..5781298e 100644
 +});
 +
 +//#endregion
--- 
+--
 2.55.0.windows.5
 
