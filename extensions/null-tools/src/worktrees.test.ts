@@ -7,7 +7,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import * as fs from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { parseWorktreeListPorcelain, getBaseBranch, listWorktrees } from './worktrees';
+import { parseWorktreeListPorcelain, getBaseBranch, listWorktrees, createWorktree, listLocalBranches } from './worktrees';
 
 function initRepo(): string {
   const dir = mkdtempSync(path.join(tmpdir(), 'worktrees-test-'));
@@ -121,4 +121,57 @@ test('getBaseBranch resolves origin/HEAD when a remote is configured', () => {
   execFileSync('git', ['push', '-q', '-u', 'origin', 'main'], { cwd: dir });
   execFileSync('git', ['remote', 'set-head', 'origin', 'main'], { cwd: dir });
   assert.strictEqual(getBaseBranch(dir), 'main');
+});
+
+test('createWorktree from scratch creates a branch and worktree under .claude/worktrees', () => {
+  const dir = initRepo();
+  commit(dir, 'a.txt', 'initial');
+
+  const result = createWorktree(dir, { kind: 'scratch', description: 'Try a fix' });
+  assert.ok(result.ok);
+  assert.strictEqual(result.value.branch, 'try-a-fix');
+  assert.ok(fs.existsSync(result.value.path));
+  assert.match(result.value.path.replace(/\\/g, '/'), /\.claude\/worktrees\/try-a-fix$/);
+
+  const gitignore = fs.readFileSync(path.join(dir, '.gitignore'), 'utf8');
+  assert.match(gitignore, /\.claude\/worktrees/);
+});
+
+test('createWorktree fails cleanly when the target directory already exists', () => {
+  const dir = initRepo();
+  commit(dir, 'a.txt', 'initial');
+  createWorktree(dir, { kind: 'scratch', description: 'dup' });
+
+  const second = createWorktree(dir, { kind: 'scratch', description: 'dup' });
+  assert.strictEqual(second.ok, false);
+});
+
+test('createWorktree from an issue uses branchNameForIssue for the branch name', () => {
+  const dir = initRepo();
+  commit(dir, 'a.txt', 'initial');
+  const result = createWorktree(dir, { kind: 'issue', issueNumber: 88, title: 'Git worktree manager' });
+  assert.ok(result.ok);
+  assert.strictEqual(result.value.branch, 'issue-88-git-worktree-manager');
+});
+
+test('createWorktree from an existing branch reuses it rather than creating a new one', () => {
+  const dir = initRepo();
+  commit(dir, 'a.txt', 'initial');
+  execFileSync('git', ['branch', 'existing-feature'], { cwd: dir });
+
+  const result = createWorktree(dir, { kind: 'branch', branch: 'existing-feature' });
+  assert.ok(result.ok);
+  assert.strictEqual(result.value.branch, 'existing-feature');
+});
+
+test('listLocalBranches returns local branch names', () => {
+  const dir = initRepo();
+  commit(dir, 'a.txt', 'initial');
+  execFileSync('git', ['branch', 'a-branch'], { cwd: dir });
+  execFileSync('git', ['branch', 'b-branch'], { cwd: dir });
+
+  const branches = listLocalBranches(dir);
+  assert.ok(branches.includes('main'));
+  assert.ok(branches.includes('a-branch'));
+  assert.ok(branches.includes('b-branch'));
 });

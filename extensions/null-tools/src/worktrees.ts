@@ -2,7 +2,11 @@
 
 import { execFile, execFileSync } from 'child_process';
 import { promisify } from 'util';
+import * as fs from 'fs';
+import * as path from 'path';
 import { computeGitStatuses } from './dashboardGitStatus';
+import { branchNameForIssue } from './github/gitBranch';
+import { slugify } from './scratchNotesStorage';
 
 const execFileAsync = promisify(execFile);
 
@@ -147,4 +151,68 @@ export async function listWorktrees(repoCwd: string): Promise<WorktreeEntry[]> {
       lastCommitDate: status?.lastCommitDate ?? '',
     };
   });
+}
+
+export type CreateWorktreeOptions =
+  | { kind: 'issue'; issueNumber: number; title: string }
+  | { kind: 'branch'; branch: string }
+  | { kind: 'scratch'; description: string };
+
+function ensureWorktreesIgnored(repoCwd: string): void {
+  try {
+    execFileSync('git', ['check-ignore', '-q', '.claude/worktrees'], { cwd: repoCwd, stdio: 'ignore' });
+    return; // already ignored
+  } catch (err) {
+    if ((err as { status?: number }).status !== 1) return; // not a "no match" result — leave .gitignore alone
+  }
+  const gitignorePath = path.join(repoCwd, '.gitignore');
+  const existing = fs.existsSync(gitignorePath) ? fs.readFileSync(gitignorePath, 'utf8') : '';
+  if (existing.includes('.claude/worktrees')) return;
+  const sep = existing.length > 0 && !existing.endsWith('\n') ? '\n' : '';
+  fs.writeFileSync(gitignorePath, `${existing}${sep}.claude/worktrees/\n`);
+}
+
+export function createWorktree(repoCwd: string, opts: CreateWorktreeOptions): Result<{ path: string; branch: string }> {
+  let branch: string;
+  let isNewBranch: boolean;
+  switch (opts.kind) {
+    case 'issue':
+      branch = branchNameForIssue(opts.issueNumber, opts.title);
+      isNewBranch = true;
+      break;
+    case 'branch':
+      branch = opts.branch;
+      isNewBranch = false;
+      break;
+    case 'scratch':
+      branch = slugify(opts.description);
+      isNewBranch = true;
+      break;
+  }
+
+  const worktreePath = path.join(repoCwd, '.claude', 'worktrees', branch);
+  if (fs.existsSync(worktreePath)) {
+    return { ok: false, message: `A worktree already exists at ${worktreePath}.` };
+  }
+
+  ensureWorktreesIgnored(repoCwd);
+
+  try {
+    const args = isNewBranch
+      ? ['worktree', 'add', '-b', branch, worktreePath]
+      : ['worktree', 'add', worktreePath, branch];
+    execFileSync('git', args, { cwd: repoCwd, encoding: 'utf8', timeout: 15000 });
+    return { ok: true, value: { path: worktreePath, branch } };
+  } catch (err) {
+    return { ok: false, message: (err as Error).message };
+  }
+}
+
+export function listLocalBranches(repoCwd: string): string[] {
+  try {
+    const stdout = execFileSync('git', ['for-each-ref', '--format=%(refname:short)', 'refs/heads/'], { cwd: repoCwd, encoding: 'utf8', timeout: 5000 });
+    return stdout.split('\n').map(l => l.trim()).filter(Boolean);
+  } catch {
+    return [];
+  }
 }
