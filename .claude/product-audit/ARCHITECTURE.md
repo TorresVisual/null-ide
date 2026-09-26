@@ -6,7 +6,7 @@ VSCodium fork, Windows-only (win32-x64). Built entirely in GitHub Actions
 ## Workbench
 - Upstream VS Code workbench. Customised by injection, not source edits:
   `workbench/custom.css` + `workbench/splash.js` injected into `workbench.html`.
-- Core patches DO exist now (CLAUDE.md says `patches/` is empty — stale):
+- Core patches (CLAUDE.md lists them since 815ac3c):
   `001-jumplist-recent-projects`, `002-fix-claude-copilotapi-types`,
   `003-null-dashboard-startup`, `004-null-dashboard-help-welcome`.
 - Native project dashboard (`null.dashboard` custom editor in null-tools)
@@ -44,12 +44,24 @@ VSCodium fork, Windows-only (win32-x64). Built entirely in GitHub Actions
 - null-actions: status-bar command buttons, project-type suggestions
   (Cargo.toml, CMakeLists.txt, *.csproj, npm scripts).
 - null-tools: dashboard, issues panel, scratch/notes, ports, updater,
-  Discord RPC, sound design, Ollama, legacy AI Agents panel.
+  Discord RPC, commit-message generation. Views: `null-workspace`,
+  `null-issues`. (AI Agents panel, Ollama, sound design, Claude history,
+  "Fix with AI" code action, xterm/node-pty all removed in e3301b1.)
 
 ## AI
-Claude Code extension/chat is the preferred AI workflow.
-The existing AI Agents panel is not the primary AI architecture (#84 proposes
-removing it; #41 proposes a provider-agnostic native agent UI).
+The official Claude Code extension (`anthropic.claude-code`), used in the
+editor, is the only AI workflow. Decided 2026-09-26: no native agent UI (#41
+closed not-planned), AI Agents panel deleted (#84, e3301b1).
+- Only in-repo AI code left: `null-tools/src/commitMessage.ts` → `claude --print`.
+- Planned integration is editor-first and reads the extension's session
+  transcripts (`~/.claude/projects/<encoded-workspace>/<sessionId>.jsonl`)
+  instead of installing hooks: #99 follow-along, #100 line provenance hover.
+  #98 command-center button needs a core patch (`MenuId.CommandCenter` isn't
+  an extension menu point).
+- Blocked by the extension: submitting prompts programmatically and
+  surfacing its permission prompts (per #41 closing comment).
+- Claude Code is neither bundled nor in `extensionRecommendations` (scope
+  added to #89).
 
 ## Important Entry Points
 - `extensions/*/src/extension.ts` (activate), mostly `onStartupFinished`.

@@ -7,6 +7,9 @@ Status: issue created
 Issue: #89
 Why: null-cpp needs clangd/cpptools/CodeLLDB but no longer declares them
 (1f7c00b); fresh installs fail at Debug with no guidance. Rust has no LSP path.
+2026-09-26: scope comment added — also the Claude Code extension (only AI
+workflow, prerequisite of #98–#100, not in extensionRecommendations) and the
+`claude` CLI that commit-message generation shells out to.
 
 ### Import settings/keybindings/snippets/extensions from VS Code / Cursor
 Status: issue created
@@ -62,10 +65,18 @@ Why: Commit → Push → CI loop leaves the IDE.
 
 ## Advanced
 
-### Native agent UI (#41), Compiler Explorer (#86), process panel (#37)
+### Editor-first Claude Code integration
+Status: issues exist (#98 command-center button, #99 follow edits live,
+#100 line provenance hover), filed by the maintainer 2026-09-26.
+Why: replaces the removed AI Agents panel / #41. Don't propose a native
+agent UI or panel again; new AI items should sit on top of the extension
+(transcripts, URI handler `vscode://anthropic.claude-code/open?session=`).
+
+### Compiler Explorer (#86), process panel (#37)
 Status: issues exist
 
 ## Polish
 
-### Floating terminal #11, distraction-free #10, explorer redesign #29
-Status: issues exist
+### Floating terminal #11
+Status: issue exists (#10 distraction-free and #29 explorer redesign closed
+by the maintainer 2026-09-25)
