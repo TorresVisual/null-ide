@@ -4,9 +4,10 @@ import assert from 'node:assert';
 import test from 'node:test';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync } from 'node:fs';
+import * as fs from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { parseWorktreeListPorcelain, getBaseBranch } from './worktrees';
+import { parseWorktreeListPorcelain, getBaseBranch, listWorktrees } from './worktrees';
 
 function initRepo(): string {
   const dir = mkdtempSync(path.join(tmpdir(), 'worktrees-test-'));
@@ -59,6 +60,56 @@ test('getBaseBranch falls back to main when there is no remote', () => {
   const dir = initRepo();
   commit(dir, 'a.txt', 'initial');
   assert.strictEqual(getBaseBranch(dir), 'main');
+});
+
+test('listWorktrees reports the primary and a linked worktree with correct branch/status', async () => {
+  const dir = initRepo();
+  writeFileSync(path.join(dir, '.gitignore'), '.claude/worktrees/\n');
+  execFileSync('git', ['add', '.gitignore'], { cwd: dir });
+  execFileSync('git', ['commit', '-q', '-m', 'gitignore'], { cwd: dir });
+  commit(dir, 'a.txt', 'initial');
+  const wtPath = path.join(dir, '.claude', 'worktrees', 'feature-x');
+  execFileSync('git', ['worktree', 'add', '-b', 'feature-x', wtPath], { cwd: dir });
+  commit(wtPath, 'b.txt', 'feature work');
+
+  const entries = await listWorktrees(dir);
+  assert.strictEqual(entries.length, 2);
+
+  const main = entries.find(e => e.isCurrent)!;
+  assert.strictEqual(main.dirty, false);
+
+  const feature = entries.find(e => !e.isCurrent)!;
+  assert.strictEqual(feature.branch, 'feature-x');
+  assert.strictEqual(feature.dirty, false);
+  assert.strictEqual(feature.aheadBase, 1);
+  assert.strictEqual(feature.behindBase, 0);
+  assert.strictEqual(feature.ahead, 0);
+  assert.strictEqual(feature.behind, 0);
+});
+
+test('listWorktrees keeps a worktree whose directory was deleted, marked prunable', async () => {
+  const dir = initRepo();
+  commit(dir, 'a.txt', 'initial');
+  const wtPath = path.join(dir, '.claude', 'worktrees', 'to-delete');
+  execFileSync('git', ['worktree', 'add', '-b', 'to-delete', wtPath], { cwd: dir });
+  fs.rmSync(wtPath, { recursive: true, force: true });
+
+  const entries = await listWorktrees(dir);
+  const gone = entries.find(e => !e.isCurrent)!;
+  assert.strictEqual(gone.prunable, true);
+  assert.strictEqual(gone.dirty, false);
+});
+
+test('listWorktrees represents a detached-HEAD worktree with a null branch', async () => {
+  const dir = initRepo();
+  commit(dir, 'a.txt', 'initial');
+  const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: dir, encoding: 'utf8' }).trim();
+  const wtPath = path.join(dir, '.claude', 'worktrees', 'detached-one');
+  execFileSync('git', ['worktree', 'add', '--detach', wtPath, head], { cwd: dir });
+
+  const entries = await listWorktrees(dir);
+  const detached = entries.find(e => !e.isCurrent)!;
+  assert.strictEqual(detached.branch, null);
 });
 
 test('getBaseBranch resolves origin/HEAD when a remote is configured', () => {

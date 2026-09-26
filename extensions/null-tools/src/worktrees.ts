@@ -1,6 +1,10 @@
 'use strict';
 
-import { execFileSync } from 'child_process';
+import { execFile, execFileSync } from 'child_process';
+import { promisify } from 'util';
+import { computeGitStatuses } from './dashboardGitStatus';
+
+const execFileAsync = promisify(execFile);
 
 export interface WorktreeBase {
   path: string;
@@ -61,4 +65,86 @@ export function getBaseBranch(repoCwd: string): string {
     }
   }
   return execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: repoCwd, encoding: 'utf8', timeout: 5000 }).trim();
+}
+
+interface WorktreeStatusFields {
+  dirty: boolean;
+  ahead: number;
+  behind: number;
+  aheadBase: number;
+  behindBase: number;
+  lastCommitSubject: string;
+  lastCommitDate: string;
+}
+
+async function fetchWorktreeStatus(
+  worktreePath: string,
+  branch: string | null,
+  head: string,
+  baseBranch: string,
+): Promise<WorktreeStatusFields | null> {
+  try {
+    const { stdout: porcelain } = await execFileAsync('git', ['status', '--porcelain'], { cwd: worktreePath, timeout: 5000 });
+    const dirty = porcelain.trim().length > 0;
+
+    let ahead = 0, behind = 0;
+    if (branch) {
+      try {
+        const { stdout } = await execFileAsync('git', ['rev-list', '--left-right', '--count', `${branch}...${branch}@{u}`], { cwd: worktreePath, timeout: 5000 });
+        [ahead, behind] = stdout.trim().split(/\s+/).map(Number);
+      } catch {
+        // no upstream configured
+      }
+    }
+
+    let aheadBase = 0, behindBase = 0;
+    try {
+      const ref = branch ?? head;
+      const { stdout } = await execFileAsync('git', ['rev-list', '--left-right', '--count', `${ref}...${baseBranch}`], { cwd: worktreePath, timeout: 5000 });
+      [aheadBase, behindBase] = stdout.trim().split(/\s+/).map(Number);
+    } catch {
+      // base branch unresolvable from this worktree
+    }
+
+    const { stdout: log } = await execFileAsync('git', ['log', '-1', '--format=%s%x1f%cI', 'HEAD'], { cwd: worktreePath, timeout: 5000 });
+    const [lastCommitSubject, lastCommitDate] = log.trim().split('\x1f');
+
+    return { dirty, ahead, behind, aheadBase, behindBase, lastCommitSubject: lastCommitSubject ?? '', lastCommitDate: lastCommitDate ?? '' };
+  } catch {
+    return null;
+  }
+}
+
+export async function listWorktrees(repoCwd: string): Promise<WorktreeEntry[]> {
+  const { stdout } = await execFileAsync('git', ['worktree', 'list', '--porcelain'], { cwd: repoCwd, timeout: 10000 });
+  const base = parseWorktreeListPorcelain(stdout, repoCwd);
+  if (base.length === 0) return [];
+
+  const baseBranch = getBaseBranch(repoCwd);
+  const byPath = new Map(base.map(e => [e.path, e]));
+  const statuses = new Map<string, WorktreeStatusFields | null>();
+
+  await computeGitStatuses<WorktreeStatusFields>(
+    base.map(e => e.path),
+    (p, status) => statuses.set(p, status),
+    4,
+    (p) => {
+      const entry = byPath.get(p)!;
+      return fetchWorktreeStatus(p, entry.branch, entry.head, baseBranch);
+    },
+  );
+
+  return base.map(entry => {
+    const status = statuses.get(entry.path);
+    return {
+      ...entry,
+      dirty: status?.dirty ?? false,
+      ahead: status?.ahead ?? 0,
+      behind: status?.behind ?? 0,
+      aheadBase: status?.aheadBase ?? 0,
+      behindBase: status?.behindBase ?? 0,
+      lastCommitSubject: status?.lastCommitSubject ?? '',
+      lastCommitDate: status?.lastCommitDate ?? '',
+    };
+  });
 }
