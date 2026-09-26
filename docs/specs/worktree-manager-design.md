@@ -12,6 +12,16 @@ afterwards. This is exactly the kind of bookkeeping `null-tools` already
 automates for other repetitive dev-loop tasks (Ports panel, GitHub Issues
 panel, recent-project git status).
 
+Claude Code itself already solves half of this problem for its own CLI
+sessions: the `using-git-worktrees` skill and its native `EnterWorktree`/
+`ExitWorktree` tools create and tear down per-session worktrees at
+`.claude/worktrees/<name>` (gitignored by default). This feature is the IDE
+half — a visible panel for creating, inspecting, and cleaning up those same
+worktrees (plus ones made for reasons that have nothing to do with an active
+Claude Code session) — so it must use that existing convention rather than
+inventing a second, competing one. See "Integration with `EnterWorktree`"
+under Architecture.
+
 ## Scope
 
 In scope: a worktree tree view in `null-tools`; create a worktree from a
@@ -24,7 +34,11 @@ glob of untracked setup files into new worktrees.
 Out of scope: worktree support for non-Git repos; a UI for arbitrary
 `git worktree move`/relocate (not requested); auto-polling refresh (see
 below); multi-root workspace fan-out (operates on `workspaceFolders[0]`,
-consistent with `issuesPanel.ts` / `issueDetailPanel.ts`).
+consistent with `issuesPanel.ts` / `issueDetailPanel.ts`); reimplementing
+`EnterWorktree`/`ExitWorktree` themselves — those are Claude Code CLI tools
+this VS Code extension has no access to and no need to call. The panel
+reads and writes worktrees at the git level (`git worktree add/remove/list`),
+the same level `EnterWorktree` itself operates at, so the two never conflict.
 
 ## Reuse (existing code this builds on)
 
@@ -48,6 +62,11 @@ consistent with `issuesPanel.ts` / `issueDetailPanel.ts`).
   `portsIntegration.ts`) as the structural template for the tree view +
   command registration; see Architecture below for why worktrees also gets a
   fourth, vscode-free data module.
+- The `.claude/worktrees/` directory convention already established by
+  Claude Code's native `EnterWorktree` tool (used by the `using-git-worktrees`
+  skill) — new worktrees this panel creates land in the same directory
+  Claude Code sessions already use, instead of a second sibling-directory
+  convention. See "Integration with `EnterWorktree`" below.
 
 ## Architecture
 
@@ -109,8 +128,13 @@ export interface WorktreeEntry {
   `branchNameForIssue`), `{ kind: 'branch', branch }` (existing branch,
   `git worktree add <path> <branch>`), or `{ kind: 'scratch', description }`
   (new branch via `slugify`, `git worktree add -b <branch> <path>`). Path is
-  always `../<repo-dir-name>-<branch-slug>`, sibling to the repo, per the
-  issue's own convention — no path prompt (confirmed with maintainer).
+  always `<repoCwd>/.claude/worktrees/<branch-slug>` — the same directory
+  `EnterWorktree` itself uses (see "Integration with `EnterWorktree`" below)
+  — no path prompt (confirmed with maintainer; this supersedes the issue's
+  own suggested `../<repo>-<issue#>-<slug>` sibling-directory convention).
+  Before the first worktree in a repo, verifies `.claude/worktrees` is
+  git-ignored (`git check-ignore -q`) and appends it to `.gitignore` if not,
+  mirroring the `using-git-worktrees` skill's own safety-verification step.
   After a successful `add`, copies files per `copyFilesGlob` (see below).
 - `removeWorktree(repoCwd, worktreePath, force): Promise<Result<void>>` —
   `git worktree remove [--force] <path>`.
@@ -137,6 +161,25 @@ export interface WorktreeEntry {
   hand-rolled matcher. Lives in `worktreesIntegration.ts` (the one function
   in this feature that needs `vscode`, since `findFiles` is a `vscode` API),
   called from the integration layer right after `createWorktree` succeeds.
+
+### Integration with `EnterWorktree`
+
+`EnterWorktree` creates worktrees at `.claude/worktrees/<name>` and registers
+them the normal git way (`git worktree add`), so `git worktree list
+--porcelain` already reports them — `listWorktrees` needs no special case to
+see a worktree an agent created mid-session, or one this panel created that
+an agent later enters via `EnterWorktree({ path })` (explicitly supported by
+that tool for "one you just created with `git worktree add`"). The two
+never need to call each other; they just agree on where things live.
+
+The only extra behavior: `WorktreeTreeProvider` marks any entry whose path
+is under `.claude/worktrees/` with `contextValue = 'worktreeEntryClaudeSession'`
+and a distinct icon (`$(hubot)`), so the maintainer can tell "a Claude Code
+session is (or was) using this" apart from a worktree they made for
+unrelated reasons. This is read-only labeling — removing, merging, or
+pruning such an entry works exactly like any other worktree; this panel
+does not attempt to detect or coordinate with a *running* session (no
+tool exists for that from the VS Code extension side).
 
 ### Tree view (`worktreesTreeView.ts`)
 
@@ -208,8 +251,9 @@ itself):
 - `getBaseBranch` finds `origin/HEAD` when a remote exists; falls back to
   `main`/`master` when it doesn't.
 - `createWorktree` for each of the three `kind`s produces the expected
-  branch name and sibling directory; fails cleanly (returns `ok: false`,
-  doesn't throw) if the target directory already exists.
+  branch name and lands under `.claude/worktrees/`; fails cleanly (returns
+  `ok: false`, doesn't throw) if the target directory already exists; adds
+  `.claude/worktrees` to `.gitignore` when a repo doesn't already ignore it.
 - `mergeWorktreeBack` refuses when `repoCwd` is dirty; succeeds via
   fast-forward when possible; the ff-only merge fails cleanly when the base
   branch has diverged (caller decides whether to retry as a real merge).
