@@ -77,3 +77,11 @@ test('computeGitStatuses isolates a failing fetch from the rest of the batch', a
   assert.deepStrictEqual(results.get('good-1'), { branch: 'main', dirty: false });
   assert.deepStrictEqual(results.get('good-2'), { branch: 'main', dirty: false });
 });
+
+test('computeGitStatuses supports a custom status type via generics', async () => {
+  interface CustomStatus { note: string }
+  const fakeFetch = async (): Promise<CustomStatus | null> => ({ note: 'ok' });
+  const results = new Map<string, CustomStatus | null>();
+  await computeGitStatuses<CustomStatus>(['a'], (p, s) => results.set(p, s), 1, fakeFetch);
+  assert.deepStrictEqual(results.get('a'), { note: 'ok' });
+});

@@ -26,11 +26,11 @@ async function getGitStatus(cwd: string): Promise<GitStatus | null> {
  * all at once) so the caller can update the UI progressively. A failing or
  * throwing fetch for one path never blocks or fails the rest of the batch.
  */
-export async function computeGitStatuses(
+export async function computeGitStatuses<T = GitStatus>(
   paths: string[],
-  onResult: (path: string, status: GitStatus | null) => void,
+  onResult: (path: string, status: T | null) => void,
   concurrency = 4,
-  fetchStatus: (cwd: string) => Promise<GitStatus | null> = getGitStatus,
+  fetchStatus: (cwd: string) => Promise<T | null> = getGitStatus as unknown as (cwd: string) => Promise<T | null>,
 ): Promise<void> {
   let next = 0;
 
@@ -38,7 +38,7 @@ export async function computeGitStatuses(
     while (next < paths.length) {
       const index = next++;
       const p = paths[index];
-      let status: GitStatus | null;
+      let status: T | null;
       try {
         status = await fetchStatus(p);
       } catch {

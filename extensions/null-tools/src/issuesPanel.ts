@@ -28,6 +28,7 @@ type InboundMessage =
   | { type: 'markRead' }
   | { type: 'openIssueInBrowser'; number: number }
   | { type: 'createBranchForIssue'; number: number }
+  | { type: 'createWorktreeForIssue'; number: number }
   | { type: 'copyAsPromptForIssue'; number: number };
 
 export class IssuesViewProvider implements vscode.WebviewViewProvider {
@@ -230,6 +231,12 @@ export class IssuesViewProvider implements vscode.WebviewViewProvider {
         const result = createIssueBranch(cwd, issue.number, issue.title);
         if (result.ok) void vscode.window.showInformationMessage(`Switched to branch ${result.branch}`);
         else void vscode.window.showErrorMessage(`Failed to create branch: ${result.message}`);
+        break;
+      }
+      case 'createWorktreeForIssue': {
+        const issue = this._store.getByNumber(msg.number);
+        if (!issue) break;
+        await vscode.commands.executeCommand('null.worktrees.createForIssue', issue.number, issue.title);
         break;
       }
       case 'copyAsPromptForIssue': {

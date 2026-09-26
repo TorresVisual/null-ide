@@ -8,6 +8,7 @@ import { registerRecentProjectsUriHandler } from './recentProjectsIntegration';
 import { registerScratchAndNotesFeature } from './scratchNotesIntegration';
 import { registerAutoGitignoreFeature } from './autoGitignore';
 import { registerPortsFeature } from './portsIntegration';
+import { registerWorktreesFeature } from './worktreesIntegration';
 import { registerDiscordPresenceFeature } from './discordPresenceIntegration';
 import { registerIssuesPanelFeature } from './issuesPanelIntegration';
 import { getStagedDiff, runClaude } from './commitMessage';
@@ -133,6 +134,7 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(plansWatcher);
 
   registerPortsFeature(context);
+  registerWorktreesFeature(context);
   registerIssuesPanelFeature(context);
   registerDiscordPresenceFeature(context);
   registerOpenInNullNotesFeature(context);

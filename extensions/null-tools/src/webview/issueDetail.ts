@@ -286,6 +286,7 @@ declare const DOMPurify: { sanitize(html: string): string };
         <button class="btn ${closed ? 'btn-reopen' : 'btn-close'}" id="state-btn">${closed ? 'Reopen' : 'Close'}</button>
         <div class="btn-row-divider"></div>
         <button class="btn btn-ghost" id="branch-btn">Branch</button>
+        <button class="btn btn-ghost" id="worktree-btn">Worktree</button>
         <button class="btn btn-ghost" id="browser-btn">Browser ↗</button>
         <button class="btn btn-ghost" id="copy-btn">Copy as prompt</button>
         <button class="btn btn-ghost" id="refresh-btn" title="Reload this issue from GitHub">Refresh</button>
@@ -352,6 +353,8 @@ declare const DOMPurify: { sanitize(html: string): string };
       vscode.postMessage({ type: 'openInBrowser' }));
     document.getElementById('branch-btn')?.addEventListener('click', () =>
       vscode.postMessage({ type: 'createBranch' }));
+    document.getElementById('worktree-btn')?.addEventListener('click', () =>
+      vscode.postMessage({ type: 'createWorktree' }));
     document.getElementById('state-btn')?.addEventListener('click', () =>
       vscode.postMessage({ type: 'setState', state: issue.state === 'closed' ? 'open' : 'closed' }));
     document.getElementById('edit-btn')?.addEventListener('click', () => {
