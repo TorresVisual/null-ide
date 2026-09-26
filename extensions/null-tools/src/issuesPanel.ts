@@ -10,6 +10,7 @@ import { GithubIssue, GithubLabel, GithubRepoRef, IssueFilterOptions, IssueState
 import { createIssueBranch, getLocallyClosedIssueNumbers } from './github/gitBranch';
 import { formatIssueAsPrompt } from './github/promptFormat';
 import { newestUpdateTime, relevantToViewer } from './github/issueFilter';
+import { createWorktree } from './worktrees';
 
 interface IssuesCacheEntry {
   issues: GithubIssue[];
@@ -28,6 +29,7 @@ type InboundMessage =
   | { type: 'markRead' }
   | { type: 'openIssueInBrowser'; number: number }
   | { type: 'createBranchForIssue'; number: number }
+  | { type: 'createWorktreeForIssue'; number: number }
   | { type: 'copyAsPromptForIssue'; number: number };
 
 export class IssuesViewProvider implements vscode.WebviewViewProvider {
@@ -230,6 +232,20 @@ export class IssuesViewProvider implements vscode.WebviewViewProvider {
         const result = createIssueBranch(cwd, issue.number, issue.title);
         if (result.ok) void vscode.window.showInformationMessage(`Switched to branch ${result.branch}`);
         else void vscode.window.showErrorMessage(`Failed to create branch: ${result.message}`);
+        break;
+      }
+      case 'createWorktreeForIssue': {
+        const issue = this._store.getByNumber(msg.number);
+        const cwd = this._cwd();
+        if (!issue || !cwd) break;
+        const result = createWorktree(cwd, { kind: 'issue', issueNumber: issue.number, title: issue.title });
+        if (!result.ok) { void vscode.window.showErrorMessage(`Failed to create worktree: ${result.message}`); break; }
+        const choice = await vscode.window.showInformationMessage(
+          `Worktree created on branch ${result.value.branch}.`, 'Open in New Window', 'Stay Here',
+        );
+        if (choice === 'Open in New Window') {
+          await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(result.value.path), { forceNewWindow: true });
+        }
         break;
       }
       case 'copyAsPromptForIssue': {
