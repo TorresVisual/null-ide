@@ -7,7 +7,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import * as fs from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { parseWorktreeListPorcelain, getBaseBranch, listWorktrees, createWorktree, listLocalBranches } from './worktrees';
+import { parseWorktreeListPorcelain, getBaseBranch, listWorktrees, createWorktree, listLocalBranches, removeWorktree, mergeWorktreeBack } from './worktrees';
 
 function initRepo(): string {
   const dir = mkdtempSync(path.join(tmpdir(), 'worktrees-test-'));
@@ -174,4 +174,55 @@ test('listLocalBranches returns local branch names', () => {
   assert.ok(branches.includes('main'));
   assert.ok(branches.includes('a-branch'));
   assert.ok(branches.includes('b-branch'));
+});
+
+test('removeWorktree deletes the worktree directory and registration', () => {
+  const dir = initRepo();
+  commit(dir, 'a.txt', 'initial');
+  const created = createWorktree(dir, { kind: 'scratch', description: 'temp' });
+  assert.ok(created.ok);
+
+  const result = removeWorktree(dir, created.value.path, false);
+  assert.ok(result.ok);
+  assert.strictEqual(fs.existsSync(created.value.path), false);
+});
+
+test('mergeWorktreeBack refuses when the main repo has uncommitted changes', () => {
+  const dir = initRepo();
+  commit(dir, 'a.txt', 'initial');
+  const created = createWorktree(dir, { kind: 'scratch', description: 'feature' });
+  assert.ok(created.ok);
+  writeFileSync(path.join(dir, 'a.txt'), 'dirty change');
+
+  const result = mergeWorktreeBack(dir, created.value.branch, 'main', 'ff-only');
+  assert.strictEqual(result.ok, false);
+});
+
+test('mergeWorktreeBack fast-forwards when the worktree branch is ahead', () => {
+  const dir = initRepo();
+  commit(dir, 'a.txt', 'initial');
+  const created = createWorktree(dir, { kind: 'scratch', description: 'feature' });
+  assert.ok(created.ok);
+  commit(created.value.path, 'b.txt', 'feature work');
+
+  const result = mergeWorktreeBack(dir, created.value.branch, 'main', 'ff-only');
+  assert.ok(result.ok);
+  assert.strictEqual(result.value.mode, 'ff');
+  assert.ok(fs.existsSync(path.join(dir, 'b.txt')));
+});
+
+test('mergeWorktreeBack ff-only fails when base has diverged, and mode "merge" succeeds', () => {
+  const dir = initRepo();
+  commit(dir, 'a.txt', 'initial');
+  const created = createWorktree(dir, { kind: 'scratch', description: 'feature' });
+  assert.ok(created.ok);
+  commit(created.value.path, 'b.txt', 'feature work');
+  commit(dir, 'c.txt', 'main moved on');
+
+  const ffResult = mergeWorktreeBack(dir, created.value.branch, 'main', 'ff-only');
+  assert.strictEqual(ffResult.ok, false);
+
+  const mergeResult = mergeWorktreeBack(dir, created.value.branch, 'main', 'merge');
+  assert.ok(mergeResult.ok);
+  assert.strictEqual(mergeResult.value.mode, 'merge');
 });

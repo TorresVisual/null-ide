@@ -170,6 +170,12 @@ function ensureWorktreesIgnored(repoCwd: string): void {
   if (existing.includes('.claude/worktrees')) return;
   const sep = existing.length > 0 && !existing.endsWith('\n') ? '\n' : '';
   fs.writeFileSync(gitignorePath, `${existing}${sep}.claude/worktrees/\n`);
+  try {
+    execFileSync('git', ['add', '.gitignore'], { cwd: repoCwd, timeout: 5000 });
+    execFileSync('git', ['commit', '-q', '-m', 'chore: ignore .claude/worktrees/'], { cwd: repoCwd, timeout: 5000 });
+  } catch {
+    // leave the .gitignore edit uncommitted — the caller's own dirty checks (e.g. mergeWorktreeBack) still see it
+  }
 }
 
 export function createWorktree(repoCwd: string, opts: CreateWorktreeOptions): Result<{ path: string; branch: string }> {
@@ -214,5 +220,37 @@ export function listLocalBranches(repoCwd: string): string[] {
     return stdout.split('\n').map(l => l.trim()).filter(Boolean);
   } catch {
     return [];
+  }
+}
+
+export function removeWorktree(repoCwd: string, worktreePath: string, force: boolean): Result<void> {
+  try {
+    const args = force ? ['worktree', 'remove', '--force', worktreePath] : ['worktree', 'remove', worktreePath];
+    execFileSync('git', args, { cwd: repoCwd, encoding: 'utf8', timeout: 15000 });
+    return { ok: true, value: undefined };
+  } catch (err) {
+    return { ok: false, message: (err as Error).message };
+  }
+}
+
+export function mergeWorktreeBack(
+  repoCwd: string, branch: string, baseBranch: string, mode: 'ff-only' | 'merge',
+): Result<{ mode: 'ff' | 'merge' }> {
+  const status = execFileSync('git', ['status', '--porcelain'], { cwd: repoCwd, encoding: 'utf8', timeout: 5000 });
+  if (status.trim().length > 0) {
+    return { ok: false, message: `${repoCwd} has uncommitted changes — commit or stash before merging back.` };
+  }
+
+  try {
+    execFileSync('git', ['checkout', baseBranch], { cwd: repoCwd, encoding: 'utf8', timeout: 10000 });
+  } catch (err) {
+    return { ok: false, message: `Failed to check out ${baseBranch}: ${(err as Error).message}` };
+  }
+
+  try {
+    execFileSync('git', ['merge', mode === 'ff-only' ? '--ff-only' : '--no-edit', branch], { cwd: repoCwd, encoding: 'utf8', timeout: 10000 });
+    return { ok: true, value: { mode: mode === 'ff-only' ? 'ff' : 'merge' } };
+  } catch (err) {
+    return { ok: false, message: (err as Error).message };
   }
 }
