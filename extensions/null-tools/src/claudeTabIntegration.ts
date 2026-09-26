@@ -24,7 +24,7 @@ export function registerClaudeTabFeature(context: vscode.ExtensionContext): void
     const claudeTabs: ClaudeTab[] = [];
     for (const group of vscode.window.tabGroups.all) {
       group.tabs.forEach((tab, index) => {
-        if (tab.input instanceof vscode.TabInputWebview && tab.input.viewType.includes('claudeVSCodePanel')) {
+        if (tab.input instanceof vscode.TabInputWebview && tab.input.viewType === 'claudeVSCodePanel') {
           claudeTabs.push({ label: tab.label, viewColumn: group.viewColumn, index });
         }
       });
