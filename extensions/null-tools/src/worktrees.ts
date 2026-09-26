@@ -1,5 +1,7 @@
 'use strict';
 
+import { execFileSync } from 'child_process';
+
 export interface WorktreeBase {
   path: string;
   branch: string | null;
@@ -41,4 +43,22 @@ export function parseWorktreeListPorcelain(output: string, currentPath: string):
       }
       return { path: wtPath, branch, head, prunable, isCurrent: normalizePath(wtPath) === current };
     });
+}
+
+export function getBaseBranch(repoCwd: string): string {
+  try {
+    const ref = execFileSync('git', ['symbolic-ref', 'refs/remotes/origin/HEAD'], { cwd: repoCwd, encoding: 'utf8', timeout: 5000 }).trim();
+    return ref.replace(/^refs\/remotes\/origin\//, '');
+  } catch {
+    // no remote, or origin/HEAD not set
+  }
+  for (const candidate of ['main', 'master']) {
+    try {
+      execFileSync('git', ['rev-parse', '--verify', `refs/heads/${candidate}`], { cwd: repoCwd, encoding: 'utf8', timeout: 5000 });
+      return candidate;
+    } catch {
+      // candidate branch doesn't exist
+    }
+  }
+  return execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: repoCwd, encoding: 'utf8', timeout: 5000 }).trim();
 }
