@@ -7,7 +7,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import * as fs from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { parseWorktreeListPorcelain, getBaseBranch, listWorktrees, createWorktree, listLocalBranches, removeWorktree, mergeWorktreeBack } from './worktrees';
+import { parseWorktreeListPorcelain, getBaseBranch, listWorktrees, createWorktree, listLocalBranches, removeWorktree, mergeWorktreeBack, pruneCandidates, pruneWorktrees } from './worktrees';
 
 function initRepo(): string {
   const dir = mkdtempSync(path.join(tmpdir(), 'worktrees-test-'));
@@ -225,4 +225,35 @@ test('mergeWorktreeBack ff-only fails when base has diverged, and mode "merge" s
   const mergeResult = mergeWorktreeBack(dir, created.value.branch, 'main', 'merge');
   assert.ok(mergeResult.ok);
   assert.strictEqual(mergeResult.value.mode, 'merge');
+});
+
+test('pruneCandidates separates a merged worktree from one with a missing directory', async () => {
+  const dir = initRepo();
+  commit(dir, 'a.txt', 'initial');
+
+  const merged = createWorktree(dir, { kind: 'scratch', description: 'merged one' });
+  assert.ok(merged.ok);
+  const missing = createWorktree(dir, { kind: 'scratch', description: 'missing one' });
+  assert.ok(missing.ok);
+
+  const mergeResult = mergeWorktreeBack(dir, merged.value.branch, 'main', 'ff-only');
+  assert.ok(mergeResult.ok);
+  fs.rmSync(missing.value.path, { recursive: true, force: true });
+
+  const { merged: mergedList, missing: missingList } = await pruneCandidates(dir, 'main');
+  assert.ok(mergedList.some(e => e.branch === merged.value.branch));
+  assert.ok(missingList.some(e => e.prunable));
+});
+
+test('pruneWorktrees removes registration for a worktree with a missing directory', () => {
+  const dir = initRepo();
+  commit(dir, 'a.txt', 'initial');
+  const created = createWorktree(dir, { kind: 'scratch', description: 'to prune' });
+  assert.ok(created.ok);
+  fs.rmSync(created.value.path, { recursive: true, force: true });
+
+  const result = pruneWorktrees(dir);
+  assert.ok(result.ok);
+  const stdout = execFileSync('git', ['worktree', 'list', '--porcelain'], { cwd: dir, encoding: 'utf8' });
+  assert.ok(!stdout.includes(created.value.branch));
 });

@@ -254,3 +254,35 @@ export function mergeWorktreeBack(
     return { ok: false, message: (err as Error).message };
   }
 }
+
+export async function pruneCandidates(
+  repoCwd: string, baseBranch: string,
+): Promise<{ merged: WorktreeEntry[]; missing: WorktreeEntry[] }> {
+  const entries = await listWorktrees(repoCwd);
+  const merged: WorktreeEntry[] = [];
+  const missing: WorktreeEntry[] = [];
+
+  let mergedBranches: string[] = [];
+  try {
+    const stdout = execFileSync('git', ['branch', '--merged', baseBranch, '--format=%(refname:short)'], { cwd: repoCwd, encoding: 'utf8', timeout: 5000 });
+    mergedBranches = stdout.split('\n').map(l => l.trim()).filter(Boolean);
+  } catch {
+    // leave mergedBranches empty — nothing will be classified as merged
+  }
+
+  for (const entry of entries) {
+    if (entry.isCurrent) continue;
+    if (entry.prunable) { missing.push(entry); continue; }
+    if (entry.branch && mergedBranches.includes(entry.branch)) merged.push(entry);
+  }
+  return { merged, missing };
+}
+
+export function pruneWorktrees(repoCwd: string): Result<void> {
+  try {
+    execFileSync('git', ['worktree', 'prune'], { cwd: repoCwd, encoding: 'utf8', timeout: 10000 });
+    return { ok: true, value: undefined };
+  } catch (err) {
+    return { ok: false, message: (err as Error).message };
+  }
+}
