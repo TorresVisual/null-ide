@@ -119,6 +119,15 @@ async function fetchWorktreeStatus(
   }
 }
 
+export function resolveMainWorktreeRoot(repoCwd: string): string {
+  try {
+    const stdout = execFileSync('git', ['worktree', 'list', '--porcelain'], { cwd: repoCwd, encoding: 'utf8', timeout: 10000 });
+    return parseWorktreeListPorcelain(stdout, repoCwd)[0]?.path ?? repoCwd;
+  } catch {
+    return repoCwd;
+  }
+}
+
 export async function listWorktrees(repoCwd: string): Promise<WorktreeEntry[]> {
   const { stdout } = await execFileAsync('git', ['worktree', 'list', '--porcelain'], { cwd: repoCwd, timeout: 10000 });
   const base = parseWorktreeListPorcelain(stdout, repoCwd);
@@ -171,10 +180,19 @@ function ensureWorktreesIgnored(repoCwd: string): void {
   const sep = existing.length > 0 && !existing.endsWith('\n') ? '\n' : '';
   fs.writeFileSync(gitignorePath, `${existing}${sep}.claude/worktrees/\n`);
   try {
-    execFileSync('git', ['add', '.gitignore'], { cwd: repoCwd, timeout: 5000 });
-    execFileSync('git', ['commit', '-q', '-m', 'chore: ignore .claude/worktrees/'], { cwd: repoCwd, timeout: 5000 });
+    execFileSync('git', ['add', '--', '.gitignore'], { cwd: repoCwd, timeout: 5000 });
+    execFileSync('git', ['commit', '-q', '-m', 'chore: ignore .claude/worktrees/', '--', '.gitignore'], { cwd: repoCwd, timeout: 5000 });
   } catch {
     // leave the .gitignore edit uncommitted — the caller's own dirty checks (e.g. mergeWorktreeBack) still see it
+  }
+}
+
+function branchExists(repoCwd: string, branch: string): boolean {
+  try {
+    execFileSync('git', ['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`], { cwd: repoCwd, stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -195,6 +213,7 @@ export function createWorktree(repoCwd: string, opts: CreateWorktreeOptions): Re
       isNewBranch = true;
       break;
   }
+  if (isNewBranch && branchExists(repoCwd, branch)) isNewBranch = false;
 
   const worktreePath = path.join(repoCwd, '.claude', 'worktrees', branch);
   if (fs.existsSync(worktreePath)) {
@@ -233,25 +252,29 @@ export function removeWorktree(repoCwd: string, worktreePath: string, force: boo
   }
 }
 
+export type MergeBackResult =
+  | { ok: true; value: { mode: 'ff' | 'merge' } }
+  | { ok: false; reason: 'dirty' | 'checkout' | 'merge'; message: string };
+
 export function mergeWorktreeBack(
   repoCwd: string, branch: string, baseBranch: string, mode: 'ff-only' | 'merge',
-): Result<{ mode: 'ff' | 'merge' }> {
+): MergeBackResult {
   const status = execFileSync('git', ['status', '--porcelain'], { cwd: repoCwd, encoding: 'utf8', timeout: 5000 });
   if (status.trim().length > 0) {
-    return { ok: false, message: `${repoCwd} has uncommitted changes — commit or stash before merging back.` };
+    return { ok: false, reason: 'dirty', message: `${repoCwd} has uncommitted changes — commit or stash before merging back.` };
   }
 
   try {
     execFileSync('git', ['checkout', baseBranch], { cwd: repoCwd, encoding: 'utf8', timeout: 10000 });
   } catch (err) {
-    return { ok: false, message: `Failed to check out ${baseBranch}: ${(err as Error).message}` };
+    return { ok: false, reason: 'checkout', message: `Failed to check out ${baseBranch}: ${(err as Error).message}` };
   }
 
   try {
     execFileSync('git', ['merge', mode === 'ff-only' ? '--ff-only' : '--no-edit', branch], { cwd: repoCwd, encoding: 'utf8', timeout: 10000 });
     return { ok: true, value: { mode: mode === 'ff-only' ? 'ff' : 'merge' } };
   } catch (err) {
-    return { ok: false, message: (err as Error).message };
+    return { ok: false, reason: 'merge', message: (err as Error).message };
   }
 }
 

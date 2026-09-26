@@ -7,7 +7,11 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import * as fs from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { parseWorktreeListPorcelain, getBaseBranch, listWorktrees, createWorktree, listLocalBranches, removeWorktree, mergeWorktreeBack, pruneCandidates, pruneWorktrees } from './worktrees';
+import { parseWorktreeListPorcelain, getBaseBranch, listWorktrees, createWorktree, listLocalBranches, removeWorktree, mergeWorktreeBack, pruneCandidates, pruneWorktrees, resolveMainWorktreeRoot } from './worktrees';
+
+function normalizeForCompare(p: string): string {
+  return p.replace(/\\/g, '/').replace(/\/$/, '').toLowerCase();
+}
 
 function initRepo(): string {
   const dir = mkdtempSync(path.join(tmpdir(), 'worktrees-test-'));
@@ -256,4 +260,65 @@ test('pruneWorktrees removes registration for a worktree with a missing director
   assert.ok(result.ok);
   const stdout = execFileSync('git', ['worktree', 'list', '--porcelain'], { cwd: dir, encoding: 'utf8' });
   assert.ok(!stdout.includes(created.value.branch));
+});
+
+test('createWorktree only commits its own .gitignore edit, never other staged changes', () => {
+  const dir = initRepo();
+  commit(dir, 'a.txt', 'initial');
+  writeFileSync(path.join(dir, 'staged.txt'), 'work in progress');
+  execFileSync('git', ['add', 'staged.txt'], { cwd: dir });
+
+  const result = createWorktree(dir, { kind: 'scratch', description: 'feature' });
+  assert.ok(result.ok);
+
+  const status = execFileSync('git', ['status', '--porcelain'], { cwd: dir, encoding: 'utf8' });
+  assert.match(status, /^A\s+staged\.txt$/m);
+});
+
+test('resolveMainWorktreeRoot resolves a linked worktree path back to the main worktree', () => {
+  const dir = initRepo();
+  commit(dir, 'a.txt', 'initial');
+  const created = createWorktree(dir, { kind: 'scratch', description: 'linked' });
+  assert.ok(created.ok);
+
+  assert.strictEqual(normalizeForCompare(resolveMainWorktreeRoot(created.value.path)), normalizeForCompare(dir));
+  assert.strictEqual(normalizeForCompare(resolveMainWorktreeRoot(dir)), normalizeForCompare(dir));
+});
+
+test('createWorktree reuses an existing branch when re-creating after a remove', () => {
+  const dir = initRepo();
+  commit(dir, 'a.txt', 'initial');
+  const first = createWorktree(dir, { kind: 'scratch', description: 'redo' });
+  assert.ok(first.ok);
+  const removed = removeWorktree(dir, first.value.path, false);
+  assert.ok(removed.ok);
+
+  const second = createWorktree(dir, { kind: 'scratch', description: 'redo' });
+  assert.ok(second.ok);
+  assert.strictEqual(second.value.branch, 'redo');
+});
+
+test('mergeWorktreeBack reports reason "dirty" when the main repo has uncommitted changes', () => {
+  const dir = initRepo();
+  commit(dir, 'a.txt', 'initial');
+  const created = createWorktree(dir, { kind: 'scratch', description: 'feature' });
+  assert.ok(created.ok);
+  writeFileSync(path.join(dir, 'a.txt'), 'dirty change');
+
+  const result = mergeWorktreeBack(dir, created.value.branch, 'main', 'ff-only');
+  assert.strictEqual(result.ok, false);
+  assert.strictEqual((result as { reason: string }).reason, 'dirty');
+});
+
+test('mergeWorktreeBack reports reason "merge" when ff-only fails because base has diverged', () => {
+  const dir = initRepo();
+  commit(dir, 'a.txt', 'initial');
+  const created = createWorktree(dir, { kind: 'scratch', description: 'feature' });
+  assert.ok(created.ok);
+  commit(created.value.path, 'b.txt', 'feature work');
+  commit(dir, 'c.txt', 'main moved on');
+
+  const result = mergeWorktreeBack(dir, created.value.branch, 'main', 'ff-only');
+  assert.strictEqual(result.ok, false);
+  assert.strictEqual((result as { reason: string }).reason, 'merge');
 });

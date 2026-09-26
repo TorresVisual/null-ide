@@ -147,6 +147,10 @@
         "icon": "$(trash)"
       },
       {
+        "command": "null.worktrees.createForIssue",
+        "title": "Create Worktree for Issue"
+      },
+      {
         "command": "null.toggleDiscordPresence",
         "title": "Null: Toggle Discord Rich Presence",
         "icon": "$(broadcast)"
@@ -384,6 +388,7 @@
         { "command": "null.worktrees.openTerminal", "when": "false" },
         { "command": "null.worktrees.mergeBack", "when": "false" },
         { "command": "null.worktrees.remove", "when": "false" },
+        { "command": "null.worktrees.createForIssue", "when": "false" },
         { "command": "null.toggleDiscordPresence" },
         { "command": "null.discord.testConnection" },
         { "command": "null.issues.create" },

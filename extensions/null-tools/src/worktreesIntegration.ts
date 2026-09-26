@@ -7,12 +7,13 @@ import * as path from 'path';
 import {
   CreateWorktreeOptions, WorktreeEntry,
   createWorktree, getBaseBranch, listLocalBranches, mergeWorktreeBack,
-  pruneCandidates, pruneWorktrees, removeWorktree,
+  pruneCandidates, pruneWorktrees, removeWorktree, resolveMainWorktreeRoot,
 } from './worktrees';
 import { WorktreeTreeProvider } from './worktreesTreeView';
 
 function repoCwd(): string | null {
-  return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? null;
+  const folder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  return folder ? resolveMainWorktreeRoot(folder) : null;
 }
 
 function getCopyFilesGlob(): string[] {
@@ -91,6 +92,12 @@ export function registerWorktreesFeature(context: vscode.ExtensionContext): void
     await createAndOffer(cwd, opts, provider);
   }));
 
+  context.subscriptions.push(vscode.commands.registerCommand('null.worktrees.createForIssue', async (issueNumber: number, title: string) => {
+    const cwd = repoCwd();
+    if (!cwd) return;
+    await createAndOffer(cwd, { kind: 'issue', issueNumber, title }, provider);
+  }));
+
   context.subscriptions.push(vscode.commands.registerCommand('null.worktrees.openInNewWindow', async (entry?: WorktreeEntry) => {
     if (!entry) return;
     await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(entry.path), { forceNewWindow: true });
@@ -133,7 +140,7 @@ export function registerWorktreesFeature(context: vscode.ExtensionContext): void
     if (entry.branch === baseBranch) { vscode.window.showInformationMessage(`${entry.branch} is already the base branch.`); return; }
 
     let result = mergeWorktreeBack(cwd, entry.branch, baseBranch, 'ff-only');
-    if (!result.ok) {
+    if (!result.ok && result.reason === 'merge') {
       const retry = await vscode.window.showWarningMessage(
         `Fast-forward merge failed (${result.message}). Try a regular merge instead?`, 'Merge', 'Cancel',
       );
@@ -143,12 +150,16 @@ export function registerWorktreesFeature(context: vscode.ExtensionContext): void
     if (!result.ok) { vscode.window.showErrorMessage(`Merge failed: ${result.message}`); return; }
 
     await provider.refresh();
-    const cleanup = await vscode.window.showInformationMessage(
-      `Merged ${entry.branch} into ${baseBranch}.`, 'Remove Worktree and Branch', 'Keep',
+    const cleanup = await vscode.window.showWarningMessage(
+      `Merged ${entry.branch} into ${baseBranch}. Remove the worktree and delete the branch?`,
+      { modal: true }, 'Remove Worktree and Branch',
     );
     if (cleanup === 'Remove Worktree and Branch') {
-      removeWorktree(cwd, entry.path, false);
-      try { execFileSync('git', ['branch', '-d', entry.branch], { cwd, encoding: 'utf8' }); } catch { /* leave the branch if delete fails */ }
+      const removeResult = removeWorktree(cwd, entry.path, false);
+      if (!removeResult.ok) { vscode.window.showErrorMessage(`Failed to remove worktree: ${removeResult.message}`); return; }
+      try { execFileSync('git', ['branch', '-d', entry.branch], { cwd, encoding: 'utf8' }); } catch (err) {
+        vscode.window.showErrorMessage(`Worktree removed, but failed to delete branch ${entry.branch}: ${(err as Error).message}`);
+      }
       await provider.refresh();
     }
   }));
@@ -173,15 +184,23 @@ export function registerWorktreesFeature(context: vscode.ExtensionContext): void
     const confirm = await vscode.window.showWarningMessage(`Clean up ${picked.length} worktree(s)?`, { modal: true }, 'Clean Up');
     if (confirm !== 'Clean Up') return;
 
-    pruneWorktrees(cwd);
+    const errors: string[] = [];
+    if (picked.some(item => item.pickKind === 'missing')) {
+      const pruneResult = pruneWorktrees(cwd);
+      if (!pruneResult.ok) errors.push(`Prune failed: ${pruneResult.message}`);
+    }
     for (const item of picked) {
       if (item.pickKind === 'merged') {
-        removeWorktree(cwd, item.entry.path, false);
+        const removeResult = removeWorktree(cwd, item.entry.path, false);
+        if (!removeResult.ok) { errors.push(`Failed to remove ${item.entry.path}: ${removeResult.message}`); continue; }
         if (item.entry.branch) {
-          try { execFileSync('git', ['branch', '-d', item.entry.branch], { cwd, encoding: 'utf8' }); } catch { /* ignore */ }
+          try { execFileSync('git', ['branch', '-d', item.entry.branch], { cwd, encoding: 'utf8' }); } catch (err) {
+            errors.push(`Removed worktree, but failed to delete branch ${item.entry.branch}: ${(err as Error).message}`);
+          }
         }
       }
     }
+    if (errors.length > 0) vscode.window.showErrorMessage(errors.join('\n'));
     await provider.refresh();
   }));
 }

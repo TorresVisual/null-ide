@@ -7,7 +7,6 @@ import { formatIssueAsPrompt } from './github/promptFormat';
 import { createIssueBranch, getLocallyClosedIssueNumbers } from './github/gitBranch';
 import { toggleTaskCheckbox } from './github/taskList';
 import { loadIssueTemplates } from './github/issueTemplates';
-import { createWorktree } from './worktrees';
 
 type InboundMessage =
   | { type: 'ready' }
@@ -196,16 +195,8 @@ export class IssueDetailPanel {
       }
       case 'createWorktree': {
         const issue = this.store.getByNumber(this.issueNumber);
-        const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-        if (!issue || !cwd) break;
-        const result = createWorktree(cwd, { kind: 'issue', issueNumber: issue.number, title: issue.title });
-        if (!result.ok) { void vscode.window.showErrorMessage(`Failed to create worktree: ${result.message}`); break; }
-        const choice = await vscode.window.showInformationMessage(
-          `Worktree created on branch ${result.value.branch}.`, 'Open in New Window', 'Stay Here',
-        );
-        if (choice === 'Open in New Window') {
-          await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(result.value.path), { forceNewWindow: true });
-        }
+        if (!issue) break;
+        await vscode.commands.executeCommand('null.worktrees.createForIssue', issue.number, issue.title);
         break;
       }
       case 'postComment': {
