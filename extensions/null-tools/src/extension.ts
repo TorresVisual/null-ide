@@ -8,6 +8,7 @@ import { registerRecentProjectsUriHandler } from './recentProjectsIntegration';
 import { registerScratchAndNotesFeature } from './scratchNotesIntegration';
 import { registerAutoGitignoreFeature } from './autoGitignore';
 import { registerPortsFeature } from './portsIntegration';
+import { registerWorktreesFeature } from './worktreesIntegration';
 import { registerDiscordPresenceFeature } from './discordPresenceIntegration';
 import { registerIssuesPanelFeature } from './issuesPanelIntegration';
 import { getStagedDiff, runClaude } from './commitMessage';
@@ -15,6 +16,7 @@ import { registerUpdaterFeature } from './updaterIntegration';
 import { registerOpenInNullNotesFeature } from './nullNotes';
 import { showWelcomePage } from './welcomePage';
 import { registerDashboardFeature } from './dashboardIntegration';
+import { registerClaudeTabFeature } from './claudeTabIntegration';
 
 // ── Activation ─────────────────────────────────────────────────────────────
 
@@ -132,9 +134,11 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(plansWatcher);
 
   registerPortsFeature(context);
+  registerWorktreesFeature(context);
   registerIssuesPanelFeature(context);
   registerDiscordPresenceFeature(context);
   registerOpenInNullNotesFeature(context);
+  registerClaudeTabFeature(context);
 }
 
 export function deactivate(): void {}

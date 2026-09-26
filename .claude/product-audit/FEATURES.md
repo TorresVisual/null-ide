@@ -60,12 +60,14 @@
 | Worktrees | Missing | — | #88 |
 | Secret scan before commit | Missing | — | #34 |
 | GitHub issues | Implemented | issuesPanel.ts | |
-| Pull requests (list/review) | Missing | — | only via marketplace ext; candidate |
+| Pull requests (list/review) | Missing | — | #92 |
 
 ## AI
 
 | Capability | Status | Location | Notes |
 |---|---|---|---|
-| Claude Code extension | Inherited-by-install | — | preferred workflow |
-| AI Agents panel | Legacy | agentsPanel.ts | #84 remove, #41 replace |
-| Ollama chat/review | Implemented | ollama.ts | |
+| Claude Code extension | Inherited-by-install | — | only AI workflow; not recommended/bundled (#89 comment) |
+| Claude command-center button | Missing | — | #98 (core patch) |
+| Follow Claude's edits in editor | Missing | — | #99 |
+| Claude line provenance hover | Missing | — | #100 |
+| AI Agents panel / Ollama / sound / "Fix with AI" | Removed | — | e3301b1, #84; #41 not planned |

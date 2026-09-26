@@ -1,23 +1,22 @@
 # Audit State
 
 Last audit:
-2026-09-25 (no-op check — no repo or issue changes since first run)
+2026-09-26 (incremental — AI subsystem only)
 
 Repository state:
-main @ 289f023 (497e048 + 2 docs-only commits: CLAUDE.md sync, this
-knowledge base's own initial commit — no application code changed)
+main @ e3301b1 (only app change since 289f023: AI Agents panel removal)
 
 Last inspected areas:
-- extensions (all 8: package.json contributions, src listing)
-- product.json overlay + extensionRecommendations
-- installer settings seeding
-- patches/
-- docs/ROADMAP.md (C++ layer, phases 1–6 complete), docs/specs listing
-- null-cpp dependency handling (clangdBridge, debugConfigSynth)
+- 2026-09-26: e3301b1 diff stat, null-tools src/ + package.json commands/
+  views, stale-reference grep (ollama/agents/claude-code) across repo,
+  product.json extensionRecommendations
+- 2026-09-25 (still valid, unchanged since): all 8 extensions, product.json
+  overlay, installer settings seeding, patches/, docs/ROADMAP.md + specs,
+  null-cpp dependency handling, updater/
 
 Last GitHub issue audit:
-2026-09-25 (#1–#90, re-verified via `gh issue list --state all` — states/
-timestamps match ISSUES.md exactly, no changes)
+2026-09-26 (#1–#100 via `gh issue list --state all`; 10 closures, 3 new
+maintainer-filed issues #98–#100)
 
 Architecture confidence:
 high
@@ -26,45 +25,27 @@ Feature inventory confidence:
 medium (built from package.json + file listings, not every source file)
 
 Known areas requiring re-audit:
-- performance (#16–#22 still not runtime-inspected, only architecture-checked)
+- performance (#19–#22, #30 not runtime-inspected; needs a live install)
+- when #98–#100 land: re-check the AI section of ARCHITECTURE/FEATURES
 
-Re-audited 2026-09-25 (deep-dive, no repo changes since first run):
-- Updater: MAJOR correction — `updater/` (native C++ EXE, CMake, WinHTTP,
-  BCrypt, miniz) plus `docs/specs/native-updater-design.md` and
-  `docs/plans/native-updater-fix.md` were entirely missed by the first-run
-  audit. The fix plan (native EXE wiring, checksum verify, rollback,
-  reapply-registrations, Retry/Close UX) is fully implemented in code
-  (commits `ff51581`..`ac4b54e`, 2026-09-19, predates the first audit).
-  Commented on #12 recommending closure pending a real-install smoke test.
-  ARCHITECTURE.md and FEATURES.md updated.
-- Testing: confirmed no extension registers a VS Code `TestController`
-  anywhere (`createTestController` grep across all extensions/ is empty,
-  excluding vendored @types/vscode) — matches existing #82 tracking, no
-  correction needed. (Node's built-in `node --test` unit-test suites exist
-  across null-actions/null-cpp/null-format/null-tools — ~35 test files —
-  but that's null-ide's own dev tooling, not a user-facing IDE feature, so
-  out of scope for FEATURES.md.)
-- Performance: confirmed all 6 TS-based extensions still activate via
-  `onStartupFinished` (matches #16 lazy-load-AI-panel still being valid);
-  did not runtime-profile startup or memory — that requires a live install,
-  not static inspection.
+Corrections this run:
+- AI architecture: panel/Ollama/sound/history/"Fix with AI" gone; Claude Code
+  extension is the only AI path; native agent UI not planned (#41).
+- CLAUDE.md now lists patches/ (815ac3c) — removed that stale-doc note.
 
-Corrections to project docs noticed:
-- CLAUDE.md says patches/ is empty — 4 patches exist.
-- docs/ROADMAP.md Phase 4 says null-cpp declares extensionDependencies — removed in 1f7c00b.
-- CLAUDE.md's repository layout and "How the Build Works" don't mention
-  `updater/` (native updater EXE) or its CI build step at all — worth a
-  CLAUDE.md sync pass, though that's outside this skill's scope (docs
-  only, not application code — but CLAUDE.md itself is a candidate for
-  `sync-agent-docs`).
+Corrections to project docs noticed (outside this skill's scope):
+- docs/index.html (public homepage) still has an "Ollama" feature card
+  (~line 577) though Ollama was removed in e3301b1.
+- PRODUCT.md lines ~19/32 still describe the AI Agents panel, agent
+  terminals (claude/agy/codex/ollama), session history, Ollama chat, and
+  node-pty/setup.ps1.
+- docs/ROADMAP.md Phase 4 says null-cpp declares extensionDependencies —
+  removed in 1f7c00b.
+- CLAUDE.md doesn't mention `updater/` (native updater EXE) or its CI step.
+- docs/plans/* and docs/specs/* reference agentsPanel/null-agents — historical
+  plans, fine to leave.
 
 Last created issues:
-- #91 (Rust development support)
-- #92 (GitHub Pull Requests in Issues panel)
-- #93 (Test Explorer for npm test / cargo test)
-- #94 (New Project templates) — 2026-09-26
-- #95 (action-button output → Problems) — 2026-09-26
-- #96 (GitHub Actions CI status) — 2026-09-26
-- #97 (Workspace Trust force-disabled) — 2026-09-26
+- #94–#97 — 2026-09-26 (none this run; #98–#100 were filed by the maintainer)
 
 Note: repo has no `security` label; #97 filed as `enhancement` only.

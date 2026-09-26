@@ -302,6 +302,11 @@
   outline-offset: -1px !important;
 }
 
+/* ── Claude Code command-center button — Anthropic brand color ───────────────── */
+.part.titlebar .action-label.codicon-null-claude-command-center {
+  color: #D97757 !important;
+}
+
 /* ── Empty editor letterpress — ambient breathing pulse ──────────────────────── */
 @keyframes null-lp-pulse {
   0%, 100% { opacity: 0.07; }

@@ -1,0 +1,128 @@
+From a12a1d5c097596cf5a6299de438f0e1b5fe184dd Mon Sep 17 00:00:00 2001
+From: TorresVisual <junk@rohsmann.at>
+Date: Sat, 26 Sep 2026 02:28:04 +0200
+Subject: [PATCH] feat: add Claude Code split button to the title-bar command
+ center
+
+Registers a split-button submenu (NullClaudeSubmenu) in both
+MenuId.CommandCenter and MenuId.TitleBar (fallback when the command
+center is disabled), gated on the claude-vscode extension's
+primaryEditorEnabled context key. Default action is
+claude-vscode.primaryEditor.open, gated by that same context key in
+the extension's own package.json. Mirrors the existing Agents control
+button registered earlier in this file.
+---
+ .../agentSessionsExperiments.contribution.ts  | 93 +++++++++++++++++++
+ 1 file changed, 93 insertions(+)
+
+diff --git a/src/vs/workbench/contrib/chat/browser/agentSessions/experiments/agentSessionsExperiments.contribution.ts b/src/vs/workbench/contrib/chat/browser/agentSessions/experiments/agentSessionsExperiments.contribution.ts
+index 0613afc0..5781298e 100644
+--- a/src/vs/workbench/contrib/chat/browser/agentSessions/experiments/agentSessionsExperiments.contribution.ts
++++ b/src/vs/workbench/contrib/chat/browser/agentSessions/experiments/agentSessionsExperiments.contribution.ts
+@@ -11,6 +11,7 @@ import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase
+ import { AgentTitleBarStatusRendering } from './agentTitleBarStatusWidget.js';
+ import { AgentTitleBarStatusService, IAgentTitleBarStatusService } from './agentTitleBarStatusService.js';
+ import { Codicon } from '../../../../../../base/common/codicons.js';
++import { registerIcon } from '../../../../../../platform/theme/common/iconRegistry.js';
+ import { localize } from '../../../../../../nls.js';
+ import { ContextKeyExpr } from '../../../../../../platform/contextkey/common/contextkey.js';
+ import { ProductQualityContext } from '../../../../../../platform/contextkey/common/contextkeys.js';
+@@ -307,3 +308,95 @@ MenuRegistry.appendMenuItem(MenuId.AgentsTitleBarControlMenu, {
+ });
+ 
+ //#endregion
++
++// #region Null IDE — Claude Code command center button
++
++const nullClaudeCommandCenterIcon = registerIcon('null-claude-command-center', Codicon.claude, localize('nullClaudeCommandCenterIcon', "Icon for the Claude Code command center button."));
++const NullClaudeMenu = new MenuId('NullClaudeSubmenu');
++const nullClaudeEnabled = ContextKeyExpr.has('claude-vscode.primaryEditorEnabled');
++
++// Command center — split button next to the Agents control
++MenuRegistry.appendMenuItem(MenuId.CommandCenter, {
++	submenu: NullClaudeMenu,
++	title: localize('nullClaudeCommandCenter', "Claude Code"),
++	icon: nullClaudeCommandCenterIcon,
++	isSplitButton: true,
++	when: ContextKeyExpr.and(
++		nullClaudeEnabled,
++		InEditorZenModeContext.negate()
++	),
++	order: 10003 // to the right of the Agents control
++});
++
++// Global title bar — fallback mount when the command center is disabled
++MenuRegistry.appendMenuItem(MenuId.TitleBar, {
++	submenu: NullClaudeMenu,
++	title: localize('nullClaudeTitleBar', "Claude Code"),
++	group: 'navigation',
++	icon: nullClaudeCommandCenterIcon,
++	isSplitButton: true,
++	when: ContextKeyExpr.and(
++		nullClaudeEnabled,
++		ContextKeyExpr.has('config.window.commandCenter').negate(),
++	),
++	order: 2
++});
++
++// Submenu items — order 1 becomes the split button's default (primary) action.
++// primaryEditor.open is gated by the same primaryEditorEnabled key as this
++// button, so it's the intended default rather than the plain editor.open tab.
++MenuRegistry.appendMenuItem(NullClaudeMenu, {
++	command: {
++		id: 'claude-vscode.primaryEditor.open',
++		title: localize('nullClaudePrimaryEditor', "Open in Primary Editor"),
++	},
++	group: 'a_open',
++	order: 1
++});
++
++MenuRegistry.appendMenuItem(NullClaudeMenu, {
++	command: {
++		id: 'claude-vscode.editor.open',
++		title: localize('nullClaudeOpenTab', "Open in New Tab"),
++	},
++	group: 'a_open',
++	order: 2
++});
++
++MenuRegistry.appendMenuItem(NullClaudeMenu, {
++	command: {
++		id: 'null.focusClaudeTab',
++		title: localize('nullClaudeFocusTab', "Go to Open Claude Chat…"),
++	},
++	group: 'a_open',
++	order: 3
++});
++
++MenuRegistry.appendMenuItem(NullClaudeMenu, {
++	command: {
++		id: 'claude-vscode.reopenClosedSession',
++		title: localize('nullClaudeReopen', "Reopen Closed Session"),
++	},
++	group: 'b_manage',
++	order: 1
++});
++
++MenuRegistry.appendMenuItem(NullClaudeMenu, {
++	command: {
++		id: 'claude-vscode.sidebar.open',
++		title: localize('nullClaudeSidebar', "Open in Side Bar"),
++	},
++	group: 'b_manage',
++	order: 2
++});
++
++MenuRegistry.appendMenuItem(NullClaudeMenu, {
++	command: {
++		id: 'claude-vscode.window.open',
++		title: localize('nullClaudeWindow', "Open in New Window"),
++	},
++	group: 'b_manage',
++	order: 3
++});
++
++//#endregion
+-- 
+2.55.0.windows.5
+

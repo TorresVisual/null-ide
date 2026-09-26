@@ -17,6 +17,7 @@ type InboundMessage =
   | { type: 'toggleTask'; index: number; checked: boolean }
   | { type: 'saveEdit'; title: string; body: string; labels: string[]; assignees: string[] }
   | { type: 'createBranch' }
+  | { type: 'createWorktree' }
   | { type: 'postComment'; body: string }
   | { type: 'editComment'; commentId: number; body: string }
   | { type: 'deleteComment'; commentId: number }
@@ -190,6 +191,12 @@ export class IssueDetailPanel {
         const result = createIssueBranch(cwd, issue.number, issue.title);
         if (result.ok) void vscode.window.showInformationMessage(`Switched to branch ${result.branch}`);
         else void vscode.window.showErrorMessage(`Failed to create branch: ${result.message}`);
+        break;
+      }
+      case 'createWorktree': {
+        const issue = this.store.getByNumber(this.issueNumber);
+        if (!issue) break;
+        await vscode.commands.executeCommand('null.worktrees.createForIssue', issue.number, issue.title);
         break;
       }
       case 'postComment': {
