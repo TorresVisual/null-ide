@@ -9,7 +9,7 @@
   "main": "./out/extension.js",
   "scripts": {
     "compile": "tsc -p tsconfig.json && tsc -p tsconfig.webview-issues.json && tsc -p tsconfig.webview-issue-detail.json && tsc -p tsconfig.webview-dashboard.json",
-    "test": "tsc -p tsconfig.json && node --test out/recentProjects.test.js out/scratchNotesStorage.test.js out/autoGitignore.test.js out/versionComparison.test.js out/nullNotes.test.js out/github/githubRemote.test.js out/github/issueFilter.test.js out/github/promptFormat.test.js out/github/gitBranch.test.js out/github/taskList.test.js out/github/issueTemplates.test.js out/dashboardGitStatus.test.js out/dashboardActions.test.js"
+    "test": "tsc -p tsconfig.json && node --test out/recentProjects.test.js out/scratchNotesStorage.test.js out/autoGitignore.test.js out/versionComparison.test.js out/nullNotes.test.js out/github/githubRemote.test.js out/github/issueFilter.test.js out/github/promptFormat.test.js out/github/gitBranch.test.js out/github/taskList.test.js out/github/issueTemplates.test.js out/dashboardGitStatus.test.js out/dashboardActions.test.js out/claudeTabIntegration.test.js"
   },
   "dependencies": {
     "ws": "^8.18.3"
@@ -53,6 +53,10 @@
       {
         "command": "null.showWelcome",
         "title": "Null: Show Welcome Page"
+      },
+      {
+        "command": "null.focusClaudeTab",
+        "title": "Null: Go to Open Claude Chat…"
       },
       {
         "command": "null.newScratchFile",
@@ -280,6 +284,7 @@
         { "command": "null.installUpdate", "when": "nullUpdateAvailable" },
         { "command": "null.clearWebviewCache" },
         { "command": "null.showWelcome" },
+        { "command": "null.focusClaudeTab" },
         { "command": "null.newScratchFile" },
         { "command": "null.newNote" },
         { "command": "null.renameScratchOrNoteItem", "when": "false" },

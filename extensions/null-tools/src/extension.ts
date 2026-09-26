@@ -15,6 +15,7 @@ import { registerUpdaterFeature } from './updaterIntegration';
 import { registerOpenInNullNotesFeature } from './nullNotes';
 import { showWelcomePage } from './welcomePage';
 import { registerDashboardFeature } from './dashboardIntegration';
+import { registerClaudeTabFeature } from './claudeTabIntegration';
 
 // ── Activation ─────────────────────────────────────────────────────────────
 
@@ -135,6 +136,7 @@ export function activate(context: vscode.ExtensionContext): void {
   registerIssuesPanelFeature(context);
   registerDiscordPresenceFeature(context);
   registerOpenInNullNotesFeature(context);
+  registerClaudeTabFeature(context);
 }
 
 export function deactivate(): void {}
