@@ -46,13 +46,21 @@ class FollowAlongWatcher {
     fileWatcher;
     activeFile = null;
     offset = 0;
-    decorationType;
+    addedDecorationType;
+    removedDecorationType;
     fadeTimers = new Map();
     constructor(workspaceRoot) {
         this.workspaceRoot = workspaceRoot;
-        this.decorationType = vscode.window.createTextEditorDecorationType({
-            backgroundColor: new vscode.ThemeColor('editor.wordHighlightStrongBackground'),
+        // Reuse the diff editor's own theme colors so this reads like a git diff.
+        this.addedDecorationType = vscode.window.createTextEditorDecorationType({
+            backgroundColor: new vscode.ThemeColor('diffEditor.insertedLineBackground'),
             isWholeLine: true,
+        });
+        this.removedDecorationType = vscode.window.createTextEditorDecorationType({
+            isWholeLine: true,
+            borderStyle: 'solid',
+            borderWidth: '2px 0 0 0',
+            borderColor: new vscode.ThemeColor('diffEditor.removedTextBackground'),
         });
     }
     start() {
@@ -68,7 +76,8 @@ class FollowAlongWatcher {
     dispose() {
         this.dirWatcher?.close();
         this.fileWatcher?.close();
-        this.decorationType.dispose();
+        this.addedDecorationType.dispose();
+        this.removedDecorationType.dispose();
         for (const timer of this.fadeTimers.values())
             clearTimeout(timer);
         this.fadeTimers.clear();
@@ -169,16 +178,38 @@ class FollowAlongWatcher {
         catch {
             return; // File may have been deleted/renamed since the edit landed.
         }
-        const startLine = Math.max(0, edit.newStart - 1);
-        const endLine = Math.min(editor.document.lineCount - 1, startLine + Math.max(0, edit.newLines - 1));
-        const range = new vscode.Range(startLine, 0, endLine, editor.document.lineAt(endLine).text.length);
-        editor.revealRange(range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
-        editor.setDecorations(this.decorationType, [range]);
+        const lineCount = editor.document.lineCount;
+        const clampLine = (n) => Math.min(lineCount - 1, Math.max(0, n));
+        const startLine = clampLine(edit.newStart - 1);
+        const endLine = clampLine(startLine + Math.max(0, edit.newLines - 1));
+        editor.revealRange(new vscode.Range(startLine, 0, endLine, editor.document.lineAt(endLine).text.length), vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+        const addedRanges = edit.addedLines.map(n => {
+            const line = clampLine(n - 1);
+            return new vscode.Range(line, 0, line, 0);
+        });
+        // Removed text no longer exists in the buffer, so it can't be highlighted
+        // in place — mark the line it used to precede with a red top border and
+        // show the deleted text on hover, the way the diff editor's gutter does.
+        const removedByLine = new Map();
+        for (const removed of edit.removedLines) {
+            const texts = removedByLine.get(removed.beforeLine) ?? [];
+            texts.push(removed.text);
+            removedByLine.set(removed.beforeLine, texts);
+        }
+        const removedDecorations = [...removedByLine].map(([beforeLine, texts]) => {
+            const line = clampLine(beforeLine - 1);
+            const hoverMessage = new vscode.MarkdownString();
+            hoverMessage.appendCodeblock(texts.join('\n'), editor.document.languageId);
+            return { range: new vscode.Range(line, 0, line, 0), hoverMessage };
+        });
+        editor.setDecorations(this.addedDecorationType, addedRanges);
+        editor.setDecorations(this.removedDecorationType, removedDecorations);
         const priorFade = this.fadeTimers.get(edit.filePath);
         if (priorFade)
             clearTimeout(priorFade);
         this.fadeTimers.set(edit.filePath, setTimeout(() => {
-            editor.setDecorations(this.decorationType, []);
+            editor.setDecorations(this.addedDecorationType, []);
+            editor.setDecorations(this.removedDecorationType, []);
             this.fadeTimers.delete(edit.filePath);
         }, FADE_MS));
     }

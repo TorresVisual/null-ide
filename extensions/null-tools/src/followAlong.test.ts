@@ -79,7 +79,26 @@ test('extractEdits pulls line ranges out of a structuredPatch', () => {
       structuredPatch: [{ newStart: 10, newLines: 3, lines: [] }],
     },
   };
-  assert.deepEqual(extractEdits(line), [{ filePath: 'C:\\repo\\src\\a.ts', newStart: 10, newLines: 3 }]);
+  assert.deepEqual(extractEdits(line), [
+    { filePath: 'C:\\repo\\src\\a.ts', newStart: 10, newLines: 3, addedLines: [], removedLines: [] },
+  ]);
+});
+
+test('extractEdits classifies added and removed lines from the patch hunk', () => {
+  const line = {
+    type: 'user',
+    toolUseResult: {
+      filePath: 'C:\\repo\\src\\a.ts',
+      structuredPatch: [{
+        newStart: 5,
+        newLines: 3,
+        lines: [' context', '-old line', '+new line', ' more context'],
+      }],
+    },
+  };
+  const [edit] = extractEdits(line);
+  assert.deepEqual(edit.addedLines, [6]);
+  assert.deepEqual(edit.removedLines, [{ beforeLine: 6, text: 'old line' }]);
 });
 
 test('extractEdits ignores unrelated transcript lines', () => {

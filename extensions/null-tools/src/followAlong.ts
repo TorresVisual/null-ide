@@ -81,15 +81,48 @@ export function parseAppendedLines(text: string): AppendedLines {
   return { lines, consumedLength: lastNewline + 1 };
 }
 
+export interface RemovedLine {
+  // 1-based new-file line number the removed text used to sit in front of.
+  beforeLine: number;
+  text: string;
+}
+
 export interface TranscriptEdit {
   filePath: string;
   newStart: number;
   newLines: number;
+  addedLines: number[]; // 1-based line numbers, present in the new file
+  removedLines: RemovedLine[];
 }
 
 interface StructuredPatchEntry {
   newStart?: unknown;
   newLines?: unknown;
+  lines?: unknown;
+}
+
+// Walks a unified-diff hunk's `lines` (each prefixed ' '/'+'/'-', from the
+// `diff` package's structuredPatch) to classify which new-file line numbers
+// were added and what text was removed, so callers can render both.
+function classifyHunkLines(newStart: number, lines: unknown): Pick<TranscriptEdit, 'addedLines' | 'removedLines'> {
+  const addedLines: number[] = [];
+  const removedLines: RemovedLine[] = [];
+  if (!Array.isArray(lines)) return { addedLines, removedLines };
+
+  let lineNum = newStart;
+  for (const raw of lines) {
+    if (typeof raw !== 'string' || raw.length === 0) continue;
+    const marker = raw[0];
+    if (marker === '+') {
+      addedLines.push(lineNum);
+      lineNum++;
+    } else if (marker === '-') {
+      removedLines.push({ beforeLine: lineNum, text: raw.slice(1) });
+    } else {
+      lineNum++;
+    }
+  }
+  return { addedLines, removedLines };
 }
 
 // Pulls exact post-edit line ranges out of a transcript `user` line's
@@ -110,7 +143,7 @@ export function extractEdits(line: unknown): TranscriptEdit[] {
     const newStart = entry?.newStart;
     const newLines = entry?.newLines;
     if (typeof newStart === 'number' && typeof newLines === 'number') {
-      edits.push({ filePath, newStart, newLines });
+      edits.push({ filePath, newStart, newLines, ...classifyHunkLines(newStart, entry?.lines) });
     }
   }
   return edits;
