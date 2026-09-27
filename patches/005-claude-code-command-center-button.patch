@@ -1,25 +1,25 @@
-From 30bda7fb5e340b4cb39ec0f3ac58b1edfa6abe60 Mon Sep 17 00:00:00 2001
+From 1ffb17ca41580c578db85fb7d3c60fba1b27ba11 Mon Sep 17 00:00:00 2001
 From: TorresVisual <junk@rohsmann.at>
-Date: Sun, 27 Sep 2026 22:11:18 +0200
-Subject: [PATCH] feat: add Claude Code split button to the title-bar command
- center
+Date: Sun, 27 Sep 2026 22:18:07 +0200
+Subject: [PATCH] fix(#98): give the command-center Claude split button its
+ icon + chevron back
 
-Registers a split-button submenu (NullClaudeSubmenu) in both
-MenuId.CommandCenter and MenuId.TitleBar (fallback when the command
-center is disabled), gated on the claude-vscode extension's
-primaryEditorEnabled context key. The primary action
-(claude-vscode.primaryEditor.open) carries its own icon so
-MenuEntryActionViewItem renders it icon-only (DropdownWithDefaultActionViewItem
-only shows a text label when the primary action has no icon of its
-own); the dropdown chevron is DropdownWithDefaultActionViewItem's
-separate codicon-chevron-down element. Mirrors the existing Agents
-control button registered earlier in this file.
+isSplitButton was dropped in 8715e45 to kill a wide, icon-less "Open in
+Primary Editor" text pill, but that also removed the dropdown chevron
+(DropdownWithDefaultActionViewItem, not the plain-dropdown path, is what
+renders it). The actual bug was that the primary action had no icon of
+its own, so MenuEntryActionViewItem fell back to its text label. Give
+claude-vscode.primaryEditor.open the Claude icon in this menu item and
+re-enable isSplitButton (togglePrimaryAction: true is required by the
+type, but primaryActionIds restricts it to this one action so the face
+never actually changes): now the primary action renders icon-only and
+the chevron is back.
 ---
  .../agentSessionsExperiments.contribution.ts  | 97 +++++++++++++++++++
  1 file changed, 97 insertions(+)
 
 diff --git a/src/vs/workbench/contrib/chat/browser/agentSessions/experiments/agentSessionsExperiments.contribution.ts b/src/vs/workbench/contrib/chat/browser/agentSessions/experiments/agentSessionsExperiments.contribution.ts
-index 0613afc0..8a617d9b 100644
+index 0613afc0..19e36bb5 100644
 --- a/src/vs/workbench/contrib/chat/browser/agentSessions/experiments/agentSessionsExperiments.contribution.ts
 +++ b/src/vs/workbench/contrib/chat/browser/agentSessions/experiments/agentSessionsExperiments.contribution.ts
 @@ -11,6 +11,7 @@ import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase
@@ -49,7 +49,7 @@ index 0613afc0..8a617d9b 100644
 +	submenu: NullClaudeMenu,
 +	title: localize('nullClaudeCommandCenter', "Claude Code"),
 +	icon: nullClaudeCommandCenterIcon,
-+	isSplitButton: { primaryActionIds: ['claude-vscode.primaryEditor.open'] },
++	isSplitButton: { togglePrimaryAction: true, primaryActionIds: ['claude-vscode.primaryEditor.open'] },
 +	when: ContextKeyExpr.and(
 +		nullClaudeEnabled,
 +		InEditorZenModeContext.negate()
@@ -63,7 +63,7 @@ index 0613afc0..8a617d9b 100644
 +	title: localize('nullClaudeTitleBar', "Claude Code"),
 +	group: 'navigation',
 +	icon: nullClaudeCommandCenterIcon,
-+	isSplitButton: { primaryActionIds: ['claude-vscode.primaryEditor.open'] },
++	isSplitButton: { togglePrimaryAction: true, primaryActionIds: ['claude-vscode.primaryEditor.open'] },
 +	when: ContextKeyExpr.and(
 +		nullClaudeEnabled,
 +		ContextKeyExpr.has('config.window.commandCenter').negate(),
