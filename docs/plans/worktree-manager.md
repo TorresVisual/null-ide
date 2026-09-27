@@ -18,10 +18,10 @@ your human partner before Step 1 and checks the chosen boxes itself.
 **Execution Target:**
 - [ ] Current branch (no isolation)
 - [ ] New feature branch (no worktree)
-- [ ] Worktree (superpowers:using-git-worktrees)
+- [x] Worktree (superpowers:using-git-worktrees)
 
 **Execution Mode:**
-- [ ] Inline execution (superpowers:executing-plans)
+- [x] Inline execution (superpowers:executing-plans)
 - [ ] Subagent-driven execution (superpowers:subagent-driven-development)
 
 ## Global Constraints

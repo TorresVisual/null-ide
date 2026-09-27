@@ -208,6 +208,13 @@ class IssueDetailPanel {
                     void vscode.window.showErrorMessage(`Failed to create branch: ${result.message}`);
                 break;
             }
+            case 'createWorktree': {
+                const issue = this.store.getByNumber(this.issueNumber);
+                if (!issue)
+                    break;
+                await vscode.commands.executeCommand('null.worktrees.createForIssue', issue.number, issue.title);
+                break;
+            }
             case 'postComment': {
                 try {
                     await this.store.addComment(this.issueNumber, msg.body);

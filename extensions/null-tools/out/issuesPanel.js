@@ -252,6 +252,13 @@ class IssuesViewProvider {
                     void vscode.window.showErrorMessage(`Failed to create branch: ${result.message}`);
                 break;
             }
+            case 'createWorktreeForIssue': {
+                const issue = this._store.getByNumber(msg.number);
+                if (!issue)
+                    break;
+                await vscode.commands.executeCommand('null.worktrees.createForIssue', issue.number, issue.title);
+                break;
+            }
             case 'copyAsPromptForIssue': {
                 const issue = this._store.getByNumber(msg.number);
                 if (!issue)

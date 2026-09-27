@@ -74,4 +74,10 @@ function commit(dir, file, message) {
     node_assert_1.default.deepStrictEqual(results.get('good-1'), { branch: 'main', dirty: false });
     node_assert_1.default.deepStrictEqual(results.get('good-2'), { branch: 'main', dirty: false });
 });
+(0, node_test_1.default)('computeGitStatuses supports a custom status type via generics', async () => {
+    const fakeFetch = async () => ({ note: 'ok' });
+    const results = new Map();
+    await (0, dashboardGitStatus_1.computeGitStatuses)(['a'], (p, s) => results.set(p, s), 1, fakeFetch);
+    node_assert_1.default.deepStrictEqual(results.get('a'), { note: 'ok' });
+});
 //# sourceMappingURL=dashboardGitStatus.test.js.map

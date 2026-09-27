@@ -1,0 +1,310 @@
+'use strict';
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const node_assert_1 = __importDefault(require("node:assert"));
+const node_test_1 = __importDefault(require("node:test"));
+const node_child_process_1 = require("node:child_process");
+const node_fs_1 = require("node:fs");
+const fs = __importStar(require("node:fs"));
+const node_os_1 = require("node:os");
+const node_path_1 = __importDefault(require("node:path"));
+const worktrees_1 = require("./worktrees");
+function normalizeForCompare(p) {
+    return p.replace(/\\/g, '/').replace(/\/$/, '').toLowerCase();
+}
+function initRepo() {
+    const dir = (0, node_fs_1.mkdtempSync)(node_path_1.default.join((0, node_os_1.tmpdir)(), 'worktrees-test-'));
+    (0, node_child_process_1.execFileSync)('git', ['init', '-q', '--initial-branch=main'], { cwd: dir });
+    (0, node_child_process_1.execFileSync)('git', ['config', 'user.email', 'test@example.com'], { cwd: dir });
+    (0, node_child_process_1.execFileSync)('git', ['config', 'user.name', 'Test'], { cwd: dir });
+    return dir;
+}
+function commit(dir, file, message) {
+    (0, node_fs_1.writeFileSync)(node_path_1.default.join(dir, file), file);
+    (0, node_child_process_1.execFileSync)('git', ['add', file], { cwd: dir });
+    (0, node_child_process_1.execFileSync)('git', ['commit', '-q', '-m', message], { cwd: dir });
+}
+(0, node_test_1.default)('parseWorktreeListPorcelain parses primary, linked, detached, and prunable worktrees', () => {
+    const output = [
+        'worktree /repo',
+        'HEAD aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        'branch refs/heads/main',
+        '',
+        'worktree /repo/.claude/worktrees/feature-x',
+        'HEAD bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        'branch refs/heads/feature-x',
+        '',
+        'worktree /repo/.claude/worktrees/detached-one',
+        'HEAD cccccccccccccccccccccccccccccccccccccccc',
+        'detached',
+        '',
+        'worktree /repo/.claude/worktrees/gone',
+        'HEAD dddddddddddddddddddddddddddddddddddddddd',
+        'branch refs/heads/gone',
+        'prunable gitdir file points to non-existent location',
+    ].join('\n');
+    const entries = (0, worktrees_1.parseWorktreeListPorcelain)(output, '/repo');
+    node_assert_1.default.strictEqual(entries.length, 4);
+    node_assert_1.default.deepStrictEqual(entries[0], {
+        path: '/repo', branch: 'main',
+        head: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        isCurrent: true, prunable: false,
+    });
+    node_assert_1.default.strictEqual(entries[1].branch, 'feature-x');
+    node_assert_1.default.strictEqual(entries[1].isCurrent, false);
+    node_assert_1.default.strictEqual(entries[2].branch, null);
+    node_assert_1.default.strictEqual(entries[3].prunable, true);
+});
+(0, node_test_1.default)('getBaseBranch falls back to main when there is no remote', () => {
+    const dir = initRepo();
+    commit(dir, 'a.txt', 'initial');
+    node_assert_1.default.strictEqual((0, worktrees_1.getBaseBranch)(dir), 'main');
+});
+(0, node_test_1.default)('listWorktrees reports the primary and a linked worktree with correct branch/status', async () => {
+    const dir = initRepo();
+    (0, node_fs_1.writeFileSync)(node_path_1.default.join(dir, '.gitignore'), '.claude/worktrees/\n');
+    (0, node_child_process_1.execFileSync)('git', ['add', '.gitignore'], { cwd: dir });
+    (0, node_child_process_1.execFileSync)('git', ['commit', '-q', '-m', 'gitignore'], { cwd: dir });
+    commit(dir, 'a.txt', 'initial');
+    const wtPath = node_path_1.default.join(dir, '.claude', 'worktrees', 'feature-x');
+    (0, node_child_process_1.execFileSync)('git', ['worktree', 'add', '-b', 'feature-x', wtPath], { cwd: dir });
+    commit(wtPath, 'b.txt', 'feature work');
+    const entries = await (0, worktrees_1.listWorktrees)(dir);
+    node_assert_1.default.strictEqual(entries.length, 2);
+    const main = entries.find(e => e.isCurrent);
+    node_assert_1.default.strictEqual(main.dirty, false);
+    const feature = entries.find(e => !e.isCurrent);
+    node_assert_1.default.strictEqual(feature.branch, 'feature-x');
+    node_assert_1.default.strictEqual(feature.dirty, false);
+    node_assert_1.default.strictEqual(feature.aheadBase, 1);
+    node_assert_1.default.strictEqual(feature.behindBase, 0);
+    node_assert_1.default.strictEqual(feature.ahead, 0);
+    node_assert_1.default.strictEqual(feature.behind, 0);
+});
+(0, node_test_1.default)('listWorktrees keeps a worktree whose directory was deleted, marked prunable', async () => {
+    const dir = initRepo();
+    commit(dir, 'a.txt', 'initial');
+    const wtPath = node_path_1.default.join(dir, '.claude', 'worktrees', 'to-delete');
+    (0, node_child_process_1.execFileSync)('git', ['worktree', 'add', '-b', 'to-delete', wtPath], { cwd: dir });
+    fs.rmSync(wtPath, { recursive: true, force: true });
+    const entries = await (0, worktrees_1.listWorktrees)(dir);
+    const gone = entries.find(e => !e.isCurrent);
+    node_assert_1.default.strictEqual(gone.prunable, true);
+    node_assert_1.default.strictEqual(gone.dirty, false);
+});
+(0, node_test_1.default)('listWorktrees represents a detached-HEAD worktree with a null branch', async () => {
+    const dir = initRepo();
+    commit(dir, 'a.txt', 'initial');
+    const head = (0, node_child_process_1.execFileSync)('git', ['rev-parse', 'HEAD'], { cwd: dir, encoding: 'utf8' }).trim();
+    const wtPath = node_path_1.default.join(dir, '.claude', 'worktrees', 'detached-one');
+    (0, node_child_process_1.execFileSync)('git', ['worktree', 'add', '--detach', wtPath, head], { cwd: dir });
+    const entries = await (0, worktrees_1.listWorktrees)(dir);
+    const detached = entries.find(e => !e.isCurrent);
+    node_assert_1.default.strictEqual(detached.branch, null);
+});
+(0, node_test_1.default)('getBaseBranch resolves origin/HEAD when a remote is configured', () => {
+    const dir = initRepo();
+    commit(dir, 'a.txt', 'initial');
+    const bare = (0, node_fs_1.mkdtempSync)(node_path_1.default.join((0, node_os_1.tmpdir)(), 'worktrees-bare-'));
+    (0, node_child_process_1.execFileSync)('git', ['init', '-q', '--bare'], { cwd: bare });
+    (0, node_child_process_1.execFileSync)('git', ['remote', 'add', 'origin', bare], { cwd: dir });
+    (0, node_child_process_1.execFileSync)('git', ['push', '-q', '-u', 'origin', 'main'], { cwd: dir });
+    (0, node_child_process_1.execFileSync)('git', ['remote', 'set-head', 'origin', 'main'], { cwd: dir });
+    node_assert_1.default.strictEqual((0, worktrees_1.getBaseBranch)(dir), 'main');
+});
+(0, node_test_1.default)('createWorktree from scratch creates a branch and worktree under .claude/worktrees', () => {
+    const dir = initRepo();
+    commit(dir, 'a.txt', 'initial');
+    const result = (0, worktrees_1.createWorktree)(dir, { kind: 'scratch', description: 'Try a fix' });
+    node_assert_1.default.ok(result.ok);
+    node_assert_1.default.strictEqual(result.value.branch, 'try-a-fix');
+    node_assert_1.default.ok(fs.existsSync(result.value.path));
+    node_assert_1.default.match(result.value.path.replace(/\\/g, '/'), /\.claude\/worktrees\/try-a-fix$/);
+    const gitignore = fs.readFileSync(node_path_1.default.join(dir, '.gitignore'), 'utf8');
+    node_assert_1.default.match(gitignore, /\.claude\/worktrees/);
+});
+(0, node_test_1.default)('createWorktree fails cleanly when the target directory already exists', () => {
+    const dir = initRepo();
+    commit(dir, 'a.txt', 'initial');
+    (0, worktrees_1.createWorktree)(dir, { kind: 'scratch', description: 'dup' });
+    const second = (0, worktrees_1.createWorktree)(dir, { kind: 'scratch', description: 'dup' });
+    node_assert_1.default.strictEqual(second.ok, false);
+});
+(0, node_test_1.default)('createWorktree from an issue uses branchNameForIssue for the branch name', () => {
+    const dir = initRepo();
+    commit(dir, 'a.txt', 'initial');
+    const result = (0, worktrees_1.createWorktree)(dir, { kind: 'issue', issueNumber: 88, title: 'Git worktree manager' });
+    node_assert_1.default.ok(result.ok);
+    node_assert_1.default.strictEqual(result.value.branch, 'issue-88-git-worktree-manager');
+});
+(0, node_test_1.default)('createWorktree from an existing branch reuses it rather than creating a new one', () => {
+    const dir = initRepo();
+    commit(dir, 'a.txt', 'initial');
+    (0, node_child_process_1.execFileSync)('git', ['branch', 'existing-feature'], { cwd: dir });
+    const result = (0, worktrees_1.createWorktree)(dir, { kind: 'branch', branch: 'existing-feature' });
+    node_assert_1.default.ok(result.ok);
+    node_assert_1.default.strictEqual(result.value.branch, 'existing-feature');
+});
+(0, node_test_1.default)('listLocalBranches returns local branch names', () => {
+    const dir = initRepo();
+    commit(dir, 'a.txt', 'initial');
+    (0, node_child_process_1.execFileSync)('git', ['branch', 'a-branch'], { cwd: dir });
+    (0, node_child_process_1.execFileSync)('git', ['branch', 'b-branch'], { cwd: dir });
+    const branches = (0, worktrees_1.listLocalBranches)(dir);
+    node_assert_1.default.ok(branches.includes('main'));
+    node_assert_1.default.ok(branches.includes('a-branch'));
+    node_assert_1.default.ok(branches.includes('b-branch'));
+});
+(0, node_test_1.default)('removeWorktree deletes the worktree directory and registration', () => {
+    const dir = initRepo();
+    commit(dir, 'a.txt', 'initial');
+    const created = (0, worktrees_1.createWorktree)(dir, { kind: 'scratch', description: 'temp' });
+    node_assert_1.default.ok(created.ok);
+    const result = (0, worktrees_1.removeWorktree)(dir, created.value.path, false);
+    node_assert_1.default.ok(result.ok);
+    node_assert_1.default.strictEqual(fs.existsSync(created.value.path), false);
+});
+(0, node_test_1.default)('mergeWorktreeBack refuses when the main repo has uncommitted changes', () => {
+    const dir = initRepo();
+    commit(dir, 'a.txt', 'initial');
+    const created = (0, worktrees_1.createWorktree)(dir, { kind: 'scratch', description: 'feature' });
+    node_assert_1.default.ok(created.ok);
+    (0, node_fs_1.writeFileSync)(node_path_1.default.join(dir, 'a.txt'), 'dirty change');
+    const result = (0, worktrees_1.mergeWorktreeBack)(dir, created.value.branch, 'main', 'ff-only');
+    node_assert_1.default.strictEqual(result.ok, false);
+});
+(0, node_test_1.default)('mergeWorktreeBack fast-forwards when the worktree branch is ahead', () => {
+    const dir = initRepo();
+    commit(dir, 'a.txt', 'initial');
+    const created = (0, worktrees_1.createWorktree)(dir, { kind: 'scratch', description: 'feature' });
+    node_assert_1.default.ok(created.ok);
+    commit(created.value.path, 'b.txt', 'feature work');
+    const result = (0, worktrees_1.mergeWorktreeBack)(dir, created.value.branch, 'main', 'ff-only');
+    node_assert_1.default.ok(result.ok);
+    node_assert_1.default.strictEqual(result.value.mode, 'ff');
+    node_assert_1.default.ok(fs.existsSync(node_path_1.default.join(dir, 'b.txt')));
+});
+(0, node_test_1.default)('mergeWorktreeBack ff-only fails when base has diverged, and mode "merge" succeeds', () => {
+    const dir = initRepo();
+    commit(dir, 'a.txt', 'initial');
+    const created = (0, worktrees_1.createWorktree)(dir, { kind: 'scratch', description: 'feature' });
+    node_assert_1.default.ok(created.ok);
+    commit(created.value.path, 'b.txt', 'feature work');
+    commit(dir, 'c.txt', 'main moved on');
+    const ffResult = (0, worktrees_1.mergeWorktreeBack)(dir, created.value.branch, 'main', 'ff-only');
+    node_assert_1.default.strictEqual(ffResult.ok, false);
+    const mergeResult = (0, worktrees_1.mergeWorktreeBack)(dir, created.value.branch, 'main', 'merge');
+    node_assert_1.default.ok(mergeResult.ok);
+    node_assert_1.default.strictEqual(mergeResult.value.mode, 'merge');
+});
+(0, node_test_1.default)('pruneCandidates separates a merged worktree from one with a missing directory', async () => {
+    const dir = initRepo();
+    commit(dir, 'a.txt', 'initial');
+    const merged = (0, worktrees_1.createWorktree)(dir, { kind: 'scratch', description: 'merged one' });
+    node_assert_1.default.ok(merged.ok);
+    const missing = (0, worktrees_1.createWorktree)(dir, { kind: 'scratch', description: 'missing one' });
+    node_assert_1.default.ok(missing.ok);
+    const mergeResult = (0, worktrees_1.mergeWorktreeBack)(dir, merged.value.branch, 'main', 'ff-only');
+    node_assert_1.default.ok(mergeResult.ok);
+    fs.rmSync(missing.value.path, { recursive: true, force: true });
+    const { merged: mergedList, missing: missingList } = await (0, worktrees_1.pruneCandidates)(dir, 'main');
+    node_assert_1.default.ok(mergedList.some(e => e.branch === merged.value.branch));
+    node_assert_1.default.ok(missingList.some(e => e.prunable));
+});
+(0, node_test_1.default)('pruneWorktrees removes registration for a worktree with a missing directory', () => {
+    const dir = initRepo();
+    commit(dir, 'a.txt', 'initial');
+    const created = (0, worktrees_1.createWorktree)(dir, { kind: 'scratch', description: 'to prune' });
+    node_assert_1.default.ok(created.ok);
+    fs.rmSync(created.value.path, { recursive: true, force: true });
+    const result = (0, worktrees_1.pruneWorktrees)(dir);
+    node_assert_1.default.ok(result.ok);
+    const stdout = (0, node_child_process_1.execFileSync)('git', ['worktree', 'list', '--porcelain'], { cwd: dir, encoding: 'utf8' });
+    node_assert_1.default.ok(!stdout.includes(created.value.branch));
+});
+(0, node_test_1.default)('createWorktree only commits its own .gitignore edit, never other staged changes', () => {
+    const dir = initRepo();
+    commit(dir, 'a.txt', 'initial');
+    (0, node_fs_1.writeFileSync)(node_path_1.default.join(dir, 'staged.txt'), 'work in progress');
+    (0, node_child_process_1.execFileSync)('git', ['add', 'staged.txt'], { cwd: dir });
+    const result = (0, worktrees_1.createWorktree)(dir, { kind: 'scratch', description: 'feature' });
+    node_assert_1.default.ok(result.ok);
+    const status = (0, node_child_process_1.execFileSync)('git', ['status', '--porcelain'], { cwd: dir, encoding: 'utf8' });
+    node_assert_1.default.match(status, /^A\s+staged\.txt$/m);
+});
+(0, node_test_1.default)('resolveMainWorktreeRoot resolves a linked worktree path back to the main worktree', () => {
+    const dir = initRepo();
+    commit(dir, 'a.txt', 'initial');
+    const created = (0, worktrees_1.createWorktree)(dir, { kind: 'scratch', description: 'linked' });
+    node_assert_1.default.ok(created.ok);
+    node_assert_1.default.strictEqual(normalizeForCompare((0, worktrees_1.resolveMainWorktreeRoot)(created.value.path)), normalizeForCompare(dir));
+    node_assert_1.default.strictEqual(normalizeForCompare((0, worktrees_1.resolveMainWorktreeRoot)(dir)), normalizeForCompare(dir));
+});
+(0, node_test_1.default)('createWorktree reuses an existing branch when re-creating after a remove', () => {
+    const dir = initRepo();
+    commit(dir, 'a.txt', 'initial');
+    const first = (0, worktrees_1.createWorktree)(dir, { kind: 'scratch', description: 'redo' });
+    node_assert_1.default.ok(first.ok);
+    const removed = (0, worktrees_1.removeWorktree)(dir, first.value.path, false);
+    node_assert_1.default.ok(removed.ok);
+    const second = (0, worktrees_1.createWorktree)(dir, { kind: 'scratch', description: 'redo' });
+    node_assert_1.default.ok(second.ok);
+    node_assert_1.default.strictEqual(second.value.branch, 'redo');
+});
+(0, node_test_1.default)('mergeWorktreeBack reports reason "dirty" when the main repo has uncommitted changes', () => {
+    const dir = initRepo();
+    commit(dir, 'a.txt', 'initial');
+    const created = (0, worktrees_1.createWorktree)(dir, { kind: 'scratch', description: 'feature' });
+    node_assert_1.default.ok(created.ok);
+    (0, node_fs_1.writeFileSync)(node_path_1.default.join(dir, 'a.txt'), 'dirty change');
+    const result = (0, worktrees_1.mergeWorktreeBack)(dir, created.value.branch, 'main', 'ff-only');
+    node_assert_1.default.strictEqual(result.ok, false);
+    node_assert_1.default.strictEqual(result.reason, 'dirty');
+});
+(0, node_test_1.default)('mergeWorktreeBack reports reason "merge" when ff-only fails because base has diverged', () => {
+    const dir = initRepo();
+    commit(dir, 'a.txt', 'initial');
+    const created = (0, worktrees_1.createWorktree)(dir, { kind: 'scratch', description: 'feature' });
+    node_assert_1.default.ok(created.ok);
+    commit(created.value.path, 'b.txt', 'feature work');
+    commit(dir, 'c.txt', 'main moved on');
+    const result = (0, worktrees_1.mergeWorktreeBack)(dir, created.value.branch, 'main', 'ff-only');
+    node_assert_1.default.strictEqual(result.ok, false);
+    node_assert_1.default.strictEqual(result.reason, 'merge');
+});
+//# sourceMappingURL=worktrees.test.js.map

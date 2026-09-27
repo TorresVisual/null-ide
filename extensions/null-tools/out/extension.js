@@ -43,6 +43,7 @@ const recentProjectsIntegration_1 = require("./recentProjectsIntegration");
 const scratchNotesIntegration_1 = require("./scratchNotesIntegration");
 const autoGitignore_1 = require("./autoGitignore");
 const portsIntegration_1 = require("./portsIntegration");
+const worktreesIntegration_1 = require("./worktreesIntegration");
 const discordPresenceIntegration_1 = require("./discordPresenceIntegration");
 const issuesPanelIntegration_1 = require("./issuesPanelIntegration");
 const commitMessage_1 = require("./commitMessage");
@@ -172,6 +173,7 @@ function activate(context) {
     });
     context.subscriptions.push(plansWatcher);
     (0, portsIntegration_1.registerPortsFeature)(context);
+    (0, worktreesIntegration_1.registerWorktreesFeature)(context);
     (0, issuesPanelIntegration_1.registerIssuesPanelFeature)(context);
     (0, discordPresenceIntegration_1.registerDiscordPresenceFeature)(context);
     (0, nullNotes_1.registerOpenInNullNotesFeature)(context);

@@ -267,6 +267,7 @@ function labelChipStyle(hex) {
         <button class="btn ${closed ? 'btn-reopen' : 'btn-close'}" id="state-btn">${closed ? 'Reopen' : 'Close'}</button>
         <div class="btn-row-divider"></div>
         <button class="btn btn-ghost" id="branch-btn">Branch</button>
+        <button class="btn btn-ghost" id="worktree-btn">Worktree</button>
         <button class="btn btn-ghost" id="browser-btn">Browser ↗</button>
         <button class="btn btn-ghost" id="copy-btn">Copy as prompt</button>
         <button class="btn btn-ghost" id="refresh-btn" title="Reload this issue from GitHub">Refresh</button>
@@ -320,23 +321,24 @@ function labelChipStyle(hex) {
             bindTaskCheckboxes();
     }
     function bindEvents(issue) {
-        var _a, _b, _c, _d, _e, _f, _g, _h, _j;
+        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
         (_a = document.getElementById('copy-btn')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', () => vscode.postMessage({ type: 'copyAsPrompt' }));
         (_b = document.getElementById('refresh-btn')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', () => vscode.postMessage({ type: 'refresh' }));
         (_c = document.getElementById('browser-btn')) === null || _c === void 0 ? void 0 : _c.addEventListener('click', () => vscode.postMessage({ type: 'openInBrowser' }));
         (_d = document.getElementById('branch-btn')) === null || _d === void 0 ? void 0 : _d.addEventListener('click', () => vscode.postMessage({ type: 'createBranch' }));
-        (_e = document.getElementById('state-btn')) === null || _e === void 0 ? void 0 : _e.addEventListener('click', () => vscode.postMessage({ type: 'setState', state: issue.state === 'closed' ? 'open' : 'closed' }));
-        (_f = document.getElementById('edit-btn')) === null || _f === void 0 ? void 0 : _f.addEventListener('click', () => {
+        (_e = document.getElementById('worktree-btn')) === null || _e === void 0 ? void 0 : _e.addEventListener('click', () => vscode.postMessage({ type: 'createWorktree' }));
+        (_f = document.getElementById('state-btn')) === null || _f === void 0 ? void 0 : _f.addEventListener('click', () => vscode.postMessage({ type: 'setState', state: issue.state === 'closed' ? 'open' : 'closed' }));
+        (_g = document.getElementById('edit-btn')) === null || _g === void 0 ? void 0 : _g.addEventListener('click', () => {
             editing = true;
             if (currentIssue)
                 render(currentIssue, lastComments, lastTimeline);
         });
-        (_g = document.getElementById('cancel-btn')) === null || _g === void 0 ? void 0 : _g.addEventListener('click', () => {
+        (_h = document.getElementById('cancel-btn')) === null || _h === void 0 ? void 0 : _h.addEventListener('click', () => {
             editing = false;
             if (currentIssue)
                 render(currentIssue, lastComments, lastTimeline);
         });
-        (_h = document.getElementById('save-btn')) === null || _h === void 0 ? void 0 : _h.addEventListener('click', () => {
+        (_j = document.getElementById('save-btn')) === null || _j === void 0 ? void 0 : _j.addEventListener('click', () => {
             const title = document.getElementById('edit-title').value.trim();
             const body = document.getElementById('edit-body').value;
             if (!title)
@@ -357,7 +359,7 @@ function labelChipStyle(hex) {
             commentBtn.disabled = true;
             vscode.postMessage({ type: 'postComment', body });
         });
-        (_j = document.getElementById('comments')) === null || _j === void 0 ? void 0 : _j.addEventListener('click', e => {
+        (_k = document.getElementById('comments')) === null || _k === void 0 ? void 0 : _k.addEventListener('click', e => {
             var _a;
             const target = e.target;
             const id = Number(target.dataset.id);
