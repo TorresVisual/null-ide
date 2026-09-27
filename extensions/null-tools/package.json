@@ -9,7 +9,7 @@
   "main": "./out/extension.js",
   "scripts": {
     "compile": "tsc -p tsconfig.json && tsc -p tsconfig.webview-issues.json && tsc -p tsconfig.webview-issue-detail.json && tsc -p tsconfig.webview-dashboard.json",
-    "test": "tsc -p tsconfig.json && node --test out/recentProjects.test.js out/scratchNotesStorage.test.js out/autoGitignore.test.js out/versionComparison.test.js out/nullNotes.test.js out/github/githubRemote.test.js out/github/issueFilter.test.js out/github/promptFormat.test.js out/github/gitBranch.test.js out/github/taskList.test.js out/github/issueTemplates.test.js out/dashboardGitStatus.test.js out/dashboardActions.test.js out/claudeTabIntegration.test.js out/worktrees.test.js"
+    "test": "tsc -p tsconfig.json && node --test out/recentProjects.test.js out/scratchNotesStorage.test.js out/autoGitignore.test.js out/versionComparison.test.js out/nullNotes.test.js out/github/githubRemote.test.js out/github/issueFilter.test.js out/github/promptFormat.test.js out/github/gitBranch.test.js out/github/taskList.test.js out/github/issueTemplates.test.js out/dashboardGitStatus.test.js out/dashboardActions.test.js out/claudeTabIntegration.test.js out/worktrees.test.js out/followAlong.test.js"
   },
   "dependencies": {
     "ws": "^8.18.3"
@@ -154,6 +154,11 @@
         "command": "null.toggleDiscordPresence",
         "title": "Null: Toggle Discord Rich Presence",
         "icon": "$(broadcast)"
+      },
+      {
+        "command": "null.toggleFollowAlong",
+        "title": "Null: Toggle Follow Claude Code's Edits Live",
+        "icon": "$(eye)"
       },
       {
         "command": "null.discord.testConnection",
@@ -449,6 +454,11 @@
           "type": "boolean",
           "default": true,
           "description": "Show Null IDE activity in Discord Rich Presence. Requires null.discord.clientId and Discord desktop app running."
+        },
+        "null.claude.followAlong": {
+          "type": "boolean",
+          "default": false,
+          "description": "Watch the active Claude Code session's transcript and reveal + briefly highlight each file it edits, live in the editor."
         },
         "null.discord.clientId": {
           "type": "string",

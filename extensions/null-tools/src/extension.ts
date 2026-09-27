@@ -17,6 +17,7 @@ import { registerOpenInNullNotesFeature } from './nullNotes';
 import { showWelcomePage } from './welcomePage';
 import { registerDashboardFeature } from './dashboardIntegration';
 import { registerClaudeTabFeature } from './claudeTabIntegration';
+import { registerFollowAlongFeature } from './followAlongIntegration';
 
 // ── Activation ─────────────────────────────────────────────────────────────
 
@@ -139,6 +140,7 @@ export function activate(context: vscode.ExtensionContext): void {
   registerDiscordPresenceFeature(context);
   registerOpenInNullNotesFeature(context);
   registerClaudeTabFeature(context);
+  registerFollowAlongFeature(context);
 }
 
 export function deactivate(): void {}

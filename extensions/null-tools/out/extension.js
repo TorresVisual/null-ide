@@ -52,6 +52,7 @@ const nullNotes_1 = require("./nullNotes");
 const welcomePage_1 = require("./welcomePage");
 const dashboardIntegration_1 = require("./dashboardIntegration");
 const claudeTabIntegration_1 = require("./claudeTabIntegration");
+const followAlongIntegration_1 = require("./followAlongIntegration");
 // ── Activation ─────────────────────────────────────────────────────────────
 async function disableRestrictedMode() {
     try {
@@ -178,6 +179,7 @@ function activate(context) {
     (0, discordPresenceIntegration_1.registerDiscordPresenceFeature)(context);
     (0, nullNotes_1.registerOpenInNullNotesFeature)(context);
     (0, claudeTabIntegration_1.registerClaudeTabFeature)(context);
+    (0, followAlongIntegration_1.registerFollowAlongFeature)(context);
 }
 function deactivate() { }
 //# sourceMappingURL=extension.js.map
