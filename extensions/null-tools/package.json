@@ -460,6 +460,11 @@
           "default": false,
           "description": "Watch the active Claude Code session's transcript and reveal + briefly highlight each file it edits, live in the editor."
         },
+        "null.claude.followAlongSplitView": {
+          "type": "boolean",
+          "default": false,
+          "description": "When Follow Along is on, always open the edited file in the second editor pane, leaving the first pane (e.g. your Claude Code tab) undisturbed."
+        },
         "null.discord.clientId": {
           "type": "string",
           "default": "",

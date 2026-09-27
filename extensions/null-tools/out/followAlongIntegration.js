@@ -156,10 +156,15 @@ class FollowAlongWatcher {
     async applyEdit(edit) {
         if (!(0, followAlong_1.isPathInWorkspace)(edit.filePath, this.workspaceRoot))
             return;
+        const splitView = vscode.workspace.getConfiguration('null.claude').get('followAlongSplitView', false);
         let editor;
         try {
             const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(edit.filePath));
-            editor = await vscode.window.showTextDocument(doc, { preview: false, preserveFocus: true });
+            editor = await vscode.window.showTextDocument(doc, {
+                preview: false,
+                preserveFocus: true,
+                viewColumn: splitView ? vscode.ViewColumn.Two : undefined,
+            });
         }
         catch {
             return; // File may have been deleted/renamed since the edit landed.
