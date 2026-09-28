@@ -349,7 +349,7 @@ foreach ($installFullPath in $targets) {
 
     if ($nullIdeRunning) {
         Write-Warning "Null IDE is running. Files will sync underneath it."
-        Write-Warning "Run 'Developer: Reload Window' afterward."
+        Write-Warning "Run scripts\reload-local.ps1 afterward -- 'Developer: Reload Window' serves stale workbench CSS/JS from Chromium's disk cache."
     }
 
     # --------------------------------------------------------
@@ -861,7 +861,7 @@ foreach ($installFullPath in $targets) {
     Write-Host "Sync complete: $installFullPath"
 
     if ($nullIdeRunning) {
-        Write-Host "Run 'Developer: Reload Window' in Null IDE."
+        Write-Host "Run scripts\reload-local.ps1 to pick up the change (a plain window reload can serve stale cached CSS/JS)."
     }
 }
 

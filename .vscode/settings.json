@@ -15,8 +15,8 @@
         {
             "id": "button-1787431253153",
             "label": "Reload IDE",
-            "type": "vscode-command",
-            "command": "workbench.action.reloadWindow",
+            "type": "terminal",
+            "command": "powershell -ExecutionPolicy Bypass ${workspaceFolder}\\scripts\\reload-local.ps1",
             "color": "#2196F3",
             "background": "none",
             "saveAll": false,
