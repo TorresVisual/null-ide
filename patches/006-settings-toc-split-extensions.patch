@@ -3,15 +3,30 @@ Subject: [PATCH] feat(settings): split the Extensions TOC node into Null / Insta
 Issue #108. See docs/specs/settings-editor-design.md.
 ---
 diff --git a/src/vs/workbench/contrib/preferences/browser/settingsEditor2.ts b/src/vs/workbench/contrib/preferences/browser/settingsEditor2.ts
-index 604caadb..15b33289 100644
+index 604caadb..ae8979f0 100644
 --- a/src/vs/workbench/contrib/preferences/browser/settingsEditor2.ts
 +++ b/src/vs/workbench/contrib/preferences/browser/settingsEditor2.ts
-@@ -1586,7 +1586,13 @@ export class SettingsEditor2 extends EditorPane {
+@@ -1447,11 +1447,11 @@ export class SettingsEditor2 extends EditorPane {
+ 		return index;
+ 	}
+ 
+-	private refreshModels(resolvedSettingsRoot: ITOCEntry<ISetting>) {
++	private refreshModels(resolvedSettingsRoot: ITOCEntry<ISetting>, orderIndexRoot: ITOCEntry<ISetting> = resolvedSettingsRoot) {
+ 		// Both calls to refreshModels require a valid settingsTreeModel.
+ 		this.settingsTreeModel.value!.update(resolvedSettingsRoot);
+ 		this.tocTreeModel.settingsTreeRoot = this.settingsTreeModel.value!.root;
+-		this.settingsOrderByTocIndex = this.createSettingsOrderByTocIndex(resolvedSettingsRoot);
++		this.settingsOrderByTocIndex = this.createSettingsOrderByTocIndex(orderIndexRoot);
+ 	}
+ 
+ 	private async onConfigUpdate(keys?: ReadonlySet<string>, forceRefresh = false, triggerSearch = false): Promise<void> {
+@@ -1586,10 +1586,29 @@ export class SettingsEditor2 extends EditorPane {
  			}
  		}
  
 -		resolvedSettingsRoot.children!.push(await createTocTreeForExtensionSettings(this.extensionService, extensionSettingsGroups, filter));
-+		// Null IDE: Null + Installed Extensions go right after Commonly Used, Built-in Extensions last.
++		// Null IDE: Null + Installed Extensions go right after Commonly Used, Built-in Extensions last (for TOC display).
++		// Search ranking still uses upstream's order (core categories before extensions) via createSearchOrderIndexRoot below.
 +		const extSections = await createTocTreeForExtensionSettings(this.extensionService, extensionSettingsGroups, filter);
 +		const builtinSection = extSections.find(section => section.id === 'builtinExtensions');
 +		resolvedSettingsRoot.children!.unshift(...extSections.filter(section => section !== builtinSection));
@@ -21,6 +36,39 @@ index 604caadb..15b33289 100644
  
  		resolvedSettingsRoot.children!.unshift(getCommonlyUsedData(groups));
  
++		// Null IDE: rebuild the extension sections' original (upstream) position for search-order purposes only,
++		// so `@modified`/tied search results still rank core settings before extension settings (spec non-goal:
++		// don't change search). The displayed TOC order above is unaffected.
++		const extSectionIds = new Set(extSections.map(section => section.id));
++		const createSearchOrderIndexRoot = (): ITOCEntry<ISetting> => ({
++			...resolvedSettingsRoot,
++			children: [
++				...resolvedSettingsRoot.children!.filter(child => !extSectionIds.has(child.id)),
++				...extSections,
++			]
++		});
++
+ 		if (toggleData && setAdditionalGroups) {
+ 			// Add the additional groups to the model to help with searching.
+ 			this.defaultSettingsEditorModel.setAdditionalGroups(additionalGroups);
+@@ -1618,7 +1637,7 @@ export class SettingsEditor2 extends EditorPane {
+ 		}
+ 
+ 		if (this.settingsTreeModel.value) {
+-			this.refreshModels(resolvedSettingsRoot);
++			this.refreshModels(resolvedSettingsRoot, createSearchOrderIndexRoot());
+ 
+ 			if (triggerSearch && this.searchResultModel) {
+ 				// If an extension's settings were just loaded and a search is active, retrigger the search so it shows up
+@@ -1668,7 +1687,7 @@ export class SettingsEditor2 extends EditorPane {
+ 			}
+ 		} else {
+ 			this.settingsTreeModel.value = this.instantiationService.createInstance(SettingsTreeModel, this.viewState, this.workspaceTrustManagementService.isWorkspaceTrusted());
+-			this.refreshModels(resolvedSettingsRoot);
++			this.refreshModels(resolvedSettingsRoot, createSearchOrderIndexRoot());
+ 
+ 			// Don't restore the cached state if we already have a query value from calling _setOptions().
+ 			const cachedState = !this.viewState.query ? this.restoreCachedState() : undefined;
 diff --git a/src/vs/workbench/contrib/preferences/browser/settingsTree.ts b/src/vs/workbench/contrib/preferences/browser/settingsTree.ts
 index 99458e8b..9c71b617 100644
 --- a/src/vs/workbench/contrib/preferences/browser/settingsTree.ts
@@ -66,15 +114,34 @@ index 99458e8b..9c71b617 100644
  }
  
 diff --git a/src/vs/workbench/contrib/preferences/browser/tocTree.ts b/src/vs/workbench/contrib/preferences/browser/tocTree.ts
-index b40fa10d..609d387d 100644
+index b40fa10d..8e0a9051 100644
 --- a/src/vs/workbench/contrib/preferences/browser/tocTree.ts
 +++ b/src/vs/workbench/contrib/preferences/browser/tocTree.ts
-@@ -164,7 +164,7 @@ export function createTOCIterator(model: TOCTreeModel | SettingsTreeGroupElement
+@@ -8,7 +8,7 @@ import * as domStylesheetsJs from '../../../../base/browser/domStylesheets.js';
+ import { IListVirtualDelegate } from '../../../../base/browser/ui/list/list.js';
+ import { DefaultStyleController, IListAccessibilityProvider } from '../../../../base/browser/ui/list/listWidget.js';
+ import { RenderIndentGuides } from '../../../../base/browser/ui/tree/abstractTree.js';
+-import { ITreeElement, ITreeNode, ITreeRenderer } from '../../../../base/browser/ui/tree/tree.js';
++import { IObjectTreeElement, ITreeNode, ITreeRenderer, ObjectTreeElementCollapseState } from '../../../../base/browser/ui/tree/tree.js';
+ import { FONT } from '../../../../base/common/font.js';
+ import { Iterable } from '../../../../base/common/iterator.js';
+ import { DisposableStore } from '../../../../base/common/lifecycle.js';
+@@ -156,7 +156,7 @@ class TOCTreeDelegate implements IListVirtualDelegate<SettingsTreeElement> {
+ 	}
+ }
+ 
+-export function createTOCIterator(model: TOCTreeModel | SettingsTreeGroupElement, tree: TOCTree): Iterable<ITreeElement<SettingsTreeGroupElement>> {
++export function createTOCIterator(model: TOCTreeModel | SettingsTreeGroupElement, tree: TOCTree): Iterable<IObjectTreeElement<SettingsTreeGroupElement>> {
+ 	const groupChildren = <SettingsTreeGroupElement[]>model.children.filter(c => c instanceof SettingsTreeGroupElement);
+ 
+ 	return Iterable.map(groupChildren, g => {
+@@ -164,7 +164,8 @@ export function createTOCIterator(model: TOCTreeModel | SettingsTreeGroupElement
  
  		return {
  			element: g,
 -			collapsed: undefined,
-+			collapsed: g.id === 'null' ? false : undefined, // Null IDE: keep the Null section open
++			// Null IDE: expand the Null section the first time it appears, but respect a user's later collapse.
++			collapsed: g.id === 'null' ? ObjectTreeElementCollapseState.PreserveOrExpanded : undefined,
  			collapsible: hasGroupChildren,
  			children: g instanceof SettingsTreeGroupElement ?
  				createTOCIterator(g, tree) :
