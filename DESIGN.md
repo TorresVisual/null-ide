@@ -110,6 +110,7 @@ Near-black neutrals carry almost the entire surface; Signal Blue is rationed to 
 - **Secondary Text** (#9D9D9D): Descriptions, inactive tab labels, breadcrumbs.
 - **Disabled Text** (#6E7681): Disabled controls, unfocused-inactive tab labels, line numbers.
 - **Success** (#2EA043) / **Warning** (#CCA700) / **Error** (#F85149): Git/diff/diagnostic state only — never used as UI accent color.
+- **GitHub issue state** (open `charts-green` / completed `charts-purple` / not planned `descriptionForeground`): issue state in the GitHub Issues panel only, mirroring github.com. Git-host state, same category as diff colors, and never used as UI accent.
 
 ### Named Rules
 **The One Accent Rule.** Signal Blue is the only color allowed to mean "interactive" or "active." Success/warning/error are reserved for git and diagnostic state and must never be reused as a UI accent, and no second brand color (teal, indigo, or otherwise) gets introduced — the accent stays singular.

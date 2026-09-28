@@ -270,10 +270,14 @@ export class IssueDetailPanel {
     const cssUri = this.panel.webview.asWebviewUri(
       vscode.Uri.joinPath(this.extensionUri, 'lib', 'issueDetail.css'),
     );
+    const sharedCssUri = this.panel.webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, 'lib', 'issues.css'),
+    );
     return `<!DOCTYPE html><html lang="en"><head>
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy"
       content="default-src 'none'; script-src ${this.panel.webview.cspSource} 'nonce-${nonce}'; style-src ${this.panel.webview.cspSource} 'unsafe-inline'; img-src ${this.panel.webview.cspSource} https://avatars.githubusercontent.com;">
+<link rel="stylesheet" href="${sharedCssUri}">
 <link rel="stylesheet" href="${cssUri}">
 </head><body>
 <div id="detail"><div id="empty">Loading…</div></div>

@@ -274,10 +274,12 @@ class IssuesViewProvider {
         const nonce = (0, webviewUtils_1.getNonce)();
         const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'lib', 'issues.js'));
         const cssUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'lib', 'issueList.css'));
+        const sharedCssUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'lib', 'issues.css'));
         return `<!DOCTYPE html><html lang="en"><head>
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy"
       content="default-src 'none'; script-src ${webview.cspSource} 'nonce-${nonce}'; style-src ${webview.cspSource} 'unsafe-inline';">
+<link rel="stylesheet" href="${sharedCssUri}">
 <link rel="stylesheet" href="${cssUri}">
 </head><body>
 <div id="app">

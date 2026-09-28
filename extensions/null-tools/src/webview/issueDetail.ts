@@ -3,7 +3,7 @@
 interface GithubLabel { name: string; color: string; }
 interface GithubUser { login: string; avatar_url: string; }
 interface GithubIssue {
-  number: number; title: string; body: string; state: string; html_url: string;
+  number: number; title: string; body: string; state: string; state_reason?: string | null; html_url: string;
   labels: GithubLabel[]; assignees: GithubUser[]; user: GithubUser; comments: number; updated_at: string;
   closedLocally?: boolean;
 }
@@ -84,7 +84,7 @@ declare const DOMPurify: { sanitize(html: string): string };
       container.innerHTML = `
         <button type="button" class="dropdown-trigger">
           ${selectedItems.length > 0 ? `<span class="selected-tags">${selectedItems.map(i => `
-            <span class="tag"${i.color ? ` style="${labelChipStyle(i.color)}"` : ''}>${escapeHtml(i.label)}<span class="tag-remove" data-value="${escapeHtml(i.value)}">&times;</span></span>`).join('')}</span>`
+            <span class="tag${i.color ? ' gh-label' : ''}"${i.color ? ` style="${labelStyleVars(i.color)}"` : ''}>${escapeHtml(i.label)}<span class="tag-remove" data-value="${escapeHtml(i.value)}">&times;</span></span>`).join('')}</span>`
             : `<span class="dropdown-placeholder">${escapeHtml(placeholder)}</span>`}
           <span class="dropdown-arrow">${open ? '▲' : '▼'}</span>
         </button>
@@ -148,10 +148,10 @@ declare const DOMPurify: { sanitize(html: string): string };
         return `${actorName} reopened this`;
       case 'labeled':
         return ev.label
-          ? `${actorName} added the <span class="label-chip" style="${labelChipStyle(ev.label.color)}">${escapeHtml(ev.label.name)}</span> label` : null;
+          ? `${actorName} added the <span class="gh-label" style="${labelStyleVars(ev.label.color)}">${escapeHtml(ev.label.name)}</span> label` : null;
       case 'unlabeled':
         return ev.label
-          ? `${actorName} removed the <span class="label-chip" style="${labelChipStyle(ev.label.color)}">${escapeHtml(ev.label.name)}</span> label` : null;
+          ? `${actorName} removed the <span class="gh-label" style="${labelStyleVars(ev.label.color)}">${escapeHtml(ev.label.name)}</span> label` : null;
       case 'assigned':
         return ev.assignee ? `${actorName} assigned ${escapeHtml(ev.assignee.login)}` : null;
       case 'unassigned':
@@ -266,10 +266,10 @@ declare const DOMPurify: { sanitize(html: string): string };
   function render(issue: GithubIssue, comments: GithubComment[], timeline: GithubTimelineEvent[]): void {
     const closed = issue.state === 'closed';
     detailEl.innerHTML = `
-      <h2><span class="state-badge${closed ? ' closed' : ''}">${issue.state}</span>${issue.closedLocally ? '<span class="closes-badge" title="An unpushed local commit will close this issue">closes on push</span>' : ''} #${issue.number} ${editing ? '' : escapeHtml(issue.title)}</h2>
+      <h2>${issueStateBadge(issue.state, issue.state_reason)}${issue.closedLocally ? '<span class="closes-badge" title="An unpushed local commit will close this issue">closes on push</span>' : ''} #${issue.number} ${editing ? '' : escapeHtml(issue.title)}</h2>
       <div class="meta-row">
-        ${issue.labels.map(l => `<span class="label-chip" style="${labelChipStyle(l.color)}">${escapeHtml(l.name)}</span>`).join('')}
-        ${avatar(issue.user)} opened by ${escapeHtml(issue.user.login)} · ${issue.comments} comments · updated ${issue.updated_at.slice(0, 10)}
+        ${issue.labels.map(l => `<span class="gh-label" style="${labelStyleVars(l.color)}">${escapeHtml(l.name)}</span>`).join('')}
+        ${avatar(issue.user)} opened by ${escapeHtml(issue.user.login)} · ${issue.comments} comments · updated ${timeHtml(issue.updated_at)}
       </div>
       ${issue.assignees.length > 0 ? `
       <div class="assignees-row">
@@ -307,12 +307,12 @@ declare const DOMPurify: { sanitize(html: string): string };
       <h3>Comments (${comments.length})</h3>
       <div id="comments">
         ${buildFeed(comments, timeline).map(item => item.kind === 'event' ? `
-          <div class="timeline-event">${item.text} · <span class="issue-meta">${item.created_at.slice(0, 10)}</span></div>` : `
+          <div class="timeline-event">${item.text} · <span class="issue-meta">${timeHtml(item.created_at)}</span></div>` : `
           <div class="comment">
             <div class="comment-header">
               <span class="comment-author-group">${avatar(item.comment.user)} <span class="comment-author">${escapeHtml(item.comment.user.login)}</span></span>
               <span class="comment-actions">
-                <span class="issue-meta">${item.comment.created_at.slice(0, 10)}</span>
+                <span class="issue-meta">${timeHtml(item.comment.created_at)}</span>
                 ${viewerLogin === item.comment.user.login && editingCommentId !== item.comment.id ? `
                 <button class="comment-link-btn comment-edit-btn" data-id="${item.comment.id}">Edit</button>
                 <button class="comment-link-btn danger comment-delete-btn" data-id="${item.comment.id}">Delete</button>` : ''}

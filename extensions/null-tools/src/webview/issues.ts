@@ -3,17 +3,17 @@
 interface GithubLabel { name: string; color: string; }
 interface GithubUser { login: string; }
 interface GithubIssue {
-  number: number; title: string; body: string; state: string; html_url: string;
+  number: number; title: string; body: string; state: string; state_reason?: string | null; html_url: string;
   labels: GithubLabel[]; assignees: GithubUser[]; user: GithubUser; comments: number; updated_at: string;
   closedLocally?: boolean;
 }
 
 declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
 
-const COPY_ICON = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="5.5" y="5.5" width="8" height="8" rx="1"/><path d="M3.5 10.5h-1a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v1" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-const OPEN_ICON = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M6.5 2.5h-3a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-3" stroke-linecap="round" stroke-linejoin="round"/><path d="M9.5 2.5h4v4M13 3l-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-const CHECK_ICON = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 8.5l4 4 8-9" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-const BRANCH_ICON = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="4" cy="3" r="1.6"/><circle cx="4" cy="13" r="1.6"/><circle cx="12" cy="6" r="1.6"/><path d="M4 4.6V11.4M4 8c0-2 2-3.5 4-3.5h2.6" stroke-linecap="round"/></svg>';
+const COPY_ICON = octicon('copy');
+const OPEN_ICON = octicon('link-external');
+const CHECK_ICON = octicon('check');
+const BRANCH_ICON = octicon('git-branch');
 const WORKTREE_ICON = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/><path d="M4.5 7v3a1 1 0 001 1h3" stroke-linecap="round"/></svg>';
 
 (function () {
@@ -84,14 +84,14 @@ const WORKTREE_ICON = '<svg width="13" height="13" viewBox="0 0 16 16" fill="non
     labelPicker.innerHTML = `
       <button type="button" class="dropdown-trigger">
         ${selected.length > 0 ? `<span class="selected-tags">${selected.map(l => `
-          <span class="tag" style="${labelChipStyle(l.color)}">${escapeHtml(l.name)}<span class="tag-remove" data-value="${escapeHtml(l.name)}">&times;</span></span>`).join('')}</span>`
+          <span class="tag gh-label" style="${labelStyleVars(l.color)}">${escapeHtml(l.name)}<span class="tag-remove" data-value="${escapeHtml(l.name)}">&times;</span></span>`).join('')}</span>`
           : '<span class="dropdown-placeholder">Filter by label…</span>'}
         <span class="dropdown-arrow">${labelDropdownOpen ? '▲' : '▼'}</span>
       </button>
       <div class="dropdown-list${labelDropdownOpen ? '' : ' hidden'}">
         ${labels.map(l => `
           <button type="button" class="dropdown-item${selectedLabels.has(l.name) ? ' selected' : ''}" data-value="${escapeHtml(l.name)}">
-            <span class="label-chip" style="${labelChipStyle(l.color)}">${escapeHtml(l.name)}</span>
+            <span class="gh-label" style="${labelStyleVars(l.color)}">${escapeHtml(l.name)}</span>
           </button>`).join('')}
       </div>`;
     labelPicker.querySelector('.dropdown-trigger')?.addEventListener('click', () => {
@@ -138,12 +138,12 @@ const WORKTREE_ICON = '<svg width="13" height="13" viewBox="0 0 16 16" fill="non
       const you = viewerLogin && issue.assignees.some(a => a.login === viewerLogin);
       return `
       <div class="issue-row${issue.state === 'closed' ? ' closed' : ''}${issue.number === selectedNumber ? ' selected' : ''}" data-number="${issue.number}">
-        <span class="state-dot" title="${issue.state}"></span>
+        <span class="row-state">${issueStateIcon(issue.state, issue.state_reason)}</span>
         <div class="issue-main">
           <div><span class="issue-num">#${issue.number}</span> <span class="issue-title">${escapeHtml(issue.title)}</span>${you ? '<span class="you-badge">@you</span>' : ''}${issue.closedLocally ? '<span class="closes-badge" title="An unpushed local commit will close this issue">closes on push</span>' : ''}</div>
           <div class="issue-meta">
-            ${issue.labels.map(l => `<span class="label-chip" style="${labelChipStyle(l.color)}">${escapeHtml(l.name)}</span>`).join('')}
-            ${issue.comments} comments · updated ${issue.updated_at.slice(0, 10)}
+            ${issue.labels.map(l => `<span class="gh-label" style="${labelStyleVars(l.color)}">${escapeHtml(l.name)}</span>`).join('')}
+            ${octicon('comment')} ${issue.comments} · updated ${timeHtml(issue.updated_at)}
           </div>
           <div class="row-actions">
             <button class="branch-btn" title="Create branch for this issue">${BRANCH_ICON}</button>

@@ -2,16 +2,10 @@ html,body { margin:0; padding:0; height:100%; background:var(--vscode-editor-bac
             font:var(--vscode-font-size,13px)/1.6 var(--vscode-font-family); }
 #detail { max-width:900px; margin:0 auto; padding:24px; }
 h2 { color:var(--vscode-foreground); display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-.state-badge {
-  font-size:.85em; font-weight:600; text-transform:uppercase; letter-spacing:.04em;
-  padding:2px 8px; border-radius:999px; color:#fff; background:var(--vscode-charts-green,#89d185);
-}
-.state-badge.closed { background:var(--vscode-charts-red,#f14c4c); }
 .closes-badge {
   font-size:.85em; font-weight:600; padding:2px 8px; border-radius:999px; color:#111;
   background:var(--vscode-charts-yellow,#cca700);
 }
-.label-chip { display:inline-block; padding:0 6px; border-radius:999px; font-size:.8em; margin-right:4px; color:#111; }
 .issue-meta { color:var(--vscode-descriptionForeground); font-size:.85em; margin:6px 0; }
 .meta-row { display:flex; align-items:center; gap:6px; flex-wrap:wrap; color:var(--vscode-descriptionForeground); font-size:.9em; margin:8px 0; }
 .avatar {
@@ -150,4 +144,3 @@ h3 { font-size:1em; margin:22px 0 8px; }
 #composer .btn-row { justify-content:flex-end; }
 #empty { padding:20px; color:var(--vscode-descriptionForeground); }
 .field-error { color:var(--vscode-errorForeground); font-size:.9em; margin:-4px 0 8px; }
-.field-error.hidden { display:none; }

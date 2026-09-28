@@ -22,6 +22,8 @@ export interface GithubIssue {
   title: string;
   body: string;
   state: 'open' | 'closed';
+  /** Why a closed issue was closed; null while open or for issues closed before GitHub tracked reasons. */
+  state_reason?: 'completed' | 'not_planned' | 'reopened' | null;
   html_url: string;
   labels: GithubLabel[];
   assignees: GithubUser[];

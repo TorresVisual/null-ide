@@ -8,5 +8,8 @@
     "sourceMap": false,
     "skipLibCheck": true
   },
-  "include": ["src/webview/colorUtils.ts", "src/webview/issueDetail.ts"]
+  "include": [
+    "src/webview/shared/octicons.ts", "src/webview/shared/time.ts", "src/webview/shared/labels.ts", "src/webview/shared/issueState.ts",
+    "src/webview/issueDetail.ts"
+  ]
 }
