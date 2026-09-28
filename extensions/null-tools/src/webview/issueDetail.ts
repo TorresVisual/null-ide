@@ -204,6 +204,7 @@ declare const DOMPurify: { sanitize(html: string): string };
           ${issueTemplates.map((t, i) => `<option value="${i}">${escapeHtml(t.name)}</option>`).join('')}
         </select>` : ''}
         <input id="edit-title" placeholder="Title">
+        <div id="title-error" class="field-error hidden">Title is required.</div>
         <textarea id="edit-body" placeholder="Description"></textarea>
         <div class="picker-group">
           <span class="assignees-label">Labels:</span>
@@ -238,12 +239,23 @@ declare const DOMPurify: { sanitize(html: string): string };
       });
       refreshLabelPicker?.();
     });
+    const titleInput = document.getElementById('edit-title') as HTMLInputElement;
+    const titleError = document.getElementById('title-error') as HTMLDivElement;
+    titleInput.addEventListener('input', () => titleError.classList.add('hidden'));
     document.getElementById('save-btn')?.addEventListener('click', () => {
-      const title = (document.getElementById('edit-title') as HTMLInputElement).value.trim();
-      const body = (document.getElementById('edit-body') as HTMLTextAreaElement).value;
-      if (!title) return;
+      const saveBtn = document.getElementById('save-btn') as HTMLButtonElement;
+      if (saveBtn.disabled) return;
+      const title = titleInput.value.trim();
+      if (!title) {
+        titleError.classList.remove('hidden');
+        titleInput.focus();
+        return;
+      }
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Creating…';
       vscode.postMessage({
-        type: 'submitCreate', title, body,
+        type: 'submitCreate', title,
+        body: (document.getElementById('edit-body') as HTMLTextAreaElement).value,
         labels: Array.from(selectedLabels), assignees: Array.from(selectedAssignees),
       });
     });
@@ -423,6 +435,14 @@ declare const DOMPurify: { sanitize(html: string): string };
       case 'commentPostFailed': {
         const btn = detailEl.querySelector<HTMLButtonElement>('#comment-btn');
         if (btn) btn.disabled = false;
+        break;
+      }
+      case 'createFailed': {
+        const btn = detailEl.querySelector<HTMLButtonElement>('#save-btn');
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = 'Create';
+        }
         break;
       }
       case 'copied': {

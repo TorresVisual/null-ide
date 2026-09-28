@@ -190,6 +190,7 @@ function labelChipStyle(hex) {
           ${issueTemplates.map((t, i) => `<option value="${i}">${escapeHtml(t.name)}</option>`).join('')}
         </select>` : ''}
         <input id="edit-title" placeholder="Title">
+        <div id="title-error" class="field-error hidden">Title is required.</div>
         <textarea id="edit-body" placeholder="Description"></textarea>
         <div class="picker-group">
           <span class="assignees-label">Labels:</span>
@@ -220,13 +221,24 @@ function labelChipStyle(hex) {
             });
             refreshLabelPicker === null || refreshLabelPicker === void 0 ? void 0 : refreshLabelPicker();
         });
+        const titleInput = document.getElementById('edit-title');
+        const titleError = document.getElementById('title-error');
+        titleInput.addEventListener('input', () => titleError.classList.add('hidden'));
         (_b = document.getElementById('save-btn')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', () => {
-            const title = document.getElementById('edit-title').value.trim();
-            const body = document.getElementById('edit-body').value;
-            if (!title)
+            const saveBtn = document.getElementById('save-btn');
+            if (saveBtn.disabled)
                 return;
+            const title = titleInput.value.trim();
+            if (!title) {
+                titleError.classList.remove('hidden');
+                titleInput.focus();
+                return;
+            }
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Creating…';
             vscode.postMessage({
-                type: 'submitCreate', title, body,
+                type: 'submitCreate', title,
+                body: document.getElementById('edit-body').value,
                 labels: Array.from(selectedLabels), assignees: Array.from(selectedAssignees),
             });
         });
@@ -408,6 +420,14 @@ function labelChipStyle(hex) {
                 const btn = detailEl.querySelector('#comment-btn');
                 if (btn)
                     btn.disabled = false;
+                break;
+            }
+            case 'createFailed': {
+                const btn = detailEl.querySelector('#save-btn');
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = 'Create';
+                }
                 break;
             }
             case 'copied': {

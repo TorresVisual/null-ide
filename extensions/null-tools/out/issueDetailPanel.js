@@ -436,6 +436,8 @@ class IssueDetailPanel {
   }
   #composer .btn-row { justify-content:flex-end; }
   #empty { padding:20px; color:var(--vscode-descriptionForeground); }
+  .field-error { color:var(--vscode-errorForeground); font-size:.9em; margin:-4px 0 8px; }
+  .field-error.hidden { display:none; }
 </style></head><body>
 <div id="detail"><div id="empty">Loading…</div></div>
 <div id="lightbox" class="hidden"><img id="lightbox-img" src="" alt=""></div>
