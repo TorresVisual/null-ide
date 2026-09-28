@@ -1,16 +1,16 @@
 ---
 name: new-extension
-description: Scaffold a new built-in VSCode extension for Null IDE following the repo's established convention (src/ + out/, package.json shape, tsconfig.json with an explicit file list, npm test wiring) and wire it into the GitHub Actions build pipeline. Use when adding an eighth (or Nth) built-in extension alongside null-theme, null-icons, null-tools, null-markdown, null-cpp, null-actions, wooting-analog.
+description: Scaffold a new built-in VSCode extension for Null IDE following the repo's established convention (src/ + out/, package.json shape, tsconfig.json with an explicit file list, npm test wiring) and wire it into the GitHub Actions build pipeline. Use when adding a seventh (or Nth) built-in extension alongside null-theme, null-icons, null-tools, null-markdown, null-cpp, null-actions.
 disable-model-invocation: true
 ---
 
 # New Extension
 
-Scaffolds a new built-in extension under `extensions/<name>/` matching the shape of the existing seven (`null-theme`, `null-icons`, `null-tools`, `null-markdown`, `null-cpp`, `null-actions`, `wooting-analog`), then wires it into `.github/workflows/build.yml` so CI actually compiles and bundles it. Do not run the build locally — CI is the only place this repo builds (see CLAUDE.md).
+Scaffolds a new built-in extension under `extensions/<name>/` matching the shape of the existing six (`null-theme`, `null-icons`, `null-tools`, `null-markdown`, `null-cpp`, `null-actions`), then wires it into `.github/workflows/build.yml` so CI actually compiles and bundles it. Do not run the build locally — CI is the only place this repo builds (see CLAUDE.md).
 
 ## Steps
 
-1. **Get the extension name and one-line description** if not given as an argument (e.g. `/new-extension null-foo "does foo"`). Names in this repo are lowercase, hyphenated, prefixed `null-` — `wooting-analog` is the one intentional exception (hardware-specific branding). Ask before dropping the prefix.
+1. **Get the extension name and one-line description** if not given as an argument (e.g. `/new-extension null-foo "does foo"`). Names in this repo are lowercase, hyphenated, prefixed `null-`. Ask before dropping the prefix.
 
 2. **Create the directory structure:**
    ```

@@ -370,31 +370,12 @@ foreach ($ext in @("null-tools", "null-cpp", "null-actions", "null-format")) {
     }
 }
 
-Write-Step "Building wooting-analog extension"
-Push-Location (Join-Path $RepoRoot "extensions/wooting-analog/native")
-try {
-    Invoke-Native "npm ci (wooting-analog/native)" { npm ci }
-    Invoke-Native "napi build (wooting-analog/native)" { npm run build }
-    Remove-Item target, node_modules -Recurse -Force -ErrorAction SilentlyContinue
-}
-finally {
-    Pop-Location
-}
-Push-Location (Join-Path $RepoRoot "extensions/wooting-analog")
-try {
-    Invoke-Native "npm ci (wooting-analog)" { npm ci }
-    Invoke-Native "npm run build (wooting-analog)" { npm run build }
-}
-finally {
-    Pop-Location
-}
-
 # ============================================================
 # COPY BUILT-IN EXTENSIONS
 # ============================================================
 
 Write-Step "Copying built-in extensions"
-foreach ($ext in @("null-theme", "null-tools", "null-icons", "null-markdown", "wooting-analog", "null-cpp", "null-actions", "null-format")) {
+foreach ($ext in @("null-theme", "null-tools", "null-icons", "null-markdown", "null-cpp", "null-actions", "null-format")) {
     Copy-Item -Recurse -Force (Join-Path $RepoRoot "extensions/$ext") (Join-Path $VscodeSrc "extensions/")
 }
 

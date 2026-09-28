@@ -262,15 +262,6 @@ $Extensions = [ordered]@{
         )
     }
 
-    "wooting-analog" = @{
-        Compile       = $true
-        CompileScript = "build"
-        Copy          = @(
-            "package.json",
-            "out"
-        )
-        NativeCheck = $true
-    }
 }
 
 # ============================================================

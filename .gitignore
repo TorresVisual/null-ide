@@ -9,11 +9,11 @@ appx-validate-stage/
 # Shell extension: wil headers fetched by CI
 shell-ext/deps/
 
-# wooting-analog: native Rust addon build output — compiled by CI/setup.ps1
-extensions/wooting-analog/native/target/
-extensions/wooting-analog/native/index.js
-extensions/wooting-analog/native/index.d.ts
-extensions/wooting-analog/native/*.node
+# wooting-analog (archived, not built by CI): native Rust addon build output
+archive/wooting-analog/native/target/
+archive/wooting-analog/native/index.js
+archive/wooting-analog/native/index.d.ts
+archive/wooting-analog/native/*.node
 
 # Build outputs
 VSCode-*/

@@ -3,7 +3,7 @@
   "displayName": "Wooting Analog Keys",
   "description": "Depth-sensitive key actions for Wooting hall-effect keyboards",
   "version": "0.1.0",
-  "publisher": "you",
+  "publisher": "null",
   "engines": { "vscode": "^1.85.0" },
   "activationEvents": ["onStartupFinished"],
   "main": "./out/extension.js",
