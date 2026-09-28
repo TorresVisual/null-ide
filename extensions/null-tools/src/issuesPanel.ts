@@ -194,12 +194,13 @@ export class IssuesViewProvider implements vscode.WebviewViewProvider {
         break;
       case 'setFilters':
         this._filters = { ...this._filters, labels: msg.labels, assignee: msg.assignee, query: msg.query };
+        // No repoLabels here: this fires on every filter keystroke, and re-fetching them would mean
+        // a synchronous git spawn (ensureSession) per keystroke. The webview keeps its last picker.
         this._view?.postMessage({
           type: 'issues',
           status: 'ok',
           issues: this._withClosedLocally(this._store.getFiltered(this._filters)),
           viewerLogin: this._filters.viewerLogin,
-          repoLabels: await this._store.getRepoLabels().catch((): GithubLabel[] => []),
         });
         break;
       case 'selectIssue': {

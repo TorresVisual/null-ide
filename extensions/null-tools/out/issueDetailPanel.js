@@ -94,17 +94,12 @@ class IssueDetailPanel {
     }
     async _sendDetail() {
         if (this.creating) {
-            let repoLabels, assignableUsers;
-            try {
-                [repoLabels, assignableUsers] = await Promise.all([
-                    this.store.getRepoLabels(),
-                    this.store.getAssignableUsers(),
-                ]);
-            }
-            catch (err) {
-                this.panel.webview.postMessage({ type: 'issueDetailError', message: err.message });
-                return;
-            }
+            // Signed-out/offline must still show the form: Create itself prompts for sign-in
+            // (ensureSession(true)), so an empty-picker form beats no form at all.
+            const [repoLabels, assignableUsers] = await Promise.all([
+                this.store.getRepoLabels().catch(() => []),
+                this.store.getAssignableUsers().catch(() => []),
+            ]);
             const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
             const templates = cwd ? (0, issueTemplates_1.loadIssueTemplates)(cwd) : [];
             this.panel.webview.postMessage({
@@ -261,8 +256,11 @@ class IssueDetailPanel {
                     const created = await this.store.createIssue({
                         title: msg.title, body: msg.body, labels: msg.labels, assignees: msg.assignees,
                     });
-                    this.onCreated?.();
+                    // Open the new issue before refreshing the list: onCreated() repaints from a
+                    // cache snapshot that doesn't include `created` yet, and would otherwise
+                    // overwrite the store's in-memory issues before openIssue's getByNumber runs.
                     await this.openIssue(created.number);
+                    this.onCreated?.();
                 }
                 catch (err) {
                     void vscode.window.showErrorMessage(`Failed to create issue: ${err.message}`);

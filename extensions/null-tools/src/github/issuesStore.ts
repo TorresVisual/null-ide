@@ -62,7 +62,8 @@ export class IssuesStore {
     if (!cwd) throw new SessionError('no-workspace');
     const repo = getWorkspaceGithubRepo(cwd);
     if (!repo) throw new SessionError('no-remote');
-    const session = await getGithubSession(interactive);
+    // VS Code rejects (rather than resolving undefined) when the sign-in prompt is dismissed.
+    const session = await getGithubSession(interactive).then(s => s, () => undefined);
     if (!session) throw new SessionError('signed-out');
     this.setRepo(repo);
     this.viewerLogin = session.account.label;
