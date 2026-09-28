@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "module": "none",
+    "lib": ["ES2017", "DOM"],
+    "outFile": "./out/webview-shared.js",
+    "strict": true,
+    "sourceMap": false,
+    "skipLibCheck": true
+  },
+  "include": [
+    "src/webview/shared/octicons.ts",
+    "src/webview/shared/time.ts",
+    "src/webview/shared/labels.ts",
+    "src/webview/shared/issueState.ts"
+  ]
+}
