@@ -308,20 +308,21 @@
 }
 
 /* ── Claude Code command-center button — fuse onto the search pill ───────────
-   The pill (.command-center-center) and our split button are separate sibling
-   action-items with a 4px flex gap between them by default. Style both halves
-   as one continuous pill: pill gets square right corners + no right border,
-   our button gets square left corners + no left border, and a negative
-   margin cancels the flex gap so they touch. Scoped with :has() so the pill's
-   own margin/radius only change when our button is actually present (context
-   key can hide it, e.g. claude-vscode not installed). */
+   Mirrors VS Code's own native pattern for this (agenttitlebarstatuswidget.css's
+   .agent-status-badge-section.sparkle — the built-in Copilot Chat split button
+   that ships fused onto the command center pill by default): the icon half and
+   chevron half are independently-hoverable mini-buttons with no radius between
+   them, only the chevron (last) half gets the outer-right radius, and the
+   pill's own right corner squares off to meet it. Scoped with :has() so the
+   pill's margin/radius only change when our button is actually present
+   (context key can hide it, e.g. claude-vscode not installed). */
 .monaco-workbench .part.titlebar .command-center .action-item.command-center-center:has(~ .action-item:has(.codicon-null-claude-command-center)) {
   margin-right: 0 !important;
   border-radius: var(--vscode-cornerRadius-medium) 0 0 var(--vscode-cornerRadius-medium) !important;
   border-right: none !important;
 }
 
-.monaco-workbench .part.titlebar .command-center .action-item:has(.codicon-null-claude-command-center) {
+.monaco-workbench .part.titlebar .command-center .action-item.monaco-dropdown-with-default:has(.codicon-null-claude-command-center) {
   display: flex !important;
   align-items: stretch !important;
   height: 22px !important;
@@ -333,16 +334,31 @@
   overflow: hidden !important;
 }
 
-.monaco-workbench .part.titlebar .command-center .action-item:has(.codicon-null-claude-command-center) .action-container,
-.monaco-workbench .part.titlebar .command-center .action-item:has(.codicon-null-claude-command-center) .dropdown-action-container {
+.monaco-workbench .part.titlebar .command-center .action-item.monaco-dropdown-with-default:has(.codicon-null-claude-command-center) .action-container {
   display: flex !important;
   align-items: center !important;
-  padding: 0 6px !important;
+  padding: 0 5px !important;
+  border-radius: 0 !important;
 }
 
-.monaco-workbench .part.titlebar .command-center .action-item:has(.codicon-null-claude-command-center):hover {
+.monaco-workbench .part.titlebar .command-center .action-item.monaco-dropdown-with-default:has(.codicon-null-claude-command-center) .dropdown-action-container {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 18px !important;
+  padding: 0 !important;
+  border-radius: 0 var(--vscode-cornerRadius-medium) var(--vscode-cornerRadius-medium) 0 !important;
+}
+
+/* Each half highlights independently on hover, like the native sparkle section —
+   suppress the generic .action-label hover box so it doesn't double up. */
+.monaco-workbench .part.titlebar .command-center .action-item.monaco-dropdown-with-default:has(.codicon-null-claude-command-center) .action-label:hover {
+  background-color: transparent !important;
+}
+
+.monaco-workbench .part.titlebar .command-center .action-item.monaco-dropdown-with-default:has(.codicon-null-claude-command-center) .action-container:hover,
+.monaco-workbench .part.titlebar .command-center .action-item.monaco-dropdown-with-default:has(.codicon-null-claude-command-center) .dropdown-action-container:hover {
   background-color: var(--vscode-commandCenter-activeBackground) !important;
-  border-color: var(--vscode-commandCenter-activeBorder) !important;
 }
 
 /* ── Empty editor letterpress — ambient breathing pulse ──────────────────────── */
