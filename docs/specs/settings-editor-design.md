@@ -86,11 +86,11 @@ Null ships four themes, including Light and Retro (green accent). The CSS uses o
 | Search field (`.settings-header .search-container`) | 6px radius, command-palette-style border | `--vscode-input-background`, `--vscode-widget-border` |
 | User / Workspace tabs (`.settings-tabs-widget`) | segmented control: bordered pill, 4px outer radii, checked segment filled; replaces the bottom-border underline | `--vscode-input-border`, `--vscode-button-secondaryBackground`, `--vscode-foreground`, `--vscode-descriptionForeground` |
 | Header divider (`.settings-header-controls`) | border removed (the segmented control carries the separation) | — |
-| TOC (`.settings-toc-container`) | 12px text; 1px right divider; selected row gets a soft fill and a 2px accent left edge | `--vscode-panel-border`, `--vscode-list-hoverBackground`, `--vscode-focusBorder` |
+| TOC (`.settings-toc-container`) | 12px text; selected row gets a soft fill and a 2px accent left edge. The 1px right divider already exists (the split-view sash uses `settings.sashBorder`, which defaults to the panel border) | `--vscode-list-hoverBackground`, `--vscode-focusBorder` |
 | Group titles (`.settings-group-title-label.settings-group-level-{1,2,3}`) | 13px / 12px / 12px, weight 600, 1px bottom divider on level 1 | `--vscode-panel-border` |
 | Setting rows (`.setting-item-contents`) | padding `8px 12px 10px`; 1px bottom divider; description in secondary text | `--vscode-panel-border`, `--vscode-descriptionForeground` |
 | Focused row | soft background fill instead of the outline box | `--vscode-settings-focusedRowBackground` (kept); the `--vscode-settings-focusedRowBorder` outline rule (`.monaco-list:focus-within .monaco-list-row.focused .setting-item-contents`) overridden to `none` |
-| Modified indicator (`.setting-item-modified-indicator`) | kept; top/bottom offsets shortened to match the new padding | `--vscode-settings-modifiedItemIndicator` (theme default = accent) |
+| Modified indicator (`.setting-item-modified-indicator`) | kept; top/bottom offsets shortened to match the new padding; recolored to the accent (upstream's `settings.modifiedItemIndicator` default is teal `#0C7D9D`, and no Null theme overrides it) | `--vscode-focusBorder` (the accent in every Null theme) |
 
 Keyboard focus must stay visible: removing the row outline is only acceptable because the focused row keeps a background fill, and focused *controls* inside the row (inputs, checkboxes, dropdowns) keep their own `focusBorder` outline.
 
@@ -100,7 +100,7 @@ The settings list is a virtualized `WorkbenchObjectTree`; `SettingsTree` measure
 
 ## Testing
 
-- **Unit test** (inside the patch): extend `src/vs/workbench/contrib/preferences/test/browser/settingsTree.test.ts` with a case for `createTocTreeForExtensionSettings` using a stub `IExtensionService` returning one `null.*` built-in, one non-`null` built-in, and one non-built-in extension — asserting three sections in the order `null`, `extensions`, `builtinExtensions`; and a second case with no non-built-in extensions asserting the `extensions` section is omitted.
+- **Patch correctness**: `npm run typecheck-client` in `vscode-src` (type-checks the whole `src/` tree), and `git apply --check --reverse` of the exported patch against the edited tree. No upstream unit test is added: CI never runs VS Code's unit-test suites (it only runs `gulp vscode-win32-x64`), and running one locally requires a full `npm run compile` plus an Electron download — a test that never runs would only add rebase weight to the patch.
 - **CSS, on the installed build** via `scripts/sync-local.ps1` (copies `workbench/custom.css` to `null-custom.css`): open Settings in Null Dark and Null Light and check — header, segmented User/Workspace switch, TOC selection, group headings, row density, a modified setting's indicator, keyboard-focused row, a search with results, and the Workspace tab.
 - **Patch**: CI applies and builds it. A local `scripts/build-local.ps1` run happens only if explicitly requested (tens of minutes).
 
