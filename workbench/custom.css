@@ -316,7 +316,7 @@
    pill's own right corner squares off to meet it. Scoped with :has() so the
    pill's margin/radius only change when our button is actually present
    (context key can hide it, e.g. claude-vscode not installed). */
-.monaco-workbench .part.titlebar .command-center .action-item.command-center-center:has(~ .action-item:has(.codicon-null-claude-command-center)) {
+.monaco-workbench .part.titlebar .command-center:has(.codicon-null-claude-command-center) .action-item.command-center-center {
   margin-right: 0 !important;
   border-radius: var(--vscode-cornerRadius-medium) 0 0 var(--vscode-cornerRadius-medium) !important;
   border-right: none !important;
@@ -325,6 +325,7 @@
 .monaco-workbench .part.titlebar .command-center .action-item.monaco-dropdown-with-default:has(.codicon-null-claude-command-center) {
   display: flex !important;
   align-items: stretch !important;
+  position: relative !important;
   height: 22px !important;
   margin: 0 6px 0 -4px !important;
   background-color: var(--vscode-commandCenter-background) !important;
@@ -332,6 +333,19 @@
   border-left: none !important;
   border-radius: 0 var(--vscode-cornerRadius-medium) var(--vscode-cornerRadius-medium) 0 !important;
   overflow: hidden !important;
+}
+
+/* Divider between the pill and the button, matching the native sparkle
+   section's fused-but-separated treatment (agent-status-badge-section +
+   agent-status-badge-section::before) — a thin inset line, not a border. */
+.monaco-workbench .part.titlebar .command-center .action-item.monaco-dropdown-with-default:has(.codicon-null-claude-command-center)::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 1px;
+  background-color: var(--vscode-commandCenter-border, rgba(128, 128, 128, 0.35));
 }
 
 .monaco-workbench .part.titlebar .command-center .action-item.monaco-dropdown-with-default:has(.codicon-null-claude-command-center) .action-container {
