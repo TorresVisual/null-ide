@@ -11,6 +11,24 @@
         ],
         "createdAt": "2026-09-24T21:52:53.854Z",
         "reason": "lightbox img is a static placeholder, display:none until JS populates src on click (confirmed false positive in 2026-09-24 critique report)"
+      },
+      {
+        "rule": "gray-on-color",
+        "value": "*",
+        "files": [
+          ".superpowers/brainstorm/468-1790610965/content/settings-look.html"
+        ],
+        "createdAt": "2026-09-28T15:57:11.225Z",
+        "reason": "Claude: throwaway brainstorm mockup; option A deliberately reproduces upstream VS Code's #CCCCCC-on-#04395E TOC selection as a reference"
+      },
+      {
+        "rule": "cramped-padding",
+        "value": "*",
+        "files": [
+          ".superpowers/brainstorm/468-1790610965/content/settings-look.html"
+        ],
+        "createdAt": "2026-09-28T15:57:28.422Z",
+        "reason": "Claude: throwaway brainstorm mockup; tabs/checkboxes/TOC rows deliberately mirror VS Code's native control sizes"
       }
     ]
   }
