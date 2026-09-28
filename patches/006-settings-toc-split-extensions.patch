@@ -1,0 +1,80 @@
+Subject: [PATCH] feat(settings): split the Extensions TOC node into Null / Installed / Built-in
+
+Issue #108. See docs/specs/settings-editor-design.md.
+---
+diff --git a/src/vs/workbench/contrib/preferences/browser/settingsEditor2.ts b/src/vs/workbench/contrib/preferences/browser/settingsEditor2.ts
+index 604caadb..15b33289 100644
+--- a/src/vs/workbench/contrib/preferences/browser/settingsEditor2.ts
++++ b/src/vs/workbench/contrib/preferences/browser/settingsEditor2.ts
+@@ -1586,7 +1586,13 @@ export class SettingsEditor2 extends EditorPane {
+ 			}
+ 		}
+ 
+-		resolvedSettingsRoot.children!.push(await createTocTreeForExtensionSettings(this.extensionService, extensionSettingsGroups, filter));
++		// Null IDE: Null + Installed Extensions go right after Commonly Used, Built-in Extensions last.
++		const extSections = await createTocTreeForExtensionSettings(this.extensionService, extensionSettingsGroups, filter);
++		const builtinSection = extSections.find(section => section.id === 'builtinExtensions');
++		resolvedSettingsRoot.children!.unshift(...extSections.filter(section => section !== builtinSection));
++		if (builtinSection) {
++			resolvedSettingsRoot.children!.push(builtinSection);
++		}
+ 
+ 		resolvedSettingsRoot.children!.unshift(getCommonlyUsedData(groups));
+ 
+diff --git a/src/vs/workbench/contrib/preferences/browser/settingsTree.ts b/src/vs/workbench/contrib/preferences/browser/settingsTree.ts
+index 99458e8b..9c71b617 100644
+--- a/src/vs/workbench/contrib/preferences/browser/settingsTree.ts
++++ b/src/vs/workbench/contrib/preferences/browser/settingsTree.ts
+@@ -477,8 +477,10 @@ export function resolveConfiguredUntrustedSettings(groups: ISettingsGroup[], tar
+ 	return [...allSettings].filter(setting => setting.restricted && inspectSetting(setting.key, target, languageFilter, configurationService).isConfigured);
+ }
+ 
+-export async function createTocTreeForExtensionSettings(extensionService: IExtensionService, groups: ISettingsGroup[], filter: ITOCFilter | undefined): Promise<ITOCEntry<ISetting>> {
++export async function createTocTreeForExtensionSettings(extensionService: IExtensionService, groups: ISettingsGroup[], filter: ITOCFilter | undefined): Promise<ITOCEntry<ISetting>[]> {
+ 	const extGroupTree = new Map<string, ITOCEntry<ISetting>>();
++	// Null IDE: which TOC section each extension goes in (see SettingsEditor2.onConfigUpdate)
++	const extSection = new Map<string, string>();
+ 	const addEntryToTree = (extensionId: string, extensionName: string, childEntry: ITOCEntry<ISetting>) => {
+ 		if (!extGroupTree.has(extensionId)) {
+ 			const rootEntry = {
+@@ -498,6 +500,7 @@ export async function createTocTreeForExtensionSettings(extensionService: IExten
+ 		const extensionId = group.extensionInfo!.id;
+ 		const extension = await extensionService.getExtension(extensionId);
+ 		const extensionName = extension?.displayName ?? extension?.name ?? extensionId;
++		extSection.set(extensionId, extensionId.toLowerCase().startsWith('null.') ? 'null' : extension?.isBuiltin ? 'builtinExtensions' : 'extensions');
+ 
+ 		// There could be multiple groups with the same extension id that all belong to the same extension.
+ 		// To avoid highlighting all groups upon expanding the extension's ToC entry,
+@@ -555,11 +558,14 @@ export async function createTocTreeForExtensionSettings(extensionService: IExten
+ 		// Sort the outermost settings.
+ 		extGroups.sort((a, b) => a.label.localeCompare(b.label));
+ 
+-		return {
+-			id: 'extensions',
+-			label: localize('extensions', "Extensions"),
+-			children: extGroups
+-		};
++		const sections = [
++			{ id: 'null', label: localize('nullExtensions', "Null") },
++			{ id: 'extensions', label: localize('installedExtensions', "Installed Extensions") },
++			{ id: 'builtinExtensions', label: localize('builtinExtensions', "Built-in Extensions") },
++		];
++		return sections
++			.map(section => ({ ...section, children: extGroups.filter(entry => extSection.get(entry.id) === section.id) }))
++			.filter(section => section.children.length > 0);
+ 	});
+ }
+ 
+diff --git a/src/vs/workbench/contrib/preferences/browser/tocTree.ts b/src/vs/workbench/contrib/preferences/browser/tocTree.ts
+index b40fa10d..609d387d 100644
+--- a/src/vs/workbench/contrib/preferences/browser/tocTree.ts
++++ b/src/vs/workbench/contrib/preferences/browser/tocTree.ts
+@@ -164,7 +164,7 @@ export function createTOCIterator(model: TOCTreeModel | SettingsTreeGroupElement
+ 
+ 		return {
+ 			element: g,
+-			collapsed: undefined,
++			collapsed: g.id === 'null' ? false : undefined, // Null IDE: keep the Null section open
+ 			collapsible: hasGroupChildren,
+ 			children: g instanceof SettingsTreeGroupElement ?
+ 				createTOCIterator(g, tree) :
