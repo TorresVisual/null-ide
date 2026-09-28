@@ -375,6 +375,94 @@
   background-color: var(--vscode-commandCenter-activeBackground) !important;
 }
 
+/* ── Settings editor — "Null Compact" (#108) ────────────────────────────────
+   Theme variables only, so Light/OLED/Retro restyle too.
+   See docs/specs/settings-editor-design.md. */
+.settings-editor {
+  font-size: 12px;
+}
+
+/* Search field — rounded like the command palette filter */
+.settings-editor > .settings-header > .search-container > .suggest-input-container {
+  border-radius: 6px !important;
+  border-color: var(--vscode-widget-border, var(--vscode-input-border, transparent)) !important;
+}
+
+/* Header: drop the full-width underline; the segmented switch separates it */
+.settings-editor > .settings-header > .settings-header-controls {
+  border-bottom: none !important;
+  margin-top: 8px !important;
+  padding-bottom: 8px;
+}
+
+/* User / Workspace / Folder — segmented control instead of underlined tabs */
+.settings-editor .settings-tabs-widget > .monaco-action-bar .action-item .action-label {
+  font-size: 12px !important;
+  padding: 3px 10px !important;
+  border: 1px solid var(--vscode-input-border, var(--vscode-panel-border)) !important;
+  color: var(--vscode-descriptionForeground) !important;
+}
+.settings-editor .settings-tabs-widget > .monaco-action-bar .action-item:not(:first-child) .action-label {
+  border-left: none !important;
+}
+.settings-editor .settings-tabs-widget > .monaco-action-bar .action-item:first-child .action-label {
+  border-radius: 4px 0 0 4px;
+}
+.settings-editor .settings-tabs-widget > .monaco-action-bar .action-item:last-child .action-label {
+  border-radius: 0 4px 4px 0;
+}
+.settings-editor .settings-tabs-widget > .monaco-action-bar .action-item .action-label.checked {
+  background: var(--vscode-button-secondaryBackground) !important;
+  color: var(--vscode-foreground) !important;
+}
+
+/* TOC — 12px, soft selection with an accent edge */
+.settings-editor > .settings-body .settings-toc-container .monaco-list-row {
+  font-size: 12px;
+}
+.settings-editor > .settings-body .settings-toc-container .monaco-list-row.selected {
+  background-color: var(--vscode-list-hoverBackground) !important;
+  box-shadow: inset 2px 0 0 var(--vscode-focusBorder);
+}
+.settings-editor > .settings-body .settings-toc-container .monaco-list-row.selected .settings-toc-entry {
+  font-weight: 600 !important;
+}
+
+/* Group headings — 13 / 12 / 12px instead of 26 / 22 / 18px */
+.settings-editor > .settings-body .settings-tree-container .settings-group-title-label.settings-group-level-1 {
+  font-size: 13px !important;
+  padding: 14px 12px 6px !important;
+  border-bottom: 1px solid var(--vscode-panel-border);
+}
+.settings-editor > .settings-body .settings-tree-container .settings-group-title-label.settings-group-level-2,
+.settings-editor > .settings-body .settings-tree-container .settings-group-title-label.settings-group-level-3 {
+  font-size: 12px !important;
+  padding: 12px 12px 4px !important;
+}
+
+/* Setting rows — denser, 1px dividers, secondary-colored descriptions */
+.settings-editor > .settings-body .settings-tree-container .setting-item-contents {
+  padding: 8px 12px 10px !important;
+  border-bottom: 1px solid var(--vscode-panel-border);
+}
+.settings-editor > .settings-body .settings-tree-container .setting-item-contents .setting-item-description {
+  color: var(--vscode-descriptionForeground) !important;
+}
+
+/* Focused row: keep the background fill, drop the outline box.
+   Controls inside the row keep their own focusBorder outline. */
+.settings-editor > .settings-body .settings-tree-container .monaco-list:focus-within .monaco-list-row.focused .setting-item-contents {
+  outline: none !important;
+}
+
+/* Modified indicator — accent color, offsets matched to the new padding */
+.settings-editor > .settings-body .settings-tree-container .setting-item-contents.is-configured .setting-item-modified-indicator {
+  border-color: var(--vscode-focusBorder) !important;
+  left: 2px !important;
+  top: 10px !important;
+  bottom: 10px !important;
+}
+
 /* ── Empty editor letterpress — ambient breathing pulse ──────────────────────── */
 @keyframes null-lp-pulse {
   0%, 100% { opacity: 0.07; }
