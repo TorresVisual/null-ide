@@ -90,10 +90,16 @@ export class IssueDetailPanel {
 
   private async _sendDetail(): Promise<void> {
     if (this.creating) {
-      const [repoLabels, assignableUsers] = await Promise.all([
-        this.store.getRepoLabels(),
-        this.store.getAssignableUsers(),
-      ]);
+      let repoLabels, assignableUsers;
+      try {
+        [repoLabels, assignableUsers] = await Promise.all([
+          this.store.getRepoLabels(),
+          this.store.getAssignableUsers(),
+        ]);
+      } catch (err) {
+        this.panel.webview.postMessage({ type: 'issueDetailError', message: (err as Error).message });
+        return;
+      }
       const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
       const templates = cwd ? loadIssueTemplates(cwd) : [];
       this.panel.webview.postMessage({
@@ -236,11 +242,11 @@ export class IssueDetailPanel {
           const created = await this.store.createIssue({
             title: msg.title, body: msg.body, labels: msg.labels, assignees: msg.assignees,
           });
-          if (!created) break;
           this.onCreated?.();
           await this.openIssue(created.number);
         } catch (err) {
           void vscode.window.showErrorMessage(`Failed to create issue: ${(err as Error).message}`);
+          this.panel.webview.postMessage({ type: 'createFailed' });
         }
         break;
       }

@@ -152,7 +152,7 @@ export class IssuesViewProvider implements vscode.WebviewViewProvider {
     if (!this._view) return;
     const cwd = this._cwd();
     const hadCache = this._paintFromCache(cwd);
-    const result = await this._store.refresh(cwd, this._state);
+    const result = await this._store.refresh(this._state);
     if (result.status !== 'ok') {
       // Offline/rate-limited: leave the cached list on screen rather than replacing it with an error.
       // Deterministic state changes (signed out, remote removed, no workspace) must still update the
@@ -167,7 +167,8 @@ export class IssuesViewProvider implements vscode.WebviewViewProvider {
       return;
     }
     this._filters = { ...this._filters, viewerLogin: result.viewerLogin };
-    const repoLabels = await this._store.getRepoLabels();
+    // A failed label fetch must not blank a list that just loaded fine.
+    const repoLabels = await this._store.getRepoLabels().catch((): GithubLabel[] => []);
     this._view.postMessage({
       type: 'issues',
       status: 'ok',
@@ -198,7 +199,7 @@ export class IssuesViewProvider implements vscode.WebviewViewProvider {
           status: 'ok',
           issues: this._withClosedLocally(this._store.getFiltered(this._filters)),
           viewerLogin: this._filters.viewerLogin,
-          repoLabels: await this._store.getRepoLabels(),
+          repoLabels: await this._store.getRepoLabels().catch((): GithubLabel[] => []),
         });
         break;
       case 'selectIssue': {

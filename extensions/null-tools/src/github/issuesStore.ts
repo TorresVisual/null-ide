@@ -19,58 +19,86 @@ export type IssuesResult =
   | { status: 'error'; message: string }
   | { status: 'ok'; repo: GithubRepoRef; issues: GithubIssue[]; viewerLogin: string | null };
 
+type SessionStatus = 'no-workspace' | 'no-remote' | 'signed-out';
+
+const SESSION_MESSAGES: Record<SessionStatus, string> = {
+  'no-workspace': 'Open a folder to use GitHub issues.',
+  'no-remote': 'This folder has no GitHub remote.',
+  'signed-out': 'Sign in to GitHub to continue.',
+};
+
+/** Why no GitHub session could be established; `refresh()` maps it to the panel's status screens. */
+export class SessionError extends Error {
+  constructor(readonly status: SessionStatus) {
+    super(SESSION_MESSAGES[status]);
+  }
+}
+
+type IssuePatch = { title?: string; body?: string; state?: 'open' | 'closed'; labels?: string[]; assignees?: string[] };
+
 export class IssuesStore {
   private issues: GithubIssue[] = [];
   private repo: GithubRepoRef | null = null;
-  private token: string | null = null;
   private repoLabels: GithubLabel[] | null = null;
   private assignableUsers: GithubUser[] | null = null;
   private viewerLogin: string | null = null;
 
+  constructor(private readonly getCwd: () => string | null) {}
+
   /** Seeds in-memory state from a persisted cache, without a network call. */
   hydrateFromCache(repo: GithubRepoRef, issues: GithubIssue[], viewerLogin: string | null): void {
-    this.repo = repo;
+    this.setRepo(repo);
     this.issues = issues;
     this.viewerLogin = viewerLogin;
   }
 
-  async refresh(cwd: string | null, state: IssueState): Promise<IssuesResult> {
-    if (!cwd) return { status: 'no-workspace' };
-
+  /**
+   * Resolves the workspace's GitHub repo and a live session token. Every read and write goes through
+   * here, so no call can go out with a missing or stale repo/token (#106). `interactive` shows the
+   * sign-in prompt, and is used for user-initiated writes; background reads stay silent.
+   */
+  async ensureSession(interactive: boolean): Promise<{ repo: GithubRepoRef; token: string }> {
+    const cwd = this.getCwd();
+    if (!cwd) throw new SessionError('no-workspace');
     const repo = getWorkspaceGithubRepo(cwd);
-    if (!repo) return { status: 'no-remote' };
+    if (!repo) throw new SessionError('no-remote');
+    const session = await getGithubSession(interactive);
+    if (!session) throw new SessionError('signed-out');
+    this.setRepo(repo);
+    this.viewerLogin = session.account.label;
+    return { repo, token: session.accessToken };
+  }
 
-    const session = await getGithubSession(false);
-    if (!session) return { status: 'signed-out' };
-
+  /** Switches the active repo, dropping every per-repo cache when it actually changes. */
+  private setRepo(repo: GithubRepoRef): void {
     if (this.repo && (this.repo.owner !== repo.owner || this.repo.repo !== repo.repo)) {
+      this.issues = [];
       this.repoLabels = null;
       this.assignableUsers = null;
     }
+    this.repo = repo;
+  }
 
+  async refresh(state: IssueState): Promise<IssuesResult> {
     try {
-      const issues = await fetchIssues(repo.owner, repo.repo, state, session.accessToken);
-      this.issues = issues;
-      this.repo = repo;
-      this.token = session.accessToken;
-      this.viewerLogin = session.account.label;
-      return { status: 'ok', repo, issues, viewerLogin: session.account.label };
+      const { repo, token } = await this.ensureSession(false);
+      this.issues = await fetchIssues(repo.owner, repo.repo, state, token);
+      return { status: 'ok', repo, issues: this.issues, viewerLogin: this.viewerLogin };
     } catch (err) {
+      if (err instanceof SessionError) return { status: err.status };
       return { status: 'error', message: (err as Error).message };
     }
   }
 
   async getRepoLabels(): Promise<GithubLabel[]> {
-    if (!this.repo) return [];
-    if (!this.repoLabels) this.repoLabels = await fetchRepoLabels(this.repo.owner, this.repo.repo, this.token);
+    const { repo, token } = await this.ensureSession(false);
+    if (!this.repoLabels) this.repoLabels = await fetchRepoLabels(repo.owner, repo.repo, token);
     return this.repoLabels;
   }
 
   async getAssignableUsers(): Promise<GithubUser[]> {
-    if (!this.repo) return [];
-    if (!this.assignableUsers) {
-      this.assignableUsers = await fetchAssignableUsers(this.repo.owner, this.repo.repo, this.token);
-    }
+    const { repo, token } = await this.ensureSession(false);
+    if (!this.assignableUsers) this.assignableUsers = await fetchAssignableUsers(repo.owner, repo.repo, token);
     return this.assignableUsers;
   }
 
@@ -94,59 +122,56 @@ export class IssuesStore {
     return this.viewerLogin;
   }
 
-  getComments(issueNumber: number): Promise<GithubComment[]> {
-    if (!this.repo) return Promise.resolve([]);
-    return fetchComments(this.repo.owner, this.repo.repo, issueNumber, this.token);
+  async getComments(issueNumber: number): Promise<GithubComment[]> {
+    const { repo, token } = await this.ensureSession(false);
+    return fetchComments(repo.owner, repo.repo, issueNumber, token);
   }
 
-  getTimeline(issueNumber: number): Promise<GithubTimelineEvent[]> {
-    if (!this.repo) return Promise.resolve([]);
-    return fetchTimeline(this.repo.owner, this.repo.repo, issueNumber, this.token);
+  async getTimeline(issueNumber: number): Promise<GithubTimelineEvent[]> {
+    const { repo, token } = await this.ensureSession(false);
+    return fetchTimeline(repo.owner, repo.repo, issueNumber, token);
   }
 
   /** Re-fetches one issue from GitHub and replaces it in the cache, without refetching the whole list. */
   async reloadIssue(issueNumber: number): Promise<void> {
-    if (!this.repo) return;
-    const fresh = await fetchIssue(this.repo.owner, this.repo.repo, issueNumber, this.token);
+    const { repo, token } = await this.ensureSession(false);
+    const fresh = await fetchIssue(repo.owner, repo.repo, issueNumber, token);
     this.issues = this.issues.map(issue => (issue.number === issueNumber ? fresh : issue));
   }
 
-  async updateIssue(
-    issueNumber: number,
-    patch: { title?: string; body?: string; state?: 'open' | 'closed'; labels?: string[]; assignees?: string[] },
-  ): Promise<GithubIssue | null> {
-    if (!this.repo) return null;
-    const updated = await updateIssue(this.repo.owner, this.repo.repo, issueNumber, patch, this.token);
+  async updateIssue(issueNumber: number, patch: IssuePatch): Promise<GithubIssue> {
+    const { repo, token } = await this.ensureSession(true);
+    const updated = await updateIssue(repo.owner, repo.repo, issueNumber, patch, token);
     this.issues = this.issues.map(issue => (issue.number === issueNumber ? updated : issue));
     return updated;
   }
 
   async createIssue(
     data: { title: string; body?: string; labels?: string[]; assignees?: string[] },
-  ): Promise<GithubIssue | null> {
-    if (!this.repo) return null;
-    const created = await createIssue(this.repo.owner, this.repo.repo, data, this.token);
+  ): Promise<GithubIssue> {
+    const { repo, token } = await this.ensureSession(true);
+    const created = await createIssue(repo.owner, repo.repo, data, token);
     this.issues = [created, ...this.issues];
     return created;
   }
 
-  async addComment(issueNumber: number, body: string): Promise<GithubComment | null> {
-    if (!this.repo) return null;
-    const comment = await createComment(this.repo.owner, this.repo.repo, issueNumber, body, this.token);
+  async addComment(issueNumber: number, body: string): Promise<GithubComment> {
+    const { repo, token } = await this.ensureSession(true);
+    const comment = await createComment(repo.owner, repo.repo, issueNumber, body, token);
     this.issues = this.issues.map(issue =>
       issue.number === issueNumber ? { ...issue, comments: issue.comments + 1 } : issue,
     );
     return comment;
   }
 
-  async updateComment(commentId: number, body: string): Promise<GithubComment | null> {
-    if (!this.repo) return null;
-    return updateComment(this.repo.owner, this.repo.repo, commentId, body, this.token);
+  async updateComment(commentId: number, body: string): Promise<GithubComment> {
+    const { repo, token } = await this.ensureSession(true);
+    return updateComment(repo.owner, repo.repo, commentId, body, token);
   }
 
   async deleteComment(issueNumber: number, commentId: number): Promise<void> {
-    if (!this.repo) return;
-    await deleteComment(this.repo.owner, this.repo.repo, commentId, this.token);
+    const { repo, token } = await this.ensureSession(true);
+    await deleteComment(repo.owner, repo.repo, commentId, token);
     this.issues = this.issues.map(issue =>
       issue.number === issueNumber ? { ...issue, comments: Math.max(0, issue.comments - 1) } : issue,
     );
