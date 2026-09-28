@@ -33,6 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.formatApiError = formatApiError;
 exports.fetchIssues = fetchIssues;
 exports.fetchIssue = fetchIssue;
 exports.fetchComments = fetchComments;
@@ -46,6 +47,22 @@ exports.fetchRepoLabels = fetchRepoLabels;
 exports.fetchAssignableUsers = fetchAssignableUsers;
 const https = __importStar(require("https"));
 const issueFilter_1 = require("./issueFilter");
+/** User-facing message for a failed GitHub REST or GraphQL call, keeping GitHub's own explanation. */
+function formatApiError(status, body) {
+    const prefix = status >= 200 && status < 300 ? 'GitHub API error' : `GitHub API ${status}`;
+    let parsed;
+    try {
+        parsed = JSON.parse(body);
+    }
+    catch {
+        return prefix;
+    }
+    if (!parsed || typeof parsed !== 'object')
+        return prefix;
+    const details = (parsed.errors ?? []).map(e => typeof e === 'string' ? e : e.message ?? [e.field, e.code].filter(Boolean).join(' '));
+    const parts = [parsed.message, ...details].filter(Boolean);
+    return parts.length > 0 ? `${prefix}: ${parts.join(' · ')}` : prefix;
+}
 function requestJson(path, token, method = 'GET', body) {
     return new Promise((resolve, reject) => {
         const headers = {
@@ -59,15 +76,15 @@ function requestJson(path, token, method = 'GET', body) {
         if (payload)
             headers['Content-Type'] = 'application/json';
         const req = https.request(`https://api.github.com${path}`, { method, headers }, res => {
-            if (!res.statusCode || res.statusCode < 200 || res.statusCode >= 300) {
-                res.resume();
-                reject(new Error(`GitHub API ${res.statusCode ?? 'error'}: ${path}`));
-                return;
-            }
             let data = '';
             res.setEncoding('utf8');
             res.on('data', chunk => (data += chunk));
             res.on('end', () => {
+                const status = res.statusCode ?? 0;
+                if (status < 200 || status >= 300) {
+                    reject(new Error(formatApiError(status, data)));
+                    return;
+                }
                 if (!data) {
                     resolve(undefined);
                     return;

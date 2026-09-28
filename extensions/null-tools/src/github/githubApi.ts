@@ -4,6 +4,27 @@ import * as https from 'https';
 import { GithubComment, GithubIssue, GithubLabel, GithubTimelineEvent, GithubUser, IssueState } from './types';
 import { stripPullRequests } from './issueFilter';
 
+interface ApiErrorBody {
+  message?: string;
+  errors?: Array<string | { message?: string; field?: string; code?: string }>;
+}
+
+/** User-facing message for a failed GitHub REST or GraphQL call, keeping GitHub's own explanation. */
+export function formatApiError(status: number, body: string): string {
+  const prefix = status >= 200 && status < 300 ? 'GitHub API error' : `GitHub API ${status}`;
+  let parsed: ApiErrorBody | null;
+  try {
+    parsed = JSON.parse(body) as ApiErrorBody | null;
+  } catch {
+    return prefix;
+  }
+  if (!parsed || typeof parsed !== 'object') return prefix;
+  const details = (parsed.errors ?? []).map(e =>
+    typeof e === 'string' ? e : e.message ?? [e.field, e.code].filter(Boolean).join(' '));
+  const parts = [parsed.message, ...details].filter(Boolean);
+  return parts.length > 0 ? `${prefix}: ${parts.join(' · ')}` : prefix;
+}
+
 function requestJson<T>(
   path: string, token: string | null, method: 'GET' | 'PATCH' | 'POST' | 'DELETE' = 'GET', body?: unknown,
 ): Promise<T> {
@@ -18,15 +39,15 @@ function requestJson<T>(
     if (payload) headers['Content-Type'] = 'application/json';
 
     const req = https.request(`https://api.github.com${path}`, { method, headers }, res => {
-      if (!res.statusCode || res.statusCode < 200 || res.statusCode >= 300) {
-        res.resume();
-        reject(new Error(`GitHub API ${res.statusCode ?? 'error'}: ${path}`));
-        return;
-      }
       let data = '';
       res.setEncoding('utf8');
       res.on('data', chunk => (data += chunk));
       res.on('end', () => {
+        const status = res.statusCode ?? 0;
+        if (status < 200 || status >= 300) {
+          reject(new Error(formatApiError(status, data)));
+          return;
+        }
         if (!data) { resolve(undefined as T); return; }
         try { resolve(JSON.parse(data) as T); }
         catch (err) { reject(err as Error); }
