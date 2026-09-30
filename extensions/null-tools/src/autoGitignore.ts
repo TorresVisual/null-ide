@@ -1,10 +1,7 @@
 'use strict';
 
 import * as vscode from 'vscode';
-import {
-  DEFAULT_ARTIFACT_PATTERNS,
-  processWorkspaceAutoGitignore,
-} from './autoGitignoreStorage';
+import { processWorkspaceAutoGitignore } from './autoGitignoreStorage';
 
 export function registerAutoGitignoreFeature(context: vscode.ExtensionContext): void {
   const output = vscode.window.createOutputChannel('Null Auto-Gitignore');
@@ -18,8 +15,7 @@ export function registerAutoGitignoreFeature(context: vscode.ExtensionContext): 
     if (!enabled) { return; }
 
     const autoCommit = config.get<boolean>('autoCommit', true);
-    const userPatterns = config.get<string[]>('ignoredPatterns', []);
-    const patterns = Array.from(new Set([...DEFAULT_ARTIFACT_PATTERNS, ...userPatterns]));
+    const patterns = Array.from(new Set(config.get<string[]>('ignoredPatterns', [])));
 
     const folders = vscode.workspace.workspaceFolders;
     if (!folders || folders.length === 0) { return; }
