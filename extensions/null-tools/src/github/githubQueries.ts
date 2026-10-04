@@ -37,8 +37,8 @@ query RepoMetadata($owner: String!, $name: String!) {
   }
 }`;
 
-interface GqlUser { login: string; avatarUrl: string }
-interface GqlIssue {
+export interface GqlUser { login: string; avatarUrl: string }
+export interface GqlIssue {
   number: number; title: string; body: string | null; state: 'OPEN' | 'CLOSED'; stateReason: string | null; url: string;
   createdAt: string; updatedAt: string; closedAt: string | null; author: GqlUser | null;
   labels: { nodes: Array<{ name: string; color: string }> };
@@ -64,12 +64,12 @@ export interface MetadataData {
   };
 }
 
-const toUser = (u: GqlUser): { login: string; avatar_url: string } => ({ login: u.login, avatar_url: u.avatarUrl });
+export const toUser = (u: GqlUser): { login: string; avatar_url: string } => ({ login: u.login, avatar_url: u.avatarUrl });
 
 /** A deleted account has no author; GitHub shows "ghost", so do we. */
-const GHOST = { login: 'ghost', avatar_url: '' };
+export const GHOST = { login: 'ghost', avatar_url: '' };
 
-function mapIssue(n: GqlIssue): GithubIssue {
+export function mapIssue(n: GqlIssue): GithubIssue {
   const sub = n.subIssuesSummary;
   return {
     number: n.number,

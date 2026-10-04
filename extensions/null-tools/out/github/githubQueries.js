@@ -1,6 +1,7 @@
 'use strict';
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.REPO_METADATA = exports.SEARCH_ISSUES = void 0;
+exports.GHOST = exports.toUser = exports.REPO_METADATA = exports.SEARCH_ISSUES = void 0;
+exports.mapIssue = mapIssue;
 exports.mapSearchPage = mapSearchPage;
 exports.mapMetadata = mapMetadata;
 const LIST_ISSUE_FIELDS = `
@@ -36,8 +37,9 @@ query RepoMetadata($owner: String!, $name: String!) {
   }
 }`;
 const toUser = (u) => ({ login: u.login, avatar_url: u.avatarUrl });
+exports.toUser = toUser;
 /** A deleted account has no author; GitHub shows "ghost", so do we. */
-const GHOST = { login: 'ghost', avatar_url: '' };
+exports.GHOST = { login: 'ghost', avatar_url: '' };
 function mapIssue(n) {
     const sub = n.subIssuesSummary;
     return {
@@ -48,8 +50,8 @@ function mapIssue(n) {
         state_reason: n.stateReason ? n.stateReason.toLowerCase() : null,
         html_url: n.url,
         labels: n.labels.nodes.map(l => ({ name: l.name, color: l.color })),
-        assignees: n.assignees.nodes.map(toUser),
-        user: n.author ? toUser(n.author) : GHOST,
+        assignees: n.assignees.nodes.map(exports.toUser),
+        user: n.author ? (0, exports.toUser)(n.author) : exports.GHOST,
         comments: n.comments.totalCount,
         created_at: n.createdAt,
         updated_at: n.updatedAt,
@@ -73,7 +75,7 @@ function mapMetadata(data) {
     const repo = data.repository;
     return {
         labels: repo.labels.nodes,
-        assignees: repo.assignableUsers.nodes.map(toUser),
+        assignees: repo.assignableUsers.nodes.map(exports.toUser),
         milestones: repo.milestones.nodes,
         issueTypes: repo.issueTypes?.nodes ?? [],
         viewerLogin: data.viewer.login,
