@@ -3,13 +3,19 @@
 import { getWorkspaceGithubRepo } from './githubRemote';
 import { getGithubSession } from './githubAuth';
 import {
-  createComment, createIssue, deleteComment, fetchAssignableUsers, fetchComments, fetchIssue, fetchRepoLabels,
+  IssuePatch, createComment, createIssue, deleteComment, fetchAssignableUsers, fetchComments, fetchIssue, fetchRepoLabels,
   fetchTimeline, requestGraphql, updateComment, updateIssue,
 } from './githubApi';
+import {
+  ADD_COMMENT, ADD_REACTION, ADD_SUB_ISSUE, DELETE_COMMENT, GqlComment, GqlReactionGroup, ISSUE_DETAIL, ISSUE_TIMELINE,
+  IssueDetailData, IssueTimelineData, REMOVE_REACTION, REMOVE_SUB_ISSUE, SET_ISSUE_TYPE, UPDATE_COMMENT, mapComment,
+  mapIssueDetail, mapReactions, mapTimelinePage,
+} from './detailQueries';
 import { MetadataData, REPO_METADATA, SEARCH_ISSUES, SearchData, mapMetadata, mapSearchPage } from './githubQueries';
 import { toApiQuery, withState } from './searchQuery';
 import {
-  GithubComment, GithubIssue, GithubLabel, GithubRepoRef, GithubTimelineEvent, GithubUser, RepoMetadata, SearchPage,
+  GithubComment, GithubIssue, GithubLabel, GithubRepoRef, GithubTimelineEvent, GithubUser, IssueDetail, IssuePost,
+  ReactionContent, ReactionGroup, RepoMetadata, SearchPage, TimelinePage,
 } from './types';
 
 export const PAGE_SIZE = 50;
@@ -28,8 +34,6 @@ export class SessionError extends Error {
     super(SESSION_MESSAGES[status]);
   }
 }
-
-type IssuePatch = { title?: string; body?: string; state?: 'open' | 'closed'; labels?: string[]; assignees?: string[] };
 
 export class IssuesStore {
   /** Every issue any list has loaded, by number, so row actions and the detail tab can find one by number. */
@@ -118,6 +122,72 @@ export class IssuesStore {
     const { repo, token } = await this.ensureSession(false);
     if (!this.assignableUsers) this.assignableUsers = await fetchAssignableUsers(repo.owner, repo.repo, token);
     return this.assignableUsers;
+  }
+
+  /** One issue with its first timeline page. Also refreshes the by-number cache the row actions read. */
+  async getDetail(issueNumber: number): Promise<IssueDetail> {
+    const { repo, token } = await this.ensureSession(false);
+    const data = await requestGraphql<IssueDetailData>(
+      ISSUE_DETAIL, { owner: repo.owner, name: repo.repo, number: issueNumber }, token);
+    const detail = mapIssueDetail(data, `${repo.owner}/${repo.repo}`);
+    this.remember([detail.issue]);
+    return detail;
+  }
+
+  async getTimelinePage(issueNumber: number, after: string): Promise<TimelinePage> {
+    const { repo, token } = await this.ensureSession(false);
+    const data = await requestGraphql<IssueTimelineData>(
+      ISSUE_TIMELINE, { owner: repo.owner, name: repo.repo, number: issueNumber, after }, token);
+    if (!data.repository.issue) throw new Error('Issue not found.');
+    return mapTimelinePage(data.repository.issue.timelineItems, `${repo.owner}/${repo.repo}`);
+  }
+
+  /** A GraphQL write. Prompts for sign-in like every user-initiated write. */
+  private async mutate<T>(query: string, variables: Record<string, unknown>): Promise<T> {
+    const { token } = await this.ensureSession(true);
+    return requestGraphql<T>(query, variables, token);
+  }
+
+  async toggleReaction(subjectId: string, content: ReactionContent, add: boolean): Promise<ReactionGroup[]> {
+    type Payload = { subject: { reactionGroups: GqlReactionGroup[] } };
+    const data = await this.mutate<{ addReaction?: Payload; removeReaction?: Payload }>(
+      add ? ADD_REACTION : REMOVE_REACTION, { id: subjectId, content });
+    return mapReactions((data.addReaction ?? data.removeReaction)!.subject.reactionGroups);
+  }
+
+  async setIssueType(issueId: string, typeId: string | null): Promise<void> {
+    await this.mutate(SET_ISSUE_TYPE, { id: issueId, typeId });
+  }
+
+  async addSubIssue(parentId: string, subIssueNumber: number): Promise<void> {
+    const { repo, token } = await this.ensureSession(true);
+    const url = `https://github.com/${repo.owner}/${repo.repo}/issues/${subIssueNumber}`;
+    await requestGraphql(ADD_SUB_ISSUE, { id: parentId, url }, token);
+  }
+
+  async removeSubIssue(parentId: string, subIssueId: string): Promise<void> {
+    await this.mutate(REMOVE_SUB_ISSUE, { id: parentId, subId: subIssueId });
+  }
+
+  /** Posts a comment and returns it already rendered, so the tab can append it without refetching. */
+  async postComment(issueNumber: number, issueId: string, body: string): Promise<IssuePost> {
+    const data = await this.mutate<{ addComment: { commentEdge: { node: GqlComment } } }>(
+      ADD_COMMENT, { id: issueId, body });
+    const issue = this.known.get(issueNumber);
+    if (issue) this.known.set(issueNumber, { ...issue, comments: issue.comments + 1 });
+    return mapComment(data.addComment.commentEdge.node);
+  }
+
+  async editComment(commentId: string, body: string): Promise<IssuePost> {
+    const data = await this.mutate<{ updateIssueComment: { issueComment: GqlComment } }>(
+      UPDATE_COMMENT, { id: commentId, body });
+    return mapComment(data.updateIssueComment.issueComment);
+  }
+
+  async removeComment(issueNumber: number, commentId: string): Promise<void> {
+    await this.mutate(DELETE_COMMENT, { id: commentId });
+    const issue = this.known.get(issueNumber);
+    if (issue) this.known.set(issueNumber, { ...issue, comments: Math.max(0, issue.comments - 1) });
   }
 
   getByNumber(number: number): GithubIssue | undefined {

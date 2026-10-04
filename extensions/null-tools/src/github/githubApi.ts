@@ -129,9 +129,19 @@ export function fetchTimeline(
   );
 }
 
+/** Fields of REST `PATCH /issues/:n` the extension sets. `milestone: null` clears it; `labels`/`assignees` replace the set. */
+export interface IssuePatch {
+  title?: string;
+  body?: string;
+  state?: 'open' | 'closed';
+  state_reason?: 'completed' | 'not_planned' | 'reopened';
+  labels?: string[];
+  assignees?: string[];
+  milestone?: number | null;
+}
+
 export function updateIssue(
-  owner: string, repo: string, issueNumber: number,
-  patch: { title?: string; body?: string; state?: 'open' | 'closed'; labels?: string[]; assignees?: string[] },
+  owner: string, repo: string, issueNumber: number, patch: IssuePatch,
   token: string | null,
 ): Promise<GithubIssue> {
   return requestJson<GithubIssue>(`/repos/${owner}/${repo}/issues/${issueNumber}`, token, 'PATCH', patch);

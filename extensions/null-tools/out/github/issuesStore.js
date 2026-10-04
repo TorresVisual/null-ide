@@ -4,6 +4,7 @@ exports.IssuesStore = exports.SessionError = exports.PAGE_SIZE = void 0;
 const githubRemote_1 = require("./githubRemote");
 const githubAuth_1 = require("./githubAuth");
 const githubApi_1 = require("./githubApi");
+const detailQueries_1 = require("./detailQueries");
 const githubQueries_1 = require("./githubQueries");
 const searchQuery_1 = require("./searchQuery");
 exports.PAGE_SIZE = 50;
@@ -107,6 +108,59 @@ class IssuesStore {
         if (!this.assignableUsers)
             this.assignableUsers = await (0, githubApi_1.fetchAssignableUsers)(repo.owner, repo.repo, token);
         return this.assignableUsers;
+    }
+    /** One issue with its first timeline page. Also refreshes the by-number cache the row actions read. */
+    async getDetail(issueNumber) {
+        const { repo, token } = await this.ensureSession(false);
+        const data = await (0, githubApi_1.requestGraphql)(detailQueries_1.ISSUE_DETAIL, { owner: repo.owner, name: repo.repo, number: issueNumber }, token);
+        const detail = (0, detailQueries_1.mapIssueDetail)(data, `${repo.owner}/${repo.repo}`);
+        this.remember([detail.issue]);
+        return detail;
+    }
+    async getTimelinePage(issueNumber, after) {
+        const { repo, token } = await this.ensureSession(false);
+        const data = await (0, githubApi_1.requestGraphql)(detailQueries_1.ISSUE_TIMELINE, { owner: repo.owner, name: repo.repo, number: issueNumber, after }, token);
+        if (!data.repository.issue)
+            throw new Error('Issue not found.');
+        return (0, detailQueries_1.mapTimelinePage)(data.repository.issue.timelineItems, `${repo.owner}/${repo.repo}`);
+    }
+    /** A GraphQL write. Prompts for sign-in like every user-initiated write. */
+    async mutate(query, variables) {
+        const { token } = await this.ensureSession(true);
+        return (0, githubApi_1.requestGraphql)(query, variables, token);
+    }
+    async toggleReaction(subjectId, content, add) {
+        const data = await this.mutate(add ? detailQueries_1.ADD_REACTION : detailQueries_1.REMOVE_REACTION, { id: subjectId, content });
+        return (0, detailQueries_1.mapReactions)((data.addReaction ?? data.removeReaction).subject.reactionGroups);
+    }
+    async setIssueType(issueId, typeId) {
+        await this.mutate(detailQueries_1.SET_ISSUE_TYPE, { id: issueId, typeId });
+    }
+    async addSubIssue(parentId, subIssueNumber) {
+        const { repo, token } = await this.ensureSession(true);
+        const url = `https://github.com/${repo.owner}/${repo.repo}/issues/${subIssueNumber}`;
+        await (0, githubApi_1.requestGraphql)(detailQueries_1.ADD_SUB_ISSUE, { id: parentId, url }, token);
+    }
+    async removeSubIssue(parentId, subIssueId) {
+        await this.mutate(detailQueries_1.REMOVE_SUB_ISSUE, { id: parentId, subId: subIssueId });
+    }
+    /** Posts a comment and returns it already rendered, so the tab can append it without refetching. */
+    async postComment(issueNumber, issueId, body) {
+        const data = await this.mutate(detailQueries_1.ADD_COMMENT, { id: issueId, body });
+        const issue = this.known.get(issueNumber);
+        if (issue)
+            this.known.set(issueNumber, { ...issue, comments: issue.comments + 1 });
+        return (0, detailQueries_1.mapComment)(data.addComment.commentEdge.node);
+    }
+    async editComment(commentId, body) {
+        const data = await this.mutate(detailQueries_1.UPDATE_COMMENT, { id: commentId, body });
+        return (0, detailQueries_1.mapComment)(data.updateIssueComment.issueComment);
+    }
+    async removeComment(issueNumber, commentId) {
+        await this.mutate(detailQueries_1.DELETE_COMMENT, { id: commentId });
+        const issue = this.known.get(issueNumber);
+        if (issue)
+            this.known.set(issueNumber, { ...issue, comments: Math.max(0, issue.comments - 1) });
     }
     getByNumber(number) {
         return this.known.get(number);
