@@ -47,6 +47,7 @@ function registerIssuesPanelFeature(context) {
         webviewOptions: { retainContextWhenHidden: true },
     }));
     context.subscriptions.push(vscode.commands.registerCommand('null.issues.create', () => provider.createIssue()));
+    context.subscriptions.push(vscode.commands.registerCommand('null.issues.openFullView', () => provider.openFullView()));
     context.subscriptions.push(vscode.commands.registerCommand('null.issues.refresh', async () => {
         await provider.refresh();
         await refreshIssueCountBar();

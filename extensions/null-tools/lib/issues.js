@@ -97,209 +97,580 @@ function issueStateBadge(state, stateReason) {
     const kind = issueStateKind(state, stateReason);
     return `<span class="state-badge state-${kind}">${issueStateIcon(state, stateReason)}${kind === 'open' ? 'Open' : 'Closed'}</span>`;
 }
-const COPY_ICON = octicon('copy');
-const OPEN_ICON = octicon('link-external');
-const CHECK_ICON = octicon('check');
-const BRANCH_ICON = octicon('git-branch');
-const WORKTREE_ICON = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/><path d="M4.5 7v3a1 1 0 001 1h3" stroke-linecap="round"/></svg>';
+function escapeHtml(s) {
+    const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+    return s.replace(/[&<>"']/g, c => map[c]);
+}
+const reconcileKeys = new WeakMap();
+const reconcileSignatures = new WeakMap();
+/**
+ * Makes `container`'s children match `items`, matched by `key`. A row whose item is unchanged (compared as JSON)
+ * keeps its DOM node, so hover, focus and scroll survive a refresh; changed rows are re-rendered in place, new
+ * ones inserted, missing ones removed, and rows are only moved when out of order. Children it didn't create
+ * (a skeleton, an old message) are removed. A repeated key is skipped.
+ */
+function reconcile(container, items, key, render) {
+    const wanted = new Set(items.map(key));
+    const existing = new Map();
+    for (const child of Array.from(container.children)) {
+        const k = reconcileKeys.get(child);
+        if (k !== undefined && wanted.has(k) && !existing.has(k))
+            existing.set(k, child);
+        else
+            container.removeChild(child);
+    }
+    const placed = new Set();
+    let previous = null;
+    for (const item of items) {
+        const k = key(item);
+        if (placed.has(k))
+            continue;
+        placed.add(k);
+        const signature = JSON.stringify(item);
+        let el = existing.get(k);
+        if (el && reconcileSignatures.get(el) !== signature) {
+            const fresh = render(item);
+            container.replaceChild(fresh, el);
+            el = fresh;
+        }
+        else if (!el) {
+            el = render(item);
+        }
+        reconcileKeys.set(el, k);
+        reconcileSignatures.set(el, signature);
+        const expected = previous ? previous.nextElementSibling : container.firstElementChild;
+        if (el !== expected)
+            container.insertBefore(el, expected);
+        previous = el;
+    }
+}
+const QUALIFIER_TOKEN = /(?:^|\s)-?[A-Za-z]+:(?:"[^"]*"?|\S*)/g;
+/** The free-text part of a search string: qualifiers (`is:open`, `label:"x y"`, `-author:bob`) removed, lowercased. */
+function freeTextOf(query) {
+    return query.replace(QUALIFIER_TOKEN, ' ').replace(/"/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+/** Instant, host-free filter over the rows already on screen: every free-text word must appear in "#number title". */
+function matchesLocalFilter(issue, query) {
+    const words = freeTextOf(query).split(' ').filter(Boolean);
+    if (words.length === 0)
+        return true;
+    const haystack = `#${issue.number} ${issue.title}`.toLowerCase();
+    return words.every(word => haystack.includes(word));
+}
+function filterPickerItems(items, text) {
+    const needle = text.trim().toLowerCase();
+    if (!needle)
+        return items;
+    return items.filter(i => { var _a; return i.label.toLowerCase().includes(needle) || ((_a = i.description) !== null && _a !== void 0 ? _a : '').toLowerCase().includes(needle); });
+}
+let closeActivePicker = null;
+let activePickerAnchor = null;
+/**
+ * Popover list under `anchor`: optional filter box, checkmarks, ↑/↓/Enter/Esc. One picker is open at a time,
+ * and activating the anchor of the open picker closes it. Styled by `.picker*` in lib/issues.css.
+ */
+function openPicker(opts) {
+    const wasOpenOnSameAnchor = activePickerAnchor === opts.anchor;
+    closeActivePicker === null || closeActivePicker === void 0 ? void 0 : closeActivePicker();
+    if (wasOpenOnSameAnchor)
+        return;
+    const items = opts.items.map(i => (Object.assign({}, i))); // multi pickers toggle `selected` on their own copy
+    const filterable = opts.filterable !== false;
+    const pop = document.createElement('div');
+    pop.className = 'picker';
+    pop.tabIndex = -1;
+    pop.innerHTML = `<div class="picker-title">${escapeHtml(opts.title)}</div>`
+        + (filterable ? '<input class="picker-filter" placeholder="Filter" spellcheck="false">' : '')
+        + '<div class="picker-list"></div>';
+    document.body.appendChild(pop);
+    const listEl = pop.querySelector('.picker-list');
+    const input = pop.querySelector('.picker-filter');
+    let shown = [];
+    let active = 0;
+    function render() {
+        var _a;
+        shown = filterPickerItems(items, input ? input.value : '');
+        if (active >= shown.length)
+            active = Math.max(0, shown.length - 1);
+        listEl.innerHTML = shown.length === 0
+            ? `<div class="picker-empty">${escapeHtml((_a = opts.emptyText) !== null && _a !== void 0 ? _a : 'Nothing to show')}</div>`
+            : shown.map((item, i) => {
+                var _a;
+                return `
+        <button type="button" class="picker-item${i === active ? ' active' : ''}" data-index="${i}">
+          <span class="picker-check">${item.selected ? octicon('check') : ''}</span>
+          <span class="picker-text">${(_a = item.html) !== null && _a !== void 0 ? _a : escapeHtml(item.label)}${item.description ? `<span class="picker-desc">${escapeHtml(item.description)}</span>` : ''}</span>
+        </button>`;
+            }).join('');
+        const activeEl = listEl.querySelector('.active');
+        if (activeEl)
+            activeEl.scrollIntoView({ block: 'nearest' });
+    }
+    function choose(index) {
+        const item = shown[index];
+        if (!item)
+            return;
+        if (opts.multi) {
+            item.selected = !item.selected;
+            render();
+        }
+        else
+            close();
+        opts.onSelect(item.value);
+    }
+    function onKeydown(e) {
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            e.stopPropagation();
+            close();
+            opts.anchor.focus();
+            return;
+        }
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            e.stopPropagation();
+            if (shown.length > 0)
+                active = (active + (e.key === 'ArrowDown' ? 1 : shown.length - 1)) % shown.length;
+            render();
+        }
+        else if (e.key === 'Enter') {
+            e.preventDefault();
+            e.stopPropagation();
+            choose(active);
+        }
+    }
+    function onOutsideMouseDown(e) {
+        const target = e.target;
+        if (!pop.contains(target) && !opts.anchor.contains(target))
+            close();
+    }
+    function close() {
+        document.removeEventListener('keydown', onKeydown, true);
+        document.removeEventListener('mousedown', onOutsideMouseDown, true);
+        pop.remove();
+        closeActivePicker = null;
+        activePickerAnchor = null;
+    }
+    listEl.addEventListener('click', e => {
+        const button = e.target.closest('.picker-item');
+        if (button)
+            choose(Number(button.dataset.index));
+    });
+    if (input)
+        input.addEventListener('input', () => { active = 0; render(); });
+    document.addEventListener('keydown', onKeydown, true);
+    document.addEventListener('mousedown', onOutsideMouseDown, true);
+    closeActivePicker = close;
+    activePickerAnchor = opts.anchor;
+    render();
+    const rect = opts.anchor.getBoundingClientRect();
+    pop.style.left = `${Math.max(4, Math.min(rect.left, window.innerWidth - pop.offsetWidth - 4))}px`;
+    pop.style.top = `${Math.max(4, Math.min(rect.bottom + 2, window.innerHeight - pop.offsetHeight - 4))}px`;
+    (input !== null && input !== void 0 ? input : pop).focus();
+}
 (function () {
     const vscode = acquireVsCodeApi();
-    const stateSelect = document.getElementById('state-select');
-    const assigneeMe = document.getElementById('assignee-me');
-    const assigneeEveryone = document.getElementById('assignee-everyone');
-    const labelPicker = document.getElementById('label-picker');
-    const searchInput = document.getElementById('search-input');
-    const listEl = document.getElementById('list');
-    const newIssueBtn = document.getElementById('new-issue-btn');
-    const refreshBtn = document.getElementById('refresh-btn');
-    const markReadBtn = document.getElementById('mark-read-btn');
-    const searchToggleBtn = document.getElementById('search-toggle-btn');
-    const filterToggleBtn = document.getElementById('filter-toggle-btn');
-    const searchBar = document.getElementById('search-bar');
-    const filterPopover = document.getElementById('filter-popover');
-    newIssueBtn.addEventListener('click', () => vscode.postMessage({ type: 'createIssue' }));
+    const el = (id) => document.getElementById(id);
+    const progressEl = el('progress');
+    const newIssueBtn = el('new-issue-btn');
+    const refreshBtn = el('refresh-btn');
+    const markReadBtn = el('mark-read-btn');
+    const fullViewBtn = el('full-view-btn');
+    const presetsBtn = el('presets-btn');
+    const searchInput = el('search-input');
+    const tabOpen = el('tab-open');
+    const tabClosed = el('tab-closed');
+    const dropdownsEl = el('dropdowns');
+    const bannerEl = el('banner');
+    const listEl = el('list');
+    const messageEl = el('message');
+    const rowsEl = el('rows');
+    const toastEl = el('toast');
+    const DROPDOWNS = [
+        { key: 'author', title: 'Author' }, { key: 'label', title: 'Labels' }, { key: 'assignee', title: 'Assignees' },
+        { key: 'milestone', title: 'Milestones' }, { key: 'type', title: 'Types' }, { key: 'sort', title: 'Sort' },
+    ];
+    const SORTS = [
+        ['created-desc', 'Newest'], ['created-asc', 'Oldest'],
+        ['updated-desc', 'Recently updated'], ['comments-desc', 'Most commented'],
+    ];
+    const PRESETS = [
+        ['is:open', 'Open issues'], ['is:open assignee:@me', 'Assigned to me'], ['is:open author:@me', 'Created by me'],
+        ['is:open mentions:@me', 'Mentioning me'], ['is:open sort:updated-desc', 'Recently updated'],
+    ];
+    let query = '';
+    let defaultQuery = 'is:open';
+    let view = { state: 'open', selected: {}, sort: null };
+    let items = [];
+    let byNumber = new Map();
+    let openCount = null;
+    let closedCount = null;
+    let hasMore = false;
+    let loading = false;
+    let metadata = null;
+    let viewerLogin = null;
+    let selectedNumber = null;
+    let searchTimer;
+    let countdownTimer;
+    let toastTimer;
+    newIssueBtn.innerHTML = octicon('plus');
+    refreshBtn.innerHTML = octicon('sync');
+    markReadBtn.innerHTML = octicon('check');
+    fullViewBtn.innerHTML = octicon('screen-full');
+    presetsBtn.innerHTML = `Filters ${octicon('triangle-down')}`;
+    function avatarHtml(user) {
+        if (!user.avatar_url)
+            return '';
+        const src = `${user.avatar_url}${user.avatar_url.includes('?') ? '&' : '?'}s=40`;
+        return `<img class="avatar" src="${escapeHtml(src)}" alt="" title="${escapeHtml(user.login)}" width="20" height="20">`;
+    }
+    function plural(n, word) {
+        return `${n} ${word}${n === 1 ? '' : 's'}`;
+    }
+    function rowHtml(r) {
+        const closed = r.state === 'closed';
+        const when = closed && r.closed_at ? `closed ${timeHtml(r.closed_at)}` : `opened ${timeHtml(r.created_at || r.updated_at)}`;
+        const prs = r.linked_prs
+            ? `<span class="count" title="${plural(r.linked_prs, 'linked pull request')}">${octicon('git-pull-request')} ${r.linked_prs}</span>` : '';
+        const avatars = r.assignees.length ? `<span class="avatars">${r.assignees.map(avatarHtml).join('')}</span>` : '';
+        const comments = r.comments
+            ? `<span class="count" title="${plural(r.comments, 'comment')}">${octicon('comment')} ${r.comments}</span>` : '';
+        const counts = prs + avatars + comments;
+        const milestone = r.milestone ? ` · ${octicon('milestone')} ${escapeHtml(r.milestone.title)}` : '';
+        const sub = r.sub_issues
+            ? ` · <span class="sub-progress" title="${r.sub_issues.completed} of ${plural(r.sub_issues.total, 'sub-issue')} done"><span style="width:${Math.round(100 * r.sub_issues.completed / r.sub_issues.total)}%"></span></span> ${r.sub_issues.completed} of ${r.sub_issues.total}`
+            : '';
+        const type = r.issue_type ? ` · ${escapeHtml(r.issue_type)}` : '';
+        return `
+      <div class="issue-row${closed ? ' closed' : ''}${r.number === selectedNumber ? ' selected' : ''}" data-number="${r.number}">
+        <span class="row-state">${issueStateIcon(r.state, r.state_reason)}</span>
+        <div class="issue-main">
+          <div class="row-top">
+            <span class="issue-title">${escapeHtml(r.title)}</span>
+            ${r.labels.map(l => `<span class="gh-label" style="${labelStyleVars(l.color)}">${escapeHtml(l.name)}</span>`).join('')}
+            ${r.you ? '<span class="you-badge">@you</span>' : ''}
+            ${r.closedLocally ? '<span class="closes-badge" title="An unpushed local commit will close this issue">closes on push</span>' : ''}
+          </div>
+          <div class="row-sub"><span class="issue-num">#${r.number}</span> · ${escapeHtml(r.user.login)} ${when}${milestone}${sub}${type}<span class="row-inline">${counts}</span></div>
+        </div>
+        <div class="row-right">${counts}</div>
+        <button type="button" class="row-menu-btn icon-btn" title="More actions" aria-label="More actions">${octicon('kebab-horizontal')}</button>
+      </div>`;
+    }
+    function showMessage(html) {
+        messageEl.innerHTML = html;
+        messageEl.classList.remove('hidden');
+    }
+    function clearStatus() {
+        clearInterval(countdownTimer);
+        bannerEl.classList.add('hidden');
+        messageEl.classList.add('hidden');
+    }
+    function applyLocalFilter() {
+        rowsEl.querySelectorAll('.issue-row').forEach(row => {
+            const issue = byNumber.get(Number(row.dataset.number));
+            row.classList.toggle('filtered', !!issue && !matchesLocalFilter(issue, searchInput.value));
+        });
+    }
+    function renderRows() {
+        byNumber = new Map(items.map(i => [i.number, i]));
+        // Rows re-render when this 5-minute bucket changes, which keeps "3 minutes ago" honest without a timer.
+        const clock = Math.floor(Date.now() / 300000);
+        const rows = items.map(i => (Object.assign(Object.assign({}, i), { you: !!viewerLogin && i.assignees.some(a => a.login === viewerLogin), clock })));
+        reconcile(rowsEl, rows, r => String(r.number), r => {
+            const holder = document.createElement('div');
+            holder.innerHTML = rowHtml(r);
+            return holder.firstElementChild;
+        });
+        applyLocalFilter();
+        if (items.length === 0) {
+            showMessage('No results matched your search.<br><button type="button" class="action" id="clear-filters">Clear filters</button>');
+        }
+    }
+    function renderTabs() {
+        const count = (n) => (n === null ? '' : ` <span class="tab-count">${n}</span>`);
+        tabOpen.innerHTML = `${octicon('issue-opened')} Open${count(openCount)}`;
+        tabClosed.innerHTML = `${octicon('issue-closed')} Closed${count(closedCount)}`;
+        tabOpen.classList.toggle('active', view.state === 'open');
+        tabClosed.classList.toggle('active', view.state === 'closed');
+    }
+    function renderDropdowns() {
+        const shown = DROPDOWNS.filter(d => {
+            if (d.key === 'milestone')
+                return !!metadata && metadata.milestones.length > 0;
+            if (d.key === 'type')
+                return !!metadata && metadata.types.length > 0;
+            return true;
+        });
+        dropdownsEl.innerHTML = shown.map(d => {
+            const active = d.key === 'sort' ? view.sort !== null : (view.selected[d.key] || []).length > 0;
+            return `<button type="button" class="gh-btn filter-btn${active ? ' active' : ''}" data-key="${d.key}">${d.title} ${octicon('triangle-down')}</button>`;
+        }).join('');
+    }
+    function isSelected(key, value) {
+        if (key === 'sort')
+            return view.sort === value;
+        return (view.selected[key] || []).some(s => s.toLowerCase() === value.toLowerCase());
+    }
+    function dropdownItems(key) {
+        if (key === 'sort')
+            return SORTS.map(([value, label]) => ({ value, label, selected: isSelected(key, value) }));
+        if (!metadata)
+            return [];
+        switch (key) {
+            case 'label':
+                return metadata.labels.map(l => ({
+                    value: l.name, label: l.name, description: l.description || undefined, selected: isSelected(key, l.name),
+                    html: `<span class="gh-label" style="${labelStyleVars(l.color)}">${escapeHtml(l.name)}</span>`,
+                }));
+            case 'author':
+            case 'assignee':
+                return metadata.assignees.map(u => ({
+                    value: u.login, label: u.login, selected: isSelected(key, u.login), html: `${avatarHtml(u)} ${escapeHtml(u.login)}`,
+                }));
+            case 'milestone':
+                return metadata.milestones.map(m => ({ value: m.title, label: m.title, selected: isSelected(key, m.title) }));
+            case 'type':
+                return metadata.types.map(t => ({ value: t.name, label: t.name, selected: isSelected(key, t.name) }));
+        }
+        return [];
+    }
+    function openDropdown(key, anchor) {
+        openPicker({
+            anchor,
+            title: DROPDOWNS.find(d => d.key === key).title,
+            items: dropdownItems(key),
+            multi: key === 'label',
+            filterable: key !== 'sort',
+            emptyText: metadata || key === 'sort' ? 'Nothing to show' : 'Loading…',
+            onSelect: value => {
+                if (key === 'label')
+                    vscode.postMessage({ type: 'editQuery', op: 'toggle', key, value });
+                else
+                    vscode.postMessage({ type: 'editQuery', op: isSelected(key, value) ? 'remove' : 'set', key, value });
+            },
+        });
+    }
+    function select(number) {
+        selectedNumber = number;
+        rowsEl.querySelectorAll('.issue-row').forEach(row => {
+            const on = Number(row.dataset.number) === number;
+            row.classList.toggle('selected', on);
+            if (on)
+                row.scrollIntoView({ block: 'nearest' });
+        });
+    }
+    function moveSelection(delta) {
+        const rows = Array.from(rowsEl.querySelectorAll('.issue-row:not(.filtered)'));
+        if (rows.length === 0)
+            return;
+        const current = rows.findIndex(r => Number(r.dataset.number) === selectedNumber);
+        const next = Math.max(0, Math.min(rows.length - 1, current + delta));
+        select(Number(rows[next].dataset.number));
+    }
+    function sendQuery() {
+        clearTimeout(searchTimer);
+        if (searchInput.value.trim() !== query)
+            vscode.postMessage({ type: 'query', text: searchInput.value });
+    }
+    function maybeLoadMore() {
+        if (!hasMore || loading)
+            return;
+        if (listEl.scrollHeight - listEl.scrollTop - listEl.clientHeight > 300)
+            return;
+        loading = true;
+        vscode.postMessage({ type: 'loadMore' });
+    }
+    function toast(text) {
+        clearTimeout(toastTimer);
+        toastEl.textContent = text;
+        toastEl.classList.remove('hidden');
+        toastTimer = window.setTimeout(() => toastEl.classList.add('hidden'), 1500);
+    }
+    function showRateLimit(retryAt, willRetry) {
+        clearInterval(countdownTimer);
+        const retryButton = '<button type="button" class="link" data-act="retry">Retry now</button>';
+        const tick = () => {
+            const seconds = Math.ceil((retryAt - Date.now()) / 1000);
+            const wait = seconds > 0 ? (willRetry ? `retrying in ${seconds}s` : `resets in ${seconds}s`) : 'ready to retry';
+            bannerEl.innerHTML = `Rate limited · ${wait} · ${retryButton}`;
+            if (seconds <= 0)
+                clearInterval(countdownTimer);
+        };
+        tick();
+        bannerEl.classList.remove('hidden');
+        countdownTimer = window.setInterval(tick, 1000);
+    }
+    function onResults(msg) {
+        clearStatus();
+        query = msg.query;
+        view = { state: msg.state, selected: msg.selected, sort: msg.sort };
+        if (msg.viewerLogin)
+            viewerLogin = msg.viewerLogin;
+        openCount = msg.openCount;
+        closedCount = msg.closedCount;
+        hasMore = msg.hasMore;
+        // Don't overwrite what the user is typing; the echo of their own Enter/pause carries the same text anyway.
+        if (document.activeElement !== searchInput)
+            searchInput.value = msg.query;
+        items = msg.append ? items.concat(msg.items) : msg.items;
+        renderTabs();
+        renderDropdowns();
+        renderRows();
+        requestAnimationFrame(maybeLoadMore);
+    }
+    function onStatus(msg) {
+        if (msg.kind === 'offline') {
+            bannerEl.innerHTML = `<span title="${escapeHtml(msg.message || '')}">Offline · showing cached results</span> · <button type="button" class="link" data-act="retry">Retry</button>`;
+            bannerEl.classList.remove('hidden');
+            return;
+        }
+        if (items.length === 0)
+            rowsEl.replaceChildren(); // drops the loading skeleton
+        if (msg.kind === 'rate-limited') {
+            showRateLimit(msg.retryAt || Date.now(), !!msg.willRetry);
+            return;
+        }
+        items = [];
+        byNumber = new Map();
+        rowsEl.replaceChildren();
+        const texts = {
+            'no-workspace': 'Open a folder to browse its GitHub issues.',
+            'no-remote': 'This folder has no GitHub remote.',
+            'signed-out': 'Sign in to GitHub to view issues.',
+            error: msg.message || 'Failed to load issues.',
+        };
+        showMessage(`${escapeHtml(texts[msg.kind] || 'Failed to load issues.')}${msg.kind === 'signed-out' ? '<br><button type="button" class="action" id="signin-btn">Sign in</button>'
+            : msg.kind === 'error' ? '<br><button type="button" class="action" id="retry-btn">Retry</button>' : ''}`);
+    }
+    newIssueBtn.addEventListener('click', () => vscode.postMessage({ type: 'create' }));
     refreshBtn.addEventListener('click', () => vscode.postMessage({ type: 'refresh' }));
     markReadBtn.addEventListener('click', () => vscode.postMessage({ type: 'markRead' }));
-    searchToggleBtn.addEventListener('click', () => {
-        searchBar.classList.toggle('hidden');
-        searchToggleBtn.classList.toggle('active');
-        if (!searchBar.classList.contains('hidden'))
-            searchInput.focus();
+    fullViewBtn.addEventListener('click', () => vscode.postMessage({ type: 'openFullView' }));
+    presetsBtn.addEventListener('click', () => openPicker({
+        anchor: presetsBtn, title: 'Filters', filterable: false,
+        items: PRESETS.map(([value, label]) => ({ value, label, selected: value === query })),
+        onSelect: value => vscode.postMessage({ type: 'query', text: value }),
+    }));
+    tabOpen.addEventListener('click', () => vscode.postMessage({ type: 'editQuery', op: 'set', key: 'state', value: 'open' }));
+    tabClosed.addEventListener('click', () => vscode.postMessage({ type: 'editQuery', op: 'set', key: 'state', value: 'closed' }));
+    dropdownsEl.addEventListener('click', e => {
+        const button = e.target.closest('.filter-btn');
+        if (button)
+            openDropdown(button.dataset.key, button);
     });
-    filterToggleBtn.addEventListener('click', () => {
-        filterPopover.classList.toggle('hidden');
-        filterToggleBtn.classList.toggle('active');
+    searchInput.addEventListener('input', () => {
+        applyLocalFilter();
+        clearTimeout(searchTimer);
+        searchTimer = window.setTimeout(sendQuery, 400);
     });
-    let assignee = 'everyone';
-    let selectedNumber = null;
-    let viewerLogin = null;
-    const selectedLabels = new Set();
-    let labelDropdownOpen = false;
-    let lastRepoLabels = [];
-    document.addEventListener('click', e => {
-        if (e.composedPath().some(n => n instanceof Element && n.classList.contains('dropdown-container')))
+    searchInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter')
+            sendQuery();
+        else if (e.key === 'Escape')
+            searchInput.blur();
+    });
+    rowsEl.addEventListener('click', e => {
+        const target = e.target;
+        const row = target.closest('.issue-row');
+        if (!row)
             return;
-        if (!labelDropdownOpen)
-            return;
-        labelDropdownOpen = false;
-        renderLabelPicker(lastRepoLabels);
-    });
-    function escapeHtml(s) {
-        const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
-        return s.replace(/[&<>"']/g, c => map[c]);
-    }
-    function sendFilters() {
-        vscode.postMessage({
-            type: 'setFilters',
-            labels: Array.from(selectedLabels),
-            assignee,
-            query: searchInput.value,
-        });
-    }
-    function renderLabelPicker(labels) {
-        var _a;
-        lastRepoLabels = labels;
-        if (labels.length === 0) {
-            labelPicker.innerHTML = '<span class="issue-meta">No labels in this repo.</span>';
-            return;
-        }
-        const selected = labels.filter(l => selectedLabels.has(l.name));
-        labelPicker.innerHTML = `
-      <button type="button" class="dropdown-trigger">
-        ${selected.length > 0 ? `<span class="selected-tags">${selected.map(l => `
-          <span class="tag gh-label" style="${labelStyleVars(l.color)}">${escapeHtml(l.name)}<span class="tag-remove" data-value="${escapeHtml(l.name)}">&times;</span></span>`).join('')}</span>`
-            : '<span class="dropdown-placeholder">Filter by label…</span>'}
-        <span class="dropdown-arrow">${labelDropdownOpen ? '▲' : '▼'}</span>
-      </button>
-      <div class="dropdown-list${labelDropdownOpen ? '' : ' hidden'}">
-        ${labels.map(l => `
-          <button type="button" class="dropdown-item${selectedLabels.has(l.name) ? ' selected' : ''}" data-value="${escapeHtml(l.name)}">
-            <span class="gh-label" style="${labelStyleVars(l.color)}">${escapeHtml(l.name)}</span>
-          </button>`).join('')}
-      </div>`;
-        (_a = labelPicker.querySelector('.dropdown-trigger')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', () => {
-            labelDropdownOpen = !labelDropdownOpen;
-            renderLabelPicker(labels);
-        });
-        labelPicker.querySelectorAll('.tag-remove').forEach(el => el.addEventListener('mousedown', e => {
-            e.preventDefault();
-            selectedLabels.delete(el.dataset.value);
-            renderLabelPicker(labels);
-            sendFilters();
-        }));
-        labelPicker.querySelectorAll('.dropdown-item').forEach(el => el.addEventListener('click', () => {
-            const v = el.dataset.value;
-            if (selectedLabels.has(v))
-                selectedLabels.delete(v);
-            else
-                selectedLabels.add(v);
-            renderLabelPicker(labels);
-            sendFilters();
-        }));
-    }
-    stateSelect.addEventListener('change', () => {
-        vscode.postMessage({ type: 'setState', state: stateSelect.value });
-    });
-    searchInput.addEventListener('input', sendFilters);
-    assigneeMe.addEventListener('click', () => {
-        assignee = 'me';
-        assigneeMe.classList.add('active');
-        assigneeEveryone.classList.remove('active');
-        sendFilters();
-    });
-    assigneeEveryone.addEventListener('click', () => {
-        assignee = 'everyone';
-        assigneeEveryone.classList.add('active');
-        assigneeMe.classList.remove('active');
-        sendFilters();
-    });
-    function renderList(issues) {
-        if (issues.length === 0) {
-            listEl.innerHTML = '<div id="empty">No issues match.</div>';
+        const number = Number(row.dataset.number);
+        const menuButton = target.closest('.row-menu-btn');
+        if (menuButton) {
+            openPicker({
+                anchor: menuButton, title: `#${number}`, filterable: false,
+                items: [
+                    { value: 'branch', label: 'Create branch' }, { value: 'worktree', label: 'Create worktree' },
+                    { value: 'copyPrompt', label: 'Copy as prompt' }, { value: 'browser', label: 'Open on github.com' },
+                ],
+                onSelect: action => vscode.postMessage({ type: 'rowAction', action, number }),
+            });
             return;
         }
-        listEl.innerHTML = issues.map(issue => {
-            const you = viewerLogin && issue.assignees.some(a => a.login === viewerLogin);
-            return `
-      <div class="issue-row${issue.state === 'closed' ? ' closed' : ''}${issue.number === selectedNumber ? ' selected' : ''}" data-number="${issue.number}">
-        <span class="row-state">${issueStateIcon(issue.state, issue.state_reason)}</span>
-        <div class="issue-main">
-          <div><span class="issue-num">#${issue.number}</span> <span class="issue-title">${escapeHtml(issue.title)}</span>${you ? '<span class="you-badge">@you</span>' : ''}${issue.closedLocally ? '<span class="closes-badge" title="An unpushed local commit will close this issue">closes on push</span>' : ''}</div>
-          <div class="issue-meta">
-            ${issue.labels.map(l => `<span class="gh-label" style="${labelStyleVars(l.color)}">${escapeHtml(l.name)}</span>`).join('')}
-            ${octicon('comment')} ${issue.comments} · updated ${timeHtml(issue.updated_at)}
-          </div>
-          <div class="row-actions">
-            <button class="branch-btn" title="Create branch for this issue">${BRANCH_ICON}</button>
-            <button class="worktree-btn" title="Create worktree for this issue">${WORKTREE_ICON}</button>
-            <button class="copy-btn" title="Copy as prompt">${COPY_ICON}</button>
-            <button class="browser-btn" title="Open in browser">${OPEN_ICON}</button>
-          </div>
-        </div>
-      </div>`;
-        }).join('');
-        listEl.querySelectorAll('.issue-row').forEach(row => {
-            var _a, _b, _c, _d;
-            const number = Number(row.dataset.number);
-            row.addEventListener('click', () => {
-                selectedNumber = number;
-                vscode.postMessage({ type: 'selectIssue', number });
-                listEl.querySelectorAll('.issue-row').forEach(r => r.classList.remove('selected'));
-                row.classList.add('selected');
-            });
-            (_a = row.querySelector('.copy-btn')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', ev => {
-                ev.stopPropagation();
-                vscode.postMessage({ type: 'copyAsPromptForIssue', number });
-            });
-            (_b = row.querySelector('.browser-btn')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', ev => {
-                ev.stopPropagation();
-                vscode.postMessage({ type: 'openIssueInBrowser', number });
-            });
-            (_c = row.querySelector('.branch-btn')) === null || _c === void 0 ? void 0 : _c.addEventListener('click', ev => {
-                ev.stopPropagation();
-                vscode.postMessage({ type: 'createBranchForIssue', number });
-            });
-            (_d = row.querySelector('.worktree-btn')) === null || _d === void 0 ? void 0 : _d.addEventListener('click', ev => {
-                ev.stopPropagation();
-                vscode.postMessage({ type: 'createWorktreeForIssue', number });
-            });
-        });
-    }
+        select(number);
+        vscode.postMessage({ type: 'open', number });
+    });
+    messageEl.addEventListener('click', e => {
+        const id = e.target.id;
+        if (id === 'signin-btn')
+            vscode.postMessage({ type: 'signIn' });
+        else if (id === 'retry-btn')
+            vscode.postMessage({ type: 'refresh' });
+        else if (id === 'clear-filters')
+            vscode.postMessage({ type: 'query', text: defaultQuery });
+    });
+    bannerEl.addEventListener('click', e => {
+        if (e.target.dataset.act === 'retry')
+            vscode.postMessage({ type: 'refresh' });
+    });
+    listEl.addEventListener('scroll', maybeLoadMore, { passive: true });
+    document.addEventListener('keydown', e => {
+        if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey)
+            return;
+        if (document.querySelector('.picker'))
+            return;
+        if (e.target.closest('input, textarea, select, button'))
+            return;
+        switch (e.key) {
+            case '/':
+                e.preventDefault();
+                searchInput.focus();
+                searchInput.select();
+                break;
+            case 'j':
+            case 'ArrowDown':
+                e.preventDefault();
+                moveSelection(1);
+                break;
+            case 'k':
+            case 'ArrowUp':
+                e.preventDefault();
+                moveSelection(-1);
+                break;
+            case 'Enter':
+                if (selectedNumber !== null)
+                    vscode.postMessage({ type: 'open', number: selectedNumber });
+                break;
+            case 'c':
+                e.preventDefault();
+                vscode.postMessage({ type: 'create' });
+                break;
+        }
+    });
     window.addEventListener('message', event => {
-        var _a, _b;
         const msg = event.data;
         switch (msg.type) {
             case 'init':
-                stateSelect.value = msg.state;
+                query = msg.query;
+                defaultQuery = msg.defaultQuery;
+                searchInput.value = msg.query;
+                fullViewBtn.classList.toggle('hidden', !msg.compact);
                 break;
-            case 'issues':
-                if (msg.status === 'ok') {
-                    viewerLogin = (_a = msg.viewerLogin) !== null && _a !== void 0 ? _a : viewerLogin;
-                    if (msg.repoLabels)
-                        renderLabelPicker(msg.repoLabels);
-                    renderList(msg.issues);
-                }
-                else {
-                    const messages = {
-                        'no-workspace': 'Open a folder to browse its GitHub issues.',
-                        'no-remote': 'This folder has no GitHub remote.',
-                        'signed-out': 'Sign in to GitHub to view issues.',
-                        'error': msg.message || 'Failed to load issues.',
-                    };
-                    const text = messages[msg.status] || 'Failed to load issues.';
-                    listEl.innerHTML = `<div id="empty">${escapeHtml(text)}${msg.status === 'signed-out' ? '<br><button class="action" id="signin-btn">Sign in</button>' : ''}</div>`;
-                    (_b = document.getElementById('signin-btn')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', () => vscode.postMessage({ type: 'signIn' }));
-                }
+            case 'results':
+                onResults(msg);
                 break;
-            case 'copiedIssue': {
-                const btn = listEl.querySelector(`.issue-row[data-number="${msg.number}"] .copy-btn`);
-                if (btn) {
-                    btn.innerHTML = CHECK_ICON;
-                    setTimeout(() => { btn.innerHTML = COPY_ICON; }, 1200);
-                }
+            case 'metadata':
+                metadata = { labels: msg.labels, assignees: msg.assignees, milestones: msg.milestones, types: msg.types };
+                if (msg.viewerLogin)
+                    viewerLogin = msg.viewerLogin;
+                renderDropdowns();
                 break;
-            }
+            case 'loading':
+                loading = msg.on;
+                progressEl.classList.toggle('hidden', !msg.on);
+                if (!msg.on)
+                    maybeLoadMore();
+                break;
+            case 'status':
+                onStatus(msg);
+                break;
+            case 'rowActionDone':
+                if (msg.action === 'copyPrompt')
+                    toast('Copied as prompt');
+                break;
         }
     });
+    renderTabs();
     vscode.postMessage({ type: 'ready' });
 })();

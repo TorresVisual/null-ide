@@ -7,7 +7,7 @@ import { formatIssueAsPrompt } from './github/promptFormat';
 import { createIssueBranch, getLocallyClosedIssueNumbers } from './github/gitBranch';
 import { toggleTaskCheckbox } from './github/taskList';
 import { loadIssueTemplates } from './github/issueTemplates';
-import { GithubLabel, GithubUser } from './github/types';
+import { GithubIssue, GithubLabel, GithubUser } from './github/types';
 
 type InboundMessage =
   | { type: 'ready' }
@@ -31,14 +31,14 @@ export class IssueDetailPanel {
   private readonly panel: vscode.WebviewPanel;
   private issueNumber = 0;
   private creating = false;
-  private onCreated?: () => void;
+  private onCreated?: (issue: GithubIssue) => void;
 
   static async show(extensionUri: vscode.Uri, store: IssuesStore, issueNumber: number): Promise<void> {
     IssueDetailPanel.open(extensionUri, store);
     await IssueDetailPanel.current!.openIssue(issueNumber);
   }
 
-  static async showCreate(extensionUri: vscode.Uri, store: IssuesStore, onCreated?: () => void): Promise<void> {
+  static async showCreate(extensionUri: vscode.Uri, store: IssuesStore, onCreated?: (issue: GithubIssue) => void): Promise<void> {
     IssueDetailPanel.open(extensionUri, store);
     await IssueDetailPanel.current!.openCreate(onCreated);
   }
@@ -82,7 +82,7 @@ export class IssueDetailPanel {
     await this._sendDetail();
   }
 
-  private async openCreate(onCreated?: () => void): Promise<void> {
+  private async openCreate(onCreated?: (issue: GithubIssue) => void): Promise<void> {
     this.creating = true;
     this.onCreated = onCreated;
     this.panel.title = 'New Issue';
@@ -239,11 +239,10 @@ export class IssueDetailPanel {
           const created = await this.store.createIssue({
             title: msg.title, body: msg.body, labels: msg.labels, assignees: msg.assignees,
           });
-          // Open the new issue before refreshing the list: onCreated() repaints from a
-          // cache snapshot that doesn't include `created` yet, and would otherwise
-          // overwrite the store's in-memory issues before openIssue's getByNumber runs.
+          // Open the new issue first so the detail tab finds it in the store, then let the lists
+          // insert it. They don't search for it: GitHub's search index lags a few seconds behind.
           await this.openIssue(created.number);
-          this.onCreated?.();
+          this.onCreated?.(created);
         } catch (err) {
           void vscode.window.showErrorMessage(`Failed to create issue: ${(err as Error).message}`);
           this.panel.webview.postMessage({ type: 'createFailed' });

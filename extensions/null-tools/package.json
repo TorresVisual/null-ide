@@ -181,6 +181,11 @@
         "icon": "$(refresh)"
       },
       {
+        "command": "null.issues.openFullView",
+        "title": "Null: Open GitHub Issues in Full View",
+        "icon": "$(screen-full)"
+      },
+      {
         "command": "null.issues.signIn",
         "title": "Null: Sign in to GitHub"
       },
@@ -398,6 +403,7 @@
         { "command": "null.discord.testConnection" },
         { "command": "null.issues.create" },
         { "command": "null.issues.refresh" },
+        { "command": "null.issues.openFullView" },
         { "command": "null.issues.signIn" },
         { "command": "null.issues.markRead" },
         { "command": "null.issues.linkFromCommitMessage" },

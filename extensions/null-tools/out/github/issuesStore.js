@@ -1,16 +1,18 @@
 'use strict';
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.IssuesStore = exports.SessionError = void 0;
+exports.IssuesStore = exports.SessionError = exports.PAGE_SIZE = void 0;
 const githubRemote_1 = require("./githubRemote");
 const githubAuth_1 = require("./githubAuth");
 const githubApi_1 = require("./githubApi");
-const issueFilter_1 = require("./issueFilter");
+const githubQueries_1 = require("./githubQueries");
+const searchQuery_1 = require("./searchQuery");
+exports.PAGE_SIZE = 50;
 const SESSION_MESSAGES = {
     'no-workspace': 'Open a folder to use GitHub issues.',
     'no-remote': 'This folder has no GitHub remote.',
     'signed-out': 'Sign in to GitHub to continue.',
 };
-/** Why no GitHub session could be established; `refresh()` maps it to the panel's status screens. */
+/** Why no GitHub session could be established; the list controller maps it to the panel's status screens. */
 class SessionError extends Error {
     status;
     constructor(status) {
@@ -21,19 +23,20 @@ class SessionError extends Error {
 exports.SessionError = SessionError;
 class IssuesStore {
     getCwd;
-    issues = [];
+    /** Every issue any list has loaded, by number, so row actions and the detail tab can find one by number. */
+    known = new Map();
     repo = null;
     repoLabels = null;
     assignableUsers = null;
+    metadata = null;
     viewerLogin = null;
     constructor(getCwd) {
         this.getCwd = getCwd;
     }
     /** Seeds in-memory state from a persisted cache, without a network call. */
-    hydrateFromCache(repo, issues, viewerLogin) {
+    hydrateFromCache(repo, issues) {
         this.setRepo(repo);
-        this.issues = issues;
-        this.viewerLogin = viewerLogin;
+        this.remember(issues);
     }
     /**
      * Resolves the workspace's GitHub repo and a live session token. Every read and write goes through
@@ -58,23 +61,40 @@ class IssuesStore {
     /** Switches the active repo, dropping every per-repo cache when it actually changes. */
     setRepo(repo) {
         if (this.repo && (this.repo.owner !== repo.owner || this.repo.repo !== repo.repo)) {
-            this.issues = [];
+            this.known.clear();
             this.repoLabels = null;
             this.assignableUsers = null;
+            this.metadata = null;
         }
         this.repo = repo;
     }
-    async refresh(state) {
-        try {
-            const { repo, token } = await this.ensureSession(false);
-            this.issues = await (0, githubApi_1.fetchIssues)(repo.owner, repo.repo, state, token);
-            return { status: 'ok', repo, issues: this.issues, viewerLogin: this.viewerLogin };
+    remember(issues) {
+        for (const issue of issues)
+            this.known.set(issue.number, issue);
+    }
+    /** One page of a search. `withCounts` also fetches the Open/Closed tab counts (first page only). */
+    async search(query, cursor, withCounts) {
+        const { repo, token } = await this.ensureSession(false);
+        const name = `${repo.owner}/${repo.repo}`;
+        const data = await (0, githubApi_1.requestGraphql)(githubQueries_1.SEARCH_ISSUES, {
+            q: (0, searchQuery_1.toApiQuery)(name, query),
+            qOpen: (0, searchQuery_1.toApiQuery)(name, (0, searchQuery_1.withState)(query, 'open')),
+            qClosed: (0, searchQuery_1.toApiQuery)(name, (0, searchQuery_1.withState)(query, 'closed')),
+            first: exports.PAGE_SIZE,
+            after: cursor,
+            withCounts,
+        }, token);
+        const page = (0, githubQueries_1.mapSearchPage)(data);
+        this.remember(page.items);
+        return page;
+    }
+    /** Labels, assignable users, milestones and issue types for the filter dropdowns. Cached until `force`. */
+    async getMetadata(force = false) {
+        const { repo, token } = await this.ensureSession(false);
+        if (force || !this.metadata) {
+            this.metadata = (0, githubQueries_1.mapMetadata)(await (0, githubApi_1.requestGraphql)(githubQueries_1.REPO_METADATA, { owner: repo.owner, name: repo.repo }, token));
         }
-        catch (err) {
-            if (err instanceof SessionError)
-                return { status: err.status };
-            return { status: 'error', message: err.message };
-        }
+        return this.metadata;
     }
     async getRepoLabels() {
         const { repo, token } = await this.ensureSession(false);
@@ -88,14 +108,8 @@ class IssuesStore {
             this.assignableUsers = await (0, githubApi_1.fetchAssignableUsers)(repo.owner, repo.repo, token);
         return this.assignableUsers;
     }
-    getFiltered(opts) {
-        return (0, issueFilter_1.filterIssues)(this.issues, opts);
-    }
     getByNumber(number) {
-        return this.issues.find(issue => issue.number === number);
-    }
-    getAllIssues() {
-        return this.issues;
+        return this.known.get(number);
     }
     getRepo() {
         return this.repo;
@@ -111,28 +125,29 @@ class IssuesStore {
         const { repo, token } = await this.ensureSession(false);
         return (0, githubApi_1.fetchTimeline)(repo.owner, repo.repo, issueNumber, token);
     }
-    /** Re-fetches one issue from GitHub and replaces it in the cache, without refetching the whole list. */
+    /** Re-fetches one issue from GitHub and replaces it in the cache, without refetching any list. */
     async reloadIssue(issueNumber) {
         const { repo, token } = await this.ensureSession(false);
-        const fresh = await (0, githubApi_1.fetchIssue)(repo.owner, repo.repo, issueNumber, token);
-        this.issues = this.issues.map(issue => (issue.number === issueNumber ? fresh : issue));
+        this.remember([await (0, githubApi_1.fetchIssue)(repo.owner, repo.repo, issueNumber, token)]);
     }
     async updateIssue(issueNumber, patch) {
         const { repo, token } = await this.ensureSession(true);
         const updated = await (0, githubApi_1.updateIssue)(repo.owner, repo.repo, issueNumber, patch, token);
-        this.issues = this.issues.map(issue => (issue.number === issueNumber ? updated : issue));
+        this.remember([updated]);
         return updated;
     }
     async createIssue(data) {
         const { repo, token } = await this.ensureSession(true);
         const created = await (0, githubApi_1.createIssue)(repo.owner, repo.repo, data, token);
-        this.issues = [created, ...this.issues];
+        this.remember([created]);
         return created;
     }
     async addComment(issueNumber, body) {
         const { repo, token } = await this.ensureSession(true);
         const comment = await (0, githubApi_1.createComment)(repo.owner, repo.repo, issueNumber, body, token);
-        this.issues = this.issues.map(issue => issue.number === issueNumber ? { ...issue, comments: issue.comments + 1 } : issue);
+        const issue = this.known.get(issueNumber);
+        if (issue)
+            this.known.set(issueNumber, { ...issue, comments: issue.comments + 1 });
         return comment;
     }
     async updateComment(commentId, body) {
@@ -142,7 +157,9 @@ class IssuesStore {
     async deleteComment(issueNumber, commentId) {
         const { repo, token } = await this.ensureSession(true);
         await (0, githubApi_1.deleteComment)(repo.owner, repo.repo, commentId, token);
-        this.issues = this.issues.map(issue => issue.number === issueNumber ? { ...issue, comments: Math.max(0, issue.comments - 1) } : issue);
+        const issue = this.known.get(issueNumber);
+        if (issue)
+            this.known.set(issueNumber, { ...issue, comments: Math.max(0, issue.comments - 1) });
     }
 }
 exports.IssuesStore = IssuesStore;

@@ -63,13 +63,6 @@ export interface GithubTimelineEvent {
   source?: { issue?: { number: number; title: string; html_url: string; repository?: { full_name: string } } };
 }
 
-export interface IssueFilterOptions {
-  labels: string[];
-  assignee: 'me' | 'everyone';
-  query: string;
-  viewerLogin: string | null;
-}
-
 export interface IssueTemplate {
   name: string;
   title: string;

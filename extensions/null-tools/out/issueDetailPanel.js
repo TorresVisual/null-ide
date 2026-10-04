@@ -256,11 +256,10 @@ class IssueDetailPanel {
                     const created = await this.store.createIssue({
                         title: msg.title, body: msg.body, labels: msg.labels, assignees: msg.assignees,
                     });
-                    // Open the new issue before refreshing the list: onCreated() repaints from a
-                    // cache snapshot that doesn't include `created` yet, and would otherwise
-                    // overwrite the store's in-memory issues before openIssue's getByNumber runs.
+                    // Open the new issue first so the detail tab finds it in the store, then let the lists
+                    // insert it. They don't search for it: GitHub's search index lags a few seconds behind.
                     await this.openIssue(created.number);
-                    this.onCreated?.();
+                    this.onCreated?.(created);
                 }
                 catch (err) {
                     void vscode.window.showErrorMessage(`Failed to create issue: ${err.message}`);
