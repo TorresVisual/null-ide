@@ -1,8 +1,19 @@
+<div align="center">
+
+<img src="icons/icon.png" alt="Null IDE" width="128" />
+
 # Null IDE
 
-A minimal, opinionated code editor for Windows, built on [VSCodium](https://vscodium.com) and shipped fully assembled: dark theme, icon pack, GitHub Issues, formatters, C++ navigation, native Explorer integration, and **zero telemetry**.
+**A minimal, opinionated code editor for Windows.**
+Fully assembled out of the box, with zero telemetry.
+
+VSCodium · Electron · TypeScript · C++ · Inno Setup
 
 [Website](https://torresvisual.github.io/null-ide/) · [Releases](https://github.com/TorresVisual/null-ide/releases/latest)
+
+</div>
+
+Null IDE is built on [VSCodium](https://vscodium.com) and ships with a dark theme, icon pack, GitHub Issues, formatters, C++ navigation, and native Explorer integration already in place.
 
 ```powershell
 irm https://github.com/TorresVisual/null-ide/releases/latest/download/install-null-ide.ps1 | iex
