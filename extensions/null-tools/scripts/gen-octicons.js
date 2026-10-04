@@ -12,6 +12,8 @@ const NAMES = [
   'issue-opened', 'issue-closed', 'skip', 'comment', 'copy', 'check', 'link-external', 'git-branch',
   'git-pull-request', 'milestone', 'issue-tracks', 'kebab-horizontal', 'triangle-down', 'screen-full',
   'search', 'x', 'plus', 'sync',
+  'git-merge', 'git-pull-request-closed', 'git-pull-request-draft', 'gear', 'smiley', 'pencil', 'trash', 'quote',
+  'link', 'tag', 'person', 'git-commit', 'issue-reopened', 'cross-reference', 'image',
 ];
 
 const pkgDir = process.argv[2];

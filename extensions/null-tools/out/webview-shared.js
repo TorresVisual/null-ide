@@ -20,6 +20,21 @@ const OCTICON_PATHS = {
     'x': "<path d=\"M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z\"></path>",
     'plus': "<path d=\"M7.75 2a.75.75 0 0 1 .75.75V7h4.25a.75.75 0 0 1 0 1.5H8.5v4.25a.75.75 0 0 1-1.5 0V8.5H2.75a.75.75 0 0 1 0-1.5H7V2.75A.75.75 0 0 1 7.75 2Z\"></path>",
     'sync': "<path d=\"M1.705 8.005a.75.75 0 0 1 .834.656 5.5 5.5 0 0 0 9.592 2.97l-1.204-1.204a.25.25 0 0 1 .177-.427h3.646a.25.25 0 0 1 .25.25v3.646a.25.25 0 0 1-.427.177l-1.38-1.38A7.002 7.002 0 0 1 1.05 8.84a.75.75 0 0 1 .656-.834ZM8 2.5a5.487 5.487 0 0 0-4.131 1.869l1.204 1.204A.25.25 0 0 1 4.896 6H1.25A.25.25 0 0 1 1 5.75V2.104a.25.25 0 0 1 .427-.177l1.38 1.38A7.002 7.002 0 0 1 14.95 7.16a.75.75 0 0 1-1.49.178A5.5 5.5 0 0 0 8 2.5Z\"></path>",
+    'git-merge': "<path d=\"M5.45 5.154A4.25 4.25 0 0 0 9.25 7.5h1.378a2.251 2.251 0 1 1 0 1.5H9.25A5.734 5.734 0 0 1 5 7.123v3.505a2.25 2.25 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.95-.218ZM4.25 13.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm8.5-4.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5ZM5 3.25a.75.75 0 1 0 0 .005V3.25Z\"></path>",
+    'git-pull-request-closed': "<path d=\"M3.25 1A2.25 2.25 0 0 1 4 5.372v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.251 2.251 0 0 1 3.25 1Zm9.5 5.5a.75.75 0 0 1 .75.75v3.378a2.251 2.251 0 1 1-1.5 0V7.25a.75.75 0 0 1 .75-.75Zm-2.03-5.273a.75.75 0 0 1 1.06 0l.97.97.97-.97a.748.748 0 0 1 1.265.332.75.75 0 0 1-.205.729l-.97.97.97.97a.751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018l-.97-.97-.97.97a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734l.97-.97-.97-.97a.75.75 0 0 1 0-1.06ZM2.5 3.25a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0ZM3.25 12a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm9.5 0a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Z\"></path>",
+    'git-pull-request-draft': "<path d=\"M3.25 1A2.25 2.25 0 0 1 4 5.372v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.251 2.251 0 0 1 3.25 1Zm9.5 14a2.25 2.25 0 1 1 0-4.5 2.25 2.25 0 0 1 0 4.5ZM2.5 3.25a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0ZM3.25 12a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm9.5 0a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5ZM14 7.5a1.25 1.25 0 1 1-2.5 0 1.25 1.25 0 0 1 2.5 0Zm0-4.25a1.25 1.25 0 1 1-2.5 0 1.25 1.25 0 0 1 2.5 0Z\"></path>",
+    'gear': "<path d=\"M8 0a8.2 8.2 0 0 1 .701.031C9.444.095 9.99.645 10.16 1.29l.288 1.107c.018.066.079.158.212.224.231.114.454.243.668.386.123.082.233.09.299.071l1.103-.303c.644-.176 1.392.021 1.82.63.27.385.506.792.704 1.218.315.675.111 1.422-.364 1.891l-.814.806c-.049.048-.098.147-.088.294.016.257.016.515 0 .772-.01.147.038.246.088.294l.814.806c.475.469.679 1.216.364 1.891a7.977 7.977 0 0 1-.704 1.217c-.428.61-1.176.807-1.82.63l-1.102-.302c-.067-.019-.177-.011-.3.071a5.909 5.909 0 0 1-.668.386c-.133.066-.194.158-.211.224l-.29 1.106c-.168.646-.715 1.196-1.458 1.26a8.006 8.006 0 0 1-1.402 0c-.743-.064-1.289-.614-1.458-1.26l-.289-1.106c-.018-.066-.079-.158-.212-.224a5.738 5.738 0 0 1-.668-.386c-.123-.082-.233-.09-.299-.071l-1.103.303c-.644.176-1.392-.021-1.82-.63a8.12 8.12 0 0 1-.704-1.218c-.315-.675-.111-1.422.363-1.891l.815-.806c.05-.048.098-.147.088-.294a6.214 6.214 0 0 1 0-.772c.01-.147-.038-.246-.088-.294l-.815-.806C.635 6.045.431 5.298.746 4.623a7.92 7.92 0 0 1 .704-1.217c.428-.61 1.176-.807 1.82-.63l1.102.302c.067.019.177.011.3-.071.214-.143.437-.272.668-.386.133-.066.194-.158.211-.224l.29-1.106C6.009.645 6.556.095 7.299.03 7.53.01 7.764 0 8 0Zm-.571 1.525c-.036.003-.108.036-.137.146l-.289 1.105c-.147.561-.549.967-.998 1.189-.173.086-.34.183-.5.29-.417.278-.97.423-1.529.27l-1.103-.303c-.109-.03-.175.016-.195.045-.22.312-.412.644-.573.99-.014.031-.021.11.059.19l.815.806c.411.406.562.957.53 1.456a4.709 4.709 0 0 0 0 .582c.032.499-.119 1.05-.53 1.456l-.815.806c-.081.08-.073.159-.059.19.162.346.353.677.573.989.02.03.085.076.195.046l1.102-.303c.56-.153 1.113-.008 1.53.27.161.107.328.204.501.29.447.222.85.629.997 1.189l.289 1.105c.029.109.101.143.137.146a6.6 6.6 0 0 0 1.142 0c.036-.003.108-.036.137-.146l.289-1.105c.147-.561.549-.967.998-1.189.173-.086.34-.183.5-.29.417-.278.97-.423 1.529-.27l1.103.303c.109.029.175-.016.195-.045.22-.313.411-.644.573-.99.014-.031.021-.11-.059-.19l-.815-.806c-.411-.406-.562-.957-.53-1.456a4.709 4.709 0 0 0 0-.582c-.032-.499.119-1.05.53-1.456l.815-.806c.081-.08.073-.159.059-.19a6.464 6.464 0 0 0-.573-.989c-.02-.03-.085-.076-.195-.046l-1.102.303c-.56.153-1.113.008-1.53-.27a4.44 4.44 0 0 0-.501-.29c-.447-.222-.85-.629-.997-1.189l-.289-1.105c-.029-.11-.101-.143-.137-.146a6.6 6.6 0 0 0-1.142 0ZM11 8a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM9.5 8a1.5 1.5 0 1 0-3.001.001A1.5 1.5 0 0 0 9.5 8Z\"></path>",
+    'smiley': "<path d=\"M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Zm3.82 1.636a.75.75 0 0 1 1.038.175l.007.009c.103.118.22.222.35.31.264.178.683.37 1.285.37.602 0 1.02-.192 1.285-.371.13-.088.247-.192.35-.31l.007-.008a.75.75 0 0 1 1.222.87l-.022-.015c.02.013.021.015.021.015v.001l-.001.002-.002.003-.005.007-.014.019a2.066 2.066 0 0 1-.184.213c-.16.166-.338.316-.53.445-.63.418-1.37.638-2.127.629-.946 0-1.652-.308-2.126-.63a3.331 3.331 0 0 1-.715-.657l-.014-.02-.005-.006-.002-.003v-.002h-.001l.613-.432-.614.43a.75.75 0 0 1 .183-1.044ZM12 7a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM5 8a1 1 0 1 1 0-2 1 1 0 0 1 0 2Zm5.25 2.25.592.416a97.71 97.71 0 0 0-.592-.416Z\"></path>",
+    'pencil': "<path d=\"M11.013 1.427a1.75 1.75 0 0 1 2.474 0l1.086 1.086a1.75 1.75 0 0 1 0 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a.75.75 0 0 1-.927-.928l.929-3.25c.081-.286.235-.547.445-.758l8.61-8.61Zm.176 4.823L9.75 4.81l-6.286 6.287a.253.253 0 0 0-.064.108l-.558 1.953 1.953-.558a.253.253 0 0 0 .108-.064Zm1.238-3.763a.25.25 0 0 0-.354 0L10.811 3.75l1.439 1.44 1.263-1.263a.25.25 0 0 0 0-.354Z\"></path>",
+    'trash': "<path d=\"M11 1.75V3h2.25a.75.75 0 0 1 0 1.5H2.75a.75.75 0 0 1 0-1.5H5V1.75C5 .784 5.784 0 6.75 0h2.5C10.216 0 11 .784 11 1.75ZM4.496 6.675l.66 6.6a.25.25 0 0 0 .249.225h5.19a.25.25 0 0 0 .249-.225l.66-6.6a.75.75 0 0 1 1.492.149l-.66 6.6A1.748 1.748 0 0 1 10.595 15h-5.19a1.75 1.75 0 0 1-1.741-1.575l-.66-6.6a.75.75 0 1 1 1.492-.15ZM6.5 1.75V3h3V1.75a.25.25 0 0 0-.25-.25h-2.5a.25.25 0 0 0-.25.25Z\"></path>",
+    'quote': "<path d=\"M1.75 2.5h10.5a.75.75 0 0 1 0 1.5H1.75a.75.75 0 0 1 0-1.5Zm4 5h8.5a.75.75 0 0 1 0 1.5h-8.5a.75.75 0 0 1 0-1.5Zm0 5h8.5a.75.75 0 0 1 0 1.5h-8.5a.75.75 0 0 1 0-1.5ZM2.5 7.75v6a.75.75 0 0 1-1.5 0v-6a.75.75 0 0 1 1.5 0Z\"></path>",
+    'link': "<path d=\"m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z\"></path>",
+    'tag': "<path d=\"M1 7.775V2.75C1 1.784 1.784 1 2.75 1h5.025c.464 0 .91.184 1.238.513l6.25 6.25a1.75 1.75 0 0 1 0 2.474l-5.026 5.026a1.75 1.75 0 0 1-2.474 0l-6.25-6.25A1.752 1.752 0 0 1 1 7.775Zm1.5 0c0 .066.026.13.073.177l6.25 6.25a.25.25 0 0 0 .354 0l5.025-5.025a.25.25 0 0 0 0-.354l-6.25-6.25a.25.25 0 0 0-.177-.073H2.75a.25.25 0 0 0-.25.25ZM6 5a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z\"></path>",
+    'person': "<path d=\"M10.561 8.073a6.005 6.005 0 0 1 3.432 5.142.75.75 0 1 1-1.498.07 4.5 4.5 0 0 0-8.99 0 .75.75 0 0 1-1.498-.07 6.004 6.004 0 0 1 3.431-5.142 3.999 3.999 0 1 1 5.123 0ZM10.5 5a2.5 2.5 0 1 0-5 0 2.5 2.5 0 0 0 5 0Z\"></path>",
+    'git-commit': "<path d=\"M11.93 8.5a4.002 4.002 0 0 1-7.86 0H.75a.75.75 0 0 1 0-1.5h3.32a4.002 4.002 0 0 1 7.86 0h3.32a.75.75 0 0 1 0 1.5Zm-1.43-.75a2.5 2.5 0 1 0-5 0 2.5 2.5 0 0 0 5 0Z\"></path>",
+    'issue-reopened': "<path d=\"M5.029 2.217a6.5 6.5 0 0 1 9.437 5.11.75.75 0 1 0 1.492-.154 8 8 0 0 0-14.315-4.03L.427 1.927A.25.25 0 0 0 0 2.104V5.75A.25.25 0 0 0 .25 6h3.646a.25.25 0 0 0 .177-.427L2.715 4.215a6.491 6.491 0 0 1 2.314-1.998ZM1.262 8.169a.75.75 0 0 0-1.22.658 8.001 8.001 0 0 0 14.315 4.03l1.216 1.216a.25.25 0 0 0 .427-.177V10.25a.25.25 0 0 0-.25-.25h-3.646a.25.25 0 0 0-.177.427l1.358 1.358a6.501 6.501 0 0 1-11.751-3.11.75.75 0 0 0-.272-.506Z\"></path><path d=\"M9.06 9.06a1.5 1.5 0 1 1-2.12-2.12 1.5 1.5 0 0 1 2.12 2.12Z\"></path>",
+    'cross-reference': "<path d=\"M2.75 3.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h2a.75.75 0 0 1 .75.75v2.19l2.72-2.72a.749.749 0 0 1 .53-.22h4.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 13H9.06l-2.573 2.573A1.458 1.458 0 0 1 4 14.543V13H2.75A1.75 1.75 0 0 1 1 11.25v-7.5C1 2.784 1.784 2 2.75 2h5.5a.75.75 0 0 1 0 1.5ZM16 1.25v4.146a.25.25 0 0 1-.427.177L14.03 4.03l-3.75 3.75a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734l3.75-3.75-1.543-1.543A.25.25 0 0 1 11.604 1h4.146a.25.25 0 0 1 .25.25Z\"></path>",
+    'image': "<path d=\"M16 13.25A1.75 1.75 0 0 1 14.25 15H1.75A1.75 1.75 0 0 1 0 13.25V2.75C0 1.784.784 1 1.75 1h12.5c.966 0 1.75.784 1.75 1.75ZM1.75 2.5a.25.25 0 0 0-.25.25v10.5c0 .138.112.25.25.25h.94l.03-.03 6.077-6.078a1.75 1.75 0 0 1 2.412-.06L14.5 10.31V2.75a.25.25 0 0 0-.25-.25Zm12.5 11a.25.25 0 0 0 .25-.25v-.917l-4.298-3.889a.25.25 0 0 0-.344.009L4.81 13.5ZM7 6a2 2 0 1 1-3.999.001A2 2 0 0 1 7 6ZM5.5 6a.5.5 0 1 0-1 0 .5.5 0 0 0 1 0Z\"></path>",
 };
 /** Inline 16px Primer octicon; takes its color from CSS via fill="currentColor". */
 function octicon(name, className = '') {
@@ -253,11 +268,13 @@ function openPicker(opts) {
             close();
     }
     function close() {
+        var _a;
         document.removeEventListener('keydown', onKeydown, true);
         document.removeEventListener('mousedown', onOutsideMouseDown, true);
         pop.remove();
         closeActivePicker = null;
         activePickerAnchor = null;
+        (_a = opts.onClose) === null || _a === void 0 ? void 0 : _a.call(opts);
     }
     listEl.addEventListener('click', e => {
         const button = e.target.closest('.picker-item');
@@ -275,4 +292,213 @@ function openPicker(opts) {
     pop.style.left = `${Math.max(4, Math.min(rect.left, window.innerWidth - pop.offsetWidth - 4))}px`;
     pop.style.top = `${Math.max(4, Math.min(rect.bottom + 2, window.innerHeight - pop.offsetHeight - 4))}px`;
     (input !== null && input !== void 0 ? input : pop).focus();
+}
+// Pure HTML builders for the issue detail tab. They take data and return strings (no DOM, no state), so
+// webviewShared tests can run them in a sandbox. Every user-controlled string goes through escapeHtml;
+// `post.bodyHTML` is the exception: GitHub renders it, and the caller sanitizes it before calling postHtml.
+const REACTION_EMOJI = {
+    THUMBS_UP: '👍', THUMBS_DOWN: '👎', LAUGH: '😄', HOORAY: '🎉', CONFUSED: '😕', HEART: '❤️', ROCKET: '🚀', EYES: '👀',
+};
+const REACTION_NAMES = {
+    THUMBS_UP: 'Thumbs up', THUMBS_DOWN: 'Thumbs down', LAUGH: 'Laugh', HOORAY: 'Hooray', CONFUSED: 'Confused',
+    HEART: 'Heart', ROCKET: 'Rocket', EYES: 'Eyes',
+};
+const ROLE_LABELS = {
+    OWNER: 'Owner', MEMBER: 'Member', COLLABORATOR: 'Collaborator', CONTRIBUTOR: 'Contributor',
+};
+function avatarHtml(user, large = false) {
+    const initials = escapeHtml(user.login.slice(0, 2).toUpperCase());
+    return `<span class="avatar${large ? ' avatar-lg' : ''}" data-initials="${initials}">`
+        + `${user.avatar_url ? `<img src="${escapeHtml(user.avatar_url)}" alt="">` : ''}</span>`;
+}
+/** GitHub's author-association badge. Only the four roles github.com shows; everyone else gets none. */
+function roleBadgeHtml(association) {
+    const label = association ? ROLE_LABELS[association] : undefined;
+    return label ? `<span class="role-badge">${label}</span>` : '';
+}
+/**
+ * GitHub's image URLs need a token the webview doesn't have, and its CSP only allows avatars, so an <img> in
+ * rendered markdown would be a broken icon. Emoji become their text; any other image becomes a labelled
+ * placeholder that opens the image externally. (Phase 5 swaps this for real thumbnails.)
+ */
+function neutralizeImagesHtml(html) {
+    return html.replace(/<img\b(?:[^>"']|"[^"]*"|'[^']*')*>/gi, tag => {
+        const attr = (name) => { var _a, _b; return (_b = (_a = new RegExp(`\\s${name}="([^"]*)"`, 'i').exec(tag)) === null || _a === void 0 ? void 0 : _a[1]) !== null && _b !== void 0 ? _b : ''; };
+        // Attribute values may hold a raw < or > (only quotes are escaped inside them); this text lands in markup.
+        const alt = attr('alt').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        if (/\bclass="[^"]*\bemoji\b/i.test(tag))
+            return alt;
+        return `<span class="img-placeholder" data-src="${attr('src')}" title="Open image on github.com">${octicon('image')} ${alt || 'image'}</span>`;
+    });
+}
+/** The issue number if `href` is an issue of `repo` (`owner/name`); null for anything else, including other repos. */
+function issueNumberFromLink(href, repo) {
+    const m = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/issues\/(\d+)(?:[/?#].*)?$/i.exec(href);
+    return m && `${m[1]}/${m[2]}`.toLowerCase() === repo.toLowerCase() ? Number(m[3]) : null;
+}
+/** Reaction chips under a post; nothing when no one has reacted. */
+function reactionsHtml(post) {
+    const chips = post.reactions.filter(r => r.count > 0).map(r => {
+        var _a, _b;
+        return `
+    <button type="button" class="reaction-chip${r.viewerHasReacted ? ' active' : ''}" data-act="react" data-id="${escapeHtml(post.id)}"
+      data-content="${escapeHtml(r.content)}" title="${(_a = REACTION_NAMES[r.content]) !== null && _a !== void 0 ? _a : ''}">${(_b = REACTION_EMOJI[r.content]) !== null && _b !== void 0 ? _b : ''} ${r.count}</button>`;
+    });
+    return chips.length > 0 ? `<div class="reactions">${chips.join('')}</div>` : '';
+}
+/** The eight reactions GitHub offers, as picker items (the viewer's own are checked). */
+function reactionPickerItems(post) {
+    return Object.keys(REACTION_EMOJI).map(content => ({
+        value: content,
+        label: `${REACTION_EMOJI[content]} ${REACTION_NAMES[content]}`,
+        selected: post.reactions.some(r => r.content === content && r.viewerHasReacted),
+    }));
+}
+/**
+ * One post: the issue body (`kind: 'body'`) or a comment. A moderator-collapsed comment is folded in a
+ * <details>. `editing` swaps the rendered body for a plain textarea (the Phase 4 composer replaces it).
+ */
+function postHtml(post, kind, editing) {
+    const id = escapeHtml(post.id);
+    const edited = post.lastEditedAt
+        ? ` <span class="post-edited" title="${escapeHtml(new Date(post.lastEditedAt).toLocaleString())}">· edited</span>` : '';
+    const content = editing
+        ? `<div class="edit-form post-edit">
+         <textarea class="post-edit-input" data-id="${id}" aria-label="Edit ${kind === 'body' ? 'description' : 'comment'}">${escapeHtml(post.body)}</textarea>
+         <div class="btn-row">
+           <button type="button" class="btn btn-primary" data-act="save-edit" data-id="${id}">Update ${kind === 'body' ? 'description' : 'comment'}</button>
+           <button type="button" class="btn btn-secondary" data-act="cancel-edit">Cancel</button>
+         </div>
+       </div>`
+        : `<div class="post-body">${post.bodyHTML || '<span class="muted">No description provided.</span>'}</div>${reactionsHtml(post)}`;
+    const html = `
+    <div class="post" data-id="${id}" data-kind="${kind}">
+      <div class="post-avatar">${avatarHtml(post.author, true)}</div>
+      <div class="post-card">
+        <div class="post-header">
+          <b class="post-author">${escapeHtml(post.author.login)}</b>${roleBadgeHtml(post.authorAssociation)}
+          <span class="post-when">${kind === 'body' ? 'opened this' : 'commented'} ${timeHtml(post.createdAt)}</span>${edited}
+          <span class="post-actions">
+            <button type="button" class="icon-btn" data-act="react-picker" data-id="${id}" title="Add reaction" aria-label="Add reaction">${octicon('smiley')}</button>
+            <button type="button" class="icon-btn" data-act="post-menu" data-id="${id}" title="More actions" aria-label="More actions">${octicon('kebab-horizontal')}</button>
+          </span>
+        </div>
+        ${content}
+      </div>
+    </div>`;
+    return kind === 'comment' && post.minimizedReason
+        ? `<details class="post-minimized"><summary>This comment was marked as ${escapeHtml(post.minimizedReason.replace(/_/g, ' '))}. Show</summary>${html}</details>`
+        : html;
+}
+function eventLabelChips(labels) {
+    return labels.map(l => `<span class="gh-label" style="${labelStyleVars(l.color)}">${escapeHtml(l.name)}</span>`).join('');
+}
+function eventLink(text, url) {
+    return `<a href="${escapeHtml(url)}">${escapeHtml(text)}</a>`;
+}
+const CLOSED_REASON_TEXT = { completed: ' as completed', not_planned: ' as not planned', duplicate: ' as a duplicate' };
+/** The rail icon, its color class and the sentence for one event (without the leading actor and trailing time). */
+function eventParts(ev) {
+    var _a, _b;
+    switch (ev.type) {
+        case 'labels': {
+            const noun = (n) => (n === 1 ? 'label' : 'labels');
+            const parts = [];
+            if (ev.added.length > 0)
+                parts.push(`added ${eventLabelChips(ev.added)} ${noun(ev.added.length)}`);
+            if (ev.removed.length > 0)
+                parts.push(`removed ${eventLabelChips(ev.removed)} ${noun(ev.removed.length)}`);
+            return { icon: 'tag', tone: '', text: parts.join(' and ') };
+        }
+        case 'closed': {
+            const unplanned = ev.reason === 'not_planned' || ev.reason === 'duplicate';
+            const closer = ev.closer ? ` in ${eventLink(ev.closer.text, ev.closer.url)}` : '';
+            return {
+                icon: unplanned ? 'skip' : 'issue-closed', tone: unplanned ? 'state-not-planned' : 'state-completed',
+                text: `closed this${(_b = CLOSED_REASON_TEXT[(_a = ev.reason) !== null && _a !== void 0 ? _a : '']) !== null && _b !== void 0 ? _b : ''}${closer}`,
+            };
+        }
+        case 'reopened': return { icon: 'issue-reopened', tone: 'state-open', text: 'reopened this' };
+        case 'renamed':
+            return { icon: 'pencil', tone: '', text: `changed the title <s>${escapeHtml(ev.from)}</s> ${escapeHtml(ev.to)}` };
+        case 'assigned':
+            return { icon: 'person', tone: '', text: ev.login === ev.actor ? 'self-assigned this' : `assigned <b>${escapeHtml(ev.login)}</b>` };
+        case 'unassigned':
+            return { icon: 'person', tone: '', text: ev.login === ev.actor ? 'removed their assignment' : `unassigned <b>${escapeHtml(ev.login)}</b>` };
+        case 'milestoned': return { icon: 'milestone', tone: '', text: `added this to the <b>${escapeHtml(ev.title)}</b> milestone` };
+        case 'demilestoned': return { icon: 'milestone', tone: '', text: `removed this from the <b>${escapeHtml(ev.title)}</b> milestone` };
+        case 'cross-referenced': return { icon: 'cross-reference', tone: '', text: `mentioned this in ${eventLink(ev.text, ev.url)}` };
+        case 'connected': return { icon: 'link', tone: '', text: `linked ${eventLink(ev.text, ev.url)}` };
+        case 'referenced': return { icon: 'git-commit', tone: '', text: `referenced this in commit ${eventLink(ev.text, ev.url)}` };
+        case 'sub-issue-added': return { icon: 'issue-tracks', tone: '', text: `added sub-issue ${eventLink(ev.text, ev.url)}` };
+        case 'sub-issue-removed': return { icon: 'issue-tracks', tone: '', text: `removed sub-issue ${eventLink(ev.text, ev.url)}` };
+    }
+}
+/** One event on the timeline rail: icon badge, "actor did something", relative time. */
+function eventHtml(ev) {
+    const { icon, tone, text } = eventParts(ev);
+    return `<div class="tl-event"><span class="tl-badge ${tone}">${octicon(icon)}</span>`
+        + `<div class="tl-text"><b class="tl-actor">${escapeHtml(ev.actor)}</b> ${text} ${timeHtml(ev.at)}</div></div>`;
+}
+// Pure HTML for the detail tab's right sidebar and the sub-issue block (see detailHtml.ts for the conventions).
+function sidebarSection(key, title, canEdit, body) {
+    const edit = canEdit
+        ? `<button type="button" class="icon-btn" data-act="pick-${key}" title="Edit ${title.toLowerCase()}" aria-label="Edit ${title.toLowerCase()}">${octicon('gear')}</button>`
+        : '';
+    return `<section class="sb-section" data-sec="${key}"><div class="sb-head"><span>${title}</span>${edit}</div><div class="sb-body">${body}</div></section>`;
+}
+function pullRequestIcon(pr) {
+    if (pr.state === 'merged')
+        return octicon('git-merge', 'pr-icon pr-merged');
+    if (pr.state === 'closed')
+        return octicon('git-pull-request-closed', 'pr-icon pr-closed');
+    return pr.isDraft ? octicon('git-pull-request-draft', 'pr-icon pr-draft') : octicon('git-pull-request', 'pr-icon pr-open');
+}
+/** Assignees, Labels, Type (only for repos that have issue types), Milestone, Development, Participants. */
+function sidebarHtml(d, meta, viewer) {
+    const canEdit = d.post.viewerCanUpdate;
+    const none = (text) => `<span class="muted">${text}</span>`;
+    const assignees = d.issue.assignees.length > 0
+        ? d.issue.assignees.map(a => `<div class="sb-person">${avatarHtml(a)} ${escapeHtml(a.login)}</div>`).join('')
+        : none('No one')
+            + (canEdit && viewer ? ` <button type="button" class="link-btn" data-act="assign-me">assign yourself</button>` : '');
+    const labels = d.issue.labels.length > 0 ? eventLabelChips(d.issue.labels) : none('None yet');
+    const type = d.issueType ? escapeHtml(d.issueType.name) : none('No type');
+    const milestone = d.milestone
+        ? `<div>${octicon('milestone')} ${escapeHtml(d.milestone.title)}</div>`
+            + `<div class="progress" title="${d.milestone.percent}% complete"><span style="width:${d.milestone.percent}%"></span></div>`
+        : none('No milestone');
+    const prs = d.linkedPrs.map(pr => `<div class="sb-pr"><a href="${escapeHtml(pr.url)}">${pullRequestIcon(pr)} ${escapeHtml(pr.title)} <span class="muted">#${pr.number}</span></a></div>`).join('');
+    const development = prs
+        + `<div class="sb-dev-actions"><button type="button" class="link-btn" data-act="branch">${octicon('git-branch')} Create a branch</button>`
+        + `<button type="button" class="link-btn" data-act="worktree">${octicon('git-branch')} Create a worktree</button></div>`;
+    const participants = d.participants.map(p => `<span title="${escapeHtml(p.login)}">${avatarHtml(p)}</span>`).join('');
+    return sidebarSection('assignees', 'Assignees', canEdit, assignees)
+        + sidebarSection('labels', 'Labels', canEdit, labels)
+        + (d.issueType || (meta && meta.types.length > 0) ? sidebarSection('type', 'Type', canEdit, type) : '')
+        + sidebarSection('milestone', 'Milestone', canEdit, milestone)
+        + sidebarSection('development', 'Development', false, development)
+        + (participants ? sidebarSection('participants', 'Participants', false, `<div class="sb-avatars">${participants}</div>`) : '');
+}
+/** The sub-issue list under the issue body: progress, one row per child, and (when editable) add / remove. */
+function subIssuesHtml(d) {
+    if (d.subIssues.length === 0)
+        return '';
+    const canEdit = d.post.viewerCanUpdate;
+    const done = d.subIssues.filter(s => s.state === 'closed').length;
+    const percent = Math.round((done / d.subIssues.length) * 100);
+    const rows = d.subIssues.map(s => `
+    <div class="sub-row">
+      ${issueStateIcon(s.state, s.stateReason)}
+      <button type="button" class="sub-title" data-act="open-issue" data-number="${s.number}">${escapeHtml(s.title)}</button>
+      <span class="muted">#${s.number}</span>
+      <span class="sub-people">${s.assignees.map(a => avatarHtml(a)).join('')}</span>
+      ${canEdit ? `<button type="button" class="icon-btn" data-act="sub-menu" data-id="${escapeHtml(s.id)}" data-number="${s.number}" title="More actions" aria-label="More actions">${octicon('kebab-horizontal')}</button>` : ''}
+    </div>`).join('');
+    return `<section class="subissues">
+    <div class="sub-head"><b>Sub-issues</b> <span class="muted">${done} of ${d.subIssues.length}</span>
+      <div class="progress"><span style="width:${percent}%"></span></div>
+      ${canEdit ? `<button type="button" class="btn btn-ghost btn-small" data-act="add-sub">Add sub-issue</button>` : ''}
+    </div>${rows}
+  </section>`;
 }

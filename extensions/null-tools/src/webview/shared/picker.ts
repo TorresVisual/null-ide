@@ -20,6 +20,8 @@ interface PickerOptions {
   filterable?: boolean;
   emptyText?: string;
   onSelect(value: string): void;
+  /** Called once when the popover closes for any reason (pick in a single-select picker, Esc, click outside). */
+  onClose?(): void;
 }
 
 function filterPickerItems(items: PickerItem[], text: string): PickerItem[] {
@@ -98,6 +100,7 @@ function openPicker(opts: PickerOptions): void {
     pop.remove();
     closeActivePicker = null;
     activePickerAnchor = null;
+    opts.onClose?.();
   }
 
   listEl.addEventListener('click', e => {
