@@ -33,7 +33,10 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.ApiError = void 0;
 exports.formatApiError = formatApiError;
+exports.rateLimitRetryAt = rateLimitRetryAt;
+exports.requestGraphql = requestGraphql;
 exports.fetchIssues = fetchIssues;
 exports.fetchIssue = fetchIssue;
 exports.fetchComments = fetchComments;
@@ -63,7 +66,26 @@ function formatApiError(status, body) {
     const parts = [parsed.message, ...details].filter(Boolean);
     return parts.length > 0 ? `${prefix}: ${parts.join(' · ')}` : prefix;
 }
-function requestJson(path, token, method = 'GET', body) {
+/** A failed GitHub call. `retryAt` (epoch ms) is set when GitHub says to wait before retrying. */
+class ApiError extends Error {
+    status;
+    retryAt;
+    constructor(message, status, retryAt = null) {
+        super(message);
+        this.status = status;
+        this.retryAt = retryAt;
+    }
+}
+exports.ApiError = ApiError;
+/** When a rate-limited request may be retried: `Retry-After` wins, else the primary limit's reset time. */
+function rateLimitRetryAt(headers, now = Date.now()) {
+    const retryAfter = Number(headers['retry-after']);
+    if (retryAfter > 0)
+        return now + retryAfter * 1000;
+    const reset = Number(headers['x-ratelimit-reset']);
+    return headers['x-ratelimit-remaining'] === '0' && reset > 0 ? reset * 1000 : null;
+}
+function request(path, token, method, body) {
     return new Promise((resolve, reject) => {
         const headers = {
             Accept: 'application/vnd.github+json',
@@ -79,23 +101,7 @@ function requestJson(path, token, method = 'GET', body) {
             let data = '';
             res.setEncoding('utf8');
             res.on('data', chunk => (data += chunk));
-            res.on('end', () => {
-                const status = res.statusCode ?? 0;
-                if (status < 200 || status >= 300) {
-                    reject(new Error(formatApiError(status, data)));
-                    return;
-                }
-                if (!data) {
-                    resolve(undefined);
-                    return;
-                }
-                try {
-                    resolve(JSON.parse(data));
-                }
-                catch (err) {
-                    reject(err);
-                }
-            });
+            res.on('end', () => resolve({ status: res.statusCode ?? 0, headers: res.headers, body: data }));
         });
         req.on('error', reject);
         req.setTimeout(10000, () => req.destroy(new Error('GitHub API request timed out')));
@@ -103,6 +109,28 @@ function requestJson(path, token, method = 'GET', body) {
             req.write(payload);
         req.end();
     });
+}
+function failure(res) {
+    const limited = res.status === 403 || res.status === 429;
+    return new ApiError(formatApiError(res.status, res.body), res.status, limited ? rateLimitRetryAt(res.headers) : null);
+}
+async function requestJson(path, token, method = 'GET', body) {
+    const res = await request(path, token, method, body);
+    if (res.status < 200 || res.status >= 300)
+        throw failure(res);
+    return (res.body ? JSON.parse(res.body) : undefined);
+}
+/** POST /graphql. Resolves to `data`; rejects on HTTP errors and on any GraphQL `errors[]`, even with partial data. */
+async function requestGraphql(query, variables, token) {
+    const res = await request('/graphql', token, 'POST', { query, variables });
+    if (res.status < 200 || res.status >= 300)
+        throw failure(res);
+    const parsed = JSON.parse(res.body);
+    // A half-filled list is worse than an error, so partial data next to errors[] is dropped.
+    if (parsed.errors?.length || !parsed.data) {
+        throw new ApiError(formatApiError(res.status, res.body), res.status, rateLimitRetryAt(res.headers));
+    }
+    return parsed.data;
 }
 // ponytail: single page, 100 issues max — add Link-header pagination if a
 // tracked repo ever exceeds that many open issues.
