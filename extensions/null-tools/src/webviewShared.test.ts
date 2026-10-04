@@ -59,6 +59,7 @@ test('issueStateKind maps REST and GraphQL state + reason', () => {
   assert.strictEqual(shared.issueStateKind('closed', 'completed'), 'completed');
   assert.strictEqual(shared.issueStateKind('closed', null), 'completed');
   assert.strictEqual(shared.issueStateKind('closed', 'not_planned'), 'not-planned');
+  assert.strictEqual(shared.issueStateKind('closed', 'duplicate'), 'not-planned');
   assert.strictEqual(shared.issueStateKind('CLOSED', 'NOT_PLANNED'), 'not-planned');
 });
 

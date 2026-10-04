@@ -48,6 +48,7 @@ const NOW = Date.UTC(2026, 8, 28, 12, 0, 0);
     node_assert_1.default.strictEqual(shared.issueStateKind('closed', 'completed'), 'completed');
     node_assert_1.default.strictEqual(shared.issueStateKind('closed', null), 'completed');
     node_assert_1.default.strictEqual(shared.issueStateKind('closed', 'not_planned'), 'not-planned');
+    node_assert_1.default.strictEqual(shared.issueStateKind('closed', 'duplicate'), 'not-planned');
     node_assert_1.default.strictEqual(shared.issueStateKind('CLOSED', 'NOT_PLANNED'), 'not-planned');
 });
 (0, node_test_1.default)('octicon renders a generated path and tolerates unknown names', () => {

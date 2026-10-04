@@ -10,6 +10,16 @@ const OCTICON_PATHS = {
     'check': "<path d=\"M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z\"></path>",
     'link-external': "<path d=\"M3.75 2h3.5a.75.75 0 0 1 0 1.5h-3.5a.25.25 0 0 0-.25.25v8.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25v-3.5a.75.75 0 0 1 1.5 0v3.5A1.75 1.75 0 0 1 12.25 14h-8.5A1.75 1.75 0 0 1 2 12.25v-8.5C2 2.784 2.784 2 3.75 2Zm6.854-1h4.146a.25.25 0 0 1 .25.25v4.146a.25.25 0 0 1-.427.177L13.03 4.03 9.28 7.78a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042l3.75-3.75-1.543-1.543A.25.25 0 0 1 10.604 1Z\"></path>",
     'git-branch': "<path d=\"M9.5 3.25a2.25 2.25 0 1 1 3 2.122V6A2.5 2.5 0 0 1 10 8.5H6a1 1 0 0 0-1 1v1.128a2.251 2.251 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.5 0v1.836A2.493 2.493 0 0 1 6 7h4a1 1 0 0 0 1-1v-.628A2.25 2.25 0 0 1 9.5 3.25Zm-6 0a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Zm8.25-.75a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5ZM4.25 12a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Z\"></path>",
+    'git-pull-request': "<path d=\"M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z\"></path>",
+    'milestone': "<path d=\"M7.75 0a.75.75 0 0 1 .75.75V3h3.634c.414 0 .814.147 1.13.414l2.07 1.75a1.75 1.75 0 0 1 0 2.672l-2.07 1.75a1.75 1.75 0 0 1-1.13.414H8.5v5.25a.75.75 0 0 1-1.5 0V10H2.75A1.75 1.75 0 0 1 1 8.25v-3.5C1 3.784 1.784 3 2.75 3H7V.75A.75.75 0 0 1 7.75 0Zm4.384 8.5a.25.25 0 0 0 .161-.06l2.07-1.75a.248.248 0 0 0 0-.38l-2.07-1.75a.25.25 0 0 0-.161-.06H2.75a.25.25 0 0 0-.25.25v3.5c0 .138.112.25.25.25h9.384Z\"></path>",
+    'issue-tracks': "<path d=\"M1.5 8a6.5 6.5 0 0 1 13 0A.75.75 0 0 0 16 8a8 8 0 1 0-8 8 .75.75 0 0 0 0-1.5A6.5 6.5 0 0 1 1.5 8Z\"></path><path d=\"M8 9.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Zm1.5 1.75a.75.75 0 0 1 .75-.75h5a.75.75 0 0 1 0 1.5h-5a.75.75 0 0 1-.75-.75Zm2.75 2.25a.75.75 0 0 0 0 1.5h3a.75.75 0 0 0 0-1.5h-3Z\"></path>",
+    'kebab-horizontal': "<path d=\"M8 9a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3ZM1.5 9a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Zm13 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z\"></path>",
+    'triangle-down': "<path d=\"m4.427 7.427 3.396 3.396a.25.25 0 0 0 .354 0l3.396-3.396A.25.25 0 0 0 11.396 7H4.604a.25.25 0 0 0-.177.427Z\"></path>",
+    'screen-full': "<path d=\"M1.75 10a.75.75 0 0 1 .75.75v2.5c0 .138.112.25.25.25h2.5a.75.75 0 0 1 0 1.5h-2.5A1.75 1.75 0 0 1 1 13.25v-2.5a.75.75 0 0 1 .75-.75Zm12.5 0a.75.75 0 0 1 .75.75v2.5A1.75 1.75 0 0 1 13.25 15h-2.5a.75.75 0 0 1 0-1.5h2.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 .75-.75ZM2.75 2.5a.25.25 0 0 0-.25.25v2.5a.75.75 0 0 1-1.5 0v-2.5C1 1.784 1.784 1 2.75 1h2.5a.75.75 0 0 1 0 1.5ZM10 1.75a.75.75 0 0 1 .75-.75h2.5c.966 0 1.75.784 1.75 1.75v2.5a.75.75 0 0 1-1.5 0v-2.5a.25.25 0 0 0-.25-.25h-2.5a.75.75 0 0 1-.75-.75Z\"></path>",
+    'search': "<path d=\"M10.68 11.74a6 6 0 0 1-7.922-8.982 6 6 0 0 1 8.982 7.922l3.04 3.04a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215ZM11.5 7a4.499 4.499 0 1 0-8.997 0A4.499 4.499 0 0 0 11.5 7Z\"></path>",
+    'x': "<path d=\"M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z\"></path>",
+    'plus': "<path d=\"M7.75 2a.75.75 0 0 1 .75.75V7h4.25a.75.75 0 0 1 0 1.5H8.5v4.25a.75.75 0 0 1-1.5 0V8.5H2.75a.75.75 0 0 1 0-1.5H7V2.75A.75.75 0 0 1 7.75 2Z\"></path>",
+    'sync': "<path d=\"M1.705 8.005a.75.75 0 0 1 .834.656 5.5 5.5 0 0 0 9.592 2.97l-1.204-1.204a.25.25 0 0 1 .177-.427h3.646a.25.25 0 0 1 .25.25v3.646a.25.25 0 0 1-.427.177l-1.38-1.38A7.002 7.002 0 0 1 1.05 8.84a.75.75 0 0 1 .656-.834ZM8 2.5a5.487 5.487 0 0 0-4.131 1.869l1.204 1.204A.25.25 0 0 1 4.896 6H1.25A.25.25 0 0 1 1 5.75V2.104a.25.25 0 0 1 .427-.177l1.38 1.38A7.002 7.002 0 0 1 14.95 7.16a.75.75 0 0 1-1.49.178A5.5 5.5 0 0 0 8 2.5Z\"></path>",
 };
 /** Inline 16px Primer octicon; takes its color from CSS via fill="currentColor". */
 function octicon(name, className = '') {
@@ -73,7 +83,8 @@ function labelStyleVars(hex) {
 function issueStateKind(state, stateReason) {
     if (state.toLowerCase() === 'open')
         return 'open';
-    return (stateReason === null || stateReason === void 0 ? void 0 : stateReason.toLowerCase()) === 'not_planned' ? 'not-planned' : 'completed';
+    const reason = stateReason === null || stateReason === void 0 ? void 0 : stateReason.toLowerCase();
+    return reason === 'not_planned' || reason === 'duplicate' ? 'not-planned' : 'completed';
 }
 /** Colored state octicon (open / closed-completed / closed-not-planned), as in github.com's issue lists. */
 function issueStateIcon(state, stateReason) {
@@ -85,4 +96,175 @@ function issueStateIcon(state, stateReason) {
 function issueStateBadge(state, stateReason) {
     const kind = issueStateKind(state, stateReason);
     return `<span class="state-badge state-${kind}">${issueStateIcon(state, stateReason)}${kind === 'open' ? 'Open' : 'Closed'}</span>`;
+}
+function escapeHtml(s) {
+    const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+    return s.replace(/[&<>"']/g, c => map[c]);
+}
+const reconcileKeys = new WeakMap();
+const reconcileSignatures = new WeakMap();
+/**
+ * Makes `container`'s children match `items`, matched by `key`. A row whose item is unchanged (compared as JSON)
+ * keeps its DOM node, so hover, focus and scroll survive a refresh; changed rows are re-rendered in place, new
+ * ones inserted, missing ones removed, and rows are only moved when out of order. Children it didn't create
+ * (a skeleton, an old message) are removed. A repeated key is skipped.
+ */
+function reconcile(container, items, key, render) {
+    const wanted = new Set(items.map(key));
+    const existing = new Map();
+    for (const child of Array.from(container.children)) {
+        const k = reconcileKeys.get(child);
+        if (k !== undefined && wanted.has(k) && !existing.has(k))
+            existing.set(k, child);
+        else
+            container.removeChild(child);
+    }
+    const placed = new Set();
+    let previous = null;
+    for (const item of items) {
+        const k = key(item);
+        if (placed.has(k))
+            continue;
+        placed.add(k);
+        const signature = JSON.stringify(item);
+        let el = existing.get(k);
+        if (el && reconcileSignatures.get(el) !== signature) {
+            const fresh = render(item);
+            container.replaceChild(fresh, el);
+            el = fresh;
+        }
+        else if (!el) {
+            el = render(item);
+        }
+        reconcileKeys.set(el, k);
+        reconcileSignatures.set(el, signature);
+        const expected = previous ? previous.nextElementSibling : container.firstElementChild;
+        if (el !== expected)
+            container.insertBefore(el, expected);
+        previous = el;
+    }
+}
+const QUALIFIER_TOKEN = /(?:^|\s)-?[A-Za-z]+:(?:"[^"]*"?|\S*)/g;
+/** The free-text part of a search string: qualifiers (`is:open`, `label:"x y"`, `-author:bob`) removed, lowercased. */
+function freeTextOf(query) {
+    return query.replace(QUALIFIER_TOKEN, ' ').replace(/"/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+/** Instant, host-free filter over the rows already on screen: every free-text word must appear in "#number title". */
+function matchesLocalFilter(issue, query) {
+    const words = freeTextOf(query).split(' ').filter(Boolean);
+    if (words.length === 0)
+        return true;
+    const haystack = `#${issue.number} ${issue.title}`.toLowerCase();
+    return words.every(word => haystack.includes(word));
+}
+function filterPickerItems(items, text) {
+    const needle = text.trim().toLowerCase();
+    if (!needle)
+        return items;
+    return items.filter(i => { var _a; return i.label.toLowerCase().includes(needle) || ((_a = i.description) !== null && _a !== void 0 ? _a : '').toLowerCase().includes(needle); });
+}
+let closeActivePicker = null;
+let activePickerAnchor = null;
+/**
+ * Popover list under `anchor`: optional filter box, checkmarks, ↑/↓/Enter/Esc. One picker is open at a time,
+ * and activating the anchor of the open picker closes it. Styled by `.picker*` in lib/issues.css.
+ */
+function openPicker(opts) {
+    const wasOpenOnSameAnchor = activePickerAnchor === opts.anchor;
+    closeActivePicker === null || closeActivePicker === void 0 ? void 0 : closeActivePicker();
+    if (wasOpenOnSameAnchor)
+        return;
+    const items = opts.items.map(i => (Object.assign({}, i))); // multi pickers toggle `selected` on their own copy
+    const filterable = opts.filterable !== false;
+    const pop = document.createElement('div');
+    pop.className = 'picker';
+    pop.tabIndex = -1;
+    pop.innerHTML = `<div class="picker-title">${escapeHtml(opts.title)}</div>`
+        + (filterable ? '<input class="picker-filter" placeholder="Filter" spellcheck="false">' : '')
+        + '<div class="picker-list"></div>';
+    document.body.appendChild(pop);
+    const listEl = pop.querySelector('.picker-list');
+    const input = pop.querySelector('.picker-filter');
+    let shown = [];
+    let active = 0;
+    function render() {
+        var _a;
+        shown = filterPickerItems(items, input ? input.value : '');
+        if (active >= shown.length)
+            active = Math.max(0, shown.length - 1);
+        listEl.innerHTML = shown.length === 0
+            ? `<div class="picker-empty">${escapeHtml((_a = opts.emptyText) !== null && _a !== void 0 ? _a : 'Nothing to show')}</div>`
+            : shown.map((item, i) => {
+                var _a;
+                return `
+        <button type="button" class="picker-item${i === active ? ' active' : ''}" data-index="${i}">
+          <span class="picker-check">${item.selected ? octicon('check') : ''}</span>
+          <span class="picker-text">${(_a = item.html) !== null && _a !== void 0 ? _a : escapeHtml(item.label)}${item.description ? `<span class="picker-desc">${escapeHtml(item.description)}</span>` : ''}</span>
+        </button>`;
+            }).join('');
+        const activeEl = listEl.querySelector('.active');
+        if (activeEl)
+            activeEl.scrollIntoView({ block: 'nearest' });
+    }
+    function choose(index) {
+        const item = shown[index];
+        if (!item)
+            return;
+        if (opts.multi) {
+            item.selected = !item.selected;
+            render();
+        }
+        else
+            close();
+        opts.onSelect(item.value);
+    }
+    function onKeydown(e) {
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            e.stopPropagation();
+            close();
+            opts.anchor.focus();
+            return;
+        }
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            e.stopPropagation();
+            if (shown.length > 0)
+                active = (active + (e.key === 'ArrowDown' ? 1 : shown.length - 1)) % shown.length;
+            render();
+        }
+        else if (e.key === 'Enter') {
+            e.preventDefault();
+            e.stopPropagation();
+            choose(active);
+        }
+    }
+    function onOutsideMouseDown(e) {
+        const target = e.target;
+        if (!pop.contains(target) && !opts.anchor.contains(target))
+            close();
+    }
+    function close() {
+        document.removeEventListener('keydown', onKeydown, true);
+        document.removeEventListener('mousedown', onOutsideMouseDown, true);
+        pop.remove();
+        closeActivePicker = null;
+        activePickerAnchor = null;
+    }
+    listEl.addEventListener('click', e => {
+        const button = e.target.closest('.picker-item');
+        if (button)
+            choose(Number(button.dataset.index));
+    });
+    if (input)
+        input.addEventListener('input', () => { active = 0; render(); });
+    document.addEventListener('keydown', onKeydown, true);
+    document.addEventListener('mousedown', onOutsideMouseDown, true);
+    closeActivePicker = close;
+    activePickerAnchor = opts.anchor;
+    render();
+    const rect = opts.anchor.getBoundingClientRect();
+    pop.style.left = `${Math.max(4, Math.min(rect.left, window.innerWidth - pop.offsetWidth - 4))}px`;
+    pop.style.top = `${Math.max(4, Math.min(rect.bottom + 2, window.innerHeight - pop.offsetHeight - 4))}px`;
+    (input !== null && input !== void 0 ? input : pop).focus();
 }

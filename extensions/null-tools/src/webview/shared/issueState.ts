@@ -3,7 +3,8 @@
 /** github.com's three issue states. Accepts REST (`closed`/`not_planned`) and GraphQL (`CLOSED`/`NOT_PLANNED`) casing. */
 function issueStateKind(state: string, stateReason?: string | null): 'open' | 'completed' | 'not-planned' {
   if (state.toLowerCase() === 'open') return 'open';
-  return stateReason?.toLowerCase() === 'not_planned' ? 'not-planned' : 'completed';
+  const reason = stateReason?.toLowerCase();
+  return reason === 'not_planned' || reason === 'duplicate' ? 'not-planned' : 'completed';
 }
 
 /** Colored state octicon (open / closed-completed / closed-not-planned), as in github.com's issue lists. */

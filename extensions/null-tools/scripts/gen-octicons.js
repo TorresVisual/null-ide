@@ -10,6 +10,8 @@ const path = require('path');
 
 const NAMES = [
   'issue-opened', 'issue-closed', 'skip', 'comment', 'copy', 'check', 'link-external', 'git-branch',
+  'git-pull-request', 'milestone', 'issue-tracks', 'kebab-horizontal', 'triangle-down', 'screen-full',
+  'search', 'x', 'plus', 'sync',
 ];
 
 const pkgDir = process.argv[2];
