@@ -10,7 +10,7 @@
           "extensions/null-tools/src/issueDetailPanel.ts"
         ],
         "createdAt": "2026-09-24T21:52:53.854Z",
-        "reason": "lightbox img is a static placeholder, display:none until JS populates src on click (confirmed false positive in 2026-09-24 critique report)"
+        "reason": "pre-existing lightbox <img id=lightbox-img src=''> placeholder, filled by JS on image click; unrelated to Task 5's verbatim CSS extraction"
       },
       {
         "rule": "gray-on-color",
@@ -29,6 +29,15 @@
         ],
         "createdAt": "2026-09-28T15:57:28.422Z",
         "reason": "Claude: throwaway brainstorm mockup; tabs/checkboxes/TOC rows deliberately mirror VS Code's native control sizes"
+      },
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "extensions/null-tools/lib/issueDetail.css"
+        ],
+        "createdAt": "2026-09-28T20:11:05.456Z",
+        "reason": "standard markdown blockquote left-border, not a card/panel accent; pre-existing rule, verbatim-moved from the old inline <style> block by Task 5 with no visual change"
       }
     ]
   }
