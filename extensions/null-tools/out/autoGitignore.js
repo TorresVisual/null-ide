@@ -47,8 +47,7 @@ function registerAutoGitignoreFeature(context) {
             return;
         }
         const autoCommit = config.get('autoCommit', true);
-        const userPatterns = config.get('ignoredPatterns', []);
-        const patterns = Array.from(new Set([...autoGitignoreStorage_1.DEFAULT_ARTIFACT_PATTERNS, ...userPatterns]));
+        const patterns = Array.from(new Set(config.get('ignoredPatterns', [])));
         const folders = vscode.workspace.workspaceFolders;
         if (!folders || folders.length === 0) {
             return;

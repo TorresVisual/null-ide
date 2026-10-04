@@ -33,7 +33,6 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DEFAULT_ARTIFACT_PATTERNS = void 0;
 exports.normalizePattern = normalizePattern;
 exports.isPatternInGitignore = isPatternInGitignore;
 exports.getMissingEntries = getMissingEntries;
@@ -45,58 +44,6 @@ const path = __importStar(require("path"));
 const child_process_1 = require("child_process");
 const util_1 = require("util");
 const execAsync = (0, util_1.promisify)(child_process_1.exec);
-exports.DEFAULT_ARTIFACT_PATTERNS = [
-    // JavaScript / Node.js
-    'node_modules/',
-    '.next/',
-    '.nuxt/',
-    '.turbo/',
-    // Python
-    '__pycache__/',
-    'lib/__pycache__/',
-    '.pytest_cache/',
-    '.mypy_cache/',
-    '*.pyc',
-    '*.pyo',
-    '*.egg-info/',
-    'tests/tmp/',
-    // Virtual environments
-    '.venv/',
-    'venv/',
-    'env/',
-    '.build-venv/',
-    // Build outputs
-    'dist/',
-    'dist_web/',
-    'build/',
-    'build_web/',
-    'out/',
-    'target/',
-    'bin/',
-    'obj/',
-    // Caches & tooling
-    '.cache/',
-    '.build-deps/',
-    '.build-cache/',
-    // Null IDE internals
-    '.null/',
-    // OS artifacts
-    '.DS_Store',
-    'Thumbs.db',
-    // Logs
-    '*.log',
-    // Environment / secrets
-    '.env',
-    '.env.local',
-    '.env.development.local',
-    '.env.test.local',
-    '.env.production.local',
-    // Agentic / AI tooling noise
-    '.claude/',
-    '.codex-tmp/',
-    '.superpowers/',
-    '.playwright-mcp/',
-];
 const SECTION_HEADER = '# Added by Null IDE Auto-Gitignore';
 function normalizePattern(pattern) {
     return pattern.trim();
