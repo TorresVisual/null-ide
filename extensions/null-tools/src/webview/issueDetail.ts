@@ -1,460 +1,612 @@
 'use strict';
 
-interface GithubLabel { name: string; color: string; }
-interface GithubUser { login: string; avatar_url: string; }
-interface GithubIssue {
-  number: number; title: string; body: string; state: string; state_reason?: string | null; html_url: string;
-  labels: GithubLabel[]; assignees: GithubUser[]; user: GithubUser; comments: number; updated_at: string;
-  closedLocally?: boolean;
-}
-interface GithubComment { id: number; user: GithubUser; body: string; created_at: string; }
-interface IssueTemplate { name: string; title: string; body: string; labels: string[]; }
-interface GithubTimelineEvent {
-  event: string; actor: GithubUser | null; created_at: string; commit_id?: string | null;
-  label?: { name: string; color: string }; assignee?: GithubUser; rename?: { from: string; to: string };
-  source?: { issue?: { number: number; title: string; html_url: string } };
-}
-
 declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
-declare const marked: { parse(src: string): string };
 declare const DOMPurify: { sanitize(html: string): string };
+
+/** What a close / reopen button asks for; the host maps it to REST `state` + `state_reason`. */
+type StateTarget = 'completed' | 'not_planned' | 'reopen';
 
 (function () {
   const vscode = acquireVsCodeApi();
-  const detailEl = document.getElementById('detail') as HTMLDivElement;
-  const lightbox = document.getElementById('lightbox') as HTMLDivElement;
-  const lightboxImg = document.getElementById('lightbox-img') as HTMLImageElement;
-  lightbox?.addEventListener('click', () => lightbox.classList.add('hidden'));
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && !lightbox?.classList.contains('hidden')) lightbox.classList.add('hidden');
-  });
-  detailEl.addEventListener('click', e => {
-    const target = e.target as HTMLElement;
-    if (target.tagName === 'IMG' && target.closest('.body-card, .comment-body')) {
-      lightboxImg.src = (target as HTMLImageElement).src;
-      lightbox.classList.remove('hidden');
-    }
-  });
+  const root = document.getElementById('detail') as HTMLDivElement;
+  const toastEl = document.createElement('div');
+  toastEl.id = 'toast';
+  toastEl.className = 'hidden';
+  toastEl.setAttribute('role', 'status');
+  document.body.appendChild(toastEl);
 
-  let editing = false;
-  let currentIssue: GithubIssue | null = null;
-  let lastComments: GithubComment[] = [];
-  let lastTimeline: GithubTimelineEvent[] = [];
-  let repoLabels: GithubLabel[] = [];
-  let assignableUsers: GithubUser[] = [];
-  let issueTemplates: IssueTemplate[] = [];
-  let viewerLogin: string | null = null;
-  let editingCommentId: number | null = null;
-  let labelOpen = false;
-  let assigneeOpen = false;
-  let refreshLabelPicker: (() => void) | null = null;
-  let refreshAssigneePicker: (() => void) | null = null;
-  let editFormSelectedLabels: Set<string> | null = null;
-  let editFormSelectedAssignees: Set<string> | null = null;
+  let detail: IssueDetail | null = null;
+  let metadata: DetailMetadata | null = null;
+  let viewer: string | null = null;
+  let repoName = '';
+  let closedLocally = false;
+  let hasMoreTimeline = false;
+  /** Id of the post whose edit form is open (the issue's own id for the body). */
+  let editingId: string | null = null;
+  let editingTitle = false;
+  let commentBusy = false;
+  /** Writes the host hasn't answered yet. While any are in flight, a refresh must not overwrite the optimistic state. */
+  let pending = 0;
+  /** `detail` as it was before the oldest unanswered write, to restore if that write fails. */
+  let rollback: IssueDetail | null = null;
+  let pageMounted = false;
+  let composerFor = 0;
+  let candidateAnchor: HTMLElement | null = null;
+  let toastTimer: ReturnType<typeof setTimeout> | undefined;
 
-  document.addEventListener('click', e => {
-    if (e.composedPath().some(n => n instanceof Element && n.classList.contains('dropdown-container'))) return;
-    if (!labelOpen && !assigneeOpen) return;
-    labelOpen = false;
-    assigneeOpen = false;
-    refreshLabelPicker?.();
-    refreshAssigneePicker?.();
-  });
+  const post = (message: unknown): void => vscode.postMessage(message);
+  const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
+  const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
+  const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`;
 
-  function escapeHtml(s: string): string {
-    const map: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
-    return s.replace(/[&<>"']/g, c => map[c]);
+  function toast(message: string): void {
+    toastEl.textContent = message;
+    toastEl.classList.remove('hidden');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.add('hidden'), 5000);
   }
 
-  function renderMarkdown(text: string): string {
-    return DOMPurify.sanitize(marked.parse(text));
-  }
+  // ---- rendering ----------------------------------------------------------------------------------------------
 
-  interface PickerItem { value: string; label: string; color?: string; }
-
-  function renderPicker(
-    containerId: string, items: PickerItem[], selected: Set<string>,
-    isOpen: () => boolean, toggleOpen: () => void, placeholder: string,
-  ): () => void {
-    const refresh = () => {
-      const container = document.getElementById(containerId) as HTMLDivElement | null;
-      if (!container) return;
-      const open = isOpen();
-      const selectedItems = items.filter(i => selected.has(i.value));
-      container.innerHTML = `
-        <button type="button" class="dropdown-trigger">
-          ${selectedItems.length > 0 ? `<span class="selected-tags">${selectedItems.map(i => `
-            <span class="tag${i.color ? ' gh-label' : ''}"${i.color ? ` style="${labelStyleVars(i.color)}"` : ''}>${escapeHtml(i.label)}<span class="tag-remove" data-value="${escapeHtml(i.value)}">&times;</span></span>`).join('')}</span>`
-            : `<span class="dropdown-placeholder">${escapeHtml(placeholder)}</span>`}
-          <span class="dropdown-arrow">${open ? '▲' : '▼'}</span>
-        </button>
-        <div class="dropdown-list${open ? '' : ' hidden'}">
-          ${items.length === 0 ? '<span class="issue-meta">None available.</span>' : items.map(i => `
-            <button type="button" class="dropdown-item${selected.has(i.value) ? ' selected' : ''}" data-value="${escapeHtml(i.value)}">
-              <span class="checkbox">${selected.has(i.value) ? '☑' : '☐'}</span>
-              ${i.color ? `<span class="color-dot" style="background:#${i.color}"></span>` : ''}
-              ${escapeHtml(i.label)}
-            </button>`).join('')}
-        </div>`;
-      container.querySelector('.dropdown-trigger')?.addEventListener('click', () => {
-        toggleOpen();
-        refresh();
-      });
-      container.querySelectorAll<HTMLElement>('.tag-remove').forEach(el => el.addEventListener('mousedown', e => {
-        e.preventDefault();
-        selected.delete(el.dataset.value!);
-        refresh();
-      }));
-      container.querySelectorAll<HTMLElement>('.dropdown-item').forEach(el => el.addEventListener('click', () => {
-        const v = el.dataset.value!;
-        if (selected.has(v)) selected.delete(v); else selected.add(v);
-        refresh();
-      }));
-    };
-    refresh();
-    return refresh;
-  }
-
-  function avatar(user: GithubUser): string {
-    const initials = escapeHtml(user.login.slice(0, 2).toUpperCase());
-    return `<span class="avatar" data-initials="${initials}">` +
-      `${user.avatar_url ? `<img src="${escapeHtml(user.avatar_url)}" alt="">` : ''}</span>`;
-  }
+  /** Server-rendered markdown, minus images the webview can't load, sanitized once more before it touches the DOM. */
+  const prepared = (p: IssuePost): IssuePost => ({ ...p, bodyHTML: DOMPurify.sanitize(neutralizeImagesHtml(p.bodyHTML)) });
 
   function bindAvatarFallbacks(): void {
-    detailEl.querySelectorAll<HTMLImageElement>('.avatar img').forEach(img =>
+    root.querySelectorAll<HTMLImageElement>('.avatar img').forEach(img =>
       img.addEventListener('error', () => { img.style.display = 'none'; }, { once: true }));
   }
 
-  function bindTaskCheckboxes(): void {
-    const boxes = detailEl.querySelectorAll<HTMLInputElement>('.body-card input[type=checkbox]');
-    boxes.forEach((box, index) => {
-      box.disabled = false;
-      box.addEventListener('change', () =>
-        vscode.postMessage({ type: 'toggleTask', index, checked: box.checked }));
-    });
-  }
-
-  function shortSha(sha: string): string {
-    return sha.slice(0, 7);
-  }
-
-  function timelineEventText(ev: GithubTimelineEvent): string | null {
-    const actorName = ev.actor ? escapeHtml(ev.actor.login) : 'someone';
-    switch (ev.event) {
-      case 'closed':
-        return `${actorName} closed this${ev.commit_id ? ` via commit <code>${shortSha(ev.commit_id)}</code>` : ''}`;
-      case 'reopened':
-        return `${actorName} reopened this`;
-      case 'labeled':
-        return ev.label
-          ? `${actorName} added the <span class="gh-label" style="${labelStyleVars(ev.label.color)}">${escapeHtml(ev.label.name)}</span> label` : null;
-      case 'unlabeled':
-        return ev.label
-          ? `${actorName} removed the <span class="gh-label" style="${labelStyleVars(ev.label.color)}">${escapeHtml(ev.label.name)}</span> label` : null;
-      case 'assigned':
-        return ev.assignee ? `${actorName} assigned ${escapeHtml(ev.assignee.login)}` : null;
-      case 'unassigned':
-        return ev.assignee ? `${actorName} unassigned ${escapeHtml(ev.assignee.login)}` : null;
-      case 'renamed':
-        return ev.rename
-          ? `${actorName} changed the title from "${escapeHtml(ev.rename.from)}" to "${escapeHtml(ev.rename.to)}"` : null;
-      case 'cross-referenced':
-        return ev.source?.issue
-          ? `${actorName} referenced this in <a href="${escapeHtml(ev.source.issue.html_url)}">#${ev.source.issue.number}</a>` : null;
-      case 'referenced':
-        return ev.commit_id ? `${actorName} referenced this in commit <code>${shortSha(ev.commit_id)}</code>` : null;
-      default:
-        return null;
-    }
-  }
-
-  type FeedItem =
-    | { kind: 'comment'; created_at: string; comment: GithubComment }
-    | { kind: 'event'; created_at: string; text: string };
-
-  function buildFeed(comments: GithubComment[], timeline: GithubTimelineEvent[]): FeedItem[] {
-    const items: FeedItem[] = comments.map(c => ({ kind: 'comment', created_at: c.created_at, comment: c }));
-    for (const ev of timeline) {
-      const text = timelineEventText(ev);
-      if (text) items.push({ kind: 'event', created_at: ev.created_at, text });
-    }
-    return items.sort((a, b) => a.created_at.localeCompare(b.created_at));
-  }
-
-  function renderDetail(issue: GithubIssue, comments: GithubComment[], timeline: GithubTimelineEvent[]): void {
-    currentIssue = issue;
-    editing = false;
-    editingCommentId = null;
-    render(issue, comments, timeline);
-  }
-
-  function renderCreateForm(): void {
-    currentIssue = null;
-    labelOpen = false;
-    assigneeOpen = false;
-    const selectedLabels = new Set<string>();
-    const selectedAssignees = new Set<string>();
-    detailEl.innerHTML = `
-      <h2>New Issue</h2>
-      <div class="edit-form">
-        ${issueTemplates.length > 0 ? `
-        <select id="template-picker">
-          <option value="">Blank issue</option>
-          ${issueTemplates.map((t, i) => `<option value="${i}">${escapeHtml(t.name)}</option>`).join('')}
-        </select>` : ''}
-        <input id="edit-title" placeholder="Title">
-        <div id="title-error" class="field-error hidden">Title is required.</div>
-        <textarea id="edit-body" placeholder="Description"></textarea>
-        <div class="picker-group">
-          <span class="assignees-label">Labels:</span>
-          <div class="dropdown-container" id="label-picker"></div>
-        </div>
-        <div class="picker-group">
-          <span class="assignees-label">Assignees:</span>
-          <div class="dropdown-container" id="assignee-picker"></div>
-        </div>
-        <div class="btn-row">
-          <button class="btn btn-primary" id="save-btn">Create</button>
-          <button class="btn btn-secondary" id="cancel-btn">Cancel</button>
+  function mountPage(): void {
+    root.innerHTML = `
+      <div id="sticky" class="hidden"></div>
+      <div id="page">
+        <header id="header"></header>
+        <div id="layout">
+          <main id="main"><div id="timeline"></div><div id="composer"></div></main>
+          <aside id="sidebar"></aside>
         </div>
       </div>`;
-    refreshLabelPicker = renderPicker(
-      'label-picker', repoLabels.map(l => ({ value: l.name, label: l.name, color: l.color })), selectedLabels,
-      () => labelOpen, () => { labelOpen = !labelOpen; }, 'Select labels…',
-    );
-    refreshAssigneePicker = renderPicker(
-      'assignee-picker', assignableUsers.map(u => ({ value: u.login, label: u.login })), selectedAssignees,
-      () => assigneeOpen, () => { assigneeOpen = !assigneeOpen; }, 'Select assignees…',
-    );
-    document.getElementById('template-picker')?.addEventListener('change', e => {
-      const index = (e.target as HTMLSelectElement).value;
-      const template = index ? issueTemplates[Number(index)] : null;
-      (document.getElementById('edit-title') as HTMLInputElement).value = template?.title ?? '';
-      (document.getElementById('edit-body') as HTMLTextAreaElement).value = template?.body ?? '';
-      selectedLabels.clear();
-      template?.labels.forEach(l => {
-        const match = repoLabels.find(rl => rl.name.toLowerCase() === l.toLowerCase());
-        if (match) selectedLabels.add(match.name);
-      });
-      refreshLabelPicker?.();
-    });
-    const titleInput = document.getElementById('edit-title') as HTMLInputElement;
-    const titleError = document.getElementById('title-error') as HTMLDivElement;
-    titleInput.addEventListener('input', () => titleError.classList.add('hidden'));
-    document.getElementById('save-btn')?.addEventListener('click', () => {
-      const saveBtn = document.getElementById('save-btn') as HTMLButtonElement;
-      if (saveBtn.disabled) return;
-      const title = titleInput.value.trim();
-      if (!title) {
-        titleError.classList.remove('hidden');
-        titleInput.focus();
-        return;
-      }
-      saveBtn.disabled = true;
-      saveBtn.textContent = 'Creating…';
-      vscode.postMessage({
-        type: 'submitCreate', title,
-        body: (document.getElementById('edit-body') as HTMLTextAreaElement).value,
-        labels: Array.from(selectedLabels), assignees: Array.from(selectedAssignees),
-      });
-    });
-    document.getElementById('cancel-btn')?.addEventListener('click', () =>
-      vscode.postMessage({ type: 'cancelCreate' }));
+    new IntersectionObserver(([entry]) => $('sticky').classList.toggle('hidden', entry.isIntersecting))
+      .observe($('header'));
+    pageMounted = true;
+    composerFor = 0;
   }
 
-  function render(issue: GithubIssue, comments: GithubComment[], timeline: GithubTimelineEvent[]): void {
-    const closed = issue.state === 'closed';
-    detailEl.innerHTML = `
-      <h2>${issueStateBadge(issue.state, issue.state_reason)}${issue.closedLocally ? '<span class="closes-badge" title="An unpushed local commit will close this issue">closes on push</span>' : ''} #${issue.number} ${editing ? '' : escapeHtml(issue.title)}</h2>
+  function renderHeader(): void {
+    if (!detail) return;
+    const { issue } = detail;
+    const title = editingTitle
+      ? `<div class="title-edit"><input id="title-input" value="${escapeHtml(issue.title)}" aria-label="Title">
+           <button type="button" class="btn btn-primary" data-act="save-title">Save</button>
+           <button type="button" class="btn btn-secondary" data-act="cancel-title">Cancel</button></div>`
+      : `<h1 class="title">${escapeHtml(issue.title)} <span class="number">#${issue.number}</span></h1>
+         <div class="title-actions">
+           ${detail.post.viewerCanUpdate ? '<button type="button" class="btn btn-ghost" data-act="edit-title">Edit</button>' : ''}
+           <button type="button" class="icon-btn" data-act="header-menu" title="More actions" aria-label="More actions">${octicon('kebab-horizontal')}</button>
+         </div>`;
+    const parent = detail.parent
+      ? ` · sub-issue of <button type="button" class="link-btn" data-act="open-issue" data-number="${detail.parent.number}">#${detail.parent.number} ${escapeHtml(detail.parent.title)}</button>` : '';
+    $('header').innerHTML = `
+      <div class="title-row">${title}</div>
       <div class="meta-row">
-        ${issue.labels.map(l => `<span class="gh-label" style="${labelStyleVars(l.color)}">${escapeHtml(l.name)}</span>`).join('')}
-        ${avatar(issue.user)} opened by ${escapeHtml(issue.user.login)} · ${issue.comments} comments · updated ${timeHtml(issue.updated_at)}
-      </div>
-      ${issue.assignees.length > 0 ? `
-      <div class="assignees-row">
-        <span class="assignees-label">Assignees:</span>
-        ${issue.assignees.map(a => `<span class="assignee-chip">${avatar(a)} ${escapeHtml(a.login)}</span>`).join('')}
-      </div>` : ''}
-      ${editing ? `
-      <div class="edit-form">
-        <input id="edit-title" value="${escapeHtml(issue.title)}">
-        <textarea id="edit-body">${escapeHtml(issue.body || '')}</textarea>
-        <div class="picker-group">
-          <span class="assignees-label">Labels:</span>
-          <div class="dropdown-container" id="label-picker"></div>
-        </div>
-        <div class="picker-group">
-          <span class="assignees-label">Assignees:</span>
-          <div class="dropdown-container" id="assignee-picker"></div>
-        </div>
-        <div class="btn-row">
-          <button class="btn btn-primary" id="save-btn">Save</button>
-          <button class="btn btn-secondary" id="cancel-btn">Cancel</button>
-        </div>
-      </div>` : `
-      <div class="btn-row">
-        <button class="btn btn-primary" id="edit-btn">Edit</button>
-        <button class="btn ${closed ? 'btn-reopen' : 'btn-close'}" id="state-btn">${closed ? 'Reopen' : 'Close'}</button>
-        <div class="btn-row-divider"></div>
-        <button class="btn btn-ghost" id="branch-btn">Branch</button>
-        <button class="btn btn-ghost" id="worktree-btn">Worktree</button>
-        <button class="btn btn-ghost" id="browser-btn">Browser ↗</button>
-        <button class="btn btn-ghost" id="copy-btn">Copy as prompt</button>
-        <button class="btn btn-ghost" id="refresh-btn" title="Reload this issue from GitHub">Refresh</button>
-      </div>
-      <div class="body-card">${issue.body ? renderMarkdown(issue.body) : '(no description)'}</div>`}
-      <h3>Comments (${comments.length})</h3>
-      <div id="comments">
-        ${buildFeed(comments, timeline).map(item => item.kind === 'event' ? `
-          <div class="timeline-event">${item.text} · <span class="issue-meta">${timeHtml(item.created_at)}</span></div>` : `
-          <div class="comment">
-            <div class="comment-header">
-              <span class="comment-author-group">${avatar(item.comment.user)} <span class="comment-author">${escapeHtml(item.comment.user.login)}</span></span>
-              <span class="comment-actions">
-                <span class="issue-meta">${timeHtml(item.comment.created_at)}</span>
-                ${viewerLogin === item.comment.user.login && editingCommentId !== item.comment.id ? `
-                <button class="comment-link-btn comment-edit-btn" data-id="${item.comment.id}">Edit</button>
-                <button class="comment-link-btn danger comment-delete-btn" data-id="${item.comment.id}">Delete</button>` : ''}
-              </span>
-            </div>
-            ${editingCommentId === item.comment.id ? `
-            <div class="edit-form">
-              <textarea class="comment-edit-input">${escapeHtml(item.comment.body)}</textarea>
-              <div class="btn-row">
-                <button class="btn btn-primary comment-save-btn" data-id="${item.comment.id}">Save</button>
-                <button class="btn btn-secondary comment-cancel-btn" data-id="${item.comment.id}">Cancel</button>
-              </div>
-            </div>` : `<div class="comment-body">${renderMarkdown(item.comment.body)}</div>`}
-          </div>`).join('') || '<div class="issue-meta">No comments yet.</div>'}
-      </div>
-      <div id="composer">
-        <textarea id="comment-input" placeholder="Write a comment…"></textarea>
-        <div class="btn-row">
-          <button class="btn btn-primary" id="comment-btn" disabled>Comment</button>
-        </div>
+        ${issueStateBadge(issue.state, issue.state_reason)}
+        ${closedLocally && issue.state === 'open' ? '<span class="closes-badge" title="An unpushed local commit will close this issue">closes on push</span>' : ''}
+        <span><b>${escapeHtml(issue.user.login)}</b> opened this ${timeHtml(issue.created_at ?? detail.post.createdAt)} · ${plural(issue.comments, 'comment')}${parent}</span>
       </div>`;
-    if (editing) {
-      editFormSelectedLabels = new Set(issue.labels.map(l => l.name));
-      editFormSelectedAssignees = new Set(issue.assignees.map(a => a.login));
-      refreshLabelPicker = renderPicker(
-        'label-picker', repoLabels.map(l => ({ value: l.name, label: l.name, color: l.color })), editFormSelectedLabels,
-        () => labelOpen, () => { labelOpen = !labelOpen; }, 'Select labels…',
-      );
-      refreshAssigneePicker = renderPicker(
-        'assignee-picker', assignableUsers.map(u => ({ value: u.login, label: u.login })), editFormSelectedAssignees,
-        () => assigneeOpen, () => { assigneeOpen = !assigneeOpen; }, 'Select assignees…',
-      );
-    } else {
-      refreshLabelPicker = null;
-      refreshAssigneePicker = null;
-      editFormSelectedLabels = null;
-      editFormSelectedAssignees = null;
-    }
-    bindEvents(issue);
+    $('sticky').innerHTML = `${issueStateIcon(issue.state, issue.state_reason)} <b>${escapeHtml(issue.title)}</b> <span class="muted">#${issue.number}</span>`;
     bindAvatarFallbacks();
-    if (!editing) bindTaskCheckboxes();
   }
 
-  function bindEvents(issue: GithubIssue): void {
-    document.getElementById('copy-btn')?.addEventListener('click', () =>
-      vscode.postMessage({ type: 'copyAsPrompt' }));
-    document.getElementById('refresh-btn')?.addEventListener('click', () =>
-      vscode.postMessage({ type: 'refresh' }));
-    document.getElementById('browser-btn')?.addEventListener('click', () =>
-      vscode.postMessage({ type: 'openInBrowser' }));
-    document.getElementById('branch-btn')?.addEventListener('click', () =>
-      vscode.postMessage({ type: 'createBranch' }));
-    document.getElementById('worktree-btn')?.addEventListener('click', () =>
-      vscode.postMessage({ type: 'createWorktree' }));
-    document.getElementById('state-btn')?.addEventListener('click', () =>
-      vscode.postMessage({ type: 'setState', state: issue.state === 'closed' ? 'open' : 'closed' }));
-    document.getElementById('edit-btn')?.addEventListener('click', () => {
-      editing = true;
-      if (currentIssue) render(currentIssue, lastComments, lastTimeline);
+  function renderSidebar(): void {
+    if (!detail) return;
+    $('sidebar').innerHTML = sidebarHtml(detail, metadata, viewer);
+    bindAvatarFallbacks();
+  }
+
+  function renderTimeline(): void {
+    if (!detail) return;
+    const d = detail;
+    // An open edit form is rebuilt with the rest, so carry what was typed across.
+    const typing = root.querySelector<HTMLTextAreaElement>('.post-edit-input');
+    const draft = typing ? typing.value : null;
+    const parts = [postHtml(prepared(d.post), 'body', editingId === d.post.id), subIssuesHtml(d)];
+    for (const item of d.timeline) {
+      parts.push(item.kind === 'comment' ? postHtml(prepared(item), 'comment', editingId === item.id) : eventHtml(item));
+    }
+    if (hasMoreTimeline) parts.push('<button type="button" class="btn btn-ghost load-more" data-act="load-more">Load more</button>');
+    $('timeline').innerHTML = parts.join('');
+    const again = root.querySelector<HTMLTextAreaElement>('.post-edit-input');
+    if (again && draft !== null) again.value = draft;
+    // GitHub's rendered task items are disabled checkboxes; make them live for people who can edit the body.
+    $('timeline').querySelectorAll<HTMLInputElement>('.post[data-kind="body"] .post-body input[type=checkbox]')
+      .forEach((box, index) => {
+        box.disabled = !d.post.viewerCanUpdate;
+        box.addEventListener('change', () => {
+          beginWrite(() => undefined);
+          post({ type: 'toggleTask', index, checked: box.checked });
+        });
+      });
+    bindAvatarFallbacks();
+  }
+
+  function renderAll(): void {
+    renderHeader();
+    renderSidebar();
+    renderTimeline();
+    updateComposer();
+  }
+
+  function mountComposer(): void {
+    $('composer').innerHTML = `
+      <div class="composer-card">
+        <textarea id="comment-input" placeholder="Leave a comment" aria-label="Comment"></textarea>
+        <div class="composer-actions">
+          <span class="split">
+            <button type="button" class="btn btn-ghost" id="close-main" data-act="close-main"></button>
+            <button type="button" class="btn btn-ghost split-caret" id="close-caret" data-act="close-menu" aria-label="Close options">${octicon('triangle-down')}</button>
+          </span>
+          <button type="button" class="btn btn-primary" id="comment-btn" data-act="comment">Comment</button>
+        </div>
+      </div>`;
+    const input = $<HTMLTextAreaElement>('comment-input');
+    input.addEventListener('input', updateComposer);
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); submitComment(); }
     });
-    document.getElementById('cancel-btn')?.addEventListener('click', () => {
-      editing = false;
-      if (currentIssue) render(currentIssue, lastComments, lastTimeline);
-    });
-    document.getElementById('save-btn')?.addEventListener('click', () => {
-      const title = (document.getElementById('edit-title') as HTMLInputElement).value.trim();
-      const body = (document.getElementById('edit-body') as HTMLTextAreaElement).value;
-      if (!title) return;
-      const labels = Array.from(editFormSelectedLabels ?? []);
-      const assignees = Array.from(editFormSelectedAssignees ?? []);
-      vscode.postMessage({ type: 'saveEdit', title, body, labels, assignees });
-    });
-    const commentInput = document.getElementById('comment-input') as HTMLTextAreaElement;
-    const commentBtn = document.getElementById('comment-btn') as HTMLButtonElement;
-    commentInput?.addEventListener('input', () => {
-      commentBtn.disabled = commentInput.value.trim().length === 0;
-    });
-    commentBtn?.addEventListener('click', () => {
-      const body = commentInput.value.trim();
-      if (!body) return;
-      commentBtn.disabled = true;
-      vscode.postMessage({ type: 'postComment', body });
-    });
-    document.getElementById('comments')?.addEventListener('click', e => {
-      const target = e.target as HTMLElement;
-      const id = Number(target.dataset.id);
-      if (target.classList.contains('comment-edit-btn')) {
-        editingCommentId = id;
-        if (currentIssue) render(currentIssue, lastComments, lastTimeline);
-      } else if (target.classList.contains('comment-cancel-btn')) {
-        editingCommentId = null;
-        if (currentIssue) render(currentIssue, lastComments, lastTimeline);
-      } else if (target.classList.contains('comment-save-btn')) {
-        const textarea = target.closest('.comment')?.querySelector('.comment-edit-input') as HTMLTextAreaElement;
-        const body = textarea.value.trim();
-        if (!body) return;
-        vscode.postMessage({ type: 'editComment', commentId: id, body });
-      } else if (target.classList.contains('comment-delete-btn')) {
-        vscode.postMessage({ type: 'deleteComment', commentId: id });
-      }
+    commentBusy = false;
+  }
+
+  /** Close/Reopen wording follows the issue's state and whether a comment is typed, like github.com. */
+  function updateComposer(): void {
+    const input = document.getElementById('comment-input') as HTMLTextAreaElement | null;
+    if (!input || !detail) return;
+    const hasText = input.value.trim().length > 0;
+    const closed = detail.issue.state === 'closed';
+    $('close-main').textContent = closed ? (hasText ? 'Reopen with comment' : 'Reopen issue') : (hasText ? 'Close with comment' : 'Close issue');
+    $('close-caret').classList.toggle('hidden', closed);
+    $<HTMLButtonElement>('close-main').disabled = commentBusy;
+    $<HTMLButtonElement>('close-caret').disabled = commentBusy;
+    $<HTMLButtonElement>('comment-btn').disabled = commentBusy || !hasText;
+  }
+
+  // ---- writes -------------------------------------------------------------------------------------------------
+
+  /** Applies a change locally right away and counts it as unanswered until the host's `detail` or `failed` arrives. */
+  function beginWrite(change: (d: IssueDetail) => void): void {
+    if (!detail) return;
+    if (pending === 0) rollback = clone(detail);
+    pending++;
+    change(detail);
+    renderAll();
+  }
+
+  function applyState(to: StateTarget): void {
+    beginWrite(d => {
+      d.issue.state = to === 'reopen' ? 'open' : 'closed';
+      d.issue.state_reason = to === 'reopen' ? 'reopened' : to;
     });
   }
+
+  function submitComment(then?: StateTarget): void {
+    const input = $<HTMLTextAreaElement>('comment-input');
+    const body = input.value.trim();
+    if (commentBusy || (!body && !then)) return;
+    if (then) applyState(then);
+    if (!body) {
+      post({ type: 'setState', to: then });
+      return;
+    }
+    commentBusy = true;
+    updateComposer();
+    post({ type: 'postComment', body, then });
+  }
+
+  /** The target a Close / Reopen click means for the issue's current state. */
+  const closeTarget = (): StateTarget => (detail?.issue.state === 'closed' ? 'reopen' : 'completed');
+
+  // ---- pickers ------------------------------------------------------------------------------------------------
+
+  const sameSet = (a: Set<string>, b: Set<string>): boolean => a.size === b.size && [...a].every(v => b.has(v));
+
+  /** A multi-select picker that applies once it closes, like github.com, instead of one request per tick. */
+  function pickMany(anchor: HTMLElement, title: string, items: PickerItem[], apply: (chosen: Set<string>) => void): void {
+    const initial = new Set(items.filter(i => i.selected).map(i => i.value));
+    const chosen = new Set(initial);
+    openPicker({
+      anchor, title, items, multi: true,
+      onSelect: v => { if (chosen.has(v)) chosen.delete(v); else chosen.add(v); },
+      onClose: () => { if (!sameSet(chosen, initial)) apply(chosen); },
+    });
+  }
+
+  function pickAssignees(anchor: HTMLElement): void {
+    if (!detail) return;
+    const current = detail.issue.assignees;
+    const known = [...(metadata?.assignees ?? [])];
+    for (const a of current) if (!known.some(k => k.login === a.login)) known.push(a);
+    const items = known.map(u => ({
+      value: u.login, label: u.login, html: `${avatarHtml(u)} ${escapeHtml(u.login)}`,
+      selected: current.some(a => a.login === u.login),
+    }));
+    pickMany(anchor, 'Assign up to 10 people', items, chosen => {
+      const logins = [...chosen];
+      beginWrite(d => { d.issue.assignees = logins.map(l => known.find(k => k.login === l)!); });
+      post({ type: 'setAssignees', logins });
+    });
+  }
+
+  function pickLabels(anchor: HTMLElement): void {
+    if (!detail) return;
+    const current = detail.issue.labels;
+    const known = [...(metadata?.labels ?? [])];
+    for (const l of current) if (!known.some(k => k.name === l.name)) known.push(l);
+    const items = known.map(l => ({
+      value: l.name, label: l.name, html: `<span class="gh-label" style="${labelStyleVars(l.color)}">${escapeHtml(l.name)}</span>`,
+      description: l.description ?? undefined, selected: current.some(c => c.name === l.name),
+    }));
+    pickMany(anchor, 'Apply labels', items, chosen => {
+      const names = [...chosen];
+      beginWrite(d => { d.issue.labels = names.map(n => known.find(k => k.name === n)!); });
+      post({ type: 'setLabels', names });
+    });
+  }
+
+  function pickMilestone(anchor: HTMLElement): void {
+    if (!detail) return;
+    const current = detail.milestone?.number ?? null;
+    const items: PickerItem[] = [{ value: '', label: 'No milestone', selected: current === null }]
+      .concat((metadata?.milestones ?? []).map(m => ({ value: String(m.number), label: m.title, selected: m.number === current })));
+    openPicker({
+      anchor, title: 'Set milestone', items, filterable: items.length > 8,
+      onSelect: v => {
+        const number = v === '' ? null : Number(v);
+        if (number === current) return;
+        const found = (metadata?.milestones ?? []).find(m => m.number === number);
+        beginWrite(d => { d.milestone = found ? { number: found.number, title: found.title, percent: 0 } : null; });
+        post({ type: 'setMilestone', number });
+      },
+    });
+  }
+
+  function pickType(anchor: HTMLElement): void {
+    if (!detail) return;
+    const current = detail.issueType?.id ?? null;
+    const items: PickerItem[] = [{ value: '', label: 'No type', selected: current === null }]
+      .concat((metadata?.types ?? []).map(t => ({ value: t.id, label: t.name, selected: t.id === current })));
+    openPicker({
+      anchor, title: 'Set issue type', items, filterable: false,
+      onSelect: v => {
+        const id = v === '' ? null : v;
+        if (id === current) return;
+        const found = (metadata?.types ?? []).find(t => t.id === id);
+        beginWrite(d => { d.issueType = found ? { id: found.id, name: found.name } : null; });
+        post({ type: 'setType', id });
+      },
+    });
+  }
+
+  function findPost(id: string): IssuePost | undefined {
+    if (!detail) return undefined;
+    if (detail.post.id === id) return detail.post;
+    return detail.timeline.find((i): i is { kind: 'comment' } & IssuePost => i.kind === 'comment' && i.id === id);
+  }
+
+  function reactionPicker(anchor: HTMLElement, id: string): void {
+    const target = findPost(id);
+    if (!target) return;
+    openPicker({
+      anchor, title: 'Pick your reaction', items: reactionPickerItems(target), multi: true, filterable: false,
+      onSelect: content => {
+        const has = target.reactions.some(r => r.content === content && r.viewerHasReacted);
+        post({ type: 'toggleReaction', subjectId: id, content, add: !has });
+      },
+    });
+  }
+
+  function quoteReply(target: IssuePost): void {
+    const input = $<HTMLTextAreaElement>('comment-input');
+    const postEl = root.querySelector(`.post[data-id="${CSS.escape(target.id)}"]`);
+    const selection = window.getSelection();
+    const selected = selection && postEl && postEl.contains(selection.anchorNode) ? selection.toString().trim() : '';
+    const quote = (selected || target.body.trim()).split('\n').map(line => `> ${line}`).join('\n');
+    input.value = `${input.value ? `${input.value.replace(/\s+$/, '')}\n\n` : ''}${quote}\n\n`;
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+    updateComposer();
+  }
+
+  function postMenu(anchor: HTMLElement, id: string): void {
+    const target = findPost(id);
+    if (!target || !detail) return;
+    const isBody = target.id === detail.post.id;
+    const items: PickerItem[] = [{ value: 'link', label: 'Copy link' }, { value: 'quote', label: 'Quote reply' }];
+    if (target.viewerCanUpdate) items.push({ value: 'edit', label: 'Edit' });
+    if (!isBody && target.viewerCanDelete) items.push({ value: 'delete', label: 'Delete' });
+    openPicker({
+      anchor, title: 'Actions', items, filterable: false,
+      onSelect: action => {
+        if (action === 'link') post({ type: 'copyText', text: target.url });
+        else if (action === 'quote') quoteReply(target);
+        else if (action === 'edit') { editingId = target.id; renderTimeline(); root.querySelector<HTMLTextAreaElement>('.post-edit-input')?.focus(); }
+        else if (action === 'delete') post({ type: 'deletePost', id: target.id });
+      },
+    });
+  }
+
+  function headerMenu(anchor: HTMLElement): void {
+    const items: PickerItem[] = [
+      { value: 'prompt', label: 'Copy as prompt' }, { value: 'browser', label: 'Open on github.com' },
+      { value: 'refresh', label: 'Refresh' },
+    ];
+    if (detail?.post.viewerCanUpdate) items.push({ value: 'sub', label: 'Add sub-issue…' });
+    openPicker({
+      anchor, title: 'Actions', items, filterable: false,
+      onSelect: action => {
+        if (action === 'prompt') post({ type: 'copyAsPrompt' });
+        else if (action === 'browser') post({ type: 'openInBrowser' });
+        else if (action === 'refresh') post({ type: 'refresh' });
+        else if (action === 'sub') requestCandidates(anchor);
+      },
+    });
+  }
+
+  function requestCandidates(anchor: HTMLElement): void {
+    candidateAnchor = anchor;
+    post({ type: 'requestCandidates' });
+  }
+
+  function candidatePicker(candidates: Array<{ number: number; title: string }>): void {
+    if (!detail) return;
+    const taken = new Set<number>([detail.issue.number, ...detail.subIssues.map(s => s.number)]);
+    if (detail.parent) taken.add(detail.parent.number);
+    const items = candidates.filter(c => !taken.has(c.number)).map(c => ({ value: String(c.number), label: `#${c.number} ${c.title}` }));
+    const anchor = candidateAnchor && candidateAnchor.isConnected ? candidateAnchor : root;
+    openPicker({
+      anchor, title: 'Add sub-issue', items, emptyText: 'No other open issues',
+      onSelect: v => {
+        const number = Number(v);
+        const picked = candidates.find(c => c.number === number);
+        beginWrite(d => d.subIssues.push({
+          id: '', number, title: picked?.title ?? `#${number}`, state: 'open', stateReason: null, url: '', assignees: [],
+        }));
+        post({ type: 'addSubIssue', number });
+      },
+    });
+  }
+
+  function subMenu(anchor: HTMLElement, id: string, number: number): void {
+    openPicker({
+      anchor, title: 'Sub-issue', filterable: false,
+      items: [{ value: 'open', label: 'Open' }, { value: 'remove', label: 'Remove sub-issue' }],
+      onSelect: action => {
+        if (action === 'open') post({ type: 'openIssue', number, newTab: false });
+        else {
+          beginWrite(d => { d.subIssues = d.subIssues.filter(s => s.id !== id); });
+          post({ type: 'removeSubIssue', id });
+        }
+      },
+    });
+  }
+
+  // ---- events -------------------------------------------------------------------------------------------------
+
+  function handleAction(act: string, el: HTMLElement, e: MouseEvent): void {
+    const id = el.dataset.id ?? '';
+    const newTab = e.ctrlKey || e.metaKey || e.button === 1;
+    switch (act) {
+      case 'edit-title':
+        editingTitle = true;
+        renderHeader();
+        $<HTMLInputElement>('title-input').focus();
+        break;
+      case 'save-title': {
+        const title = $<HTMLInputElement>('title-input').value.trim();
+        editingTitle = false;
+        if (title && detail && title !== detail.issue.title) {
+          beginWrite(d => { d.issue.title = title; });
+          post({ type: 'setTitle', title });
+        } else renderHeader();
+        break;
+      }
+      case 'cancel-title': editingTitle = false; renderHeader(); break;
+      case 'header-menu': headerMenu(el); break;
+      case 'react': {
+        const content = el.dataset.content!;
+        const has = findPost(id)?.reactions.some(r => r.content === content && r.viewerHasReacted) ?? false;
+        post({ type: 'toggleReaction', subjectId: id, content, add: !has });
+        break;
+      }
+      case 'react-picker': reactionPicker(el, id); break;
+      case 'post-menu': postMenu(el, id); break;
+      case 'save-edit': {
+        const body = (el.closest('.post')?.querySelector('.post-edit-input') as HTMLTextAreaElement).value;
+        const isBody = detail?.post.id === id;
+        if (isBody) beginWrite(() => undefined);
+        (el as HTMLButtonElement).disabled = true;
+        el.textContent = 'Saving…';
+        post({ type: 'editPost', kind: isBody ? 'body' : 'comment', id, body });
+        break;
+      }
+      case 'cancel-edit': editingId = null; renderTimeline(); break;
+      case 'open-issue': post({ type: 'openIssue', number: Number(el.dataset.number), newTab }); break;
+      case 'add-sub': requestCandidates(el); break;
+      case 'sub-menu': subMenu(el, id, Number(el.dataset.number)); break;
+      case 'load-more':
+        (el as HTMLButtonElement).disabled = true;
+        post({ type: 'loadMoreTimeline' });
+        break;
+      case 'pick-assignees': pickAssignees(el); break;
+      case 'pick-labels': pickLabels(el); break;
+      case 'pick-type': pickType(el); break;
+      case 'pick-milestone': pickMilestone(el); break;
+      case 'assign-me':
+        if (viewer) {
+          const me = (metadata?.assignees ?? []).find(a => a.login === viewer) ?? { login: viewer, avatar_url: '' };
+          beginWrite(d => { d.issue.assignees = [me]; });
+          post({ type: 'setAssignees', logins: [viewer] });
+        }
+        break;
+      case 'branch': post({ type: 'createBranch' }); break;
+      case 'worktree': post({ type: 'createWorktree' }); break;
+      case 'comment': submitComment(); break;
+      case 'close-main': submitComment(closeTarget()); break;
+      case 'close-menu':
+        openPicker({
+          anchor: el, title: 'Close issue', filterable: false,
+          items: [{ value: 'completed', label: 'Close as completed' }, { value: 'not_planned', label: 'Close as not planned' }],
+          onSelect: v => submitComment(v as StateTarget),
+        });
+        break;
+      case 'retry': post({ type: 'refresh' }); break;
+    }
+  }
+
+  /** Links inside GitHub-rendered markdown: this repo's issues open in a tab, anything else leaves for the browser. */
+  function handleLink(a: HTMLAnchorElement, e: MouseEvent): void {
+    const href = a.getAttribute('href') ?? '';
+    if (href.startsWith('#')) return; // footnote jumps stay in the page
+    e.preventDefault();
+    const number = issueNumberFromLink(href, repoName);
+    if (number !== null) post({ type: 'openIssue', number, newTab: e.ctrlKey || e.metaKey || e.button === 1 });
+    else post({ type: 'openExternal', url: href });
+  }
+
+  function onClick(e: MouseEvent): void {
+    const target = e.target as HTMLElement;
+    const actEl = target.closest<HTMLElement>('[data-act]');
+    if (actEl) {
+      handleAction(actEl.dataset.act!, actEl, e);
+      return;
+    }
+    const link = target.closest<HTMLAnchorElement>('a[href]');
+    if (link && link.closest('.post-body, .tl-text, .sb-pr')) {
+      handleLink(link, e);
+      return;
+    }
+    const placeholder = target.closest<HTMLElement>('.img-placeholder');
+    if (placeholder && !placeholder.closest('a')) post({ type: 'openExternal', url: placeholder.dataset.src ?? '' });
+  }
+
+  root.addEventListener('click', onClick);
+  root.addEventListener('auxclick', e => {
+    const target = e.target as HTMLElement;
+    if (e.button === 1 && (target.closest('a[href]') || target.closest('[data-act="open-issue"]'))) onClick(e);
+  });
 
   window.addEventListener('message', event => {
     const msg = event.data;
     switch (msg.type) {
-      case 'issueDetail':
-        lastComments = msg.comments;
-        lastTimeline = msg.timeline;
-        repoLabels = msg.repoLabels;
-        assignableUsers = msg.assignableUsers;
-        issueTemplates = msg.templates ?? [];
-        viewerLogin = msg.viewerLogin;
-        if (msg.issue) renderDetail(msg.issue, msg.comments, msg.timeline);
-        else renderCreateForm();
-        break;
-      case 'issueDetailError':
-        detailEl.innerHTML = `<div id="empty">Failed to load issue: ${escapeHtml(msg.message)}</div>`;
-        break;
-      case 'commentPostFailed': {
-        const btn = detailEl.querySelector<HTMLButtonElement>('#comment-btn');
-        if (btn) btn.disabled = false;
+      case 'detail': {
+        if (!detail || detail.issue.number !== msg.detail.issue.number) {
+          // A different issue (this tab was reused, or the create form just became an issue): nothing in flight applies.
+          pending = 0;
+          rollback = null;
+        } else if (msg.afterWrite) {
+          pending = Math.max(0, pending - 1);
+        }
+        if (pending > 0) break; // newer local edits are still in flight; the last answer is the one to show
+        rollback = null;
+        detail = msg.detail;
+        viewer = msg.viewer;
+        repoName = msg.repo;
+        closedLocally = msg.closedLocally;
+        hasMoreTimeline = msg.detail.hasMoreTimeline;
+        if (!pageMounted) mountPage();
+        if (composerFor !== msg.detail.issue.number) {
+          composerFor = msg.detail.issue.number;
+          editingId = null;
+          editingTitle = false;
+          mountComposer();
+        }
+        if (msg.afterWrite) { editingId = null; editingTitle = false; }
+        renderAll();
         break;
       }
+      case 'metadata':
+        metadata = { labels: msg.labels, assignees: msg.assignees, milestones: msg.milestones, types: msg.types };
+        renderSidebar();
+        break;
+      case 'timelinePage': {
+        if (!detail) break;
+        const have = new Set(detail.timeline.filter((i): i is { kind: 'comment' } & IssuePost => i.kind === 'comment').map(c => c.id));
+        detail.timeline.push(...(msg.items as TimelineItem[]).filter(i => i.kind !== 'comment' || !have.has(i.id)));
+        hasMoreTimeline = msg.hasMore;
+        renderTimeline();
+        break;
+      }
+      case 'commentAdded': {
+        if (!detail) break;
+        const item = msg.item as IssuePost;
+        if (!findPost(item.id)) detail.timeline.push({ kind: 'comment', ...item });
+        detail.issue.comments++;
+        $<HTMLTextAreaElement>('comment-input').value = '';
+        commentBusy = false;
+        renderHeader();
+        renderTimeline();
+        updateComposer();
+        $('timeline').lastElementChild?.scrollIntoView({ block: 'nearest' });
+        break;
+      }
+      case 'postUpdated': {
+        const item = msg.item as IssuePost;
+        const at = detail ? detail.timeline.findIndex(i => i.kind === 'comment' && i.id === item.id) : -1;
+        if (detail && at >= 0) detail.timeline[at] = { kind: 'comment', ...item };
+        editingId = null;
+        renderTimeline();
+        break;
+      }
+      case 'postDeleted':
+        if (detail) {
+          detail.timeline = detail.timeline.filter(i => i.kind !== 'comment' || i.id !== msg.id);
+          detail.issue.comments = Math.max(0, detail.issue.comments - 1);
+          renderHeader();
+          renderTimeline();
+        }
+        break;
+      case 'reactions': {
+        const target = findPost(msg.id);
+        if (target) {
+          target.reactions = msg.groups;
+          renderTimeline();
+        }
+        break;
+      }
+      case 'candidates': candidatePicker(msg.items); break;
+      case 'failed':
+        toast(msg.message);
+        if (msg.what === 'write' || msg.what === 'refresh') pending = Math.max(0, pending - 1);
+        if (msg.what === 'write' && pending === 0 && rollback) {
+          detail = rollback;
+          rollback = null;
+          editingId = null;
+          renderAll();
+        }
+        if (msg.what === 'write' || msg.what === 'comment') { commentBusy = false; updateComposer(); }
+        if (msg.what === 'edit' || msg.what === 'timeline') renderTimeline();
+        break;
+      case 'error':
+        pageMounted = false;
+        root.innerHTML = `<div id="empty">Failed to load issue: ${escapeHtml(msg.message)}
+          <div><button type="button" class="btn btn-secondary" data-act="retry">Retry</button></div></div>`;
+        break;
+      case 'copied': toast('Copied'); break;
+      case 'createInit':
+        pageMounted = false;
+        detail = null;
+        pending = 0;
+        rollback = null;
+        renderCreateForm(root, msg, post);
+        break;
       case 'createFailed': {
-        const btn = detailEl.querySelector<HTMLButtonElement>('#save-btn');
+        const btn = document.getElementById('save-btn') as HTMLButtonElement | null;
         if (btn) {
           btn.disabled = false;
           btn.textContent = 'Create';
         }
         break;
       }
-      case 'copied': {
-        const btn = detailEl.querySelector('#copy-btn');
-        if (btn) {
-          btn.textContent = 'Copied!';
-          setTimeout(() => { if (btn) btn.textContent = 'Copy as prompt'; }, 1500);
-        }
-        break;
-      }
     }
   });
 
-  vscode.postMessage({ type: 'ready' });
+  post({ type: 'ready' });
 })();

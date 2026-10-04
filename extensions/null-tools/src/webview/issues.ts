@@ -355,7 +355,17 @@ declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
       return;
     }
     select(number);
-    vscode.postMessage({ type: 'open', number });
+    vscode.postMessage({ type: 'open', number, newTab: e.ctrlKey || e.metaKey });
+  });
+  // Middle-click opens a tab of its own. Without the mousedown guard Chromium starts autoscroll instead.
+  rowsEl.addEventListener('mousedown', e => { if (e.button === 1) e.preventDefault(); });
+  rowsEl.addEventListener('auxclick', e => {
+    if (e.button !== 1) return;
+    const row = (e.target as HTMLElement).closest<HTMLElement>('.issue-row');
+    if (!row || (e.target as HTMLElement).closest('.row-menu-btn')) return;
+    const number = Number(row.dataset.number);
+    select(number);
+    vscode.postMessage({ type: 'open', number, newTab: true });
   });
 
   messageEl.addEventListener('click', e => {
@@ -370,9 +380,13 @@ declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
   listEl.addEventListener('scroll', maybeLoadMore, { passive: true });
 
   document.addEventListener('keydown', e => {
-    if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.defaultPrevented || e.altKey) return;
     if (document.querySelector('.picker')) return;
     if ((e.target as HTMLElement).closest('input, textarea, select, button')) return;
+    if (e.ctrlKey || e.metaKey) {
+      if (e.key === 'Enter' && selectedNumber !== null) vscode.postMessage({ type: 'open', number: selectedNumber, newTab: true });
+      return;
+    }
     switch (e.key) {
       case '/': e.preventDefault(); searchInput.focus(); searchInput.select(); break;
       case 'j': case 'ArrowDown': e.preventDefault(); moveSelection(1); break;

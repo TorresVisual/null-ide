@@ -292,7 +292,7 @@ class IssuesListController {
                 break;
             case 'open':
                 if (this._store.getByNumber(msg.number)) {
-                    await issueDetailPanel_1.IssueDetailPanel.show(this._extensionUri, this._store, msg.number);
+                    await issueDetailPanel_1.IssueDetailPanel.show(this._extensionUri, this._store, msg.number, msg.newTab === true);
                 }
                 break;
             case 'rowAction':

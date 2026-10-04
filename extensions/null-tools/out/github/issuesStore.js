@@ -171,19 +171,6 @@ class IssuesStore {
     getViewerLogin() {
         return this.viewerLogin;
     }
-    async getComments(issueNumber) {
-        const { repo, token } = await this.ensureSession(false);
-        return (0, githubApi_1.fetchComments)(repo.owner, repo.repo, issueNumber, token);
-    }
-    async getTimeline(issueNumber) {
-        const { repo, token } = await this.ensureSession(false);
-        return (0, githubApi_1.fetchTimeline)(repo.owner, repo.repo, issueNumber, token);
-    }
-    /** Re-fetches one issue from GitHub and replaces it in the cache, without refetching any list. */
-    async reloadIssue(issueNumber) {
-        const { repo, token } = await this.ensureSession(false);
-        this.remember([await (0, githubApi_1.fetchIssue)(repo.owner, repo.repo, issueNumber, token)]);
-    }
     async updateIssue(issueNumber, patch) {
         const { repo, token } = await this.ensureSession(true);
         const updated = await (0, githubApi_1.updateIssue)(repo.owner, repo.repo, issueNumber, patch, token);
@@ -195,25 +182,6 @@ class IssuesStore {
         const created = await (0, githubApi_1.createIssue)(repo.owner, repo.repo, data, token);
         this.remember([created]);
         return created;
-    }
-    async addComment(issueNumber, body) {
-        const { repo, token } = await this.ensureSession(true);
-        const comment = await (0, githubApi_1.createComment)(repo.owner, repo.repo, issueNumber, body, token);
-        const issue = this.known.get(issueNumber);
-        if (issue)
-            this.known.set(issueNumber, { ...issue, comments: issue.comments + 1 });
-        return comment;
-    }
-    async updateComment(commentId, body) {
-        const { repo, token } = await this.ensureSession(true);
-        return (0, githubApi_1.updateComment)(repo.owner, repo.repo, commentId, body, token);
-    }
-    async deleteComment(issueNumber, commentId) {
-        const { repo, token } = await this.ensureSession(true);
-        await (0, githubApi_1.deleteComment)(repo.owner, repo.repo, commentId, token);
-        const issue = this.known.get(issueNumber);
-        if (issue)
-            this.known.set(issueNumber, { ...issue, comments: Math.max(0, issue.comments - 1) });
     }
 }
 exports.IssuesStore = IssuesStore;

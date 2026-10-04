@@ -2,7 +2,7 @@
 
 import * as https from 'https';
 import type { IncomingHttpHeaders } from 'http';
-import { GithubComment, GithubIssue, GithubLabel, GithubTimelineEvent, GithubUser, IssueState } from './types';
+import { GithubIssue, GithubLabel, GithubUser, IssueState } from './types';
 import { stripPullRequests } from './issueFilter';
 
 interface ApiErrorBody {
@@ -107,28 +107,6 @@ export async function fetchIssues(
   return stripPullRequests(raw);
 }
 
-export function fetchIssue(
-  owner: string, repo: string, issueNumber: number, token: string | null,
-): Promise<GithubIssue> {
-  return requestJson<GithubIssue>(`/repos/${owner}/${repo}/issues/${issueNumber}`, token);
-}
-
-export function fetchComments(
-  owner: string, repo: string, issueNumber: number, token: string | null,
-): Promise<GithubComment[]> {
-  return requestJson<GithubComment[]>(
-    `/repos/${owner}/${repo}/issues/${issueNumber}/comments?per_page=100`, token,
-  );
-}
-
-export function fetchTimeline(
-  owner: string, repo: string, issueNumber: number, token: string | null,
-): Promise<GithubTimelineEvent[]> {
-  return requestJson<GithubTimelineEvent[]>(
-    `/repos/${owner}/${repo}/issues/${issueNumber}/timeline?per_page=100`, token,
-  );
-}
-
 /** Fields of REST `PATCH /issues/:n` the extension sets. `milestone: null` clears it; `labels`/`assignees` replace the set. */
 export interface IssuePatch {
   title?: string;
@@ -153,28 +131,6 @@ export function createIssue(
   token: string | null,
 ): Promise<GithubIssue> {
   return requestJson<GithubIssue>(`/repos/${owner}/${repo}/issues`, token, 'POST', data);
-}
-
-export function createComment(
-  owner: string, repo: string, issueNumber: number, body: string, token: string | null,
-): Promise<GithubComment> {
-  return requestJson<GithubComment>(
-    `/repos/${owner}/${repo}/issues/${issueNumber}/comments`, token, 'POST', { body },
-  );
-}
-
-export function updateComment(
-  owner: string, repo: string, commentId: number, body: string, token: string | null,
-): Promise<GithubComment> {
-  return requestJson<GithubComment>(
-    `/repos/${owner}/${repo}/issues/comments/${commentId}`, token, 'PATCH', { body },
-  );
-}
-
-export function deleteComment(
-  owner: string, repo: string, commentId: number, token: string | null,
-): Promise<void> {
-  return requestJson<void>(`/repos/${owner}/${repo}/issues/comments/${commentId}`, token, 'DELETE');
 }
 
 export function fetchRepoLabels(owner: string, repo: string, token: string | null): Promise<GithubLabel[]> {

@@ -112,176 +112,440 @@ function issueStateBadge(state, stateReason) {
     const kind = issueStateKind(state, stateReason);
     return `<span class="state-badge state-${kind}">${issueStateIcon(state, stateReason)}${kind === 'open' ? 'Open' : 'Closed'}</span>`;
 }
-(function () {
-    const vscode = acquireVsCodeApi();
-    const detailEl = document.getElementById('detail');
-    const lightbox = document.getElementById('lightbox');
-    const lightboxImg = document.getElementById('lightbox-img');
-    lightbox === null || lightbox === void 0 ? void 0 : lightbox.addEventListener('click', () => lightbox.classList.add('hidden'));
-    document.addEventListener('keydown', e => {
-        if (e.key === 'Escape' && !(lightbox === null || lightbox === void 0 ? void 0 : lightbox.classList.contains('hidden')))
-            lightbox.classList.add('hidden');
-    });
-    detailEl.addEventListener('click', e => {
-        const target = e.target;
-        if (target.tagName === 'IMG' && target.closest('.body-card, .comment-body')) {
-            lightboxImg.src = target.src;
-            lightbox.classList.remove('hidden');
+function escapeHtml(s) {
+    const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+    return s.replace(/[&<>"']/g, c => map[c]);
+}
+const reconcileKeys = new WeakMap();
+const reconcileSignatures = new WeakMap();
+/**
+ * Makes `container`'s children match `items`, matched by `key`. A row whose item is unchanged (compared as JSON)
+ * keeps its DOM node, so hover, focus and scroll survive a refresh; changed rows are re-rendered in place, new
+ * ones inserted, missing ones removed, and rows are only moved when out of order. Children it didn't create
+ * (a skeleton, an old message) are removed. A repeated key is skipped.
+ */
+function reconcile(container, items, key, render) {
+    const wanted = new Set(items.map(key));
+    const existing = new Map();
+    for (const child of Array.from(container.children)) {
+        const k = reconcileKeys.get(child);
+        if (k !== undefined && wanted.has(k) && !existing.has(k))
+            existing.set(k, child);
+        else
+            container.removeChild(child);
+    }
+    const placed = new Set();
+    let previous = null;
+    for (const item of items) {
+        const k = key(item);
+        if (placed.has(k))
+            continue;
+        placed.add(k);
+        const signature = JSON.stringify(item);
+        let el = existing.get(k);
+        if (el && reconcileSignatures.get(el) !== signature) {
+            const fresh = render(item);
+            container.replaceChild(fresh, el);
+            el = fresh;
         }
+        else if (!el) {
+            el = render(item);
+        }
+        reconcileKeys.set(el, k);
+        reconcileSignatures.set(el, signature);
+        const expected = previous ? previous.nextElementSibling : container.firstElementChild;
+        if (el !== expected)
+            container.insertBefore(el, expected);
+        previous = el;
+    }
+}
+function filterPickerItems(items, text) {
+    const needle = text.trim().toLowerCase();
+    if (!needle)
+        return items;
+    return items.filter(i => { var _a; return i.label.toLowerCase().includes(needle) || ((_a = i.description) !== null && _a !== void 0 ? _a : '').toLowerCase().includes(needle); });
+}
+let closeActivePicker = null;
+let activePickerAnchor = null;
+/**
+ * Popover list under `anchor`: optional filter box, checkmarks, ↑/↓/Enter/Esc. One picker is open at a time,
+ * and activating the anchor of the open picker closes it. Styled by `.picker*` in lib/issues.css.
+ */
+function openPicker(opts) {
+    const wasOpenOnSameAnchor = activePickerAnchor === opts.anchor;
+    closeActivePicker === null || closeActivePicker === void 0 ? void 0 : closeActivePicker();
+    if (wasOpenOnSameAnchor)
+        return;
+    const items = opts.items.map(i => (Object.assign({}, i))); // multi pickers toggle `selected` on their own copy
+    const filterable = opts.filterable !== false;
+    const pop = document.createElement('div');
+    pop.className = 'picker';
+    pop.tabIndex = -1;
+    pop.innerHTML = `<div class="picker-title">${escapeHtml(opts.title)}</div>`
+        + (filterable ? '<input class="picker-filter" placeholder="Filter" spellcheck="false">' : '')
+        + '<div class="picker-list"></div>';
+    document.body.appendChild(pop);
+    const listEl = pop.querySelector('.picker-list');
+    const input = pop.querySelector('.picker-filter');
+    let shown = [];
+    let active = 0;
+    function render() {
+        var _a;
+        shown = filterPickerItems(items, input ? input.value : '');
+        if (active >= shown.length)
+            active = Math.max(0, shown.length - 1);
+        listEl.innerHTML = shown.length === 0
+            ? `<div class="picker-empty">${escapeHtml((_a = opts.emptyText) !== null && _a !== void 0 ? _a : 'Nothing to show')}</div>`
+            : shown.map((item, i) => {
+                var _a;
+                return `
+        <button type="button" class="picker-item${i === active ? ' active' : ''}" data-index="${i}">
+          <span class="picker-check">${item.selected ? octicon('check') : ''}</span>
+          <span class="picker-text">${(_a = item.html) !== null && _a !== void 0 ? _a : escapeHtml(item.label)}${item.description ? `<span class="picker-desc">${escapeHtml(item.description)}</span>` : ''}</span>
+        </button>`;
+            }).join('');
+        const activeEl = listEl.querySelector('.active');
+        if (activeEl)
+            activeEl.scrollIntoView({ block: 'nearest' });
+    }
+    function choose(index) {
+        const item = shown[index];
+        if (!item)
+            return;
+        if (opts.multi) {
+            item.selected = !item.selected;
+            render();
+        }
+        else
+            close();
+        opts.onSelect(item.value);
+    }
+    function onKeydown(e) {
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            e.stopPropagation();
+            close();
+            opts.anchor.focus();
+            return;
+        }
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            e.stopPropagation();
+            if (shown.length > 0)
+                active = (active + (e.key === 'ArrowDown' ? 1 : shown.length - 1)) % shown.length;
+            render();
+        }
+        else if (e.key === 'Enter') {
+            e.preventDefault();
+            e.stopPropagation();
+            choose(active);
+        }
+    }
+    function onOutsideMouseDown(e) {
+        const target = e.target;
+        if (!pop.contains(target) && !opts.anchor.contains(target))
+            close();
+    }
+    function close() {
+        var _a;
+        document.removeEventListener('keydown', onKeydown, true);
+        document.removeEventListener('mousedown', onOutsideMouseDown, true);
+        pop.remove();
+        closeActivePicker = null;
+        activePickerAnchor = null;
+        (_a = opts.onClose) === null || _a === void 0 ? void 0 : _a.call(opts);
+    }
+    listEl.addEventListener('click', e => {
+        const button = e.target.closest('.picker-item');
+        if (button)
+            choose(Number(button.dataset.index));
     });
-    let editing = false;
-    let currentIssue = null;
-    let lastComments = [];
-    let lastTimeline = [];
-    let repoLabels = [];
-    let assignableUsers = [];
-    let issueTemplates = [];
-    let viewerLogin = null;
-    let editingCommentId = null;
+    if (input)
+        input.addEventListener('input', () => { active = 0; render(); });
+    document.addEventListener('keydown', onKeydown, true);
+    document.addEventListener('mousedown', onOutsideMouseDown, true);
+    closeActivePicker = close;
+    activePickerAnchor = opts.anchor;
+    render();
+    const rect = opts.anchor.getBoundingClientRect();
+    pop.style.left = `${Math.max(4, Math.min(rect.left, window.innerWidth - pop.offsetWidth - 4))}px`;
+    pop.style.top = `${Math.max(4, Math.min(rect.bottom + 2, window.innerHeight - pop.offsetHeight - 4))}px`;
+    (input !== null && input !== void 0 ? input : pop).focus();
+}
+// Pure HTML builders for the issue detail tab. They take data and return strings (no DOM, no state), so
+// webviewShared tests can run them in a sandbox. Every user-controlled string goes through escapeHtml;
+// `post.bodyHTML` is the exception: GitHub renders it, and the caller sanitizes it before calling postHtml.
+const REACTION_EMOJI = {
+    THUMBS_UP: '👍', THUMBS_DOWN: '👎', LAUGH: '😄', HOORAY: '🎉', CONFUSED: '😕', HEART: '❤️', ROCKET: '🚀', EYES: '👀',
+};
+const REACTION_NAMES = {
+    THUMBS_UP: 'Thumbs up', THUMBS_DOWN: 'Thumbs down', LAUGH: 'Laugh', HOORAY: 'Hooray', CONFUSED: 'Confused',
+    HEART: 'Heart', ROCKET: 'Rocket', EYES: 'Eyes',
+};
+const ROLE_LABELS = {
+    OWNER: 'Owner', MEMBER: 'Member', COLLABORATOR: 'Collaborator', CONTRIBUTOR: 'Contributor',
+};
+function avatarHtml(user, large = false) {
+    const initials = escapeHtml(user.login.slice(0, 2).toUpperCase());
+    return `<span class="avatar${large ? ' avatar-lg' : ''}" data-initials="${initials}">`
+        + `${user.avatar_url ? `<img src="${escapeHtml(user.avatar_url)}" alt="">` : ''}</span>`;
+}
+/** GitHub's author-association badge. Only the four roles github.com shows; everyone else gets none. */
+function roleBadgeHtml(association) {
+    const label = association ? ROLE_LABELS[association] : undefined;
+    return label ? `<span class="role-badge">${label}</span>` : '';
+}
+/**
+ * GitHub's image URLs need a token the webview doesn't have, and its CSP only allows avatars, so an <img> in
+ * rendered markdown would be a broken icon. Emoji become their text; any other image becomes a labelled
+ * placeholder that opens the image externally. (Phase 5 swaps this for real thumbnails.)
+ */
+function neutralizeImagesHtml(html) {
+    return html.replace(/<img\b(?:[^>"']|"[^"]*"|'[^']*')*>/gi, tag => {
+        const attr = (name) => { var _a, _b; return (_b = (_a = new RegExp(`\\s${name}="([^"]*)"`, 'i').exec(tag)) === null || _a === void 0 ? void 0 : _a[1]) !== null && _b !== void 0 ? _b : ''; };
+        // Attribute values may hold a raw < or > (only quotes are escaped inside them); this text lands in markup.
+        const alt = attr('alt').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        if (/\bclass="[^"]*\bemoji\b/i.test(tag))
+            return alt;
+        return `<span class="img-placeholder" data-src="${attr('src')}" title="Open image on github.com">${octicon('image')} ${alt || 'image'}</span>`;
+    });
+}
+/** The issue number if `href` is an issue of `repo` (`owner/name`); null for anything else, including other repos. */
+function issueNumberFromLink(href, repo) {
+    const m = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/issues\/(\d+)(?:[/?#].*)?$/i.exec(href);
+    return m && `${m[1]}/${m[2]}`.toLowerCase() === repo.toLowerCase() ? Number(m[3]) : null;
+}
+/** Reaction chips under a post; nothing when no one has reacted. */
+function reactionsHtml(post) {
+    const chips = post.reactions.filter(r => r.count > 0).map(r => {
+        var _a, _b;
+        return `
+    <button type="button" class="reaction-chip${r.viewerHasReacted ? ' active' : ''}" data-act="react" data-id="${escapeHtml(post.id)}"
+      data-content="${escapeHtml(r.content)}" title="${(_a = REACTION_NAMES[r.content]) !== null && _a !== void 0 ? _a : ''}">${(_b = REACTION_EMOJI[r.content]) !== null && _b !== void 0 ? _b : ''} ${r.count}</button>`;
+    });
+    return chips.length > 0 ? `<div class="reactions">${chips.join('')}</div>` : '';
+}
+/** The eight reactions GitHub offers, as picker items (the viewer's own are checked). */
+function reactionPickerItems(post) {
+    return Object.keys(REACTION_EMOJI).map(content => ({
+        value: content,
+        label: `${REACTION_EMOJI[content]} ${REACTION_NAMES[content]}`,
+        selected: post.reactions.some(r => r.content === content && r.viewerHasReacted),
+    }));
+}
+/**
+ * One post: the issue body (`kind: 'body'`) or a comment. A moderator-collapsed comment is folded in a
+ * <details>. `editing` swaps the rendered body for a plain textarea (the Phase 4 composer replaces it).
+ */
+function postHtml(post, kind, editing) {
+    const id = escapeHtml(post.id);
+    const edited = post.lastEditedAt
+        ? ` <span class="post-edited" title="${escapeHtml(new Date(post.lastEditedAt).toLocaleString())}">· edited</span>` : '';
+    const content = editing
+        ? `<div class="edit-form post-edit">
+         <textarea class="post-edit-input" data-id="${id}" aria-label="Edit ${kind === 'body' ? 'description' : 'comment'}">${escapeHtml(post.body)}</textarea>
+         <div class="btn-row">
+           <button type="button" class="btn btn-primary" data-act="save-edit" data-id="${id}">Update ${kind === 'body' ? 'description' : 'comment'}</button>
+           <button type="button" class="btn btn-secondary" data-act="cancel-edit">Cancel</button>
+         </div>
+       </div>`
+        : `<div class="post-body">${post.bodyHTML || '<span class="muted">No description provided.</span>'}</div>${reactionsHtml(post)}`;
+    const html = `
+    <div class="post" data-id="${id}" data-kind="${kind}">
+      <div class="post-avatar">${avatarHtml(post.author, true)}</div>
+      <div class="post-card">
+        <div class="post-header">
+          <b class="post-author">${escapeHtml(post.author.login)}</b>${roleBadgeHtml(post.authorAssociation)}
+          <span class="post-when">${kind === 'body' ? 'opened this' : 'commented'} ${timeHtml(post.createdAt)}</span>${edited}
+          <span class="post-actions">
+            <button type="button" class="icon-btn" data-act="react-picker" data-id="${id}" title="Add reaction" aria-label="Add reaction">${octicon('smiley')}</button>
+            <button type="button" class="icon-btn" data-act="post-menu" data-id="${id}" title="More actions" aria-label="More actions">${octicon('kebab-horizontal')}</button>
+          </span>
+        </div>
+        ${content}
+      </div>
+    </div>`;
+    return kind === 'comment' && post.minimizedReason
+        ? `<details class="post-minimized"><summary>This comment was marked as ${escapeHtml(post.minimizedReason.replace(/_/g, ' '))}. Show</summary>${html}</details>`
+        : html;
+}
+function eventLabelChips(labels) {
+    return labels.map(l => `<span class="gh-label" style="${labelStyleVars(l.color)}">${escapeHtml(l.name)}</span>`).join('');
+}
+function eventLink(text, url) {
+    return `<a href="${escapeHtml(url)}">${escapeHtml(text)}</a>`;
+}
+const CLOSED_REASON_TEXT = { completed: ' as completed', not_planned: ' as not planned', duplicate: ' as a duplicate' };
+/** The rail icon, its color class and the sentence for one event (without the leading actor and trailing time). */
+function eventParts(ev) {
+    var _a, _b;
+    switch (ev.type) {
+        case 'labels': {
+            const noun = (n) => (n === 1 ? 'label' : 'labels');
+            const parts = [];
+            if (ev.added.length > 0)
+                parts.push(`added ${eventLabelChips(ev.added)} ${noun(ev.added.length)}`);
+            if (ev.removed.length > 0)
+                parts.push(`removed ${eventLabelChips(ev.removed)} ${noun(ev.removed.length)}`);
+            return { icon: 'tag', tone: '', text: parts.join(' and ') };
+        }
+        case 'closed': {
+            const unplanned = ev.reason === 'not_planned' || ev.reason === 'duplicate';
+            const closer = ev.closer ? ` in ${eventLink(ev.closer.text, ev.closer.url)}` : '';
+            return {
+                icon: unplanned ? 'skip' : 'issue-closed', tone: unplanned ? 'state-not-planned' : 'state-completed',
+                text: `closed this${(_b = CLOSED_REASON_TEXT[(_a = ev.reason) !== null && _a !== void 0 ? _a : '']) !== null && _b !== void 0 ? _b : ''}${closer}`,
+            };
+        }
+        case 'reopened': return { icon: 'issue-reopened', tone: 'state-open', text: 'reopened this' };
+        case 'renamed':
+            return { icon: 'pencil', tone: '', text: `changed the title <s>${escapeHtml(ev.from)}</s> ${escapeHtml(ev.to)}` };
+        case 'assigned':
+            return { icon: 'person', tone: '', text: ev.login === ev.actor ? 'self-assigned this' : `assigned <b>${escapeHtml(ev.login)}</b>` };
+        case 'unassigned':
+            return { icon: 'person', tone: '', text: ev.login === ev.actor ? 'removed their assignment' : `unassigned <b>${escapeHtml(ev.login)}</b>` };
+        case 'milestoned': return { icon: 'milestone', tone: '', text: `added this to the <b>${escapeHtml(ev.title)}</b> milestone` };
+        case 'demilestoned': return { icon: 'milestone', tone: '', text: `removed this from the <b>${escapeHtml(ev.title)}</b> milestone` };
+        case 'cross-referenced': return { icon: 'cross-reference', tone: '', text: `mentioned this in ${eventLink(ev.text, ev.url)}` };
+        case 'connected': return { icon: 'link', tone: '', text: `linked ${eventLink(ev.text, ev.url)}` };
+        case 'referenced': return { icon: 'git-commit', tone: '', text: `referenced this in commit ${eventLink(ev.text, ev.url)}` };
+        case 'sub-issue-added': return { icon: 'issue-tracks', tone: '', text: `added sub-issue ${eventLink(ev.text, ev.url)}` };
+        case 'sub-issue-removed': return { icon: 'issue-tracks', tone: '', text: `removed sub-issue ${eventLink(ev.text, ev.url)}` };
+    }
+}
+/** One event on the timeline rail: icon badge, "actor did something", relative time. */
+function eventHtml(ev) {
+    const { icon, tone, text } = eventParts(ev);
+    return `<div class="tl-event"><span class="tl-badge ${tone}">${octicon(icon)}</span>`
+        + `<div class="tl-text"><b class="tl-actor">${escapeHtml(ev.actor)}</b> ${text} ${timeHtml(ev.at)}</div></div>`;
+}
+// Pure HTML for the detail tab's right sidebar and the sub-issue block (see detailHtml.ts for the conventions).
+function sidebarSection(key, title, canEdit, body) {
+    const edit = canEdit
+        ? `<button type="button" class="icon-btn" data-act="pick-${key}" title="Edit ${title.toLowerCase()}" aria-label="Edit ${title.toLowerCase()}">${octicon('gear')}</button>`
+        : '';
+    return `<section class="sb-section" data-sec="${key}"><div class="sb-head"><span>${title}</span>${edit}</div><div class="sb-body">${body}</div></section>`;
+}
+function pullRequestIcon(pr) {
+    if (pr.state === 'merged')
+        return octicon('git-merge', 'pr-icon pr-merged');
+    if (pr.state === 'closed')
+        return octicon('git-pull-request-closed', 'pr-icon pr-closed');
+    return pr.isDraft ? octicon('git-pull-request-draft', 'pr-icon pr-draft') : octicon('git-pull-request', 'pr-icon pr-open');
+}
+/** Assignees, Labels, Type (only for repos that have issue types), Milestone, Development, Participants. */
+function sidebarHtml(d, meta, viewer) {
+    const canEdit = d.post.viewerCanUpdate;
+    const none = (text) => `<span class="muted">${text}</span>`;
+    const assignees = d.issue.assignees.length > 0
+        ? d.issue.assignees.map(a => `<div class="sb-person">${avatarHtml(a)} ${escapeHtml(a.login)}</div>`).join('')
+        : none('No one')
+            + (canEdit && viewer ? ` <button type="button" class="link-btn" data-act="assign-me">assign yourself</button>` : '');
+    const labels = d.issue.labels.length > 0 ? eventLabelChips(d.issue.labels) : none('None yet');
+    const type = d.issueType ? escapeHtml(d.issueType.name) : none('No type');
+    const milestone = d.milestone
+        ? `<div>${octicon('milestone')} ${escapeHtml(d.milestone.title)}</div>`
+            + `<div class="progress" title="${d.milestone.percent}% complete"><span style="width:${d.milestone.percent}%"></span></div>`
+        : none('No milestone');
+    const prs = d.linkedPrs.map(pr => `<div class="sb-pr"><a href="${escapeHtml(pr.url)}">${pullRequestIcon(pr)} ${escapeHtml(pr.title)} <span class="muted">#${pr.number}</span></a></div>`).join('');
+    const development = prs
+        + `<div class="sb-dev-actions"><button type="button" class="link-btn" data-act="branch">${octicon('git-branch')} Create a branch</button>`
+        + `<button type="button" class="link-btn" data-act="worktree">${octicon('git-branch')} Create a worktree</button></div>`;
+    const participants = d.participants.map(p => `<span title="${escapeHtml(p.login)}">${avatarHtml(p)}</span>`).join('');
+    return sidebarSection('assignees', 'Assignees', canEdit, assignees)
+        + sidebarSection('labels', 'Labels', canEdit, labels)
+        + (d.issueType || (meta && meta.types.length > 0) ? sidebarSection('type', 'Type', canEdit, type) : '')
+        + sidebarSection('milestone', 'Milestone', canEdit, milestone)
+        + sidebarSection('development', 'Development', false, development)
+        + (participants ? sidebarSection('participants', 'Participants', false, `<div class="sb-avatars">${participants}</div>`) : '');
+}
+/** The sub-issue list under the issue body: progress, one row per child, and (when editable) add / remove. */
+function subIssuesHtml(d) {
+    if (d.subIssues.length === 0)
+        return '';
+    const canEdit = d.post.viewerCanUpdate;
+    const done = d.subIssues.filter(s => s.state === 'closed').length;
+    const percent = Math.round((done / d.subIssues.length) * 100);
+    const rows = d.subIssues.map(s => `
+    <div class="sub-row">
+      ${issueStateIcon(s.state, s.stateReason)}
+      <button type="button" class="sub-title" data-act="open-issue" data-number="${s.number}">${escapeHtml(s.title)}</button>
+      <span class="muted">#${s.number}</span>
+      <span class="sub-people">${s.assignees.map(a => avatarHtml(a)).join('')}</span>
+      ${canEdit ? `<button type="button" class="icon-btn" data-act="sub-menu" data-id="${escapeHtml(s.id)}" data-number="${s.number}" title="More actions" aria-label="More actions">${octicon('kebab-horizontal')}</button>` : ''}
+    </div>`).join('');
+    return `<section class="subissues">
+    <div class="sub-head"><b>Sub-issues</b> <span class="muted">${done} of ${d.subIssues.length}</span>
+      <div class="progress"><span style="width:${percent}%"></span></div>
+      ${canEdit ? `<button type="button" class="btn btn-ghost btn-small" data-act="add-sub">Add sub-issue</button>` : ''}
+    </div>${rows}
+  </section>`;
+}
+/** Closes the form's open dropdowns. Set while the form is on screen. */
+let closeCreateDropdowns = null;
+document.addEventListener('click', e => {
+    if (e.composedPath().some(n => n instanceof Element && n.classList.contains('dropdown-container')))
+        return;
+    closeCreateDropdowns === null || closeCreateDropdowns === void 0 ? void 0 : closeCreateDropdowns();
+});
+function renderDropdown(containerId, items, selected, isOpen, toggleOpen, placeholder) {
+    const refresh = () => {
+        var _a;
+        const container = document.getElementById(containerId);
+        if (!container)
+            return;
+        const open = isOpen();
+        const selectedItems = items.filter(i => selected.has(i.value));
+        container.innerHTML = `
+      <button type="button" class="dropdown-trigger">
+        ${selectedItems.length > 0 ? `<span class="selected-tags">${selectedItems.map(i => `
+          <span class="tag${i.color ? ' gh-label' : ''}"${i.color ? ` style="${labelStyleVars(i.color)}"` : ''}>${escapeHtml(i.label)}<span class="tag-remove" data-value="${escapeHtml(i.value)}">&times;</span></span>`).join('')}</span>`
+            : `<span class="dropdown-placeholder">${escapeHtml(placeholder)}</span>`}
+        <span class="dropdown-arrow">${open ? '▲' : '▼'}</span>
+      </button>
+      <div class="dropdown-list${open ? '' : ' hidden'}">
+        ${items.length === 0 ? '<span class="muted">None available.</span>' : items.map(i => `
+          <button type="button" class="dropdown-item${selected.has(i.value) ? ' selected' : ''}" data-value="${escapeHtml(i.value)}">
+            <span class="checkbox">${selected.has(i.value) ? '☑' : '☐'}</span>
+            ${i.color ? `<span class="color-dot" style="background:#${i.color}"></span>` : ''}
+            ${escapeHtml(i.label)}
+          </button>`).join('')}
+      </div>`;
+        (_a = container.querySelector('.dropdown-trigger')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', () => {
+            toggleOpen();
+            refresh();
+        });
+        container.querySelectorAll('.tag-remove').forEach(el => el.addEventListener('mousedown', e => {
+            e.preventDefault();
+            selected.delete(el.dataset.value);
+            refresh();
+        }));
+        container.querySelectorAll('.dropdown-item').forEach(el => el.addEventListener('click', () => {
+            const v = el.dataset.value;
+            if (selected.has(v))
+                selected.delete(v);
+            else
+                selected.add(v);
+            refresh();
+        }));
+    };
+    refresh();
+    return refresh;
+}
+function renderCreateForm(root, data, post) {
+    var _a, _b, _c;
     let labelOpen = false;
     let assigneeOpen = false;
-    let refreshLabelPicker = null;
-    let refreshAssigneePicker = null;
-    let editFormSelectedLabels = null;
-    let editFormSelectedAssignees = null;
-    document.addEventListener('click', e => {
-        if (e.composedPath().some(n => n instanceof Element && n.classList.contains('dropdown-container')))
-            return;
-        if (!labelOpen && !assigneeOpen)
-            return;
-        labelOpen = false;
-        assigneeOpen = false;
-        refreshLabelPicker === null || refreshLabelPicker === void 0 ? void 0 : refreshLabelPicker();
-        refreshAssigneePicker === null || refreshAssigneePicker === void 0 ? void 0 : refreshAssigneePicker();
-    });
-    function escapeHtml(s) {
-        const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
-        return s.replace(/[&<>"']/g, c => map[c]);
-    }
-    function renderMarkdown(text) {
-        return DOMPurify.sanitize(marked.parse(text));
-    }
-    function renderPicker(containerId, items, selected, isOpen, toggleOpen, placeholder) {
-        const refresh = () => {
-            var _a;
-            const container = document.getElementById(containerId);
-            if (!container)
-                return;
-            const open = isOpen();
-            const selectedItems = items.filter(i => selected.has(i.value));
-            container.innerHTML = `
-        <button type="button" class="dropdown-trigger">
-          ${selectedItems.length > 0 ? `<span class="selected-tags">${selectedItems.map(i => `
-            <span class="tag${i.color ? ' gh-label' : ''}"${i.color ? ` style="${labelStyleVars(i.color)}"` : ''}>${escapeHtml(i.label)}<span class="tag-remove" data-value="${escapeHtml(i.value)}">&times;</span></span>`).join('')}</span>`
-                : `<span class="dropdown-placeholder">${escapeHtml(placeholder)}</span>`}
-          <span class="dropdown-arrow">${open ? '▲' : '▼'}</span>
-        </button>
-        <div class="dropdown-list${open ? '' : ' hidden'}">
-          ${items.length === 0 ? '<span class="issue-meta">None available.</span>' : items.map(i => `
-            <button type="button" class="dropdown-item${selected.has(i.value) ? ' selected' : ''}" data-value="${escapeHtml(i.value)}">
-              <span class="checkbox">${selected.has(i.value) ? '☑' : '☐'}</span>
-              ${i.color ? `<span class="color-dot" style="background:#${i.color}"></span>` : ''}
-              ${escapeHtml(i.label)}
-            </button>`).join('')}
-        </div>`;
-            (_a = container.querySelector('.dropdown-trigger')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', () => {
-                toggleOpen();
-                refresh();
-            });
-            container.querySelectorAll('.tag-remove').forEach(el => el.addEventListener('mousedown', e => {
-                e.preventDefault();
-                selected.delete(el.dataset.value);
-                refresh();
-            }));
-            container.querySelectorAll('.dropdown-item').forEach(el => el.addEventListener('click', () => {
-                const v = el.dataset.value;
-                if (selected.has(v))
-                    selected.delete(v);
-                else
-                    selected.add(v);
-                refresh();
-            }));
-        };
-        refresh();
-        return refresh;
-    }
-    function avatar(user) {
-        const initials = escapeHtml(user.login.slice(0, 2).toUpperCase());
-        return `<span class="avatar" data-initials="${initials}">` +
-            `${user.avatar_url ? `<img src="${escapeHtml(user.avatar_url)}" alt="">` : ''}</span>`;
-    }
-    function bindAvatarFallbacks() {
-        detailEl.querySelectorAll('.avatar img').forEach(img => img.addEventListener('error', () => { img.style.display = 'none'; }, { once: true }));
-    }
-    function bindTaskCheckboxes() {
-        const boxes = detailEl.querySelectorAll('.body-card input[type=checkbox]');
-        boxes.forEach((box, index) => {
-            box.disabled = false;
-            box.addEventListener('change', () => vscode.postMessage({ type: 'toggleTask', index, checked: box.checked }));
-        });
-    }
-    function shortSha(sha) {
-        return sha.slice(0, 7);
-    }
-    function timelineEventText(ev) {
-        var _a;
-        const actorName = ev.actor ? escapeHtml(ev.actor.login) : 'someone';
-        switch (ev.event) {
-            case 'closed':
-                return `${actorName} closed this${ev.commit_id ? ` via commit <code>${shortSha(ev.commit_id)}</code>` : ''}`;
-            case 'reopened':
-                return `${actorName} reopened this`;
-            case 'labeled':
-                return ev.label
-                    ? `${actorName} added the <span class="gh-label" style="${labelStyleVars(ev.label.color)}">${escapeHtml(ev.label.name)}</span> label` : null;
-            case 'unlabeled':
-                return ev.label
-                    ? `${actorName} removed the <span class="gh-label" style="${labelStyleVars(ev.label.color)}">${escapeHtml(ev.label.name)}</span> label` : null;
-            case 'assigned':
-                return ev.assignee ? `${actorName} assigned ${escapeHtml(ev.assignee.login)}` : null;
-            case 'unassigned':
-                return ev.assignee ? `${actorName} unassigned ${escapeHtml(ev.assignee.login)}` : null;
-            case 'renamed':
-                return ev.rename
-                    ? `${actorName} changed the title from "${escapeHtml(ev.rename.from)}" to "${escapeHtml(ev.rename.to)}"` : null;
-            case 'cross-referenced':
-                return ((_a = ev.source) === null || _a === void 0 ? void 0 : _a.issue)
-                    ? `${actorName} referenced this in <a href="${escapeHtml(ev.source.issue.html_url)}">#${ev.source.issue.number}</a>` : null;
-            case 'referenced':
-                return ev.commit_id ? `${actorName} referenced this in commit <code>${shortSha(ev.commit_id)}</code>` : null;
-            default:
-                return null;
-        }
-    }
-    function buildFeed(comments, timeline) {
-        const items = comments.map(c => ({ kind: 'comment', created_at: c.created_at, comment: c }));
-        for (const ev of timeline) {
-            const text = timelineEventText(ev);
-            if (text)
-                items.push({ kind: 'event', created_at: ev.created_at, text });
-        }
-        return items.sort((a, b) => a.created_at.localeCompare(b.created_at));
-    }
-    function renderDetail(issue, comments, timeline) {
-        currentIssue = issue;
-        editing = false;
-        editingCommentId = null;
-        render(issue, comments, timeline);
-    }
-    function renderCreateForm() {
-        var _a, _b, _c;
-        currentIssue = null;
-        labelOpen = false;
-        assigneeOpen = false;
-        const selectedLabels = new Set();
-        const selectedAssignees = new Set();
-        detailEl.innerHTML = `
-      <h2>New Issue</h2>
+    const selectedLabels = new Set();
+    const selectedAssignees = new Set();
+    root.innerHTML = `
+    <div id="create-form">
+      <h1 class="title">New issue</h1>
       <div class="edit-form">
-        ${issueTemplates.length > 0 ? `
+        ${data.templates.length > 0 ? `
         <select id="template-picker">
           <option value="">Blank issue</option>
-          ${issueTemplates.map((t, i) => `<option value="${i}">${escapeHtml(t.name)}</option>`).join('')}
+          ${data.templates.map((t, i) => `<option value="${i}">${escapeHtml(t.name)}</option>`).join('')}
         </select>` : ''}
         <input id="edit-title" placeholder="Title">
         <div id="title-error" class="field-error hidden">Title is required.</div>
@@ -298,242 +562,744 @@ function issueStateBadge(state, stateReason) {
           <button class="btn btn-primary" id="save-btn">Create</button>
           <button class="btn btn-secondary" id="cancel-btn">Cancel</button>
         </div>
-      </div>`;
-        refreshLabelPicker = renderPicker('label-picker', repoLabels.map(l => ({ value: l.name, label: l.name, color: l.color })), selectedLabels, () => labelOpen, () => { labelOpen = !labelOpen; }, 'Select labels…');
-        refreshAssigneePicker = renderPicker('assignee-picker', assignableUsers.map(u => ({ value: u.login, label: u.login })), selectedAssignees, () => assigneeOpen, () => { assigneeOpen = !assigneeOpen; }, 'Select assignees…');
-        (_a = document.getElementById('template-picker')) === null || _a === void 0 ? void 0 : _a.addEventListener('change', e => {
-            var _a, _b;
-            const index = e.target.value;
-            const template = index ? issueTemplates[Number(index)] : null;
-            document.getElementById('edit-title').value = (_a = template === null || template === void 0 ? void 0 : template.title) !== null && _a !== void 0 ? _a : '';
-            document.getElementById('edit-body').value = (_b = template === null || template === void 0 ? void 0 : template.body) !== null && _b !== void 0 ? _b : '';
-            selectedLabels.clear();
-            template === null || template === void 0 ? void 0 : template.labels.forEach(l => {
-                const match = repoLabels.find(rl => rl.name.toLowerCase() === l.toLowerCase());
-                if (match)
-                    selectedLabels.add(match.name);
-            });
-            refreshLabelPicker === null || refreshLabelPicker === void 0 ? void 0 : refreshLabelPicker();
+      </div>
+    </div>`;
+    const refreshLabels = renderDropdown('label-picker', data.repoLabels.map(l => ({ value: l.name, label: l.name, color: l.color })), selectedLabels, () => labelOpen, () => { labelOpen = !labelOpen; }, 'Select labels…');
+    const refreshAssignees = renderDropdown('assignee-picker', data.assignableUsers.map(u => ({ value: u.login, label: u.login })), selectedAssignees, () => assigneeOpen, () => { assigneeOpen = !assigneeOpen; }, 'Select assignees…');
+    closeCreateDropdowns = () => {
+        if (!labelOpen && !assigneeOpen)
+            return;
+        labelOpen = false;
+        assigneeOpen = false;
+        refreshLabels();
+        refreshAssignees();
+    };
+    (_a = document.getElementById('template-picker')) === null || _a === void 0 ? void 0 : _a.addEventListener('change', e => {
+        var _a, _b;
+        const index = e.target.value;
+        const template = index ? data.templates[Number(index)] : null;
+        document.getElementById('edit-title').value = (_a = template === null || template === void 0 ? void 0 : template.title) !== null && _a !== void 0 ? _a : '';
+        document.getElementById('edit-body').value = (_b = template === null || template === void 0 ? void 0 : template.body) !== null && _b !== void 0 ? _b : '';
+        selectedLabels.clear();
+        template === null || template === void 0 ? void 0 : template.labels.forEach(l => {
+            const match = data.repoLabels.find(rl => rl.name.toLowerCase() === l.toLowerCase());
+            if (match)
+                selectedLabels.add(match.name);
         });
-        const titleInput = document.getElementById('edit-title');
-        const titleError = document.getElementById('title-error');
-        titleInput.addEventListener('input', () => titleError.classList.add('hidden'));
-        (_b = document.getElementById('save-btn')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', () => {
-            const saveBtn = document.getElementById('save-btn');
-            if (saveBtn.disabled)
-                return;
-            const title = titleInput.value.trim();
-            if (!title) {
-                titleError.classList.remove('hidden');
-                titleInput.focus();
-                return;
-            }
-            saveBtn.disabled = true;
-            saveBtn.textContent = 'Creating…';
-            vscode.postMessage({
-                type: 'submitCreate', title,
-                body: document.getElementById('edit-body').value,
-                labels: Array.from(selectedLabels), assignees: Array.from(selectedAssignees),
-            });
+        refreshLabels();
+    });
+    const titleInput = document.getElementById('edit-title');
+    const titleError = document.getElementById('title-error');
+    titleInput.addEventListener('input', () => titleError.classList.add('hidden'));
+    (_b = document.getElementById('save-btn')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', () => {
+        const saveBtn = document.getElementById('save-btn');
+        if (saveBtn.disabled)
+            return;
+        const title = titleInput.value.trim();
+        if (!title) {
+            titleError.classList.remove('hidden');
+            titleInput.focus();
+            return;
+        }
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Creating…';
+        post({
+            type: 'submitCreate', title,
+            body: document.getElementById('edit-body').value,
+            labels: Array.from(selectedLabels), assignees: Array.from(selectedAssignees),
         });
-        (_c = document.getElementById('cancel-btn')) === null || _c === void 0 ? void 0 : _c.addEventListener('click', () => vscode.postMessage({ type: 'cancelCreate' }));
+    });
+    (_c = document.getElementById('cancel-btn')) === null || _c === void 0 ? void 0 : _c.addEventListener('click', () => post({ type: 'cancelCreate' }));
+}
+(function () {
+    const vscode = acquireVsCodeApi();
+    const root = document.getElementById('detail');
+    const toastEl = document.createElement('div');
+    toastEl.id = 'toast';
+    toastEl.className = 'hidden';
+    toastEl.setAttribute('role', 'status');
+    document.body.appendChild(toastEl);
+    let detail = null;
+    let metadata = null;
+    let viewer = null;
+    let repoName = '';
+    let closedLocally = false;
+    let hasMoreTimeline = false;
+    /** Id of the post whose edit form is open (the issue's own id for the body). */
+    let editingId = null;
+    let editingTitle = false;
+    let commentBusy = false;
+    /** Writes the host hasn't answered yet. While any are in flight, a refresh must not overwrite the optimistic state. */
+    let pending = 0;
+    /** `detail` as it was before the oldest unanswered write, to restore if that write fails. */
+    let rollback = null;
+    let pageMounted = false;
+    let composerFor = 0;
+    let candidateAnchor = null;
+    let toastTimer;
+    const post = (message) => vscode.postMessage(message);
+    const $ = (id) => document.getElementById(id);
+    const clone = (value) => JSON.parse(JSON.stringify(value));
+    const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+    function toast(message) {
+        toastEl.textContent = message;
+        toastEl.classList.remove('hidden');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => toastEl.classList.add('hidden'), 5000);
     }
-    function render(issue, comments, timeline) {
-        const closed = issue.state === 'closed';
-        detailEl.innerHTML = `
-      <h2>${issueStateBadge(issue.state, issue.state_reason)}${issue.closedLocally ? '<span class="closes-badge" title="An unpushed local commit will close this issue">closes on push</span>' : ''} #${issue.number} ${editing ? '' : escapeHtml(issue.title)}</h2>
+    // ---- rendering ----------------------------------------------------------------------------------------------
+    /** Server-rendered markdown, minus images the webview can't load, sanitized once more before it touches the DOM. */
+    const prepared = (p) => (Object.assign(Object.assign({}, p), { bodyHTML: DOMPurify.sanitize(neutralizeImagesHtml(p.bodyHTML)) }));
+    function bindAvatarFallbacks() {
+        root.querySelectorAll('.avatar img').forEach(img => img.addEventListener('error', () => { img.style.display = 'none'; }, { once: true }));
+    }
+    function mountPage() {
+        root.innerHTML = `
+      <div id="sticky" class="hidden"></div>
+      <div id="page">
+        <header id="header"></header>
+        <div id="layout">
+          <main id="main"><div id="timeline"></div><div id="composer"></div></main>
+          <aside id="sidebar"></aside>
+        </div>
+      </div>`;
+        new IntersectionObserver(([entry]) => $('sticky').classList.toggle('hidden', entry.isIntersecting))
+            .observe($('header'));
+        pageMounted = true;
+        composerFor = 0;
+    }
+    function renderHeader() {
+        var _a;
+        if (!detail)
+            return;
+        const { issue } = detail;
+        const title = editingTitle
+            ? `<div class="title-edit"><input id="title-input" value="${escapeHtml(issue.title)}" aria-label="Title">
+           <button type="button" class="btn btn-primary" data-act="save-title">Save</button>
+           <button type="button" class="btn btn-secondary" data-act="cancel-title">Cancel</button></div>`
+            : `<h1 class="title">${escapeHtml(issue.title)} <span class="number">#${issue.number}</span></h1>
+         <div class="title-actions">
+           ${detail.post.viewerCanUpdate ? '<button type="button" class="btn btn-ghost" data-act="edit-title">Edit</button>' : ''}
+           <button type="button" class="icon-btn" data-act="header-menu" title="More actions" aria-label="More actions">${octicon('kebab-horizontal')}</button>
+         </div>`;
+        const parent = detail.parent
+            ? ` · sub-issue of <button type="button" class="link-btn" data-act="open-issue" data-number="${detail.parent.number}">#${detail.parent.number} ${escapeHtml(detail.parent.title)}</button>` : '';
+        $('header').innerHTML = `
+      <div class="title-row">${title}</div>
       <div class="meta-row">
-        ${issue.labels.map(l => `<span class="gh-label" style="${labelStyleVars(l.color)}">${escapeHtml(l.name)}</span>`).join('')}
-        ${avatar(issue.user)} opened by ${escapeHtml(issue.user.login)} · ${issue.comments} comments · updated ${timeHtml(issue.updated_at)}
-      </div>
-      ${issue.assignees.length > 0 ? `
-      <div class="assignees-row">
-        <span class="assignees-label">Assignees:</span>
-        ${issue.assignees.map(a => `<span class="assignee-chip">${avatar(a)} ${escapeHtml(a.login)}</span>`).join('')}
-      </div>` : ''}
-      ${editing ? `
-      <div class="edit-form">
-        <input id="edit-title" value="${escapeHtml(issue.title)}">
-        <textarea id="edit-body">${escapeHtml(issue.body || '')}</textarea>
-        <div class="picker-group">
-          <span class="assignees-label">Labels:</span>
-          <div class="dropdown-container" id="label-picker"></div>
-        </div>
-        <div class="picker-group">
-          <span class="assignees-label">Assignees:</span>
-          <div class="dropdown-container" id="assignee-picker"></div>
-        </div>
-        <div class="btn-row">
-          <button class="btn btn-primary" id="save-btn">Save</button>
-          <button class="btn btn-secondary" id="cancel-btn">Cancel</button>
-        </div>
-      </div>` : `
-      <div class="btn-row">
-        <button class="btn btn-primary" id="edit-btn">Edit</button>
-        <button class="btn ${closed ? 'btn-reopen' : 'btn-close'}" id="state-btn">${closed ? 'Reopen' : 'Close'}</button>
-        <div class="btn-row-divider"></div>
-        <button class="btn btn-ghost" id="branch-btn">Branch</button>
-        <button class="btn btn-ghost" id="worktree-btn">Worktree</button>
-        <button class="btn btn-ghost" id="browser-btn">Browser ↗</button>
-        <button class="btn btn-ghost" id="copy-btn">Copy as prompt</button>
-        <button class="btn btn-ghost" id="refresh-btn" title="Reload this issue from GitHub">Refresh</button>
-      </div>
-      <div class="body-card">${issue.body ? renderMarkdown(issue.body) : '(no description)'}</div>`}
-      <h3>Comments (${comments.length})</h3>
-      <div id="comments">
-        ${buildFeed(comments, timeline).map(item => item.kind === 'event' ? `
-          <div class="timeline-event">${item.text} · <span class="issue-meta">${timeHtml(item.created_at)}</span></div>` : `
-          <div class="comment">
-            <div class="comment-header">
-              <span class="comment-author-group">${avatar(item.comment.user)} <span class="comment-author">${escapeHtml(item.comment.user.login)}</span></span>
-              <span class="comment-actions">
-                <span class="issue-meta">${timeHtml(item.comment.created_at)}</span>
-                ${viewerLogin === item.comment.user.login && editingCommentId !== item.comment.id ? `
-                <button class="comment-link-btn comment-edit-btn" data-id="${item.comment.id}">Edit</button>
-                <button class="comment-link-btn danger comment-delete-btn" data-id="${item.comment.id}">Delete</button>` : ''}
-              </span>
-            </div>
-            ${editingCommentId === item.comment.id ? `
-            <div class="edit-form">
-              <textarea class="comment-edit-input">${escapeHtml(item.comment.body)}</textarea>
-              <div class="btn-row">
-                <button class="btn btn-primary comment-save-btn" data-id="${item.comment.id}">Save</button>
-                <button class="btn btn-secondary comment-cancel-btn" data-id="${item.comment.id}">Cancel</button>
-              </div>
-            </div>` : `<div class="comment-body">${renderMarkdown(item.comment.body)}</div>`}
-          </div>`).join('') || '<div class="issue-meta">No comments yet.</div>'}
-      </div>
-      <div id="composer">
-        <textarea id="comment-input" placeholder="Write a comment…"></textarea>
-        <div class="btn-row">
-          <button class="btn btn-primary" id="comment-btn" disabled>Comment</button>
+        ${issueStateBadge(issue.state, issue.state_reason)}
+        ${closedLocally && issue.state === 'open' ? '<span class="closes-badge" title="An unpushed local commit will close this issue">closes on push</span>' : ''}
+        <span><b>${escapeHtml(issue.user.login)}</b> opened this ${timeHtml((_a = issue.created_at) !== null && _a !== void 0 ? _a : detail.post.createdAt)} · ${plural(issue.comments, 'comment')}${parent}</span>
+      </div>`;
+        $('sticky').innerHTML = `${issueStateIcon(issue.state, issue.state_reason)} <b>${escapeHtml(issue.title)}</b> <span class="muted">#${issue.number}</span>`;
+        bindAvatarFallbacks();
+    }
+    function renderSidebar() {
+        if (!detail)
+            return;
+        $('sidebar').innerHTML = sidebarHtml(detail, metadata, viewer);
+        bindAvatarFallbacks();
+    }
+    function renderTimeline() {
+        if (!detail)
+            return;
+        const d = detail;
+        // An open edit form is rebuilt with the rest, so carry what was typed across.
+        const typing = root.querySelector('.post-edit-input');
+        const draft = typing ? typing.value : null;
+        const parts = [postHtml(prepared(d.post), 'body', editingId === d.post.id), subIssuesHtml(d)];
+        for (const item of d.timeline) {
+            parts.push(item.kind === 'comment' ? postHtml(prepared(item), 'comment', editingId === item.id) : eventHtml(item));
+        }
+        if (hasMoreTimeline)
+            parts.push('<button type="button" class="btn btn-ghost load-more" data-act="load-more">Load more</button>');
+        $('timeline').innerHTML = parts.join('');
+        const again = root.querySelector('.post-edit-input');
+        if (again && draft !== null)
+            again.value = draft;
+        // GitHub's rendered task items are disabled checkboxes; make them live for people who can edit the body.
+        $('timeline').querySelectorAll('.post[data-kind="body"] .post-body input[type=checkbox]')
+            .forEach((box, index) => {
+            box.disabled = !d.post.viewerCanUpdate;
+            box.addEventListener('change', () => {
+                beginWrite(() => undefined);
+                post({ type: 'toggleTask', index, checked: box.checked });
+            });
+        });
+        bindAvatarFallbacks();
+    }
+    function renderAll() {
+        renderHeader();
+        renderSidebar();
+        renderTimeline();
+        updateComposer();
+    }
+    function mountComposer() {
+        $('composer').innerHTML = `
+      <div class="composer-card">
+        <textarea id="comment-input" placeholder="Leave a comment" aria-label="Comment"></textarea>
+        <div class="composer-actions">
+          <span class="split">
+            <button type="button" class="btn btn-ghost" id="close-main" data-act="close-main"></button>
+            <button type="button" class="btn btn-ghost split-caret" id="close-caret" data-act="close-menu" aria-label="Close options">${octicon('triangle-down')}</button>
+          </span>
+          <button type="button" class="btn btn-primary" id="comment-btn" data-act="comment">Comment</button>
         </div>
       </div>`;
-        if (editing) {
-            editFormSelectedLabels = new Set(issue.labels.map(l => l.name));
-            editFormSelectedAssignees = new Set(issue.assignees.map(a => a.login));
-            refreshLabelPicker = renderPicker('label-picker', repoLabels.map(l => ({ value: l.name, label: l.name, color: l.color })), editFormSelectedLabels, () => labelOpen, () => { labelOpen = !labelOpen; }, 'Select labels…');
-            refreshAssigneePicker = renderPicker('assignee-picker', assignableUsers.map(u => ({ value: u.login, label: u.login })), editFormSelectedAssignees, () => assigneeOpen, () => { assigneeOpen = !assigneeOpen; }, 'Select assignees…');
-        }
-        else {
-            refreshLabelPicker = null;
-            refreshAssigneePicker = null;
-            editFormSelectedLabels = null;
-            editFormSelectedAssignees = null;
-        }
-        bindEvents(issue);
-        bindAvatarFallbacks();
-        if (!editing)
-            bindTaskCheckboxes();
+        const input = $('comment-input');
+        input.addEventListener('input', updateComposer);
+        input.addEventListener('keydown', e => {
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                submitComment();
+            }
+        });
+        commentBusy = false;
     }
-    function bindEvents(issue) {
-        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
-        (_a = document.getElementById('copy-btn')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', () => vscode.postMessage({ type: 'copyAsPrompt' }));
-        (_b = document.getElementById('refresh-btn')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', () => vscode.postMessage({ type: 'refresh' }));
-        (_c = document.getElementById('browser-btn')) === null || _c === void 0 ? void 0 : _c.addEventListener('click', () => vscode.postMessage({ type: 'openInBrowser' }));
-        (_d = document.getElementById('branch-btn')) === null || _d === void 0 ? void 0 : _d.addEventListener('click', () => vscode.postMessage({ type: 'createBranch' }));
-        (_e = document.getElementById('worktree-btn')) === null || _e === void 0 ? void 0 : _e.addEventListener('click', () => vscode.postMessage({ type: 'createWorktree' }));
-        (_f = document.getElementById('state-btn')) === null || _f === void 0 ? void 0 : _f.addEventListener('click', () => vscode.postMessage({ type: 'setState', state: issue.state === 'closed' ? 'open' : 'closed' }));
-        (_g = document.getElementById('edit-btn')) === null || _g === void 0 ? void 0 : _g.addEventListener('click', () => {
-            editing = true;
-            if (currentIssue)
-                render(currentIssue, lastComments, lastTimeline);
+    /** Close/Reopen wording follows the issue's state and whether a comment is typed, like github.com. */
+    function updateComposer() {
+        const input = document.getElementById('comment-input');
+        if (!input || !detail)
+            return;
+        const hasText = input.value.trim().length > 0;
+        const closed = detail.issue.state === 'closed';
+        $('close-main').textContent = closed ? (hasText ? 'Reopen with comment' : 'Reopen issue') : (hasText ? 'Close with comment' : 'Close issue');
+        $('close-caret').classList.toggle('hidden', closed);
+        $('close-main').disabled = commentBusy;
+        $('close-caret').disabled = commentBusy;
+        $('comment-btn').disabled = commentBusy || !hasText;
+    }
+    // ---- writes -------------------------------------------------------------------------------------------------
+    /** Applies a change locally right away and counts it as unanswered until the host's `detail` or `failed` arrives. */
+    function beginWrite(change) {
+        if (!detail)
+            return;
+        if (pending === 0)
+            rollback = clone(detail);
+        pending++;
+        change(detail);
+        renderAll();
+    }
+    function applyState(to) {
+        beginWrite(d => {
+            d.issue.state = to === 'reopen' ? 'open' : 'closed';
+            d.issue.state_reason = to === 'reopen' ? 'reopened' : to;
         });
-        (_h = document.getElementById('cancel-btn')) === null || _h === void 0 ? void 0 : _h.addEventListener('click', () => {
-            editing = false;
-            if (currentIssue)
-                render(currentIssue, lastComments, lastTimeline);
+    }
+    function submitComment(then) {
+        const input = $('comment-input');
+        const body = input.value.trim();
+        if (commentBusy || (!body && !then))
+            return;
+        if (then)
+            applyState(then);
+        if (!body) {
+            post({ type: 'setState', to: then });
+            return;
+        }
+        commentBusy = true;
+        updateComposer();
+        post({ type: 'postComment', body, then });
+    }
+    /** The target a Close / Reopen click means for the issue's current state. */
+    const closeTarget = () => ((detail === null || detail === void 0 ? void 0 : detail.issue.state) === 'closed' ? 'reopen' : 'completed');
+    // ---- pickers ------------------------------------------------------------------------------------------------
+    const sameSet = (a, b) => a.size === b.size && [...a].every(v => b.has(v));
+    /** A multi-select picker that applies once it closes, like github.com, instead of one request per tick. */
+    function pickMany(anchor, title, items, apply) {
+        const initial = new Set(items.filter(i => i.selected).map(i => i.value));
+        const chosen = new Set(initial);
+        openPicker({
+            anchor, title, items, multi: true,
+            onSelect: v => { if (chosen.has(v))
+                chosen.delete(v);
+            else
+                chosen.add(v); },
+            onClose: () => { if (!sameSet(chosen, initial))
+                apply(chosen); },
         });
-        (_j = document.getElementById('save-btn')) === null || _j === void 0 ? void 0 : _j.addEventListener('click', () => {
-            const title = document.getElementById('edit-title').value.trim();
-            const body = document.getElementById('edit-body').value;
-            if (!title)
-                return;
-            const labels = Array.from(editFormSelectedLabels !== null && editFormSelectedLabels !== void 0 ? editFormSelectedLabels : []);
-            const assignees = Array.from(editFormSelectedAssignees !== null && editFormSelectedAssignees !== void 0 ? editFormSelectedAssignees : []);
-            vscode.postMessage({ type: 'saveEdit', title, body, labels, assignees });
+    }
+    function pickAssignees(anchor) {
+        var _a;
+        if (!detail)
+            return;
+        const current = detail.issue.assignees;
+        const known = [...((_a = metadata === null || metadata === void 0 ? void 0 : metadata.assignees) !== null && _a !== void 0 ? _a : [])];
+        for (const a of current)
+            if (!known.some(k => k.login === a.login))
+                known.push(a);
+        const items = known.map(u => ({
+            value: u.login, label: u.login, html: `${avatarHtml(u)} ${escapeHtml(u.login)}`,
+            selected: current.some(a => a.login === u.login),
+        }));
+        pickMany(anchor, 'Assign up to 10 people', items, chosen => {
+            const logins = [...chosen];
+            beginWrite(d => { d.issue.assignees = logins.map(l => known.find(k => k.login === l)); });
+            post({ type: 'setAssignees', logins });
         });
-        const commentInput = document.getElementById('comment-input');
-        const commentBtn = document.getElementById('comment-btn');
-        commentInput === null || commentInput === void 0 ? void 0 : commentInput.addEventListener('input', () => {
-            commentBtn.disabled = commentInput.value.trim().length === 0;
-        });
-        commentBtn === null || commentBtn === void 0 ? void 0 : commentBtn.addEventListener('click', () => {
-            const body = commentInput.value.trim();
-            if (!body)
-                return;
-            commentBtn.disabled = true;
-            vscode.postMessage({ type: 'postComment', body });
-        });
-        (_k = document.getElementById('comments')) === null || _k === void 0 ? void 0 : _k.addEventListener('click', e => {
+    }
+    function pickLabels(anchor) {
+        var _a;
+        if (!detail)
+            return;
+        const current = detail.issue.labels;
+        const known = [...((_a = metadata === null || metadata === void 0 ? void 0 : metadata.labels) !== null && _a !== void 0 ? _a : [])];
+        for (const l of current)
+            if (!known.some(k => k.name === l.name))
+                known.push(l);
+        const items = known.map(l => {
             var _a;
-            const target = e.target;
-            const id = Number(target.dataset.id);
-            if (target.classList.contains('comment-edit-btn')) {
-                editingCommentId = id;
-                if (currentIssue)
-                    render(currentIssue, lastComments, lastTimeline);
-            }
-            else if (target.classList.contains('comment-cancel-btn')) {
-                editingCommentId = null;
-                if (currentIssue)
-                    render(currentIssue, lastComments, lastTimeline);
-            }
-            else if (target.classList.contains('comment-save-btn')) {
-                const textarea = (_a = target.closest('.comment')) === null || _a === void 0 ? void 0 : _a.querySelector('.comment-edit-input');
-                const body = textarea.value.trim();
-                if (!body)
-                    return;
-                vscode.postMessage({ type: 'editComment', commentId: id, body });
-            }
-            else if (target.classList.contains('comment-delete-btn')) {
-                vscode.postMessage({ type: 'deleteComment', commentId: id });
-            }
+            return ({
+                value: l.name, label: l.name, html: `<span class="gh-label" style="${labelStyleVars(l.color)}">${escapeHtml(l.name)}</span>`,
+                description: (_a = l.description) !== null && _a !== void 0 ? _a : undefined, selected: current.some(c => c.name === l.name),
+            });
+        });
+        pickMany(anchor, 'Apply labels', items, chosen => {
+            const names = [...chosen];
+            beginWrite(d => { d.issue.labels = names.map(n => known.find(k => k.name === n)); });
+            post({ type: 'setLabels', names });
         });
     }
+    function pickMilestone(anchor) {
+        var _a, _b, _c;
+        if (!detail)
+            return;
+        const current = (_b = (_a = detail.milestone) === null || _a === void 0 ? void 0 : _a.number) !== null && _b !== void 0 ? _b : null;
+        const items = [{ value: '', label: 'No milestone', selected: current === null }]
+            .concat(((_c = metadata === null || metadata === void 0 ? void 0 : metadata.milestones) !== null && _c !== void 0 ? _c : []).map(m => ({ value: String(m.number), label: m.title, selected: m.number === current })));
+        openPicker({
+            anchor, title: 'Set milestone', items, filterable: items.length > 8,
+            onSelect: v => {
+                var _a;
+                const number = v === '' ? null : Number(v);
+                if (number === current)
+                    return;
+                const found = ((_a = metadata === null || metadata === void 0 ? void 0 : metadata.milestones) !== null && _a !== void 0 ? _a : []).find(m => m.number === number);
+                beginWrite(d => { d.milestone = found ? { number: found.number, title: found.title, percent: 0 } : null; });
+                post({ type: 'setMilestone', number });
+            },
+        });
+    }
+    function pickType(anchor) {
+        var _a, _b, _c;
+        if (!detail)
+            return;
+        const current = (_b = (_a = detail.issueType) === null || _a === void 0 ? void 0 : _a.id) !== null && _b !== void 0 ? _b : null;
+        const items = [{ value: '', label: 'No type', selected: current === null }]
+            .concat(((_c = metadata === null || metadata === void 0 ? void 0 : metadata.types) !== null && _c !== void 0 ? _c : []).map(t => ({ value: t.id, label: t.name, selected: t.id === current })));
+        openPicker({
+            anchor, title: 'Set issue type', items, filterable: false,
+            onSelect: v => {
+                var _a;
+                const id = v === '' ? null : v;
+                if (id === current)
+                    return;
+                const found = ((_a = metadata === null || metadata === void 0 ? void 0 : metadata.types) !== null && _a !== void 0 ? _a : []).find(t => t.id === id);
+                beginWrite(d => { d.issueType = found ? { id: found.id, name: found.name } : null; });
+                post({ type: 'setType', id });
+            },
+        });
+    }
+    function findPost(id) {
+        if (!detail)
+            return undefined;
+        if (detail.post.id === id)
+            return detail.post;
+        return detail.timeline.find((i) => i.kind === 'comment' && i.id === id);
+    }
+    function reactionPicker(anchor, id) {
+        const target = findPost(id);
+        if (!target)
+            return;
+        openPicker({
+            anchor, title: 'Pick your reaction', items: reactionPickerItems(target), multi: true, filterable: false,
+            onSelect: content => {
+                const has = target.reactions.some(r => r.content === content && r.viewerHasReacted);
+                post({ type: 'toggleReaction', subjectId: id, content, add: !has });
+            },
+        });
+    }
+    function quoteReply(target) {
+        const input = $('comment-input');
+        const postEl = root.querySelector(`.post[data-id="${CSS.escape(target.id)}"]`);
+        const selection = window.getSelection();
+        const selected = selection && postEl && postEl.contains(selection.anchorNode) ? selection.toString().trim() : '';
+        const quote = (selected || target.body.trim()).split('\n').map(line => `> ${line}`).join('\n');
+        input.value = `${input.value ? `${input.value.replace(/\s+$/, '')}\n\n` : ''}${quote}\n\n`;
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+        updateComposer();
+    }
+    function postMenu(anchor, id) {
+        const target = findPost(id);
+        if (!target || !detail)
+            return;
+        const isBody = target.id === detail.post.id;
+        const items = [{ value: 'link', label: 'Copy link' }, { value: 'quote', label: 'Quote reply' }];
+        if (target.viewerCanUpdate)
+            items.push({ value: 'edit', label: 'Edit' });
+        if (!isBody && target.viewerCanDelete)
+            items.push({ value: 'delete', label: 'Delete' });
+        openPicker({
+            anchor, title: 'Actions', items, filterable: false,
+            onSelect: action => {
+                var _a;
+                if (action === 'link')
+                    post({ type: 'copyText', text: target.url });
+                else if (action === 'quote')
+                    quoteReply(target);
+                else if (action === 'edit') {
+                    editingId = target.id;
+                    renderTimeline();
+                    (_a = root.querySelector('.post-edit-input')) === null || _a === void 0 ? void 0 : _a.focus();
+                }
+                else if (action === 'delete')
+                    post({ type: 'deletePost', id: target.id });
+            },
+        });
+    }
+    function headerMenu(anchor) {
+        const items = [
+            { value: 'prompt', label: 'Copy as prompt' }, { value: 'browser', label: 'Open on github.com' },
+            { value: 'refresh', label: 'Refresh' },
+        ];
+        if (detail === null || detail === void 0 ? void 0 : detail.post.viewerCanUpdate)
+            items.push({ value: 'sub', label: 'Add sub-issue…' });
+        openPicker({
+            anchor, title: 'Actions', items, filterable: false,
+            onSelect: action => {
+                if (action === 'prompt')
+                    post({ type: 'copyAsPrompt' });
+                else if (action === 'browser')
+                    post({ type: 'openInBrowser' });
+                else if (action === 'refresh')
+                    post({ type: 'refresh' });
+                else if (action === 'sub')
+                    requestCandidates(anchor);
+            },
+        });
+    }
+    function requestCandidates(anchor) {
+        candidateAnchor = anchor;
+        post({ type: 'requestCandidates' });
+    }
+    function candidatePicker(candidates) {
+        if (!detail)
+            return;
+        const taken = new Set([detail.issue.number, ...detail.subIssues.map(s => s.number)]);
+        if (detail.parent)
+            taken.add(detail.parent.number);
+        const items = candidates.filter(c => !taken.has(c.number)).map(c => ({ value: String(c.number), label: `#${c.number} ${c.title}` }));
+        const anchor = candidateAnchor && candidateAnchor.isConnected ? candidateAnchor : root;
+        openPicker({
+            anchor, title: 'Add sub-issue', items, emptyText: 'No other open issues',
+            onSelect: v => {
+                const number = Number(v);
+                const picked = candidates.find(c => c.number === number);
+                beginWrite(d => {
+                    var _a;
+                    return d.subIssues.push({
+                        id: '', number, title: (_a = picked === null || picked === void 0 ? void 0 : picked.title) !== null && _a !== void 0 ? _a : `#${number}`, state: 'open', stateReason: null, url: '', assignees: [],
+                    });
+                });
+                post({ type: 'addSubIssue', number });
+            },
+        });
+    }
+    function subMenu(anchor, id, number) {
+        openPicker({
+            anchor, title: 'Sub-issue', filterable: false,
+            items: [{ value: 'open', label: 'Open' }, { value: 'remove', label: 'Remove sub-issue' }],
+            onSelect: action => {
+                if (action === 'open')
+                    post({ type: 'openIssue', number, newTab: false });
+                else {
+                    beginWrite(d => { d.subIssues = d.subIssues.filter(s => s.id !== id); });
+                    post({ type: 'removeSubIssue', id });
+                }
+            },
+        });
+    }
+    // ---- events -------------------------------------------------------------------------------------------------
+    function handleAction(act, el, e) {
+        var _a, _b, _c, _d, _e, _f;
+        const id = (_a = el.dataset.id) !== null && _a !== void 0 ? _a : '';
+        const newTab = e.ctrlKey || e.metaKey || e.button === 1;
+        switch (act) {
+            case 'edit-title':
+                editingTitle = true;
+                renderHeader();
+                $('title-input').focus();
+                break;
+            case 'save-title': {
+                const title = $('title-input').value.trim();
+                editingTitle = false;
+                if (title && detail && title !== detail.issue.title) {
+                    beginWrite(d => { d.issue.title = title; });
+                    post({ type: 'setTitle', title });
+                }
+                else
+                    renderHeader();
+                break;
+            }
+            case 'cancel-title':
+                editingTitle = false;
+                renderHeader();
+                break;
+            case 'header-menu':
+                headerMenu(el);
+                break;
+            case 'react': {
+                const content = el.dataset.content;
+                const has = (_c = (_b = findPost(id)) === null || _b === void 0 ? void 0 : _b.reactions.some(r => r.content === content && r.viewerHasReacted)) !== null && _c !== void 0 ? _c : false;
+                post({ type: 'toggleReaction', subjectId: id, content, add: !has });
+                break;
+            }
+            case 'react-picker':
+                reactionPicker(el, id);
+                break;
+            case 'post-menu':
+                postMenu(el, id);
+                break;
+            case 'save-edit': {
+                const body = ((_d = el.closest('.post')) === null || _d === void 0 ? void 0 : _d.querySelector('.post-edit-input')).value;
+                const isBody = (detail === null || detail === void 0 ? void 0 : detail.post.id) === id;
+                if (isBody)
+                    beginWrite(() => undefined);
+                el.disabled = true;
+                el.textContent = 'Saving…';
+                post({ type: 'editPost', kind: isBody ? 'body' : 'comment', id, body });
+                break;
+            }
+            case 'cancel-edit':
+                editingId = null;
+                renderTimeline();
+                break;
+            case 'open-issue':
+                post({ type: 'openIssue', number: Number(el.dataset.number), newTab });
+                break;
+            case 'add-sub':
+                requestCandidates(el);
+                break;
+            case 'sub-menu':
+                subMenu(el, id, Number(el.dataset.number));
+                break;
+            case 'load-more':
+                el.disabled = true;
+                post({ type: 'loadMoreTimeline' });
+                break;
+            case 'pick-assignees':
+                pickAssignees(el);
+                break;
+            case 'pick-labels':
+                pickLabels(el);
+                break;
+            case 'pick-type':
+                pickType(el);
+                break;
+            case 'pick-milestone':
+                pickMilestone(el);
+                break;
+            case 'assign-me':
+                if (viewer) {
+                    const me = (_f = ((_e = metadata === null || metadata === void 0 ? void 0 : metadata.assignees) !== null && _e !== void 0 ? _e : []).find(a => a.login === viewer)) !== null && _f !== void 0 ? _f : { login: viewer, avatar_url: '' };
+                    beginWrite(d => { d.issue.assignees = [me]; });
+                    post({ type: 'setAssignees', logins: [viewer] });
+                }
+                break;
+            case 'branch':
+                post({ type: 'createBranch' });
+                break;
+            case 'worktree':
+                post({ type: 'createWorktree' });
+                break;
+            case 'comment':
+                submitComment();
+                break;
+            case 'close-main':
+                submitComment(closeTarget());
+                break;
+            case 'close-menu':
+                openPicker({
+                    anchor: el, title: 'Close issue', filterable: false,
+                    items: [{ value: 'completed', label: 'Close as completed' }, { value: 'not_planned', label: 'Close as not planned' }],
+                    onSelect: v => submitComment(v),
+                });
+                break;
+            case 'retry':
+                post({ type: 'refresh' });
+                break;
+        }
+    }
+    /** Links inside GitHub-rendered markdown: this repo's issues open in a tab, anything else leaves for the browser. */
+    function handleLink(a, e) {
+        var _a;
+        const href = (_a = a.getAttribute('href')) !== null && _a !== void 0 ? _a : '';
+        if (href.startsWith('#'))
+            return; // footnote jumps stay in the page
+        e.preventDefault();
+        const number = issueNumberFromLink(href, repoName);
+        if (number !== null)
+            post({ type: 'openIssue', number, newTab: e.ctrlKey || e.metaKey || e.button === 1 });
+        else
+            post({ type: 'openExternal', url: href });
+    }
+    function onClick(e) {
+        var _a;
+        const target = e.target;
+        const actEl = target.closest('[data-act]');
+        if (actEl) {
+            handleAction(actEl.dataset.act, actEl, e);
+            return;
+        }
+        const link = target.closest('a[href]');
+        if (link && link.closest('.post-body, .tl-text, .sb-pr')) {
+            handleLink(link, e);
+            return;
+        }
+        const placeholder = target.closest('.img-placeholder');
+        if (placeholder && !placeholder.closest('a'))
+            post({ type: 'openExternal', url: (_a = placeholder.dataset.src) !== null && _a !== void 0 ? _a : '' });
+    }
+    root.addEventListener('click', onClick);
+    root.addEventListener('auxclick', e => {
+        const target = e.target;
+        if (e.button === 1 && (target.closest('a[href]') || target.closest('[data-act="open-issue"]')))
+            onClick(e);
+    });
     window.addEventListener('message', event => {
         var _a;
         const msg = event.data;
         switch (msg.type) {
-            case 'issueDetail':
-                lastComments = msg.comments;
-                lastTimeline = msg.timeline;
-                repoLabels = msg.repoLabels;
-                assignableUsers = msg.assignableUsers;
-                issueTemplates = (_a = msg.templates) !== null && _a !== void 0 ? _a : [];
-                viewerLogin = msg.viewerLogin;
-                if (msg.issue)
-                    renderDetail(msg.issue, msg.comments, msg.timeline);
-                else
-                    renderCreateForm();
-                break;
-            case 'issueDetailError':
-                detailEl.innerHTML = `<div id="empty">Failed to load issue: ${escapeHtml(msg.message)}</div>`;
-                break;
-            case 'commentPostFailed': {
-                const btn = detailEl.querySelector('#comment-btn');
-                if (btn)
-                    btn.disabled = false;
+            case 'detail': {
+                if (!detail || detail.issue.number !== msg.detail.issue.number) {
+                    // A different issue (this tab was reused, or the create form just became an issue): nothing in flight applies.
+                    pending = 0;
+                    rollback = null;
+                }
+                else if (msg.afterWrite) {
+                    pending = Math.max(0, pending - 1);
+                }
+                if (pending > 0)
+                    break; // newer local edits are still in flight; the last answer is the one to show
+                rollback = null;
+                detail = msg.detail;
+                viewer = msg.viewer;
+                repoName = msg.repo;
+                closedLocally = msg.closedLocally;
+                hasMoreTimeline = msg.detail.hasMoreTimeline;
+                if (!pageMounted)
+                    mountPage();
+                if (composerFor !== msg.detail.issue.number) {
+                    composerFor = msg.detail.issue.number;
+                    editingId = null;
+                    editingTitle = false;
+                    mountComposer();
+                }
+                if (msg.afterWrite) {
+                    editingId = null;
+                    editingTitle = false;
+                }
+                renderAll();
                 break;
             }
+            case 'metadata':
+                metadata = { labels: msg.labels, assignees: msg.assignees, milestones: msg.milestones, types: msg.types };
+                renderSidebar();
+                break;
+            case 'timelinePage': {
+                if (!detail)
+                    break;
+                const have = new Set(detail.timeline.filter((i) => i.kind === 'comment').map(c => c.id));
+                detail.timeline.push(...msg.items.filter(i => i.kind !== 'comment' || !have.has(i.id)));
+                hasMoreTimeline = msg.hasMore;
+                renderTimeline();
+                break;
+            }
+            case 'commentAdded': {
+                if (!detail)
+                    break;
+                const item = msg.item;
+                if (!findPost(item.id))
+                    detail.timeline.push(Object.assign({ kind: 'comment' }, item));
+                detail.issue.comments++;
+                $('comment-input').value = '';
+                commentBusy = false;
+                renderHeader();
+                renderTimeline();
+                updateComposer();
+                (_a = $('timeline').lastElementChild) === null || _a === void 0 ? void 0 : _a.scrollIntoView({ block: 'nearest' });
+                break;
+            }
+            case 'postUpdated': {
+                const item = msg.item;
+                const at = detail ? detail.timeline.findIndex(i => i.kind === 'comment' && i.id === item.id) : -1;
+                if (detail && at >= 0)
+                    detail.timeline[at] = Object.assign({ kind: 'comment' }, item);
+                editingId = null;
+                renderTimeline();
+                break;
+            }
+            case 'postDeleted':
+                if (detail) {
+                    detail.timeline = detail.timeline.filter(i => i.kind !== 'comment' || i.id !== msg.id);
+                    detail.issue.comments = Math.max(0, detail.issue.comments - 1);
+                    renderHeader();
+                    renderTimeline();
+                }
+                break;
+            case 'reactions': {
+                const target = findPost(msg.id);
+                if (target) {
+                    target.reactions = msg.groups;
+                    renderTimeline();
+                }
+                break;
+            }
+            case 'candidates':
+                candidatePicker(msg.items);
+                break;
+            case 'failed':
+                toast(msg.message);
+                if (msg.what === 'write' || msg.what === 'refresh')
+                    pending = Math.max(0, pending - 1);
+                if (msg.what === 'write' && pending === 0 && rollback) {
+                    detail = rollback;
+                    rollback = null;
+                    editingId = null;
+                    renderAll();
+                }
+                if (msg.what === 'write' || msg.what === 'comment') {
+                    commentBusy = false;
+                    updateComposer();
+                }
+                if (msg.what === 'edit' || msg.what === 'timeline')
+                    renderTimeline();
+                break;
+            case 'error':
+                pageMounted = false;
+                root.innerHTML = `<div id="empty">Failed to load issue: ${escapeHtml(msg.message)}
+          <div><button type="button" class="btn btn-secondary" data-act="retry">Retry</button></div></div>`;
+                break;
+            case 'copied':
+                toast('Copied');
+                break;
+            case 'createInit':
+                pageMounted = false;
+                detail = null;
+                pending = 0;
+                rollback = null;
+                renderCreateForm(root, msg, post);
+                break;
             case 'createFailed': {
-                const btn = detailEl.querySelector('#save-btn');
+                const btn = document.getElementById('save-btn');
                 if (btn) {
                     btn.disabled = false;
                     btn.textContent = 'Create';
                 }
                 break;
             }
-            case 'copied': {
-                const btn = detailEl.querySelector('#copy-btn');
-                if (btn) {
-                    btn.textContent = 'Copied!';
-                    setTimeout(() => { if (btn)
-                        btn.textContent = 'Copy as prompt'; }, 1500);
-                }
-                break;
-            }
         }
     });
-    vscode.postMessage({ type: 'ready' });
+    post({ type: 'ready' });
 })();

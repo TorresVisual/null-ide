@@ -35,7 +35,7 @@ type InboundMessage =
   | { type: 'query'; text: string }
   | { type: 'editQuery'; op: 'toggle' | 'set' | 'remove'; key: string; value?: string }
   | { type: 'loadMore' }
-  | { type: 'open'; number: number }
+  | { type: 'open'; number: number; newTab?: boolean }
   | { type: 'rowAction'; action: 'branch' | 'worktree' | 'copyPrompt' | 'browser'; number: number }
   | { type: 'create' }
   | { type: 'signIn' }
@@ -279,7 +279,7 @@ export class IssuesListController {
         break;
       case 'open':
         if (this._store.getByNumber(msg.number)) {
-          await IssueDetailPanel.show(this._extensionUri, this._store, msg.number);
+          await IssueDetailPanel.show(this._extensionUri, this._store, msg.number, msg.newTab === true);
         }
         break;
       case 'rowAction':

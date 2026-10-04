@@ -5,8 +5,8 @@ const FENCE_RE = /^\s*(```|~~~)/;
 const TASK_RE = /^(\s*(?:[-*+]|\d+[.)])\s+)\[[ xX]\](.*)$/;
 /**
  * Flips the nth GFM task-list checkbox (`- [ ]` / `- [x]`) in `body`, skipping
- * any inside fenced code blocks — mirrors the order marked.js emits `checkbox()`
- * renderer calls in, so `index` lines up with the webview's DOM order.
+ * any inside fenced code blocks — mirrors the order GitHub renders task items
+ * in `bodyHTML`, so `index` lines up with the webview's DOM order.
  */
 function toggleTaskCheckbox(body, index, checked) {
     const lines = body.split('\n');

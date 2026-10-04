@@ -38,14 +38,8 @@ exports.formatApiError = formatApiError;
 exports.rateLimitRetryAt = rateLimitRetryAt;
 exports.requestGraphql = requestGraphql;
 exports.fetchIssues = fetchIssues;
-exports.fetchIssue = fetchIssue;
-exports.fetchComments = fetchComments;
-exports.fetchTimeline = fetchTimeline;
 exports.updateIssue = updateIssue;
 exports.createIssue = createIssue;
-exports.createComment = createComment;
-exports.updateComment = updateComment;
-exports.deleteComment = deleteComment;
 exports.fetchRepoLabels = fetchRepoLabels;
 exports.fetchAssignableUsers = fetchAssignableUsers;
 const https = __importStar(require("https"));
@@ -138,29 +132,11 @@ async function fetchIssues(owner, repo, state, token) {
     const raw = await requestJson(`/repos/${owner}/${repo}/issues?state=${state}&per_page=100`, token);
     return (0, issueFilter_1.stripPullRequests)(raw);
 }
-function fetchIssue(owner, repo, issueNumber, token) {
-    return requestJson(`/repos/${owner}/${repo}/issues/${issueNumber}`, token);
-}
-function fetchComments(owner, repo, issueNumber, token) {
-    return requestJson(`/repos/${owner}/${repo}/issues/${issueNumber}/comments?per_page=100`, token);
-}
-function fetchTimeline(owner, repo, issueNumber, token) {
-    return requestJson(`/repos/${owner}/${repo}/issues/${issueNumber}/timeline?per_page=100`, token);
-}
 function updateIssue(owner, repo, issueNumber, patch, token) {
     return requestJson(`/repos/${owner}/${repo}/issues/${issueNumber}`, token, 'PATCH', patch);
 }
 function createIssue(owner, repo, data, token) {
     return requestJson(`/repos/${owner}/${repo}/issues`, token, 'POST', data);
-}
-function createComment(owner, repo, issueNumber, body, token) {
-    return requestJson(`/repos/${owner}/${repo}/issues/${issueNumber}/comments`, token, 'POST', { body });
-}
-function updateComment(owner, repo, commentId, body, token) {
-    return requestJson(`/repos/${owner}/${repo}/issues/comments/${commentId}`, token, 'PATCH', { body });
-}
-function deleteComment(owner, repo, commentId, token) {
-    return requestJson(`/repos/${owner}/${repo}/issues/comments/${commentId}`, token, 'DELETE');
 }
 function fetchRepoLabels(owner, repo, token) {
     return requestJson(`/repos/${owner}/${repo}/labels?per_page=100`, token);

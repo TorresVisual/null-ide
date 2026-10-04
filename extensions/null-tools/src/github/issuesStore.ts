@@ -2,10 +2,7 @@
 
 import { getWorkspaceGithubRepo } from './githubRemote';
 import { getGithubSession } from './githubAuth';
-import {
-  IssuePatch, createComment, createIssue, deleteComment, fetchAssignableUsers, fetchComments, fetchIssue, fetchRepoLabels,
-  fetchTimeline, requestGraphql, updateComment, updateIssue,
-} from './githubApi';
+import { IssuePatch, createIssue, fetchAssignableUsers, fetchRepoLabels, requestGraphql, updateIssue } from './githubApi';
 import {
   ADD_COMMENT, ADD_REACTION, ADD_SUB_ISSUE, DELETE_COMMENT, GqlComment, GqlReactionGroup, ISSUE_DETAIL, ISSUE_TIMELINE,
   IssueDetailData, IssueTimelineData, REMOVE_REACTION, REMOVE_SUB_ISSUE, SET_ISSUE_TYPE, UPDATE_COMMENT, mapComment,
@@ -14,7 +11,7 @@ import {
 import { MetadataData, REPO_METADATA, SEARCH_ISSUES, SearchData, mapMetadata, mapSearchPage } from './githubQueries';
 import { toApiQuery, withState } from './searchQuery';
 import {
-  GithubComment, GithubIssue, GithubLabel, GithubRepoRef, GithubTimelineEvent, GithubUser, IssueDetail, IssuePost,
+  GithubIssue, GithubLabel, GithubRepoRef, GithubUser, IssueDetail, IssuePost,
   ReactionContent, ReactionGroup, RepoMetadata, SearchPage, TimelinePage,
 } from './types';
 
@@ -202,22 +199,6 @@ export class IssuesStore {
     return this.viewerLogin;
   }
 
-  async getComments(issueNumber: number): Promise<GithubComment[]> {
-    const { repo, token } = await this.ensureSession(false);
-    return fetchComments(repo.owner, repo.repo, issueNumber, token);
-  }
-
-  async getTimeline(issueNumber: number): Promise<GithubTimelineEvent[]> {
-    const { repo, token } = await this.ensureSession(false);
-    return fetchTimeline(repo.owner, repo.repo, issueNumber, token);
-  }
-
-  /** Re-fetches one issue from GitHub and replaces it in the cache, without refetching any list. */
-  async reloadIssue(issueNumber: number): Promise<void> {
-    const { repo, token } = await this.ensureSession(false);
-    this.remember([await fetchIssue(repo.owner, repo.repo, issueNumber, token)]);
-  }
-
   async updateIssue(issueNumber: number, patch: IssuePatch): Promise<GithubIssue> {
     const { repo, token } = await this.ensureSession(true);
     const updated = await updateIssue(repo.owner, repo.repo, issueNumber, patch, token);
@@ -232,25 +213,5 @@ export class IssuesStore {
     const created = await createIssue(repo.owner, repo.repo, data, token);
     this.remember([created]);
     return created;
-  }
-
-  async addComment(issueNumber: number, body: string): Promise<GithubComment> {
-    const { repo, token } = await this.ensureSession(true);
-    const comment = await createComment(repo.owner, repo.repo, issueNumber, body, token);
-    const issue = this.known.get(issueNumber);
-    if (issue) this.known.set(issueNumber, { ...issue, comments: issue.comments + 1 });
-    return comment;
-  }
-
-  async updateComment(commentId: number, body: string): Promise<GithubComment> {
-    const { repo, token } = await this.ensureSession(true);
-    return updateComment(repo.owner, repo.repo, commentId, body, token);
-  }
-
-  async deleteComment(issueNumber: number, commentId: number): Promise<void> {
-    const { repo, token } = await this.ensureSession(true);
-    await deleteComment(repo.owner, repo.repo, commentId, token);
-    const issue = this.known.get(issueNumber);
-    if (issue) this.known.set(issueNumber, { ...issue, comments: Math.max(0, issue.comments - 1) });
   }
 }
