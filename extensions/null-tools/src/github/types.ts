@@ -10,6 +10,8 @@ export interface GithubRepoRef {
 export interface GithubLabel {
   name: string;
   color: string;
+  /** Only present on labels from the repo metadata query. */
+  description?: string | null;
 }
 
 export interface GithubUser {
@@ -23,13 +25,20 @@ export interface GithubIssue {
   body: string;
   state: 'open' | 'closed';
   /** Why a closed issue was closed; null while open or for issues closed before GitHub tracked reasons. */
-  state_reason?: 'completed' | 'not_planned' | 'reopened' | null;
+  state_reason?: 'completed' | 'not_planned' | 'reopened' | 'duplicate' | null;
   html_url: string;
   labels: GithubLabel[];
   assignees: GithubUser[];
   user: GithubUser;
   comments: number;
+  /** The fields below come from the GraphQL list query; REST-fetched issues lack them. */
+  created_at?: string;
   updated_at: string;
+  closed_at?: string | null;
+  milestone?: { number: number; title: string } | null;
+  issue_type?: string | null;
+  sub_issues?: { total: number; completed: number } | null;
+  linked_prs?: number;
   pull_request?: unknown;
   /** True when an unpushed local commit will close this issue on push. Computed client-side, never sent to GitHub. */
   closedLocally?: boolean;
@@ -66,4 +75,21 @@ export interface IssueTemplate {
   title: string;
   body: string;
   labels: string[];
+}
+
+export interface RepoMetadata {
+  labels: GithubLabel[];
+  assignees: GithubUser[];
+  milestones: Array<{ number: number; title: string }>;
+  issueTypes: Array<{ id: string; name: string }>;
+  viewerLogin: string;
+}
+
+export interface SearchPage {
+  items: GithubIssue[];
+  hasMore: boolean;
+  cursor: string | null;
+  /** Null when the request skipped the count aliases (every page after the first). */
+  openCount: number | null;
+  closedCount: number | null;
 }
