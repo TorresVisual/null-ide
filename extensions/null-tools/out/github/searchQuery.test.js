@@ -56,4 +56,13 @@ const searchQuery_1 = require("./searchQuery");
 (0, node_test_1.default)('toApiQuery drops repo:/org:/user: so the list cannot leave this repo', () => {
     node_assert_1.default.strictEqual((0, searchQuery_1.toApiQuery)('o/r', 'repo:evil/private org:x -user:y is:open'), 'repo:o/r is:issue is:open sort:created-desc');
 });
+(0, node_test_1.default)('toApiQuery also drops owner: (it widens the search to every repo of that owner)', () => {
+    node_assert_1.default.strictEqual((0, searchQuery_1.toApiQuery)('o/r', 'owner:microsoft is:open'), 'repo:o/r is:issue is:open sort:created-desc');
+});
+(0, node_test_1.default)('hasFreeText is true only when there is text besides qualifiers', () => {
+    node_assert_1.default.strictEqual((0, searchQuery_1.hasFreeText)('is:open label:"good first issue" sort:updated-desc'), false);
+    node_assert_1.default.strictEqual((0, searchQuery_1.hasFreeText)('is:open crash'), true);
+    node_assert_1.default.strictEqual((0, searchQuery_1.hasFreeText)('"exact phrase"'), true);
+    node_assert_1.default.strictEqual((0, searchQuery_1.hasFreeText)(''), false);
+});
 //# sourceMappingURL=searchQuery.test.js.map

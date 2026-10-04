@@ -7,6 +7,7 @@ exports.removeQualifier = removeQualifier;
 exports.withState = withState;
 exports.describeQuery = describeQuery;
 exports.toApiQuery = toApiQuery;
+exports.hasFreeText = hasFreeText;
 const QUALIFIER = /^(-?)([A-Za-z]+):(.*)$/;
 /** Splits on whitespace, keeping "quoted phrases" and key:"quoted value" in one piece. */
 function tokenize(q) {
@@ -61,15 +62,19 @@ function describeQuery(q, viewerLogin) {
     };
 }
 /**
- * The string sent to GitHub search: the user's query scoped to this repo's issues. `repo:`/`org:`/`user:`
+ * The string sent to GitHub search: the user's query scoped to this repo's issues. `repo:`/`org:`/`user:`/`owner:`
  * typed by the user are dropped (GitHub ORs repeated `repo:`, which would leak other repos into the list),
  * and with no free text and no `sort:` we sort newest-first like github.com instead of "best match".
  */
 function toApiQuery(repo, q) {
-    const tokens = tokenize(q).filter(t => !(t.key && ['repo', 'org', 'user'].includes(t.key)));
+    const tokens = tokenize(q).filter(t => !(t.key && ['repo', 'org', 'user', 'owner'].includes(t.key)));
     const parts = [`repo:${repo}`, 'is:issue', join(tokens)];
     if (!tokens.some(t => t.key === 'sort') && !tokens.some(t => t.key === null))
         parts.push('sort:created-desc');
     return parts.filter(Boolean).join(' ');
+}
+/** True when the query has free text besides qualifiers (`is:open crash`), which a just-created issue may not match. */
+function hasFreeText(q) {
+    return tokenize(q).some(t => t.key === null);
 }
 //# sourceMappingURL=searchQuery.js.map

@@ -7,6 +7,7 @@ import { createIssueBranch, getLocallyClosedIssueNumbers } from './github/gitBra
 import { getWorkspaceGithubRepo } from './github/githubRemote';
 import { IssuesStore, SessionError } from './github/issuesStore';
 import { formatIssueAsPrompt } from './github/promptFormat';
+import { RecentIssue, mergeRecentlyCreated } from './github/recentlyCreated';
 import { describeQuery, removeQualifier, setQualifier, toggleQualifier, withState } from './github/searchQuery';
 import { GithubIssue, GithubRepoRef, RepoMetadata } from './github/types';
 import { IssueDetailPanel } from './issueDetailPanel';
@@ -54,6 +55,8 @@ export class IssuesListController {
   private _openCount: number | null = null;
   private _closedCount: number | null = null;
   private _cachedViewer: string | null = null;
+  /** Issues created from this window; kept briefly so a refresh doesn't drop them while GitHub's search lags. */
+  private _recent: RecentIssue[] = [];
   /** Bumped by every request; a response whose number is no longer current belongs to a superseded query. */
   private _seq = 0;
   private _loading = false;
@@ -93,6 +96,7 @@ export class IssuesListController {
    * search corrects that.
    */
   insertCreated(issue: GithubIssue): void {
+    this._recent.push({ issue, at: Date.now() });
     this._items = [issue, ...this._items.filter(i => i.number !== issue.number)];
     if (issue.state === 'open' && this._openCount !== null) this._openCount++;
     this._showingRows = true;
@@ -191,16 +195,23 @@ export class IssuesListController {
       if (seq !== this._seq) return;
       const loaded = new Set(this._items.map(i => i.number));
       const fresh = append ? page.items.filter(i => !loaded.has(i.number)) : page.items;
-      this._items = append ? [...this._items, ...fresh] : page.items;
+      let added: GithubIssue[] = [];
+      if (append) {
+        this._items = [...this._items, ...fresh];
+      } else {
+        ({ items: this._items, added } = mergeRecentlyCreated(page.items, this._recent, query, Date.now()));
+      }
       this._cursor = page.cursor;
       this._hasMore = page.hasMore;
       if (page.openCount !== null) {
         this._openCount = page.openCount;
         this._closedCount = page.closedCount;
+        const openAdded = added.filter(i => i.state === 'open').length;
+        if (this._openCount !== null) this._openCount += openAdded;
       }
       this._rateRetried = false;
       this._showingRows = true;
-      this._post(this._resultsMessage(fresh, append));
+      this._post(this._resultsMessage(append ? fresh : this._items, append));
       if (!append && query === DEFAULT_QUERY) {
         const repo = this._store.getRepo();
         if (repo) {

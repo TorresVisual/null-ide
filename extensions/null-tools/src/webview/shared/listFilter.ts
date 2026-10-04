@@ -14,3 +14,12 @@ function matchesLocalFilter(issue: { number: number; title: string }, query: str
   const haystack = `#${issue.number} ${issue.title}`.toLowerCase();
   return words.every(word => haystack.includes(word));
 }
+
+/**
+ * The text the instant filter should apply: what the user typed, but only while it differs from the query the
+ * rows on screen answer. Once results for the typed text arrive the server is authoritative (it also matches
+ * bodies and comments, which the instant filter can't see), so nothing is hidden.
+ */
+function activeLocalFilter(input: string, sentQuery: string): string {
+  return input.trim() === sentQuery.trim() ? '' : input;
+}

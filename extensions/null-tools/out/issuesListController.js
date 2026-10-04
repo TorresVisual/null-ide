@@ -41,6 +41,7 @@ const gitBranch_1 = require("./github/gitBranch");
 const githubRemote_1 = require("./github/githubRemote");
 const issuesStore_1 = require("./github/issuesStore");
 const promptFormat_1 = require("./github/promptFormat");
+const recentlyCreated_1 = require("./github/recentlyCreated");
 const searchQuery_1 = require("./github/searchQuery");
 const issueDetailPanel_1 = require("./issueDetailPanel");
 exports.DEFAULT_QUERY = 'is:open';
@@ -64,6 +65,8 @@ class IssuesListController {
     _openCount = null;
     _closedCount = null;
     _cachedViewer = null;
+    /** Issues created from this window; kept briefly so a refresh doesn't drop them while GitHub's search lags. */
+    _recent = [];
     /** Bumped by every request; a response whose number is no longer current belongs to a superseded query. */
     _seq = 0;
     _loading = false;
@@ -98,6 +101,7 @@ class IssuesListController {
      * search corrects that.
      */
     insertCreated(issue) {
+        this._recent.push({ issue, at: Date.now() });
         this._items = [issue, ...this._items.filter(i => i.number !== issue.number)];
         if (issue.state === 'open' && this._openCount !== null)
             this._openCount++;
@@ -192,16 +196,25 @@ class IssuesListController {
                 return;
             const loaded = new Set(this._items.map(i => i.number));
             const fresh = append ? page.items.filter(i => !loaded.has(i.number)) : page.items;
-            this._items = append ? [...this._items, ...fresh] : page.items;
+            let added = [];
+            if (append) {
+                this._items = [...this._items, ...fresh];
+            }
+            else {
+                ({ items: this._items, added } = (0, recentlyCreated_1.mergeRecentlyCreated)(page.items, this._recent, query, Date.now()));
+            }
             this._cursor = page.cursor;
             this._hasMore = page.hasMore;
             if (page.openCount !== null) {
                 this._openCount = page.openCount;
                 this._closedCount = page.closedCount;
+                const openAdded = added.filter(i => i.state === 'open').length;
+                if (this._openCount !== null)
+                    this._openCount += openAdded;
             }
             this._rateRetried = false;
             this._showingRows = true;
-            this._post(this._resultsMessage(fresh, append));
+            this._post(this._resultsMessage(append ? fresh : this._items, append));
             if (!append && query === exports.DEFAULT_QUERY) {
                 const repo = this._store.getRepo();
                 if (repo) {

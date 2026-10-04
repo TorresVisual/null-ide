@@ -129,7 +129,7 @@ declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
   function applyLocalFilter(): void {
     rowsEl.querySelectorAll<HTMLElement>('.issue-row').forEach(row => {
       const issue = byNumber.get(Number(row.dataset.number));
-      row.classList.toggle('filtered', !!issue && !matchesLocalFilter(issue, searchInput.value));
+      row.classList.toggle('filtered', !!issue && !matchesLocalFilter(issue, activeLocalFilter(searchInput.value, query)));
     });
   }
 

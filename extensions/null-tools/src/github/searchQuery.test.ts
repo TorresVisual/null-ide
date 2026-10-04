@@ -3,7 +3,7 @@
 import assert from 'node:assert';
 import test from 'node:test';
 import {
-  describeQuery, getQualifierValues, removeQualifier, setQualifier, toApiQuery, toggleQualifier, withState,
+  describeQuery, getQualifierValues, hasFreeText, removeQualifier, setQualifier, toApiQuery, toggleQualifier, withState,
 } from './searchQuery';
 
 test('getQualifierValues unquotes values and ignores negated and other keys', () => {
@@ -70,4 +70,18 @@ test('toApiQuery drops repo:/org:/user: so the list cannot leave this repo', () 
     toApiQuery('o/r', 'repo:evil/private org:x -user:y is:open'),
     'repo:o/r is:issue is:open sort:created-desc',
   );
+});
+
+test('toApiQuery also drops owner: (it widens the search to every repo of that owner)', () => {
+  assert.strictEqual(
+    toApiQuery('o/r', 'owner:microsoft is:open'),
+    'repo:o/r is:issue is:open sort:created-desc',
+  );
+});
+
+test('hasFreeText is true only when there is text besides qualifiers', () => {
+  assert.strictEqual(hasFreeText('is:open label:"good first issue" sort:updated-desc'), false);
+  assert.strictEqual(hasFreeText('is:open crash'), true);
+  assert.strictEqual(hasFreeText('"exact phrase"'), true);
+  assert.strictEqual(hasFreeText(''), false);
 });

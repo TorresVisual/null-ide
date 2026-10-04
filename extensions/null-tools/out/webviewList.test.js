@@ -115,4 +115,10 @@ const names = (c) => c.kids.map(k => k.name);
 (0, node_test_1.default)('escapeHtml escapes the five HTML-significant characters', () => {
     node_assert_1.default.strictEqual(shared.escapeHtml('<a href="x">&\'</a>'), '&lt;a href=&quot;x&quot;&gt;&amp;&#39;&lt;/a&gt;');
 });
+(0, node_test_1.default)('activeLocalFilter filters only while the typed text differs from the query the results are for', () => {
+    const f = shared.activeLocalFilter;
+    node_assert_1.default.strictEqual(f('is:open crash', 'is:open'), 'is:open crash');
+    node_assert_1.default.strictEqual(f('  is:open crash ', 'is:open crash'), '');
+    node_assert_1.default.strictEqual(f('', ''), '');
+});
 //# sourceMappingURL=webviewList.test.js.map

@@ -127,3 +127,10 @@ test('filterPickerItems matches label or description, case-insensitively', () =>
 test('escapeHtml escapes the five HTML-significant characters', () => {
   assert.strictEqual(shared.escapeHtml('<a href="x">&\'</a>'), '&lt;a href=&quot;x&quot;&gt;&amp;&#39;&lt;/a&gt;');
 });
+
+test('activeLocalFilter filters only while the typed text differs from the query the results are for', () => {
+  const f = (shared as unknown as { activeLocalFilter(input: string, sent: string): string }).activeLocalFilter;
+  assert.strictEqual(f('is:open crash', 'is:open'), 'is:open crash');
+  assert.strictEqual(f('  is:open crash ', 'is:open crash'), '');
+  assert.strictEqual(f('', ''), '');
+});
