@@ -133,7 +133,7 @@ Written in TypeScript (`src/`), compiled to `out/` during CI. Activated on `onSt
 | Feature | Details |
 |---|---|
 | **Project dashboard** | Custom editor (`null.dashboard`, `viewType`); opened on startup and via Help > Welcome (see `patches/003-*` and `004-*`); recent-project cards with async git status, New Project, Clone Repo |
-| **GitHub Issues panel** | Own activity-bar view (`null-issues`); browse/create/comment on repo issues, sign-in, mark-as-read, issue templates and filters, link/insert issue references in commit messages |
+| **GitHub Issues panel** | Own activity-bar view (`null-issues`) plus a full-width tab (`null.issues.openFullView`); GraphQL search with a github.com-style query box, Open/Closed counts, filter dropdowns, sort, presets, paging and keyboard navigation; create/comment on issues, sign-in, mark-as-read, issue templates, link/insert issue references in commit messages |
 | **Commit message generation** | `null.generateCommitMessage` (`Ctrl+Shift+Alt+G`) — runs `claude --print` with staged diff; sets SCM input box |
 | **In-app updater** | Checks GitHub Releases on startup; shows status bar button; self-updates via PowerShell |
 | **Discord Rich Presence** | `discordRpcClient.ts` (IPC pipe / WebSocket transport), `discordPresence.ts` (activity building), `presenceOwnership.ts` (one window publishes), `discordAppInfo.ts` (Developer Portal diagnostics). Configured via `null.discord.*`; `null.discord.testConnection` reports setup problems |
