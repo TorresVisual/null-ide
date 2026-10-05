@@ -245,3 +245,13 @@ on:
 - Do not touch system PATH, registry, or any existing VS Code/VSCodium installation outside this repo's installer scripts.
 - Full builds normally run in GitHub Actions, not locally. `scripts/build-local.ps1` is the exception: it mirrors the `build-windows` job for iterating on `build.yml`, `shell-ext/`, `installer/`, or the VSCodium/VS Code patch/merge steps — things `scripts/sync-local.ps1` can't reach. Don't run it without being asked; it takes tens of minutes and needs Node, Rust, CMake, VS2022, and Inno Setup 6 installed (see the script's header for the full list).
 - Do not set the Microsoft extension gallery env var silently; document it in the README only.
+
+## graphify
+
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+
+Rules:
+- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
+- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
+- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).

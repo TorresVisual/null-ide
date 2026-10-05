@@ -1,0 +1,36 @@
+{
+  "enabledPlugins": {
+    "typescript-lsp@claude-plugins-official": true,
+    "clangd-lsp@claude-plugins-official": true
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/block-compiled-output.js",
+            "shell": "bash",
+            "timeout": 10,
+            "statusMessage": "Checking for compiled-output edits..."
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/test-on-src-edit.js",
+            "shell": "bash",
+            "timeout": 60,
+            "statusMessage": "Running extension tests..."
+          }
+        ]
+      }
+    ]
+  }
+}
