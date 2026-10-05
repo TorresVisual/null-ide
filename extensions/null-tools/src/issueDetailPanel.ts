@@ -4,7 +4,7 @@ import * as vscode from 'vscode';
 import { getNonce } from './webviewUtils';
 import { IssuePatch } from './github/githubApi';
 import { IssuesStore } from './github/issuesStore';
-import { formatIssueAsPrompt } from './github/promptFormat';
+import { buildIssuePrompt } from './issuePrompt';
 import { createIssueBranch, getLocallyClosedIssueNumbers } from './github/gitBranch';
 import { toggleTaskCheckbox } from './github/taskList';
 import { loadIssueTemplates } from './github/issueTemplates';
@@ -398,8 +398,10 @@ export class IssueDetailPanel {
       case 'copyAsPrompt': {
         const issue = this.store.getByNumber(number);
         if (!issue) break;
-        await vscode.env.clipboard.writeText(formatIssueAsPrompt(issue));
+        const { text, warning } = await buildIssuePrompt(this.store, issue);
+        await vscode.env.clipboard.writeText(text);
         this._post({ type: 'copied' });
+        if (warning) void vscode.window.showWarningMessage(warning);
         break;
       }
       case 'openInBrowser': {

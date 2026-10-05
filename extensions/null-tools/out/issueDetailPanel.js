@@ -36,7 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.IssueDetailPanel = void 0;
 const vscode = __importStar(require("vscode"));
 const webviewUtils_1 = require("./webviewUtils");
-const promptFormat_1 = require("./github/promptFormat");
+const issuePrompt_1 = require("./issuePrompt");
 const gitBranch_1 = require("./github/gitBranch");
 const taskList_1 = require("./github/taskList");
 const issueTemplates_1 = require("./github/issueTemplates");
@@ -407,8 +407,11 @@ class IssueDetailPanel {
                 const issue = this.store.getByNumber(number);
                 if (!issue)
                     break;
-                await vscode.env.clipboard.writeText((0, promptFormat_1.formatIssueAsPrompt)(issue));
+                const { text, warning } = await (0, issuePrompt_1.buildIssuePrompt)(this.store, issue);
+                await vscode.env.clipboard.writeText(text);
                 this._post({ type: 'copied' });
+                if (warning)
+                    void vscode.window.showWarningMessage(warning);
                 break;
             }
             case 'openInBrowser': {

@@ -6,7 +6,7 @@ import { getGithubSession } from './github/githubAuth';
 import { createIssueBranch, getLocallyClosedIssueNumbers } from './github/gitBranch';
 import { getWorkspaceGithubRepo } from './github/githubRemote';
 import { IssuesStore, SessionError } from './github/issuesStore';
-import { formatIssueAsPrompt } from './github/promptFormat';
+import { buildIssuePrompt } from './issuePrompt';
 import { RecentIssue, mergeRecentlyCreated } from './github/recentlyCreated';
 import { describeQuery, removeQualifier, setQualifier, toggleQualifier, withState } from './github/searchQuery';
 import { GithubIssue, GithubRepoRef, RepoMetadata } from './github/types';
@@ -322,10 +322,13 @@ export class IssuesListController {
       case 'worktree':
         await vscode.commands.executeCommand('null.worktrees.createForIssue', issue.number, issue.title);
         break;
-      case 'copyPrompt':
-        await vscode.env.clipboard.writeText(formatIssueAsPrompt(issue));
+      case 'copyPrompt': {
+        const { text, warning } = await buildIssuePrompt(this._store, issue);
+        await vscode.env.clipboard.writeText(text);
+        if (warning) void vscode.window.showWarningMessage(warning);
         this._post({ type: 'rowActionDone', action, number });
         break;
+      }
     }
   }
 }

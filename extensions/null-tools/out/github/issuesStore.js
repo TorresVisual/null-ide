@@ -111,6 +111,23 @@ class IssuesStore {
             throw new Error('Issue not found.');
         return (0, detailQueries_1.mapTimelinePage)(data.repository.issue.timelineItems, `${repo.owner}/${repo.repo}`);
     }
+    /**
+     * The issue body and every visible comment, paging past the first 100 timeline items, for Copy as prompt.
+     * Collapsed (minimized) comments are spam or off-topic, so they stay out.
+     * ponytail: 1000 timeline items at most; a longer thread is cut off there.
+     */
+    async getConversation(issueNumber) {
+        const detail = await this.getDetail(issueNumber);
+        const items = [...detail.timeline];
+        let cursor = detail.hasMoreTimeline ? detail.timelineCursor : null;
+        for (let pages = 0; cursor && pages < 9; pages++) {
+            const page = await this.getTimelinePage(issueNumber, cursor);
+            items.push(...page.items);
+            cursor = page.hasMore ? page.cursor : null;
+        }
+        const comments = items.filter((i) => i.kind === 'comment' && !i.minimizedReason);
+        return { post: detail.post, comments };
+    }
     /** GitHub's own rendering of `text` in this repo's context (so `#12` and `@user` become links), for the composer's Preview tab. */
     async renderPreview(text) {
         const { repo, token } = await this.ensureSession(false);

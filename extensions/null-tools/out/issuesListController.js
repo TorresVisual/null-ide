@@ -40,7 +40,7 @@ const githubAuth_1 = require("./github/githubAuth");
 const gitBranch_1 = require("./github/gitBranch");
 const githubRemote_1 = require("./github/githubRemote");
 const issuesStore_1 = require("./github/issuesStore");
-const promptFormat_1 = require("./github/promptFormat");
+const issuePrompt_1 = require("./issuePrompt");
 const recentlyCreated_1 = require("./github/recentlyCreated");
 const searchQuery_1 = require("./github/searchQuery");
 const issueDetailPanel_1 = require("./issueDetailPanel");
@@ -338,10 +338,14 @@ class IssuesListController {
             case 'worktree':
                 await vscode.commands.executeCommand('null.worktrees.createForIssue', issue.number, issue.title);
                 break;
-            case 'copyPrompt':
-                await vscode.env.clipboard.writeText((0, promptFormat_1.formatIssueAsPrompt)(issue));
+            case 'copyPrompt': {
+                const { text, warning } = await (0, issuePrompt_1.buildIssuePrompt)(this._store, issue);
+                await vscode.env.clipboard.writeText(text);
+                if (warning)
+                    void vscode.window.showWarningMessage(warning);
                 this._post({ type: 'rowActionDone', action, number });
                 break;
+            }
         }
     }
 }
