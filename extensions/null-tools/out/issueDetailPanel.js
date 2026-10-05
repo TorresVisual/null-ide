@@ -176,8 +176,8 @@ class IssueDetailPanel {
         // Signed-out/offline must still show the form: Create itself prompts for sign-in
         // (ensureSession(true)), so an empty-picker form beats no form at all.
         const [repoLabels, assignableUsers] = await Promise.all([
-            this.store.getRepoLabels().catch(() => []),
-            this.store.getAssignableUsers().catch(() => []),
+            Promise.resolve([]),
+            Promise.resolve([]),
         ]);
         const cwd = this._cwd();
         this._post({ type: 'createInit', repoLabels, assignableUsers, templates: cwd ? (0, issueTemplates_1.loadIssueTemplates)(cwd) : [] });

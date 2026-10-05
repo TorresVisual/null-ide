@@ -8,7 +8,7 @@ const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/;
 
 export function parseIssueTemplate(raw: string, fallbackName: string): IssueTemplate {
   const match = raw.match(FRONTMATTER);
-  if (!match) return { name: fallbackName, title: '', body: raw.trim(), labels: [] };
+  if (!match) return { name: fallbackName, about: '', title: '', body: raw.trim(), labels: [] };
   const [, frontmatter, body] = match;
   const fields: Record<string, string> = {};
   for (const line of frontmatter.split(/\r?\n/)) {
@@ -17,6 +17,7 @@ export function parseIssueTemplate(raw: string, fallbackName: string): IssueTemp
   }
   return {
     name: fields.name || fallbackName,
+    about: fields.about || '',
     title: fields.title || '',
     body: body.trim(),
     labels: fields.labels ? fields.labels.split(',').map(l => l.trim()).filter(Boolean) : [],

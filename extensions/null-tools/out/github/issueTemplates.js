@@ -41,7 +41,7 @@ const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/;
 function parseIssueTemplate(raw, fallbackName) {
     const match = raw.match(FRONTMATTER);
     if (!match)
-        return { name: fallbackName, title: '', body: raw.trim(), labels: [] };
+        return { name: fallbackName, about: '', title: '', body: raw.trim(), labels: [] };
     const [, frontmatter, body] = match;
     const fields = {};
     for (const line of frontmatter.split(/\r?\n/)) {
@@ -51,6 +51,7 @@ function parseIssueTemplate(raw, fallbackName) {
     }
     return {
         name: fields.name || fallbackName,
+        about: fields.about || '',
         title: fields.title || '',
         body: body.trim(),
         labels: fields.labels ? fields.labels.split(',').map(l => l.trim()).filter(Boolean) : [],

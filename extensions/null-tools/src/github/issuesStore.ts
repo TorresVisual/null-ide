@@ -2,16 +2,18 @@
 
 import { getWorkspaceGithubRepo } from './githubRemote';
 import { getGithubSession } from './githubAuth';
-import { IssuePatch, createIssue, fetchAssignableUsers, fetchRepoLabels, requestGraphql, updateIssue } from './githubApi';
+import { CreateExtraStep, runCreateExtras } from './createExtras';
+import { IssuePatch, createIssue, renderMarkdown, requestGraphql, updateIssue } from './githubApi';
 import {
   ADD_COMMENT, ADD_REACTION, ADD_SUB_ISSUE, DELETE_COMMENT, GqlComment, GqlReactionGroup, ISSUE_DETAIL, ISSUE_TIMELINE,
   IssueDetailData, IssueTimelineData, REMOVE_REACTION, REMOVE_SUB_ISSUE, SET_ISSUE_TYPE, UPDATE_COMMENT, mapComment,
   mapIssueDetail, mapReactions, mapTimelinePage,
 } from './detailQueries';
 import { MetadataData, REPO_METADATA, SEARCH_ISSUES, SearchData, mapMetadata, mapSearchPage } from './githubQueries';
+import { IssueSuggestion, matchIssues, toSuggestion } from './issueSuggest';
 import { toApiQuery, withState } from './searchQuery';
 import {
-  GithubIssue, GithubLabel, GithubRepoRef, GithubUser, IssueDetail, IssuePost,
+  GithubIssue, GithubRepoRef, IssueDetail, IssuePost,
   ReactionContent, ReactionGroup, RepoMetadata, SearchPage, TimelinePage,
 } from './types';
 
@@ -36,8 +38,6 @@ export class IssuesStore {
   /** Every issue any list has loaded, by number, so row actions and the detail tab can find one by number. */
   private known = new Map<number, GithubIssue>();
   private repo: GithubRepoRef | null = null;
-  private repoLabels: GithubLabel[] | null = null;
-  private assignableUsers: GithubUser[] | null = null;
   private metadata: RepoMetadata | null = null;
   private viewerLogin: string | null = null;
 
@@ -71,8 +71,6 @@ export class IssuesStore {
   private setRepo(repo: GithubRepoRef): void {
     if (this.repo && (this.repo.owner !== repo.owner || this.repo.repo !== repo.repo)) {
       this.known.clear();
-      this.repoLabels = null;
-      this.assignableUsers = null;
       this.metadata = null;
     }
     this.repo = repo;
@@ -109,18 +107,6 @@ export class IssuesStore {
     return this.metadata;
   }
 
-  async getRepoLabels(): Promise<GithubLabel[]> {
-    const { repo, token } = await this.ensureSession(false);
-    if (!this.repoLabels) this.repoLabels = await fetchRepoLabels(repo.owner, repo.repo, token);
-    return this.repoLabels;
-  }
-
-  async getAssignableUsers(): Promise<GithubUser[]> {
-    const { repo, token } = await this.ensureSession(false);
-    if (!this.assignableUsers) this.assignableUsers = await fetchAssignableUsers(repo.owner, repo.repo, token);
-    return this.assignableUsers;
-  }
-
   /** One issue with its first timeline page. Also refreshes the by-number cache the row actions read. */
   async getDetail(issueNumber: number): Promise<IssueDetail> {
     const { repo, token } = await this.ensureSession(false);
@@ -137,6 +123,25 @@ export class IssuesStore {
       ISSUE_TIMELINE, { owner: repo.owner, name: repo.repo, number: issueNumber, after }, token);
     if (!data.repository.issue) throw new Error('Issue not found.');
     return mapTimelinePage(data.repository.issue.timelineItems, `${repo.owner}/${repo.repo}`);
+  }
+
+  /** GitHub's own rendering of `text` in this repo's context (so `#12` and `@user` become links), for the composer's Preview tab. */
+  async renderPreview(text: string): Promise<string> {
+    const { repo, token } = await this.ensureSession(false);
+    return renderMarkdown(text, `${repo.owner}/${repo.repo}`, token);
+  }
+
+  /** Issues for the composer's `#` popup: what is already loaded first, then (from 2 characters) a server search. */
+  async suggestIssues(prefix: string): Promise<IssueSuggestion[]> {
+    const local = matchIssues([...this.known.values()], prefix);
+    if (prefix.length < 2 || local.length >= 5) return local;
+    try {
+      const page = await this.search(prefix, null, false);
+      const have = new Set(local.map(i => i.number));
+      return local.concat(page.items.filter(i => !have.has(i.number)).map(toSuggestion)).slice(0, 8);
+    } catch {
+      return local; // offline or rate limited: the loaded issues are still a useful answer
+    }
   }
 
   /** A GraphQL write. Prompts for sign-in like every user-initiated write. */
@@ -207,11 +212,36 @@ export class IssuesStore {
   }
 
   async createIssue(
-    data: { title: string; body?: string; labels?: string[]; assignees?: string[] },
+    data: { title: string; body?: string; labels?: string[]; assignees?: string[]; milestone?: number },
   ): Promise<GithubIssue> {
     const { repo, token } = await this.ensureSession(true);
     const created = await createIssue(repo.owner, repo.repo, data, token);
     this.remember([created]);
     return created;
+  }
+
+  /**
+   * REST create can't set an issue type or a parent, so they follow it. Returns what failed and never throws.
+   * ponytail: the parent's node id comes from a full getDetail (100 timeline items); add a light id query if that is ever slow.
+   */
+  applyCreateExtras(created: GithubIssue, extras: { typeId: string | null; parent: number | null }): Promise<string[]> {
+    const steps: CreateExtraStep[] = [];
+    const { typeId, parent } = extras;
+    if (typeId) {
+      steps.push({
+        what: 'set the type',
+        run: async () => {
+          if (!created.node_id) throw new Error('GitHub did not return the issue id');
+          await this.setIssueType(created.node_id, typeId);
+        },
+      });
+    }
+    if (parent) {
+      steps.push({
+        what: `link it to #${parent}`,
+        run: async () => this.addSubIssue((await this.getDetail(parent)).id, created.number),
+      });
+    }
+    return runCreateExtras(steps);
   }
 }

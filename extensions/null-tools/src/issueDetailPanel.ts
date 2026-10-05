@@ -177,8 +177,8 @@ export class IssueDetailPanel {
     // Signed-out/offline must still show the form: Create itself prompts for sign-in
     // (ensureSession(true)), so an empty-picker form beats no form at all.
     const [repoLabels, assignableUsers] = await Promise.all([
-      this.store.getRepoLabels().catch((): GithubLabel[] => []),
-      this.store.getAssignableUsers().catch((): GithubUser[] => []),
+      Promise.resolve([] as GithubLabel[]),
+      Promise.resolve([] as GithubUser[]),
     ]);
     const cwd = this._cwd();
     this._post({ type: 'createInit', repoLabels, assignableUsers, templates: cwd ? loadIssueTemplates(cwd) : [] });

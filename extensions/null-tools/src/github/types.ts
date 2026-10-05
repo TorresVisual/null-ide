@@ -40,12 +40,15 @@ export interface GithubIssue {
   sub_issues?: { total: number; completed: number } | null;
   linked_prs?: number;
   pull_request?: unknown;
+  /** REST responses only (create/update). GraphQL-mapped issues don't carry it; the detail query has its own `id`. */
+  node_id?: string;
   /** True when an unpushed local commit will close this issue on push. Computed client-side, never sent to GitHub. */
   closedLocally?: boolean;
 }
 
 export interface IssueTemplate {
   name: string;
+  about: string;
   title: string;
   body: string;
   labels: string[];

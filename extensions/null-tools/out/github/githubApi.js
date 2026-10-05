@@ -37,11 +37,10 @@ exports.ApiError = void 0;
 exports.formatApiError = formatApiError;
 exports.rateLimitRetryAt = rateLimitRetryAt;
 exports.requestGraphql = requestGraphql;
+exports.renderMarkdown = renderMarkdown;
 exports.fetchIssues = fetchIssues;
 exports.updateIssue = updateIssue;
 exports.createIssue = createIssue;
-exports.fetchRepoLabels = fetchRepoLabels;
-exports.fetchAssignableUsers = fetchAssignableUsers;
 const https = __importStar(require("https"));
 const issueFilter_1 = require("./issueFilter");
 /** User-facing message for a failed GitHub REST or GraphQL call, keeping GitHub's own explanation. */
@@ -126,6 +125,13 @@ async function requestGraphql(query, variables, token) {
     }
     return parsed.data;
 }
+/** POST /markdown (GFM, in this repo's context): GitHub's own HTML for `text`, as a posted comment would show it. Answers text/html, not JSON. */
+async function renderMarkdown(text, repoFullName, token) {
+    const res = await request('/markdown', token, 'POST', { text, mode: 'gfm', context: repoFullName });
+    if (res.status < 200 || res.status >= 300)
+        throw failure(res);
+    return res.body;
+}
 // ponytail: single page, 100 issues max — add Link-header pagination if a
 // tracked repo ever exceeds that many open issues.
 async function fetchIssues(owner, repo, state, token) {
@@ -137,11 +143,5 @@ function updateIssue(owner, repo, issueNumber, patch, token) {
 }
 function createIssue(owner, repo, data, token) {
     return requestJson(`/repos/${owner}/${repo}/issues`, token, 'POST', data);
-}
-function fetchRepoLabels(owner, repo, token) {
-    return requestJson(`/repos/${owner}/${repo}/labels?per_page=100`, token);
-}
-function fetchAssignableUsers(owner, repo, token) {
-    return requestJson(`/repos/${owner}/${repo}/assignees?per_page=100`, token);
 }
 //# sourceMappingURL=githubApi.js.map

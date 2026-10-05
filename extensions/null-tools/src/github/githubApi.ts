@@ -2,7 +2,7 @@
 
 import * as https from 'https';
 import type { IncomingHttpHeaders } from 'http';
-import { GithubIssue, GithubLabel, GithubUser, IssueState } from './types';
+import { GithubIssue, IssueState } from './types';
 import { stripPullRequests } from './issueFilter';
 
 interface ApiErrorBody {
@@ -96,6 +96,13 @@ export async function requestGraphql<T>(
   return parsed.data;
 }
 
+/** POST /markdown (GFM, in this repo's context): GitHub's own HTML for `text`, as a posted comment would show it. Answers text/html, not JSON. */
+export async function renderMarkdown(text: string, repoFullName: string, token: string | null): Promise<string> {
+  const res = await request('/markdown', token, 'POST', { text, mode: 'gfm', context: repoFullName });
+  if (res.status < 200 || res.status >= 300) throw failure(res);
+  return res.body;
+}
+
 // ponytail: single page, 100 issues max — add Link-header pagination if a
 // tracked repo ever exceeds that many open issues.
 export async function fetchIssues(
@@ -127,16 +134,8 @@ export function updateIssue(
 
 export function createIssue(
   owner: string, repo: string,
-  data: { title: string; body?: string; labels?: string[]; assignees?: string[] },
+  data: { title: string; body?: string; labels?: string[]; assignees?: string[]; milestone?: number },
   token: string | null,
 ): Promise<GithubIssue> {
   return requestJson<GithubIssue>(`/repos/${owner}/${repo}/issues`, token, 'POST', data);
-}
-
-export function fetchRepoLabels(owner: string, repo: string, token: string | null): Promise<GithubLabel[]> {
-  return requestJson<GithubLabel[]>(`/repos/${owner}/${repo}/labels?per_page=100`, token);
-}
-
-export function fetchAssignableUsers(owner: string, repo: string, token: string | null): Promise<GithubUser[]> {
-  return requestJson<GithubUser[]>(`/repos/${owner}/${repo}/assignees?per_page=100`, token);
 }

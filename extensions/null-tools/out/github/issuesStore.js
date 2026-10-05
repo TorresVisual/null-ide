@@ -3,9 +3,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.IssuesStore = exports.SessionError = exports.PAGE_SIZE = void 0;
 const githubRemote_1 = require("./githubRemote");
 const githubAuth_1 = require("./githubAuth");
+const createExtras_1 = require("./createExtras");
 const githubApi_1 = require("./githubApi");
 const detailQueries_1 = require("./detailQueries");
 const githubQueries_1 = require("./githubQueries");
+const issueSuggest_1 = require("./issueSuggest");
 const searchQuery_1 = require("./searchQuery");
 exports.PAGE_SIZE = 50;
 const SESSION_MESSAGES = {
@@ -27,8 +29,6 @@ class IssuesStore {
     /** Every issue any list has loaded, by number, so row actions and the detail tab can find one by number. */
     known = new Map();
     repo = null;
-    repoLabels = null;
-    assignableUsers = null;
     metadata = null;
     viewerLogin = null;
     constructor(getCwd) {
@@ -63,8 +63,6 @@ class IssuesStore {
     setRepo(repo) {
         if (this.repo && (this.repo.owner !== repo.owner || this.repo.repo !== repo.repo)) {
             this.known.clear();
-            this.repoLabels = null;
-            this.assignableUsers = null;
             this.metadata = null;
         }
         this.repo = repo;
@@ -97,18 +95,6 @@ class IssuesStore {
         }
         return this.metadata;
     }
-    async getRepoLabels() {
-        const { repo, token } = await this.ensureSession(false);
-        if (!this.repoLabels)
-            this.repoLabels = await (0, githubApi_1.fetchRepoLabels)(repo.owner, repo.repo, token);
-        return this.repoLabels;
-    }
-    async getAssignableUsers() {
-        const { repo, token } = await this.ensureSession(false);
-        if (!this.assignableUsers)
-            this.assignableUsers = await (0, githubApi_1.fetchAssignableUsers)(repo.owner, repo.repo, token);
-        return this.assignableUsers;
-    }
     /** One issue with its first timeline page. Also refreshes the by-number cache the row actions read. */
     async getDetail(issueNumber) {
         const { repo, token } = await this.ensureSession(false);
@@ -123,6 +109,25 @@ class IssuesStore {
         if (!data.repository.issue)
             throw new Error('Issue not found.');
         return (0, detailQueries_1.mapTimelinePage)(data.repository.issue.timelineItems, `${repo.owner}/${repo.repo}`);
+    }
+    /** GitHub's own rendering of `text` in this repo's context (so `#12` and `@user` become links), for the composer's Preview tab. */
+    async renderPreview(text) {
+        const { repo, token } = await this.ensureSession(false);
+        return (0, githubApi_1.renderMarkdown)(text, `${repo.owner}/${repo.repo}`, token);
+    }
+    /** Issues for the composer's `#` popup: what is already loaded first, then (from 2 characters) a server search. */
+    async suggestIssues(prefix) {
+        const local = (0, issueSuggest_1.matchIssues)([...this.known.values()], prefix);
+        if (prefix.length < 2 || local.length >= 5)
+            return local;
+        try {
+            const page = await this.search(prefix, null, false);
+            const have = new Set(local.map(i => i.number));
+            return local.concat(page.items.filter(i => !have.has(i.number)).map(issueSuggest_1.toSuggestion)).slice(0, 8);
+        }
+        catch {
+            return local; // offline or rate limited: the loaded issues are still a useful answer
+        }
     }
     /** A GraphQL write. Prompts for sign-in like every user-initiated write. */
     async mutate(query, variables) {
@@ -182,6 +187,31 @@ class IssuesStore {
         const created = await (0, githubApi_1.createIssue)(repo.owner, repo.repo, data, token);
         this.remember([created]);
         return created;
+    }
+    /**
+     * REST create can't set an issue type or a parent, so they follow it. Returns what failed and never throws.
+     * ponytail: the parent's node id comes from a full getDetail (100 timeline items); add a light id query if that is ever slow.
+     */
+    applyCreateExtras(created, extras) {
+        const steps = [];
+        const { typeId, parent } = extras;
+        if (typeId) {
+            steps.push({
+                what: 'set the type',
+                run: async () => {
+                    if (!created.node_id)
+                        throw new Error('GitHub did not return the issue id');
+                    await this.setIssueType(created.node_id, typeId);
+                },
+            });
+        }
+        if (parent) {
+            steps.push({
+                what: `link it to #${parent}`,
+                run: async () => this.addSubIssue((await this.getDetail(parent)).id, created.number),
+            });
+        }
+        return (0, createExtras_1.runCreateExtras)(steps);
     }
 }
 exports.IssuesStore = IssuesStore;
