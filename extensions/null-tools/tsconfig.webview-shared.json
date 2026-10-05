@@ -19,6 +19,7 @@
     "src/webview/detailTypes.ts",
     "src/webview/detailHtml.ts",
     "src/webview/detailSidebarHtml.ts",
-    "src/webview/composerText.ts"
+    "src/webview/composerText.ts",
+    "src/webview/createFormHtml.ts"
   ]
 }

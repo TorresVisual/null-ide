@@ -592,6 +592,31 @@ function userSuggestion(u) {
 function issueSuggestion(i) {
     return { insert: `#${i.number}`, html: `${issueStateIcon(i.state, null)} <b>#${i.number}</b> ${escapeHtml(i.title)}` };
 }
+/** One card per template, then a Blank issue card. `data-index` is the template's position, -1 for Blank. */
+function templateChooserHtml(templates) {
+    const card = (index, name, about) => `
+    <button type="button" class="template-card" data-act="pick-template" data-index="${index}">
+      <b>${escapeHtml(name)}</b>${about ? `<span class="muted">${escapeHtml(about)}</span>` : ''}
+    </button>`;
+    return `<h1 class="title">Choose a template</h1>
+    <div class="template-grid">${templates.map((t, i) => card(i, t.name, t.about)).join('')}${card(-1, 'Blank issue', 'Create a new issue from scratch')}</div>`;
+}
+/** Assignees, Labels, Type (only for repos that have issue types), Milestone and Parent, each with an edit gear. */
+function createSidebarHtml(s, meta) {
+    const none = (text) => `<span class="muted">${text}</span>`;
+    const assignees = s.assignees.length > 0
+        ? s.assignees.map(a => `<div class="sb-person">${avatarHtml(a)} ${escapeHtml(a.login)}</div>`).join('')
+        : none('No one');
+    const labels = s.labels.length > 0 ? eventLabelChips(s.labels) : none('None yet');
+    const type = s.type ? escapeHtml(s.type.name) : none('No type');
+    const milestone = s.milestone ? `<div>${octicon('milestone')} ${escapeHtml(s.milestone.title)}</div>` : none('No milestone');
+    const parent = s.parent ? `<div>${octicon('issue-tracks')} #${s.parent.number} ${escapeHtml(s.parent.title)}</div>` : none('None yet');
+    return sidebarSection('assignees', 'Assignees', true, assignees)
+        + sidebarSection('labels', 'Labels', true, labels)
+        + (meta && meta.types.length > 0 ? sidebarSection('type', 'Type', true, type) : '')
+        + sidebarSection('milestone', 'Milestone', true, milestone)
+        + sidebarSection('parent', 'Parent', true, parent);
+}
 /** Host answers the composers are still waiting for (preview, `#` suggestions), by request id. */
 const composerWaiting = new Map();
 let composerSeq = 0;

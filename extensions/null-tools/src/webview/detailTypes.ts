@@ -5,7 +5,7 @@
 
 interface GithubLabel { name: string; color: string; description?: string | null; }
 interface GithubUser { login: string; avatar_url: string; }
-interface IssueTemplate { name: string; title: string; body: string; labels: string[]; }
+interface IssueTemplate { name: string; about: string; title: string; body: string; labels: string[]; }
 
 interface ReactionGroup { content: string; count: number; viewerHasReacted: boolean; }
 
