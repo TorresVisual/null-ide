@@ -363,15 +363,15 @@ function reactionPickerItems(post) {
 }
 /**
  * One post: the issue body (`kind: 'body'`) or a comment. A moderator-collapsed comment is folded in a
- * <details>. `editing` swaps the rendered body for a plain textarea (the Phase 4 composer replaces it).
+ * <details>. `editing` swaps the rendered body for an empty slot that issueDetail.ts fills with a composer.
  */
 function postHtml(post, kind, editing) {
     const id = escapeHtml(post.id);
     const edited = post.lastEditedAt
         ? ` <span class="post-edited" title="${escapeHtml(new Date(post.lastEditedAt).toLocaleString())}">· edited</span>` : '';
     const content = editing
-        ? `<div class="edit-form post-edit">
-         <textarea class="post-edit-input" data-id="${id}" aria-label="Edit ${kind === 'body' ? 'description' : 'comment'}">${escapeHtml(post.body)}</textarea>
+        ? `<div class="post-edit">
+         <div class="composer-slot" data-id="${id}"></div>
          <div class="btn-row">
            <button type="button" class="btn btn-primary" data-act="save-edit" data-id="${id}">Update ${kind === 'body' ? 'description' : 'comment'}</button>
            <button type="button" class="btn btn-secondary" data-act="cancel-edit">Cancel</button>

@@ -40,6 +40,7 @@ const promptFormat_1 = require("./github/promptFormat");
 const gitBranch_1 = require("./github/gitBranch");
 const taskList_1 = require("./github/taskList");
 const issueTemplates_1 = require("./github/issueTemplates");
+const issueDrafts_1 = require("./github/issueDrafts");
 const STATE_PATCHES = {
     completed: { state: 'closed', state_reason: 'completed' },
     not_planned: { state: 'closed', state_reason: 'not_planned' },
@@ -57,6 +58,11 @@ class IssueDetailPanel {
     static shared;
     /** The one New issue tab. */
     static creatingTab;
+    /** Where unsent comment text is kept; set once by registerIssuesPanelFeature. */
+    static drafts;
+    static configure(drafts) {
+        IssueDetailPanel.drafts = drafts;
+    }
     panel;
     issueNumber = 0;
     creating = false;
@@ -137,6 +143,21 @@ class IssueDetailPanel {
     _cwd() {
         return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     }
+    /** `number` 0 is the New issue form. */
+    _draftKey(number) {
+        const repo = this.store.getRepo();
+        return repo ? (0, issueDrafts_1.draftKey)(repo, number || 'new') : null;
+    }
+    _readDraft(number) {
+        const key = this._draftKey(number);
+        return key && IssueDetailPanel.drafts ? IssueDetailPanel.drafts.get(key, '') : '';
+    }
+    /** Empty or whitespace-only text deletes the draft. */
+    _writeDraft(number, body) {
+        const key = this._draftKey(number);
+        if (key && IssueDetailPanel.drafts)
+            void IssueDetailPanel.drafts.update(key, body.trim() ? body : undefined);
+    }
     /** Fetches the issue and sends it. `afterWrite` tells the webview this answers one of its own writes. */
     async _load(afterWrite) {
         const number = this.issueNumber;
@@ -151,6 +172,7 @@ class IssueDetailPanel {
             const repo = this.store.getRepo();
             this._post({
                 type: 'detail', detail, afterWrite,
+                draft: this._readDraft(number),
                 viewer: this.store.getViewerLogin(),
                 repo: repo ? `${repo.owner}/${repo.repo}` : '',
                 closedLocally: detail.issue.state === 'open' && !!cwd && (0, gitBranch_1.getLocallyClosedIssueNumbers)(cwd).has(number),
@@ -276,6 +298,7 @@ class IssueDetailPanel {
                 try {
                     const item = await this.store.postComment(number, this.detail.id, msg.body);
                     this._post({ type: 'commentAdded', item });
+                    this._writeDraft(number, '');
                 }
                 catch (err) {
                     // With a close/reopen attached, the webview already applied it optimistically and has to undo it.
@@ -324,6 +347,20 @@ class IssueDetailPanel {
                 await this._write(() => this.store.updateIssue(number, { body: newBody }));
                 break;
             }
+            case 'preview':
+                try {
+                    this._post({ type: 'previewResult', requestId: msg.requestId, html: await this.store.renderPreview(msg.text) });
+                }
+                catch (err) {
+                    this._post({ type: 'previewResult', requestId: msg.requestId, error: err.message });
+                }
+                break;
+            case 'suggest':
+                this._post({ type: 'suggestions', requestId: msg.requestId, items: await this.store.suggestIssues(msg.prefix).catch(() => []) });
+                break;
+            case 'saveDraft':
+                this._writeDraft(msg.number, msg.body);
+                break;
             case 'openIssue':
                 await IssueDetailPanel.show(this.extensionUri, this.store, msg.number, msg.newTab);
                 break;

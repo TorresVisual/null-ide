@@ -8,6 +8,7 @@ import { formatIssueAsPrompt } from './github/promptFormat';
 import { createIssueBranch, getLocallyClosedIssueNumbers } from './github/gitBranch';
 import { toggleTaskCheckbox } from './github/taskList';
 import { loadIssueTemplates } from './github/issueTemplates';
+import { draftKey } from './github/issueDrafts';
 import { GithubIssue, GithubLabel, GithubUser, ReactionContent } from './github/types';
 
 /** What a close/reopen button asks for. */
@@ -44,6 +45,9 @@ type InboundMessage =
   | { type: 'openInBrowser' }
   | { type: 'createBranch' }
   | { type: 'createWorktree' }
+  | { type: 'preview'; requestId: number; text: string }
+  | { type: 'suggest'; requestId: number; prefix: string }
+  | { type: 'saveDraft'; number: number; body: string }
   | { type: 'submitCreate'; title: string; body: string; labels: string[]; assignees: string[] }
   | { type: 'cancelCreate' };
 
@@ -59,6 +63,12 @@ export class IssueDetailPanel {
   private static shared: IssueDetailPanel | undefined;
   /** The one New issue tab. */
   private static creatingTab: IssueDetailPanel | undefined;
+  /** Where unsent comment text is kept; set once by registerIssuesPanelFeature. */
+  private static drafts: vscode.Memento | undefined;
+
+  static configure(drafts: vscode.Memento): void {
+    IssueDetailPanel.drafts = drafts;
+  }
 
   private readonly panel: vscode.WebviewPanel;
   private issueNumber = 0;
@@ -139,6 +149,23 @@ export class IssueDetailPanel {
     return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   }
 
+  /** `number` 0 is the New issue form. */
+  private _draftKey(number: number): string | null {
+    const repo = this.store.getRepo();
+    return repo ? draftKey(repo, number || 'new') : null;
+  }
+
+  private _readDraft(number: number): string {
+    const key = this._draftKey(number);
+    return key && IssueDetailPanel.drafts ? IssueDetailPanel.drafts.get<string>(key, '') : '';
+  }
+
+  /** Empty or whitespace-only text deletes the draft. */
+  private _writeDraft(number: number, body: string): void {
+    const key = this._draftKey(number);
+    if (key && IssueDetailPanel.drafts) void IssueDetailPanel.drafts.update(key, body.trim() ? body : undefined);
+  }
+
   /** Fetches the issue and sends it. `afterWrite` tells the webview this answers one of its own writes. */
   private async _load(afterWrite: boolean): Promise<void> {
     const number = this.issueNumber;
@@ -152,6 +179,7 @@ export class IssueDetailPanel {
       const repo = this.store.getRepo();
       this._post({
         type: 'detail', detail, afterWrite,
+        draft: this._readDraft(number),
         viewer: this.store.getViewerLogin(),
         repo: repo ? `${repo.owner}/${repo.repo}` : '',
         closedLocally: detail.issue.state === 'open' && !!cwd && getLocallyClosedIssueNumbers(cwd).has(number),
@@ -267,6 +295,7 @@ export class IssueDetailPanel {
         try {
           const item = await this.store.postComment(number, this.detail.id, msg.body);
           this._post({ type: 'commentAdded', item });
+          this._writeDraft(number, '');
         } catch (err) {
           // With a close/reopen attached, the webview already applied it optimistically and has to undo it.
           this._post({ type: 'failed', what: msg.then ? 'write' : 'comment', message: (err as Error).message });
@@ -310,6 +339,19 @@ export class IssueDetailPanel {
         await this._write(() => this.store.updateIssue(number, { body: newBody }));
         break;
       }
+      case 'preview':
+        try {
+          this._post({ type: 'previewResult', requestId: msg.requestId, html: await this.store.renderPreview(msg.text) });
+        } catch (err) {
+          this._post({ type: 'previewResult', requestId: msg.requestId, error: (err as Error).message });
+        }
+        break;
+      case 'suggest':
+        this._post({ type: 'suggestions', requestId: msg.requestId, items: await this.store.suggestIssues(msg.prefix).catch(() => []) });
+        break;
+      case 'saveDraft':
+        this._writeDraft(msg.number, msg.body);
+        break;
       case 'openIssue':
         await IssueDetailPanel.show(this.extensionUri, this.store, msg.number, msg.newTab);
         break;

@@ -92,11 +92,15 @@ const post = (over = {}) => ({
     node_assert_1.default.ok(reacted.includes('👍 2'));
     node_assert_1.default.ok(!reacted.includes('👀'));
 });
-(0, node_test_1.default)('postHtml in edit mode shows the escaped markdown source instead of the rendered body', () => {
+(0, node_test_1.default)('postHtml in edit mode leaves a slot for the composer and never inlines the markdown source', () => {
     const out = html.postHtml(post({ body: 'a </textarea><script>x</script>' }), 'comment', true);
-    node_assert_1.default.ok(out.includes('a &lt;/textarea&gt;&lt;script&gt;x&lt;/script&gt;'));
+    node_assert_1.default.ok(out.includes('class="composer-slot" data-id="IC_1"'));
     node_assert_1.default.ok(!out.includes('post-body'));
+    node_assert_1.default.ok(!out.includes('<script>'));
+    node_assert_1.default.ok(!out.includes('</textarea>'));
+    node_assert_1.default.ok(!out.includes('a &lt;/textarea&gt;'), 'the source is set as a value by the composer, not written into markup');
     node_assert_1.default.ok(out.includes('data-act="save-edit"'));
+    node_assert_1.default.ok(out.includes('data-act="cancel-edit"'));
 });
 (0, node_test_1.default)('reactionPickerItems offers GitHub\'s eight and checks the viewer\'s own', () => {
     const items = html.reactionPickerItems(post({ reactions: [{ content: 'HEART', count: 1, viewerHasReacted: true }] }));

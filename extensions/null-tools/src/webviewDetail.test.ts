@@ -111,11 +111,15 @@ test('postHtml folds minimized comments and shows only reactions someone used', 
   assert.ok(!reacted.includes('👀'));
 });
 
-test('postHtml in edit mode shows the escaped markdown source instead of the rendered body', () => {
+test('postHtml in edit mode leaves a slot for the composer and never inlines the markdown source', () => {
   const out = html.postHtml(post({ body: 'a </textarea><script>x</script>' }), 'comment', true);
-  assert.ok(out.includes('a &lt;/textarea&gt;&lt;script&gt;x&lt;/script&gt;'));
+  assert.ok(out.includes('class="composer-slot" data-id="IC_1"'));
   assert.ok(!out.includes('post-body'));
+  assert.ok(!out.includes('<script>'));
+  assert.ok(!out.includes('</textarea>'));
+  assert.ok(!out.includes('a &lt;/textarea&gt;'), 'the source is set as a value by the composer, not written into markup');
   assert.ok(out.includes('data-act="save-edit"'));
+  assert.ok(out.includes('data-act="cancel-edit"'));
 });
 
 test('reactionPickerItems offers GitHub\'s eight and checks the viewer\'s own', () => {

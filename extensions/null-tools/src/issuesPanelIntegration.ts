@@ -3,6 +3,7 @@
 import * as vscode from 'vscode';
 import { IssuesStore } from './github/issuesStore';
 import { IssuesViewProvider } from './issuesPanel';
+import { IssueDetailPanel } from './issueDetailPanel';
 import { getWorkspaceGithubRepo } from './github/githubRemote';
 import { getGithubSession } from './github/githubAuth';
 import { fetchIssues } from './github/githubApi';
@@ -11,6 +12,7 @@ import { GithubIssue } from './github/types';
 export function registerIssuesPanelFeature(context: vscode.ExtensionContext): void {
   const store = new IssuesStore(() => vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? null);
   const provider = new IssuesViewProvider(context.extensionUri, store, context.globalState);
+  IssueDetailPanel.configure(context.workspaceState);
 
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider('null.issuesView', provider, {

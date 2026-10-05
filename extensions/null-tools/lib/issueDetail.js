@@ -342,15 +342,15 @@ function reactionPickerItems(post) {
 }
 /**
  * One post: the issue body (`kind: 'body'`) or a comment. A moderator-collapsed comment is folded in a
- * <details>. `editing` swaps the rendered body for a plain textarea (the Phase 4 composer replaces it).
+ * <details>. `editing` swaps the rendered body for an empty slot that issueDetail.ts fills with a composer.
  */
 function postHtml(post, kind, editing) {
     const id = escapeHtml(post.id);
     const edited = post.lastEditedAt
         ? ` <span class="post-edited" title="${escapeHtml(new Date(post.lastEditedAt).toLocaleString())}">· edited</span>` : '';
     const content = editing
-        ? `<div class="edit-form post-edit">
-         <textarea class="post-edit-input" data-id="${id}" aria-label="Edit ${kind === 'body' ? 'description' : 'comment'}">${escapeHtml(post.body)}</textarea>
+        ? `<div class="post-edit">
+         <div class="composer-slot" data-id="${id}"></div>
          <div class="btn-row">
            <button type="button" class="btn btn-primary" data-act="save-edit" data-id="${id}">Update ${kind === 'body' ? 'description' : 'comment'}</button>
            <button type="button" class="btn btn-secondary" data-act="cancel-edit">Cancel</button>
@@ -1018,6 +1018,13 @@ function renderCreateForm(root, data, post) {
     let hasMoreTimeline = false;
     /** Id of the post whose edit form is open (the issue's own id for the body). */
     let editingId = null;
+    /** What the open edit form holds. The timeline is rebuilt around the form on every render, so the form is re-created from this. */
+    let editDraft = '';
+    let editComposer = null;
+    let commentComposer = null;
+    /** Unsent new-comment text queued for the host, and the timer that sends it. */
+    let pendingDraft = null;
+    let draftTimer;
     let editingTitle = false;
     let commentBusy = false;
     /** Writes the host hasn't answered yet. While any are in flight, a refresh must not overwrite the optimistic state. */
@@ -1032,6 +1039,36 @@ function renderCreateForm(root, data, post) {
     const $ = (id) => document.getElementById(id);
     const clone = (value) => JSON.parse(JSON.stringify(value));
     const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+    const mentionUsers = () => { var _a, _b; return [...((_a = metadata === null || metadata === void 0 ? void 0 : metadata.assignees) !== null && _a !== void 0 ? _a : []), ...((_b = detail === null || detail === void 0 ? void 0 : detail.participants) !== null && _b !== void 0 ? _b : [])]; };
+    /** The unsent comment text is stored by the host 500 ms after the last keystroke, so it survives switching issues and closing the tab. */
+    function saveDraftSoon(number, body) {
+        pendingDraft = { number, body };
+        clearTimeout(draftTimer);
+        draftTimer = setTimeout(flushDraft, 500);
+    }
+    /** Sends a queued draft now. It carries the issue number it was typed for, so a late flush can't land under another issue. */
+    function flushDraft() {
+        clearTimeout(draftTimer);
+        if (pendingDraft)
+            post(Object.assign({ type: 'saveDraft' }, pendingDraft));
+        pendingDraft = null;
+    }
+    function dropDraft() {
+        clearTimeout(draftTimer);
+        pendingDraft = null;
+    }
+    document.addEventListener('visibilitychange', flushDraft);
+    function startEditing(target) {
+        editingId = target.id;
+        editDraft = target.body;
+        renderTimeline();
+        editComposer === null || editComposer === void 0 ? void 0 : editComposer.focus();
+    }
+    function stopEditing() {
+        editingId = null;
+        editDraft = '';
+        editComposer = null;
+    }
     function toast(message) {
         toastEl.textContent = message;
         toastEl.classList.remove('hidden');
@@ -1095,9 +1132,8 @@ function renderCreateForm(root, data, post) {
         if (!detail)
             return;
         const d = detail;
-        // An open edit form is rebuilt with the rest, so carry what was typed across.
-        const typing = root.querySelector('.post-edit-input');
-        const draft = typing ? typing.value : null;
+        // The timeline is rebuilt below; if the user was typing in the edit form, put the caret back afterwards.
+        const refocus = editComposer !== null && editComposer.el.contains(document.activeElement);
         const parts = [postHtml(prepared(d.post), 'body', editingId === d.post.id), subIssuesHtml(d)];
         for (const item of d.timeline) {
             parts.push(item.kind === 'comment' ? postHtml(prepared(item), 'comment', editingId === item.id) : eventHtml(item));
@@ -1105,9 +1141,9 @@ function renderCreateForm(root, data, post) {
         if (hasMoreTimeline)
             parts.push('<button type="button" class="btn btn-ghost load-more" data-act="load-more">Load more</button>');
         $('timeline').innerHTML = parts.join('');
-        const again = root.querySelector('.post-edit-input');
-        if (again && draft !== null)
-            again.value = draft;
+        mountEditComposer();
+        if (refocus)
+            editComposer === null || editComposer === void 0 ? void 0 : editComposer.focus();
         // GitHub's rendered task items are disabled checkboxes; make them live for people who can edit the body.
         $('timeline').querySelectorAll('.post[data-kind="body"] .post-body input[type=checkbox]')
             .forEach((box, index) => {
@@ -1119,16 +1155,37 @@ function renderCreateForm(root, data, post) {
         });
         bindAvatarFallbacks();
     }
+    /** Puts a composer in the open edit form's slot. It is re-created on every render, from `editDraft`. */
+    function mountEditComposer() {
+        var _a, _b;
+        editComposer = null;
+        const slot = root.querySelector('.composer-slot');
+        if (!slot || editingId === null || !detail)
+            return;
+        const id = editingId;
+        editComposer = createComposer({
+            value: editDraft,
+            pristine: (_b = (_a = findPost(id)) === null || _a === void 0 ? void 0 : _a.body) !== null && _b !== void 0 ? _b : '',
+            label: id === detail.post.id ? 'Edit description' : 'Edit comment',
+            placeholder: '',
+            post,
+            users: mentionUsers,
+            onChange: v => { editDraft = v; },
+            onSubmit: () => saveEdit(id),
+            onCancel: () => { stopEditing(); renderTimeline(); },
+        });
+        slot.replaceWith(editComposer.el);
+    }
     function renderAll() {
         renderHeader();
         renderSidebar();
         renderTimeline();
         updateComposer();
     }
-    function mountComposer() {
+    function mountComposer(draft) {
         $('composer').innerHTML = `
       <div class="composer-card">
-        <textarea id="comment-input" placeholder="Leave a comment" aria-label="Comment"></textarea>
+        <div id="comment-slot"></div>
         <div class="composer-actions">
           <span class="split">
             <button type="button" class="btn btn-ghost" id="close-main" data-act="close-main"></button>
@@ -1137,22 +1194,23 @@ function renderCreateForm(root, data, post) {
           <button type="button" class="btn btn-primary" id="comment-btn" data-act="comment">Comment</button>
         </div>
       </div>`;
-        const input = $('comment-input');
-        input.addEventListener('input', updateComposer);
-        input.addEventListener('keydown', e => {
-            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                e.preventDefault();
-                submitComment();
-            }
+        commentComposer = createComposer({
+            value: draft,
+            label: 'Comment',
+            placeholder: 'Leave a comment',
+            post,
+            users: mentionUsers,
+            onChange: v => { updateComposer(); saveDraftSoon(composerFor, v); },
+            onSubmit: () => submitComment(),
         });
+        $('comment-slot').replaceWith(commentComposer.el);
         commentBusy = false;
     }
     /** Close/Reopen wording follows the issue's state and whether a comment is typed, like github.com. */
     function updateComposer() {
-        const input = document.getElementById('comment-input');
-        if (!input || !detail)
+        if (!commentComposer || !detail)
             return;
-        const hasText = input.value.trim().length > 0;
+        const hasText = commentComposer.getValue().trim().length > 0;
         const closed = detail.issue.state === 'closed';
         $('close-main').textContent = closed ? (hasText ? 'Reopen with comment' : 'Reopen issue') : (hasText ? 'Close with comment' : 'Close issue');
         $('close-caret').classList.toggle('hidden', closed);
@@ -1178,8 +1236,7 @@ function renderCreateForm(root, data, post) {
         });
     }
     function submitComment(then) {
-        const input = $('comment-input');
-        const body = input.value.trim();
+        const body = commentComposer ? commentComposer.getValue().trim() : '';
         if (commentBusy || (!body && !then))
             return;
         if (then)
@@ -1191,6 +1248,25 @@ function renderCreateForm(root, data, post) {
         commentBusy = true;
         updateComposer();
         post({ type: 'postComment', body, then });
+    }
+    function saveEdit(id) {
+        var _a;
+        if (!editComposer || ((_a = root.querySelector('[data-act="save-edit"]')) === null || _a === void 0 ? void 0 : _a.disabled))
+            return;
+        const body = editComposer.getValue();
+        const isBody = (detail === null || detail === void 0 ? void 0 : detail.post.id) === id;
+        if (!isBody && !body.trim()) {
+            toast('A comment can\'t be empty.');
+            return;
+        }
+        if (isBody)
+            beginWrite(() => undefined); // re-renders the form, so the button is looked up afterwards
+        const button = root.querySelector('[data-act="save-edit"]');
+        if (button) {
+            button.disabled = true;
+            button.textContent = 'Saving…';
+        }
+        post({ type: 'editPost', kind: isBody ? 'body' : 'comment', id, body });
     }
     /** The target a Close / Reopen click means for the issue's current state. */
     const closeTarget = () => ((detail === null || detail === void 0 ? void 0 : detail.issue.state) === 'closed' ? 'reopen' : 'completed');
@@ -1311,15 +1387,10 @@ function renderCreateForm(root, data, post) {
         });
     }
     function quoteReply(target) {
-        const input = $('comment-input');
         const postEl = root.querySelector(`.post[data-id="${CSS.escape(target.id)}"]`);
         const selection = window.getSelection();
         const selected = selection && postEl && postEl.contains(selection.anchorNode) ? selection.toString().trim() : '';
-        const quote = (selected || target.body.trim()).split('\n').map(line => `> ${line}`).join('\n');
-        input.value = `${input.value ? `${input.value.replace(/\s+$/, '')}\n\n` : ''}${quote}\n\n`;
-        input.focus();
-        input.setSelectionRange(input.value.length, input.value.length);
-        updateComposer();
+        commentComposer === null || commentComposer === void 0 ? void 0 : commentComposer.insertBlock(quoteMarkdown(selected || target.body));
     }
     function postMenu(anchor, id) {
         const target = findPost(id);
@@ -1334,16 +1405,12 @@ function renderCreateForm(root, data, post) {
         openPicker({
             anchor, title: 'Actions', items, filterable: false,
             onSelect: action => {
-                var _a;
                 if (action === 'link')
                     post({ type: 'copyText', text: target.url });
                 else if (action === 'quote')
                     quoteReply(target);
-                else if (action === 'edit') {
-                    editingId = target.id;
-                    renderTimeline();
-                    (_a = root.querySelector('.post-edit-input')) === null || _a === void 0 ? void 0 : _a.focus();
-                }
+                else if (action === 'edit')
+                    startEditing(target);
                 else if (action === 'delete')
                     post({ type: 'deletePost', id: target.id });
             },
@@ -1413,7 +1480,7 @@ function renderCreateForm(root, data, post) {
     }
     // ---- events -------------------------------------------------------------------------------------------------
     function handleAction(act, el, e) {
-        var _a, _b, _c, _d, _e, _f;
+        var _a, _b, _c, _d, _e;
         const id = (_a = el.dataset.id) !== null && _a !== void 0 ? _a : '';
         const newTab = e.ctrlKey || e.metaKey || e.button === 1;
         switch (act) {
@@ -1452,18 +1519,11 @@ function renderCreateForm(root, data, post) {
             case 'post-menu':
                 postMenu(el, id);
                 break;
-            case 'save-edit': {
-                const body = ((_d = el.closest('.post')) === null || _d === void 0 ? void 0 : _d.querySelector('.post-edit-input')).value;
-                const isBody = (detail === null || detail === void 0 ? void 0 : detail.post.id) === id;
-                if (isBody)
-                    beginWrite(() => undefined);
-                el.disabled = true;
-                el.textContent = 'Saving…';
-                post({ type: 'editPost', kind: isBody ? 'body' : 'comment', id, body });
+            case 'save-edit':
+                saveEdit(id);
                 break;
-            }
             case 'cancel-edit':
-                editingId = null;
+                stopEditing();
                 renderTimeline();
                 break;
             case 'open-issue':
@@ -1493,7 +1553,7 @@ function renderCreateForm(root, data, post) {
                 break;
             case 'assign-me':
                 if (viewer) {
-                    const me = (_f = ((_e = metadata === null || metadata === void 0 ? void 0 : metadata.assignees) !== null && _e !== void 0 ? _e : []).find(a => a.login === viewer)) !== null && _f !== void 0 ? _f : { login: viewer, avatar_url: '' };
+                    const me = (_e = ((_d = metadata === null || metadata === void 0 ? void 0 : metadata.assignees) !== null && _d !== void 0 ? _d : []).find(a => a.login === viewer)) !== null && _e !== void 0 ? _e : { login: viewer, avatar_url: '' };
                     beginWrite(d => { d.issue.assignees = [me]; });
                     post({ type: 'setAssignees', logins: [viewer] });
                 }
@@ -1559,7 +1619,7 @@ function renderCreateForm(root, data, post) {
             onClick(e);
     });
     window.addEventListener('message', event => {
-        var _a;
+        var _a, _b;
         const msg = event.data;
         switch (msg.type) {
             case 'detail': {
@@ -1582,13 +1642,14 @@ function renderCreateForm(root, data, post) {
                 if (!pageMounted)
                     mountPage();
                 if (composerFor !== msg.detail.issue.number) {
+                    flushDraft(); // whatever was typed for the previous issue belongs to it
                     composerFor = msg.detail.issue.number;
-                    editingId = null;
+                    stopEditing();
                     editingTitle = false;
-                    mountComposer();
+                    mountComposer((_a = msg.draft) !== null && _a !== void 0 ? _a : '');
                 }
                 if (msg.afterWrite) {
-                    editingId = null;
+                    stopEditing();
                     editingTitle = false;
                 }
                 renderAll();
@@ -1614,12 +1675,12 @@ function renderCreateForm(root, data, post) {
                 if (!findPost(item.id))
                     detail.timeline.push(Object.assign({ kind: 'comment' }, item));
                 detail.issue.comments++;
-                $('comment-input').value = '';
+                commentComposer === null || commentComposer === void 0 ? void 0 : commentComposer.setValue('');
                 commentBusy = false;
                 renderHeader();
                 renderTimeline();
                 updateComposer();
-                (_a = $('timeline').lastElementChild) === null || _a === void 0 ? void 0 : _a.scrollIntoView({ block: 'nearest' });
+                (_b = $('timeline').lastElementChild) === null || _b === void 0 ? void 0 : _b.scrollIntoView({ block: 'nearest' });
                 break;
             }
             case 'postUpdated': {
@@ -1627,7 +1688,7 @@ function renderCreateForm(root, data, post) {
                 const at = detail ? detail.timeline.findIndex(i => i.kind === 'comment' && i.id === item.id) : -1;
                 if (detail && at >= 0)
                     detail.timeline[at] = Object.assign({ kind: 'comment' }, item);
-                editingId = null;
+                stopEditing();
                 renderTimeline();
                 break;
             }
@@ -1647,6 +1708,10 @@ function renderCreateForm(root, data, post) {
                 }
                 break;
             }
+            case 'previewResult':
+            case 'suggestions':
+                composerReceive(msg);
+                break;
             case 'candidates':
                 candidatePicker(msg.items);
                 break;
@@ -1657,7 +1722,7 @@ function renderCreateForm(root, data, post) {
                 if (msg.what === 'write' && pending === 0 && rollback) {
                     detail = rollback;
                     rollback = null;
-                    editingId = null;
+                    stopEditing();
                     renderAll();
                 }
                 if (msg.what === 'write' || msg.what === 'comment') {
