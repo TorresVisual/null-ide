@@ -35,6 +35,13 @@ const OCTICON_PATHS = {
     'issue-reopened': "<path d=\"M5.029 2.217a6.5 6.5 0 0 1 9.437 5.11.75.75 0 1 0 1.492-.154 8 8 0 0 0-14.315-4.03L.427 1.927A.25.25 0 0 0 0 2.104V5.75A.25.25 0 0 0 .25 6h3.646a.25.25 0 0 0 .177-.427L2.715 4.215a6.491 6.491 0 0 1 2.314-1.998ZM1.262 8.169a.75.75 0 0 0-1.22.658 8.001 8.001 0 0 0 14.315 4.03l1.216 1.216a.25.25 0 0 0 .427-.177V10.25a.25.25 0 0 0-.25-.25h-3.646a.25.25 0 0 0-.177.427l1.358 1.358a6.501 6.501 0 0 1-11.751-3.11.75.75 0 0 0-.272-.506Z\"></path><path d=\"M9.06 9.06a1.5 1.5 0 1 1-2.12-2.12 1.5 1.5 0 0 1 2.12 2.12Z\"></path>",
     'cross-reference': "<path d=\"M2.75 3.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h2a.75.75 0 0 1 .75.75v2.19l2.72-2.72a.749.749 0 0 1 .53-.22h4.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 13H9.06l-2.573 2.573A1.458 1.458 0 0 1 4 14.543V13H2.75A1.75 1.75 0 0 1 1 11.25v-7.5C1 2.784 1.784 2 2.75 2h5.5a.75.75 0 0 1 0 1.5ZM16 1.25v4.146a.25.25 0 0 1-.427.177L14.03 4.03l-3.75 3.75a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734l3.75-3.75-1.543-1.543A.25.25 0 0 1 11.604 1h4.146a.25.25 0 0 1 .25.25Z\"></path>",
     'image': "<path d=\"M16 13.25A1.75 1.75 0 0 1 14.25 15H1.75A1.75 1.75 0 0 1 0 13.25V2.75C0 1.784.784 1 1.75 1h12.5c.966 0 1.75.784 1.75 1.75ZM1.75 2.5a.25.25 0 0 0-.25.25v10.5c0 .138.112.25.25.25h.94l.03-.03 6.077-6.078a1.75 1.75 0 0 1 2.412-.06L14.5 10.31V2.75a.25.25 0 0 0-.25-.25Zm12.5 11a.25.25 0 0 0 .25-.25v-.917l-4.298-3.889a.25.25 0 0 0-.344.009L4.81 13.5ZM7 6a2 2 0 1 1-3.999.001A2 2 0 0 1 7 6ZM5.5 6a.5.5 0 1 0-1 0 .5.5 0 0 0 1 0Z\"></path>",
+    'heading': "<path d=\"M3.75 2a.75.75 0 0 1 .75.75V7h7V2.75a.75.75 0 0 1 1.5 0v10.5a.75.75 0 0 1-1.5 0V8.5h-7v4.75a.75.75 0 0 1-1.5 0V2.75A.75.75 0 0 1 3.75 2Z\"></path>",
+    'bold': "<path d=\"M4 2h4.5a3.501 3.501 0 0 1 2.852 5.53A3.499 3.499 0 0 1 9.5 14H4a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Zm1 7v3h4.5a1.5 1.5 0 0 0 0-3Zm3.5-2a1.5 1.5 0 0 0 0-3H5v3Z\"></path>",
+    'italic': "<path d=\"M6 2.75A.75.75 0 0 1 6.75 2h6.5a.75.75 0 0 1 0 1.5h-2.505l-3.858 9H9.25a.75.75 0 0 1 0 1.5h-6.5a.75.75 0 0 1 0-1.5h2.505l3.858-9H6.75A.75.75 0 0 1 6 2.75Z\"></path>",
+    'code': "<path d=\"m11.28 3.22 4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734L13.94 8l-3.72-3.72a.749.749 0 0 1 .326-1.275.749.749 0 0 1 .734.215Zm-6.56 0a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042L2.06 8l3.72 3.72a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L.47 8.53a.75.75 0 0 1 0-1.06Z\"></path>",
+    'list-unordered': "<path d=\"M5.75 2.5h8.5a.75.75 0 0 1 0 1.5h-8.5a.75.75 0 0 1 0-1.5Zm0 5h8.5a.75.75 0 0 1 0 1.5h-8.5a.75.75 0 0 1 0-1.5Zm0 5h8.5a.75.75 0 0 1 0 1.5h-8.5a.75.75 0 0 1 0-1.5ZM2 14a1 1 0 1 1 0-2 1 1 0 0 1 0 2Zm1-6a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM2 4a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z\"></path>",
+    'list-ordered': "<path d=\"M5 3.25a.75.75 0 0 1 .75-.75h8.5a.75.75 0 0 1 0 1.5h-8.5A.75.75 0 0 1 5 3.25Zm0 5a.75.75 0 0 1 .75-.75h8.5a.75.75 0 0 1 0 1.5h-8.5A.75.75 0 0 1 5 8.25Zm0 5a.75.75 0 0 1 .75-.75h8.5a.75.75 0 0 1 0 1.5h-8.5a.75.75 0 0 1-.75-.75ZM.924 10.32a.5.5 0 0 1-.851-.525l.001-.001.001-.002.002-.004.007-.011c.097-.144.215-.273.348-.384.228-.19.588-.392 1.068-.392.468 0 .858.181 1.126.484.259.294.377.673.377 1.038 0 .987-.686 1.495-1.156 1.845l-.047.035c-.303.225-.522.4-.654.597h1.357a.5.5 0 0 1 0 1H.5a.5.5 0 0 1-.5-.5c0-1.005.692-1.52 1.167-1.875l.035-.025c.531-.396.8-.625.8-1.078a.57.57 0 0 0-.128-.376C1.806 10.068 1.695 10 1.5 10a.658.658 0 0 0-.429.163.835.835 0 0 0-.144.153ZM2.003 2.5V6h.503a.5.5 0 0 1 0 1H.5a.5.5 0 0 1 0-1h.503V3.308l-.28.14a.5.5 0 0 1-.446-.895l1.003-.5a.5.5 0 0 1 .723.447Z\"></path>",
+    'tasklist': "<path d=\"M2 2h4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Zm4.655 8.595a.75.75 0 0 1 0 1.06L4.03 14.28a.75.75 0 0 1-1.06 0l-1.5-1.5a.749.749 0 0 1 .326-1.275.749.749 0 0 1 .734.215l.97.97 2.095-2.095a.75.75 0 0 1 1.06 0ZM9.75 2.5h5.5a.75.75 0 0 1 0 1.5h-5.5a.75.75 0 0 1 0-1.5Zm0 5h5.5a.75.75 0 0 1 0 1.5h-5.5a.75.75 0 0 1 0-1.5Zm0 5h5.5a.75.75 0 0 1 0 1.5h-5.5a.75.75 0 0 1 0-1.5Zm-7.25-9v3h3v-3Z\"></path>",
 };
 /** Inline 16px Primer octicon; takes its color from CSS via fill="currentColor". */
 function octicon(name, className = '') {
@@ -584,6 +591,286 @@ function userSuggestion(u) {
 }
 function issueSuggestion(i) {
     return { insert: `#${i.number}`, html: `${issueStateIcon(i.state, null)} <b>#${i.number}</b> ${escapeHtml(i.title)}` };
+}
+/** Host answers the composers are still waiting for (preview, `#` suggestions), by request id. */
+const composerWaiting = new Map();
+let composerSeq = 0;
+/** Routes the host's `previewResult` / `suggestions` to whichever composer asked. Unknown or already-answered ids are ignored. */
+function composerReceive(msg) {
+    const waiting = msg.requestId === undefined ? undefined : composerWaiting.get(msg.requestId);
+    if (!waiting)
+        return;
+    composerWaiting.delete(msg.requestId);
+    waiting(msg);
+}
+const COMPOSER_MIRRORED = [
+    'box-sizing', 'width', 'font-family', 'font-size', 'font-weight', 'line-height', 'letter-spacing', 'tab-size',
+    'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
+    'border-top-width', 'border-right-width', 'border-bottom-width', 'border-left-width',
+];
+/** Where the caret at `index` is inside `ta`, measured by laying the same text out in a hidden copy of it. */
+function composerCaretOffset(ta, index) {
+    const style = getComputedStyle(ta);
+    const mirror = document.createElement('div');
+    for (const prop of COMPOSER_MIRRORED)
+        mirror.style.setProperty(prop, style.getPropertyValue(prop));
+    mirror.style.position = 'absolute';
+    mirror.style.visibility = 'hidden';
+    mirror.style.whiteSpace = 'pre-wrap';
+    mirror.style.overflowWrap = 'break-word';
+    mirror.textContent = ta.value.slice(0, index);
+    const marker = document.createElement('span');
+    marker.textContent = '​';
+    mirror.appendChild(marker);
+    document.body.appendChild(mirror);
+    const at = { left: marker.offsetLeft - ta.scrollLeft, top: marker.offsetTop - ta.scrollTop, height: marker.offsetHeight };
+    mirror.remove();
+    return at;
+}
+function createComposer(opts) {
+    const el = document.createElement('div');
+    el.className = 'composer';
+    el.innerHTML = `
+    <div class="composer-head">
+      <div class="composer-tabs" role="tablist">
+        <button type="button" class="composer-tab active" role="tab" aria-selected="true" data-tab="write">Write</button>
+        <button type="button" class="composer-tab" role="tab" aria-selected="false" data-tab="preview">Preview</button>
+      </div>
+      <div class="composer-tools">${COMPOSER_TOOLS.map(t => `<button type="button" class="icon-btn" data-tool="${t.id}" title="${t.title}" aria-label="${t.title}">${octicon(t.icon)}</button>`).join('')}</div>
+    </div>
+    <textarea class="composer-input" spellcheck="true"></textarea>
+    <div class="composer-preview post-body hidden"></div>
+    <div class="composer-hint hidden" role="status"></div>
+    <div class="composer-suggest hidden" role="listbox"></div>`;
+    const ta = el.querySelector('.composer-input');
+    const preview = el.querySelector('.composer-preview');
+    const hint = el.querySelector('.composer-hint');
+    const popup = el.querySelector('.composer-suggest');
+    const tools = el.querySelector('.composer-tools');
+    ta.value = opts.value;
+    ta.placeholder = opts.placeholder;
+    ta.setAttribute('aria-label', opts.label);
+    let mode = 'write';
+    let previewedText = null;
+    let previewSeq = 0;
+    let armedDiscard = false;
+    let suggestions = [];
+    let active = 0;
+    let trigger = null;
+    let suggestSeq = 0;
+    let suggestTimer;
+    const changed = () => {
+        var _a;
+        armedDiscard = false;
+        hint.classList.add('hidden');
+        (_a = opts.onChange) === null || _a === void 0 ? void 0 : _a.call(opts, ta.value);
+    };
+    // ---- text edits ---------------------------------------------------------------------------------------------
+    /** Replaces the whole text through the browser's edit command so Ctrl+Z still works; plain assignment would wipe the undo stack. */
+    function replaceAll(edit) {
+        const scroll = ta.scrollTop;
+        ta.focus();
+        ta.select();
+        if (!edit.value || !document.execCommand('insertText', false, edit.value))
+            ta.value = edit.value;
+        ta.setSelectionRange(edit.start, edit.end);
+        ta.scrollTop = scroll;
+        closeSuggest(); // the input event the edit command fires may have opened the popup for the old caret
+        changed();
+    }
+    function runTool(id) {
+        if (mode !== 'write')
+            return;
+        const edit = applyTool(id, ta.value, ta.selectionStart, ta.selectionEnd);
+        if (edit)
+            replaceAll(edit);
+    }
+    // ---- Write / Preview ----------------------------------------------------------------------------------------
+    function showPreview() {
+        const text = ta.value;
+        previewedText = null;
+        if (!text.trim()) {
+            preview.innerHTML = '<span class="muted">Nothing to preview</span>';
+            return;
+        }
+        preview.innerHTML = '<span class="muted">Loading preview…</span>';
+        const id = ++composerSeq;
+        previewSeq = id;
+        composerWaiting.set(id, msg => {
+            // The user may have gone back to Write, or asked for a newer preview, while this was in flight.
+            if (mode !== 'preview' || previewSeq !== id)
+                return;
+            if (msg.error) {
+                preview.innerHTML = `<span class="field-error">${escapeHtml(msg.error)}</span>`;
+                return;
+            }
+            preview.innerHTML = DOMPurify.sanitize(neutralizeImagesHtml(msg.html));
+            previewedText = text;
+        });
+        opts.post({ type: 'preview', requestId: id, text });
+    }
+    function setMode(next) {
+        mode = next;
+        closeSuggest();
+        el.querySelectorAll('.composer-tab').forEach(tab => {
+            const on = tab.dataset.tab === next;
+            tab.classList.toggle('active', on);
+            tab.setAttribute('aria-selected', String(on));
+        });
+        ta.classList.toggle('hidden', next === 'preview');
+        tools.classList.toggle('hidden', next === 'preview');
+        preview.classList.toggle('hidden', next === 'write');
+        if (next === 'write')
+            ta.focus();
+        else if (previewedText !== ta.value)
+            showPreview();
+    }
+    // ---- @ and # autocomplete -----------------------------------------------------------------------------------
+    function closeSuggest() {
+        clearTimeout(suggestTimer);
+        suggestSeq++; // any answer still on its way is now stale
+        suggestions = [];
+        trigger = null;
+        popup.classList.add('hidden');
+    }
+    function renderSuggest() {
+        if (suggestions.length === 0) {
+            popup.classList.add('hidden');
+            return;
+        }
+        popup.innerHTML = suggestions.map((s, i) => `<button type="button" class="composer-suggest-item${i === active ? ' active' : ''}" role="option" data-index="${i}">${s.html}</button>`).join('');
+        popup.classList.remove('hidden');
+        const at = composerCaretOffset(ta, ta.selectionStart);
+        popup.style.left = `${Math.max(0, Math.min(ta.offsetLeft + at.left, el.clientWidth - popup.offsetWidth - 4))}px`;
+        popup.style.top = `${ta.offsetTop + at.top + at.height + 2}px`;
+    }
+    function updateSuggest() {
+        const t = ta.selectionStart === ta.selectionEnd ? activeTrigger(ta.value, ta.selectionStart) : null;
+        if (!t) {
+            closeSuggest();
+            return;
+        }
+        trigger = t;
+        clearTimeout(suggestTimer);
+        const id = ++suggestSeq;
+        if (t.trigger === '@') {
+            suggestions = matchUsers(opts.users(), t.prefix).map(userSuggestion);
+            active = 0;
+            renderSuggest();
+            return;
+        }
+        suggestTimer = setTimeout(() => {
+            const request = ++composerSeq;
+            composerWaiting.set(request, msg => {
+                if (id !== suggestSeq || !trigger)
+                    return; // typed on, moved the caret, or closed the popup
+                suggestions = msg.items.map(issueSuggestion);
+                active = 0;
+                renderSuggest();
+            });
+            opts.post({ type: 'suggest', requestId: request, prefix: t.prefix });
+        }, 150);
+    }
+    function accept(index) {
+        const s = suggestions[index];
+        if (!s || !trigger)
+            return;
+        replaceAll(applySuggestion(ta.value, trigger.start, ta.selectionStart, s.insert));
+    }
+    // ---- events -------------------------------------------------------------------------------------------------
+    ta.addEventListener('input', () => {
+        changed();
+        updateSuggest();
+    });
+    ta.addEventListener('click', updateSuggest);
+    ta.addEventListener('blur', closeSuggest);
+    ta.addEventListener('keydown', e => {
+        var _a, _b;
+        if (e.isComposing)
+            return; // an input method is still choosing characters
+        const open = !popup.classList.contains('hidden');
+        const mod = e.ctrlKey || e.metaKey;
+        if (open && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+            e.preventDefault();
+            active = (active + (e.key === 'ArrowDown' ? 1 : suggestions.length - 1)) % suggestions.length;
+            renderSuggest();
+            return;
+        }
+        if (open && (e.key === 'Enter' || e.key === 'Tab') && !mod) {
+            e.preventDefault();
+            accept(active);
+            return;
+        }
+        if (open && e.key === 'Escape') {
+            e.preventDefault();
+            e.stopPropagation();
+            closeSuggest();
+            return;
+        }
+        if (mod && e.key === 'Enter') {
+            e.preventDefault();
+            (_a = opts.onSubmit) === null || _a === void 0 ? void 0 : _a.call(opts);
+            return;
+        }
+        if (mod && !e.altKey && !e.shiftKey) {
+            const tool = COMPOSER_TOOLS.find(t => t.key === e.key.toLowerCase());
+            if (tool) {
+                e.preventDefault();
+                runTool(tool.id);
+                return;
+            }
+        }
+        if (e.key === 'Escape' && opts.onCancel) {
+            e.preventDefault();
+            if (ta.value !== ((_b = opts.pristine) !== null && _b !== void 0 ? _b : opts.value) && !armedDiscard) {
+                armedDiscard = true;
+                hint.textContent = 'Press Esc again to discard your changes.';
+                hint.classList.remove('hidden');
+            }
+            else {
+                opts.onCancel();
+            }
+        }
+    });
+    el.addEventListener('click', e => {
+        const target = e.target;
+        const tab = target.closest('[data-tab]');
+        if (tab) {
+            setMode(tab.dataset.tab);
+            return;
+        }
+        const tool = target.closest('[data-tool]');
+        if (tool)
+            runTool(tool.dataset.tool);
+    });
+    // mousedown, not click, and preventDefault: the textarea keeps focus, so the blur handler doesn't close the popup first.
+    popup.addEventListener('mousedown', e => {
+        e.preventDefault();
+        const item = e.target.closest('.composer-suggest-item');
+        if (item)
+            accept(Number(item.dataset.index));
+    });
+    return {
+        el,
+        getValue: () => ta.value,
+        setValue(value) {
+            if (mode === 'preview')
+                setMode('write');
+            replaceAll({ value, start: value.length, end: value.length });
+        },
+        insertBlock(block) {
+            if (mode === 'preview')
+                setMode('write');
+            const base = ta.value.replace(/\s+$/, '');
+            const value = `${base ? `${base}\n\n` : ''}${block}\n\n`;
+            replaceAll({ value, start: value.length, end: value.length });
+            ta.scrollTop = ta.scrollHeight;
+        },
+        focus() {
+            ta.focus();
+            ta.setSelectionRange(ta.value.length, ta.value.length);
+        },
+    };
 }
 /** Closes the form's open dropdowns. Set while the form is on screen. */
 let closeCreateDropdowns = null;

@@ -14,6 +14,7 @@ const NAMES = [
   'search', 'x', 'plus', 'sync',
   'git-merge', 'git-pull-request-closed', 'git-pull-request-draft', 'gear', 'smiley', 'pencil', 'trash', 'quote',
   'link', 'tag', 'person', 'git-commit', 'issue-reopened', 'cross-reference', 'image',
+  'heading', 'bold', 'italic', 'code', 'list-unordered', 'list-ordered', 'tasklist',
 ];
 
 const pkgDir = process.argv[2];
