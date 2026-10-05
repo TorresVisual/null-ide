@@ -147,6 +147,7 @@ function createComposer(opts: ComposerOptions): Composer {
         return;
       }
       preview.innerHTML = DOMPurify.sanitize(neutralizeImagesHtml(msg.html));
+      resolveImagesIn(preview, opts.post);
       previewedText = text;
     });
     opts.post({ type: 'preview', requestId: id, text });

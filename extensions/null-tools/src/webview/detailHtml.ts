@@ -30,7 +30,8 @@ function roleBadgeHtml(association: string | null): string {
 /**
  * GitHub's image URLs need a token the webview doesn't have, and its CSP only allows avatars, so an <img> in
  * rendered markdown would be a broken icon. Emoji become their text; any other image becomes a labelled
- * placeholder that opens the image externally. (Phase 5 swaps this for real thumbnails.)
+ * placeholder that opens the image externally. imageResolve.ts swaps each placeholder for a real thumbnail once
+ * the host has downloaded the file; `data-src` is the original URL, `data-alt` the (escaped) alt text.
  */
 function neutralizeImagesHtml(html: string): string {
   return html.replace(/<img\b(?:[^>"']|"[^"]*"|'[^']*')*>/gi, tag => {
@@ -38,7 +39,7 @@ function neutralizeImagesHtml(html: string): string {
     // Attribute values may hold a raw < or > (only quotes are escaped inside them); this text lands in markup.
     const alt = attr('alt').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     if (/\bclass="[^"]*\bemoji\b/i.test(tag)) return alt;
-    return `<span class="img-placeholder" data-src="${attr('src')}" title="Open image on github.com">${octicon('image')} ${alt || 'image'}</span>`;
+    return `<span class="img-placeholder" data-src="${attr('src')}" data-alt="${alt}" title="Open image on github.com">${octicon('image')} ${alt || 'image'}</span>`;
   });
 }
 

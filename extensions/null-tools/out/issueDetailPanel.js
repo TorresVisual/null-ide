@@ -41,6 +41,7 @@ const gitBranch_1 = require("./github/gitBranch");
 const taskList_1 = require("./github/taskList");
 const issueTemplates_1 = require("./github/issueTemplates");
 const issueDrafts_1 = require("./github/issueDrafts");
+const imageCache_1 = require("./github/imageCache");
 const STATE_PATCHES = {
     completed: { state: 'closed', state_reason: 'completed' },
     not_planned: { state: 'closed', state_reason: 'not_planned' },
@@ -72,6 +73,7 @@ class IssueDetailPanel {
     parent = null;
     detail = null;
     loadedAt = 0;
+    disposed = false;
     static async show(extensionUri, store, issueNumber, newTab = false) {
         const existing = IssueDetailPanel.byNumber.get(issueNumber);
         if (existing) {
@@ -104,10 +106,13 @@ class IssueDetailPanel {
     constructor(extensionUri, store) {
         this.extensionUri = extensionUri;
         this.store = store;
+        const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        const cacheRoots = cwd ? [vscode.Uri.file((0, imageCache_1.issueImagesDir)(cwd))] : [];
         this.panel = vscode.window.createWebviewPanel('null-tools.issueDetail', 'Issue', vscode.ViewColumn.Active, {
             enableScripts: true,
             retainContextWhenHidden: true,
-            localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'lib')],
+            // The cache folder too: images the host downloaded are shown through asWebviewUri, which only serves these roots.
+            localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'lib'), ...cacheRoots],
         });
         this.panel.iconPath = vscode.Uri.joinPath(extensionUri, 'media', 'github-issues.svg');
         this.panel.webview.html = this._buildHtml();
@@ -117,6 +122,7 @@ class IssueDetailPanel {
                 void this._load(false);
         });
         this.panel.onDidDispose(() => {
+            this.disposed = true;
             if (IssueDetailPanel.byNumber.get(this.issueNumber) === this)
                 IssueDetailPanel.byNumber.delete(this.issueNumber);
             if (IssueDetailPanel.shared === this)
@@ -126,7 +132,8 @@ class IssueDetailPanel {
         });
     }
     _post(message) {
-        void this.panel.webview.postMessage(message);
+        if (!this.disposed)
+            void this.panel.webview.postMessage(message); // a reply can outlive its tab
     }
     async openIssue(issueNumber) {
         if (IssueDetailPanel.byNumber.get(this.issueNumber) === this)
@@ -365,6 +372,20 @@ class IssueDetailPanel {
             case 'suggest':
                 this._post({ type: 'suggestions', requestId: msg.requestId, items: await this.store.suggestIssues(msg.prefix).catch(() => []) });
                 break;
+            case 'resolveImages': {
+                // At most 50 per message and 4 downloads at a time; a failure is reported per image and never stops the rest.
+                const urls = (Array.isArray(msg.urls) ? msg.urls : []).filter((u) => typeof u === 'string').slice(0, 50);
+                await (0, imageCache_1.mapLimit)(urls, 4, async (url) => {
+                    try {
+                        const file = await this.store.resolveImage(url);
+                        this._post({ type: 'imageResolved', url, src: this.panel.webview.asWebviewUri(vscode.Uri.file(file)).toString() });
+                    }
+                    catch (err) {
+                        this._post({ type: 'imageFailed', url, message: err.message });
+                    }
+                });
+                break;
+            }
             case 'saveDraft':
                 this._writeDraft(msg.number, msg.body);
                 break;

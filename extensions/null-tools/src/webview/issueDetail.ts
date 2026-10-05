@@ -160,6 +160,7 @@ type StateTarget = 'completed' | 'not_planned' | 'reopen';
     if (hasMoreTimeline) parts.push('<button type="button" class="btn btn-ghost load-more" data-act="load-more">Load more</button>');
     $('timeline').innerHTML = parts.join('');
     mountEditComposer();
+    resolveImagesIn($('timeline'), post);
     if (refocus) editComposer?.focus();
     // GitHub's rendered task items are disabled checkboxes; make them live for people who can edit the body.
     $('timeline').querySelectorAll<HTMLInputElement>('.post[data-kind="body"] .post-body input[type=checkbox]')
@@ -560,6 +561,7 @@ type StateTarget = 'completed' | 'not_planned' | 'reopen';
     switch (msg.type) {
       case 'detail': {
         createForm = null;
+        if (!msg.afterWrite) retryFailedImages();
         if (!detail || detail.issue.number !== msg.detail.issue.number) {
           // A different issue (this tab was reused, or the create form just became an issue): nothing in flight applies.
           pending = 0;
@@ -639,6 +641,8 @@ type StateTarget = 'completed' | 'not_planned' | 'reopen';
       case 'suggestions':
         composerReceive(msg);
         break;
+      case 'imageResolved': imageResolved(msg.url, msg.src); break;
+      case 'imageFailed': imageFailed(msg.url, msg.message); break;
       case 'candidates':
         if (createForm) createForm.candidates(msg.items); else candidatePicker(msg.items);
         break;

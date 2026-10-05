@@ -9,6 +9,7 @@ import { createIssueBranch, getLocallyClosedIssueNumbers } from './github/gitBra
 import { toggleTaskCheckbox } from './github/taskList';
 import { loadIssueTemplates } from './github/issueTemplates';
 import { draftKey } from './github/issueDrafts';
+import { issueImagesDir, mapLimit } from './github/imageCache';
 import { GithubIssue, ReactionContent } from './github/types';
 
 /** What a close/reopen button asks for. */
@@ -48,6 +49,7 @@ type InboundMessage =
   | { type: 'preview'; requestId: number; text: string }
   | { type: 'suggest'; requestId: number; prefix: string }
   | { type: 'saveDraft'; number: number; body: string }
+  | { type: 'resolveImages'; urls: string[] }
   | { type: 'submitCreate'; title: string; body: string; labels: string[]; assignees: string[]; milestone: number | null; typeId: string | null; parent: number | null; createMore: boolean }
   | { type: 'createSubIssue' }
   | { type: 'cancelCreate' };
@@ -81,6 +83,7 @@ export class IssueDetailPanel {
   private parent: { number: number; title: string } | null = null;
   private detail: { id: string; timelineCursor: string | null } | null = null;
   private loadedAt = 0;
+  private disposed = false;
 
   static async show(extensionUri: vscode.Uri, store: IssuesStore, issueNumber: number, newTab = false): Promise<void> {
     const existing = IssueDetailPanel.byNumber.get(issueNumber);
@@ -113,10 +116,13 @@ export class IssueDetailPanel {
   }
 
   private constructor(private readonly extensionUri: vscode.Uri, private readonly store: IssuesStore) {
+    const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const cacheRoots = cwd ? [vscode.Uri.file(issueImagesDir(cwd))] : [];
     this.panel = vscode.window.createWebviewPanel('null-tools.issueDetail', 'Issue', vscode.ViewColumn.Active, {
       enableScripts: true,
       retainContextWhenHidden: true,
-      localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'lib')],
+      // The cache folder too: images the host downloaded are shown through asWebviewUri, which only serves these roots.
+      localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'lib'), ...cacheRoots],
     });
     this.panel.iconPath = vscode.Uri.joinPath(extensionUri, 'media', 'github-issues.svg');
     this.panel.webview.html = this._buildHtml();
@@ -125,6 +131,7 @@ export class IssueDetailPanel {
       if (e.webviewPanel.active && this.issueNumber && Date.now() - this.loadedAt > STALE_MS) void this._load(false);
     });
     this.panel.onDidDispose(() => {
+      this.disposed = true;
       if (IssueDetailPanel.byNumber.get(this.issueNumber) === this) IssueDetailPanel.byNumber.delete(this.issueNumber);
       if (IssueDetailPanel.shared === this) IssueDetailPanel.shared = undefined;
       if (IssueDetailPanel.creatingTab === this) IssueDetailPanel.creatingTab = undefined;
@@ -132,7 +139,7 @@ export class IssueDetailPanel {
   }
 
   private _post(message: unknown): void {
-    void this.panel.webview.postMessage(message);
+    if (!this.disposed) void this.panel.webview.postMessage(message); // a reply can outlive its tab
   }
 
   private async openIssue(issueNumber: number): Promise<void> {
@@ -359,6 +366,19 @@ export class IssueDetailPanel {
       case 'suggest':
         this._post({ type: 'suggestions', requestId: msg.requestId, items: await this.store.suggestIssues(msg.prefix).catch(() => []) });
         break;
+      case 'resolveImages': {
+        // At most 50 per message and 4 downloads at a time; a failure is reported per image and never stops the rest.
+        const urls = (Array.isArray(msg.urls) ? msg.urls : []).filter((u): u is string => typeof u === 'string').slice(0, 50);
+        await mapLimit(urls, 4, async url => {
+          try {
+            const file = await this.store.resolveImage(url);
+            this._post({ type: 'imageResolved', url, src: this.panel.webview.asWebviewUri(vscode.Uri.file(file)).toString() });
+          } catch (err) {
+            this._post({ type: 'imageFailed', url, message: (err as Error).message });
+          }
+        });
+        break;
+      }
       case 'saveDraft':
         this._writeDraft(msg.number, msg.body);
         break;

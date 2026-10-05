@@ -50,6 +50,12 @@ test('neutralizeImagesHtml does not let a raw < in alt text become markup', () =
   assert.ok(out.includes('&lt;script&gt;'));
 });
 
+test('neutralizeImagesHtml keeps the alt text, escaped, in data-alt for the thumbnail', () => {
+  const out = html.neutralizeImagesHtml('<img src="https://x/y.png" alt="a &quot;b&quot; <i>">');
+  assert.ok(out.includes('data-alt="a &quot;b&quot; &lt;i&gt;"'), out);
+  assert.ok(!out.includes('<i>'));
+});
+
 test('issueNumberFromLink recognises only issue links of this repo', () => {
   assert.strictEqual(html.issueNumberFromLink('https://github.com/O/R/issues/12', 'o/r'), 12);
   assert.strictEqual(html.issueNumberFromLink('https://github.com/o/r/issues/12#issuecomment-5', 'o/r'), 12);

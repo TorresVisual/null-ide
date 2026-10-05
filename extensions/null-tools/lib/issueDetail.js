@@ -324,7 +324,8 @@ function roleBadgeHtml(association) {
 /**
  * GitHub's image URLs need a token the webview doesn't have, and its CSP only allows avatars, so an <img> in
  * rendered markdown would be a broken icon. Emoji become their text; any other image becomes a labelled
- * placeholder that opens the image externally. (Phase 5 swaps this for real thumbnails.)
+ * placeholder that opens the image externally. imageResolve.ts swaps each placeholder for a real thumbnail once
+ * the host has downloaded the file; `data-src` is the original URL, `data-alt` the (escaped) alt text.
  */
 function neutralizeImagesHtml(html) {
     return html.replace(/<img\b(?:[^>"']|"[^"]*"|'[^']*')*>/gi, tag => {
@@ -333,7 +334,7 @@ function neutralizeImagesHtml(html) {
         const alt = attr('alt').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         if (/\bclass="[^"]*\bemoji\b/i.test(tag))
             return alt;
-        return `<span class="img-placeholder" data-src="${attr('src')}" title="Open image on github.com">${octicon('image')} ${alt || 'image'}</span>`;
+        return `<span class="img-placeholder" data-src="${attr('src')}" data-alt="${alt}" title="Open image on github.com">${octicon('image')} ${alt || 'image'}</span>`;
     });
 }
 /** The issue number if `href` is an issue of `repo` (`owner/name`); null for anything else, including other repos. */
@@ -612,6 +613,77 @@ function userSuggestion(u) {
 function issueSuggestion(i) {
     return { insert: `#${i.number}`, html: `${issueStateIcon(i.state, null)} <b>#${i.number}</b> ${escapeHtml(i.title)}` };
 }
+// Thumbnails for the images in rendered markdown (posts and the composer's preview). neutralizeImagesHtml leaves a
+// `.img-placeholder` chip per image; this asks the host for a local copy of each (it downloads with the token, which the
+// webview doesn't have) and swaps the chip for an <img> once the copy exists. DOM only, so no unit tests: which URLs are
+// images and where they come from is decided host-side (imageUrls.ts).
+// ponytail: no reserved size, so the layout shifts when an image appears; add width/height from the <img> tag if it bothers anyone.
+/** Webview URI of each image's local copy, by the URL the post carries. Outlives renders: the timeline is rebuilt often. */
+const resolvedImages = new Map();
+/** Why an image failed, by URL, so a re-render shows the reason again without asking the host twice. */
+const failedImages = new Map();
+/** URLs already sent to the host. */
+const requestedImages = new Set();
+function markImageFailed(placeholder, reason) {
+    placeholder.classList.add('img-failed');
+    placeholder.title = `Couldn't load this image (${reason}). Click to open it on github.com.`;
+}
+function showImage(placeholder, src) {
+    var _a, _b;
+    const url = (_a = placeholder.dataset.src) !== null && _a !== void 0 ? _a : '';
+    const img = document.createElement('img');
+    img.className = 'post-img';
+    img.alt = (_b = placeholder.dataset.alt) !== null && _b !== void 0 ? _b : '';
+    img.addEventListener('error', () => {
+        // The local file wouldn't load (deleted, or outside the folders the webview may read): fall back to the chip, once.
+        resolvedImages.delete(url);
+        failedImages.set(url, 'the local copy could not be read');
+        markImageFailed(placeholder, 'the local copy could not be read');
+        img.replaceWith(placeholder);
+    }, { once: true });
+    img.src = src;
+    placeholder.replaceWith(img);
+}
+/** Thumbnails for the placeholders in `container`: known ones right away, new ones after one batched request to the host. */
+function resolveImagesIn(container, post) {
+    const wanted = [];
+    container.querySelectorAll('.img-placeholder[data-src]').forEach(el => {
+        const url = el.dataset.src;
+        const src = resolvedImages.get(url);
+        const failure = failedImages.get(url);
+        if (src)
+            showImage(el, src);
+        else if (failure)
+            markImageFailed(el, failure);
+        else if (!requestedImages.has(url)) {
+            requestedImages.add(url);
+            wanted.push(url);
+        }
+    });
+    if (wanted.length > 0)
+        post({ type: 'resolveImages', urls: wanted });
+}
+/** The host has the file: every chip for that URL, wherever it is on the page, becomes the image. */
+function imageResolved(url, src) {
+    resolvedImages.set(url, src);
+    document.querySelectorAll('.img-placeholder[data-src]').forEach(el => {
+        if (el.dataset.src === url)
+            showImage(el, src);
+    });
+}
+function imageFailed(url, reason) {
+    failedImages.set(url, reason);
+    document.querySelectorAll('.img-placeholder[data-src]').forEach(el => {
+        if (el.dataset.src === url)
+            markImageFailed(el, reason);
+    });
+}
+/** Forgets failures so the next render asks again: a refresh, after the user fixed their connection. */
+function retryFailedImages() {
+    for (const url of failedImages.keys())
+        requestedImages.delete(url);
+    failedImages.clear();
+}
 /** One card per template, then a Blank issue card. `data-index` is the template's position, -1 for Blank. */
 function templateChooserHtml(templates) {
     const card = (index, name, about) => `
@@ -750,6 +822,7 @@ function createComposer(opts) {
                 return;
             }
             preview.innerHTML = DOMPurify.sanitize(neutralizeImagesHtml(msg.html));
+            resolveImagesIn(preview, opts.post);
             previewedText = text;
         });
         opts.post({ type: 'preview', requestId: id, text });
@@ -1289,6 +1362,7 @@ function renderCreateForm(root, init, io) {
             parts.push('<button type="button" class="btn btn-ghost load-more" data-act="load-more">Load more</button>');
         $('timeline').innerHTML = parts.join('');
         mountEditComposer();
+        resolveImagesIn($('timeline'), post);
         if (refocus)
             editComposer === null || editComposer === void 0 ? void 0 : editComposer.focus();
         // GitHub's rendered task items are disabled checkboxes; make them live for people who can edit the body.
@@ -1763,6 +1837,8 @@ function renderCreateForm(root, init, io) {
         switch (msg.type) {
             case 'detail': {
                 createForm = null;
+                if (!msg.afterWrite)
+                    retryFailedImages();
                 if (!detail || detail.issue.number !== msg.detail.issue.number) {
                     // A different issue (this tab was reused, or the create form just became an issue): nothing in flight applies.
                     pending = 0;
@@ -1851,6 +1927,12 @@ function renderCreateForm(root, init, io) {
             case 'previewResult':
             case 'suggestions':
                 composerReceive(msg);
+                break;
+            case 'imageResolved':
+                imageResolved(msg.url, msg.src);
+                break;
+            case 'imageFailed':
+                imageFailed(msg.url, msg.message);
                 break;
             case 'candidates':
                 if (createForm)

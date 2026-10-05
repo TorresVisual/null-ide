@@ -36,6 +36,11 @@ const post = (over = {}) => ({
     node_assert_1.default.ok(!out.includes('<script>'));
     node_assert_1.default.ok(out.includes('&lt;script&gt;'));
 });
+(0, node_test_1.default)('neutralizeImagesHtml keeps the alt text, escaped, in data-alt for the thumbnail', () => {
+    const out = html.neutralizeImagesHtml('<img src="https://x/y.png" alt="a &quot;b&quot; <i>">');
+    node_assert_1.default.ok(out.includes('data-alt="a &quot;b&quot; &lt;i&gt;"'), out);
+    node_assert_1.default.ok(!out.includes('<i>'));
+});
 (0, node_test_1.default)('issueNumberFromLink recognises only issue links of this repo', () => {
     node_assert_1.default.strictEqual(html.issueNumberFromLink('https://github.com/O/R/issues/12', 'o/r'), 12);
     node_assert_1.default.strictEqual(html.issueNumberFromLink('https://github.com/o/r/issues/12#issuecomment-5', 'o/r'), 12);

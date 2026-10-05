@@ -124,6 +124,8 @@ button:focus-visible, .icon-btn:focus-visible { outline:1px solid var(--vscode-f
   display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:4px; cursor:pointer;
   background:color-mix(in srgb, var(--vscode-foreground) 8%, transparent); color:var(--vscode-textLink-foreground);
 }
+.img-placeholder.img-failed { color:var(--vscode-errorForeground); }
+.post-body img.post-img { max-width:100%; height:auto; border-radius:6px; vertical-align:middle; }
 .post-edit { padding:12px; }
 .post-edit-input, #comment-input {
   width:100%; box-sizing:border-box; min-height:110px; resize:vertical; padding:8px; font:inherit; border-radius:4px;
