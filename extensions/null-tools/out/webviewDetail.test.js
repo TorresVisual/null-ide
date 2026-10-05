@@ -153,4 +153,9 @@ const detail = (over = {}) => ({
     node_assert_1.default.ok(!readOnly.includes('data-act="sub-menu"'));
     node_assert_1.default.ok(!readOnly.includes('data-act="add-sub"'));
 });
+(0, node_test_1.default)('subIssuesHtml offers Create sub-issue next to Add only to someone who can edit', () => {
+    const subs = [{ id: 'I_8', number: 8, title: 'Done', state: 'closed', stateReason: 'completed', url: 'u', assignees: [] }];
+    node_assert_1.default.ok(html.subIssuesHtml(detail({ subIssues: subs })).includes('data-act="create-sub"'));
+    node_assert_1.default.ok(!html.subIssuesHtml(detail({ subIssues: subs, post: post({ viewerCanUpdate: false }) })).includes('data-act="create-sub"'));
+});
 //# sourceMappingURL=webviewDetail.test.js.map

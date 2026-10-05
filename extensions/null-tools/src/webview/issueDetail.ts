@@ -404,7 +404,9 @@ type StateTarget = 'completed' | 'not_planned' | 'reopen';
       { value: 'prompt', label: 'Copy as prompt' }, { value: 'browser', label: 'Open on github.com' },
       { value: 'refresh', label: 'Refresh' },
     ];
-    if (detail?.post.viewerCanUpdate) items.push({ value: 'sub', label: 'Add sub-issue…' });
+    if (detail?.post.viewerCanUpdate) {
+      items.push({ value: 'sub', label: 'Add existing sub-issue…' }, { value: 'create-sub', label: 'Create sub-issue…' });
+    }
     openPicker({
       anchor, title: 'Actions', items, filterable: false,
       onSelect: action => {
@@ -412,6 +414,7 @@ type StateTarget = 'completed' | 'not_planned' | 'reopen';
         else if (action === 'browser') post({ type: 'openInBrowser' });
         else if (action === 'refresh') post({ type: 'refresh' });
         else if (action === 'sub') requestCandidates(anchor);
+        else if (action === 'create-sub') post({ type: 'createSubIssue' });
       },
     });
   }
@@ -488,6 +491,7 @@ type StateTarget = 'completed' | 'not_planned' | 'reopen';
       case 'cancel-edit': stopEditing(); renderTimeline(); break;
       case 'open-issue': post({ type: 'openIssue', number: Number(el.dataset.number), newTab }); break;
       case 'add-sub': requestCandidates(el); break;
+      case 'create-sub': post({ type: 'createSubIssue' }); break;
       case 'sub-menu': subMenu(el, id, Number(el.dataset.number)); break;
       case 'load-more':
         (el as HTMLButtonElement).disabled = true;

@@ -524,7 +524,8 @@ function subIssuesHtml(d) {
     return `<section class="subissues">
     <div class="sub-head"><b>Sub-issues</b> <span class="muted">${done} of ${d.subIssues.length}</span>
       <div class="progress"><span style="width:${percent}%"></span></div>
-      ${canEdit ? `<button type="button" class="btn btn-ghost btn-small" data-act="add-sub">Add sub-issue</button>` : ''}
+      ${canEdit ? `<button type="button" class="btn btn-ghost btn-small" data-act="add-sub">Add existing</button>
+      <button type="button" class="btn btn-ghost btn-small" data-act="create-sub">Create sub-issue</button>` : ''}
     </div>${rows}
   </section>`;
 }

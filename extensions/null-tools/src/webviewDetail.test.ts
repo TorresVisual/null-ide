@@ -178,3 +178,9 @@ test('subIssuesHtml is empty without children; otherwise counts closed ones and 
   assert.ok(!readOnly.includes('data-act="sub-menu"'));
   assert.ok(!readOnly.includes('data-act="add-sub"'));
 });
+
+test('subIssuesHtml offers Create sub-issue next to Add only to someone who can edit', () => {
+  const subs = [{ id: 'I_8', number: 8, title: 'Done', state: 'closed', stateReason: 'completed', url: 'u', assignees: [] }];
+  assert.ok(html.subIssuesHtml(detail({ subIssues: subs })).includes('data-act="create-sub"'));
+  assert.ok(!html.subIssuesHtml(detail({ subIssues: subs, post: post({ viewerCanUpdate: false }) })).includes('data-act="create-sub"'));
+});

@@ -368,6 +368,9 @@ class IssueDetailPanel {
             case 'saveDraft':
                 this._writeDraft(msg.number, msg.body);
                 break;
+            case 'createSubIssue':
+                await IssueDetailPanel.showCreate(this.extensionUri, this.store, { number, title: this.store.getByNumber(number)?.title ?? '' });
+                break;
             case 'openIssue':
                 await IssueDetailPanel.show(this.extensionUri, this.store, msg.number, msg.newTab);
                 break;

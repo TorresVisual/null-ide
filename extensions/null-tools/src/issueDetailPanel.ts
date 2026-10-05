@@ -49,6 +49,7 @@ type InboundMessage =
   | { type: 'suggest'; requestId: number; prefix: string }
   | { type: 'saveDraft'; number: number; body: string }
   | { type: 'submitCreate'; title: string; body: string; labels: string[]; assignees: string[]; milestone: number | null; typeId: string | null; parent: number | null; createMore: boolean }
+  | { type: 'createSubIssue' }
   | { type: 'cancelCreate' };
 
 /** A tab that regains focus after this long reloads its issue. */
@@ -360,6 +361,9 @@ export class IssueDetailPanel {
         break;
       case 'saveDraft':
         this._writeDraft(msg.number, msg.body);
+        break;
+      case 'createSubIssue':
+        await IssueDetailPanel.showCreate(this.extensionUri, this.store, { number, title: this.store.getByNumber(number)?.title ?? '' });
         break;
       case 'openIssue':
         await IssueDetailPanel.show(this.extensionUri, this.store, msg.number, msg.newTab);

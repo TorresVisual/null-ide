@@ -503,7 +503,8 @@ function subIssuesHtml(d) {
     return `<section class="subissues">
     <div class="sub-head"><b>Sub-issues</b> <span class="muted">${done} of ${d.subIssues.length}</span>
       <div class="progress"><span style="width:${percent}%"></span></div>
-      ${canEdit ? `<button type="button" class="btn btn-ghost btn-small" data-act="add-sub">Add sub-issue</button>` : ''}
+      ${canEdit ? `<button type="button" class="btn btn-ghost btn-small" data-act="add-sub">Add existing</button>
+      <button type="button" class="btn btn-ghost btn-small" data-act="create-sub">Create sub-issue</button>` : ''}
     </div>${rows}
   </section>`;
 }
@@ -1552,8 +1553,9 @@ function renderCreateForm(root, init, io) {
             { value: 'prompt', label: 'Copy as prompt' }, { value: 'browser', label: 'Open on github.com' },
             { value: 'refresh', label: 'Refresh' },
         ];
-        if (detail === null || detail === void 0 ? void 0 : detail.post.viewerCanUpdate)
-            items.push({ value: 'sub', label: 'Add sub-issue…' });
+        if (detail === null || detail === void 0 ? void 0 : detail.post.viewerCanUpdate) {
+            items.push({ value: 'sub', label: 'Add existing sub-issue…' }, { value: 'create-sub', label: 'Create sub-issue…' });
+        }
         openPicker({
             anchor, title: 'Actions', items, filterable: false,
             onSelect: action => {
@@ -1565,6 +1567,8 @@ function renderCreateForm(root, init, io) {
                     post({ type: 'refresh' });
                 else if (action === 'sub')
                     requestCandidates(anchor);
+                else if (action === 'create-sub')
+                    post({ type: 'createSubIssue' });
             },
         });
     }
@@ -1662,6 +1666,9 @@ function renderCreateForm(root, init, io) {
                 break;
             case 'add-sub':
                 requestCandidates(el);
+                break;
+            case 'create-sub':
+                post({ type: 'createSubIssue' });
                 break;
             case 'sub-menu':
                 subMenu(el, id, Number(el.dataset.number));
