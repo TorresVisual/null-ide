@@ -18,6 +18,7 @@
     "src/webview/shared/picker.ts",
     "src/webview/detailTypes.ts",
     "src/webview/detailHtml.ts",
-    "src/webview/detailSidebarHtml.ts"
+    "src/webview/detailSidebarHtml.ts",
+    "src/webview/composerText.ts"
   ]
 }

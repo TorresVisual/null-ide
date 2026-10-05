@@ -12,6 +12,7 @@
     "src/webview/shared/octicons.ts", "src/webview/shared/time.ts", "src/webview/shared/labels.ts", "src/webview/shared/issueState.ts",
     "src/webview/shared/dom.ts", "src/webview/shared/picker.ts",
     "src/webview/detailTypes.ts", "src/webview/detailHtml.ts", "src/webview/detailSidebarHtml.ts",
+    "src/webview/composerText.ts",
     "src/webview/issueCreate.ts", "src/webview/issueDetail.ts"
   ]
 }
