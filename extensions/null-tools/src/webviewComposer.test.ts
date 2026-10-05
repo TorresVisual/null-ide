@@ -24,6 +24,8 @@ const text = sandbox as unknown as {
   uploadingPlaceholder(name: string, id: number): string;
   insertAtCaret(v: string, start: number, end: number, t: string): Edit;
   replacePlaceholder(v: string, caret: number, placeholder: string, replacement: string): Edit | null;
+  uploadIdsIn(v: string): number[];
+  dropStaleUploads(v: string, live: number[]): string;
   userSuggestion(u: User): { insert: string; html: string };
   issueSuggestion(i: { number: number; title: string; state: string }): { insert: string; html: string };
 };
@@ -156,4 +158,14 @@ test('replacePlaceholder with an empty replacement removes the stand-in; one the
   const p = '![Uploading a.png…](#upload-1)';
   assert.strictEqual(text.replacePlaceholder(`a${p}b`, 0, p, '')!.value, 'ab');
   assert.strictEqual(text.replacePlaceholder('the user deleted it', 3, p, 'x'), null);
+});
+
+test('uploadIdsIn finds the upload stand-ins in a text, and dropStaleUploads removes only the ones nothing is waiting for', () => {
+  const live = text.uploadingPlaceholder('a.png', 4);
+  const stale = text.uploadingPlaceholder('b.png', 2);
+  const value = `x\n${stale}\ny\n${live}\nz`;
+  assert.deepStrictEqual(plain(text.uploadIdsIn(value)), [2, 4]);
+  assert.deepStrictEqual(plain(text.uploadIdsIn('no uploads here, ![img](#upload-9) is not one')), []);
+  assert.strictEqual(text.dropStaleUploads(value, [4]), `x\ny\n${live}\nz`);
+  assert.strictEqual(text.dropStaleUploads('plain', []), 'plain');
 });

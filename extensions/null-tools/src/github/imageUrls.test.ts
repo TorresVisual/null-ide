@@ -88,3 +88,8 @@ test('tokenForUrl gives the token to GitHub itself on the first request only', (
   assert.strictEqual(tokenForUrl('https://github.com/a.png', null, 0), null);
   assert.strictEqual(tokenForUrl('nope', 't', 0), null);
 });
+
+test('imageFetchPlan refuses a repo path that climbs out of the Contents API (%2F..%2F decodes to ../)', () => {
+  assert.strictEqual(imageFetchPlan('https://github.com/o/r/blob/main/a%2F..%2F..%2F..%2F..%2Fuser%2Frepos'), null);
+  assert.ok(imageFetchPlan('https://github.com/o/r/blob/main/a..b/x.png')); // dots inside a name are fine
+});

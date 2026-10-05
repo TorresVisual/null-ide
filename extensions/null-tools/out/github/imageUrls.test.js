@@ -74,4 +74,8 @@ const SIGNED = 'https://private-user-images.githubusercontent.com/91338024/65930
     node_assert_1.default.strictEqual((0, imageUrls_1.tokenForUrl)('https://github.com/a.png', null, 0), null);
     node_assert_1.default.strictEqual((0, imageUrls_1.tokenForUrl)('nope', 't', 0), null);
 });
+(0, node_test_1.default)('imageFetchPlan refuses a repo path that climbs out of the Contents API (%2F..%2F decodes to ../)', () => {
+    node_assert_1.default.strictEqual((0, imageUrls_1.imageFetchPlan)('https://github.com/o/r/blob/main/a%2F..%2F..%2F..%2F..%2Fuser%2Frepos'), null);
+    node_assert_1.default.ok((0, imageUrls_1.imageFetchPlan)('https://github.com/o/r/blob/main/a..b/x.png')); // dots inside a name are fine
+});
 //# sourceMappingURL=imageUrls.test.js.map

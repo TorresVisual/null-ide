@@ -657,6 +657,15 @@ function replacePlaceholder(value, caret, placeholder, replacement) {
     const moved = caret >= stop ? caret + replacement.length - placeholder.length : caret > at ? at + replacement.length : caret;
     return { value: value.slice(0, at) + replacement + value.slice(stop), start: moved, end: moved };
 }
+const UPLOAD_STANDIN = /!\[Uploading [^\]\n]*…\]\(#upload-(\d+)\)\n?/g;
+/** The ids of the upload stand-ins in `value`: uploads that were started and have not put their result in yet. */
+function uploadIdsIn(value) {
+    return Array.from(value.matchAll(UPLOAD_STANDIN), m => Number(m[1]));
+}
+/** `value` without stand-ins nothing is waiting for (a draft saved mid-upload and restored later would keep them forever). */
+function dropStaleUploads(value, live) {
+    return value.replace(UPLOAD_STANDIN, (standin, id) => (live.includes(Number(id)) ? standin : ''));
+}
 /** One card per template, then a Blank issue card. `data-index` is the template's position, -1 for Blank. */
 function templateChooserHtml(templates) {
     const card = (index, name, about) => `

@@ -23,6 +23,8 @@ interface ComposerOptions {
 interface Composer {
   el: HTMLElement;
   getValue(): string;
+  /** True while an image pasted into this box is still uploading: sending now would post its stand-in text. */
+  uploading(): boolean;
   setValue(value: string): void;
   /** Appends a block (a quote) after the current text, switches to Write and focuses. */
   insertBlock(block: string): void;
@@ -88,7 +90,7 @@ function createComposer(opts: ComposerOptions): Composer {
   const popup = el.querySelector('.composer-suggest') as HTMLElement;
   const tools = el.querySelector('.composer-tools') as HTMLElement;
   const fileInput = el.querySelector('.composer-file') as HTMLInputElement;
-  ta.value = opts.value;
+  ta.value = dropStaleUploads(opts.value, Array.from(composerWaiting.keys()));
   ta.placeholder = opts.placeholder;
   ta.setAttribute('aria-label', opts.label);
 
@@ -379,6 +381,7 @@ function createComposer(opts: ComposerOptions): Composer {
   return {
     el,
     getValue: () => ta.value,
+    uploading: () => uploadIdsIn(ta.value).some(id => composerWaiting.has(id)),
     setValue(value) {
       if (mode === 'preview') setMode('write');
       replaceAll({ value, start: value.length, end: value.length });

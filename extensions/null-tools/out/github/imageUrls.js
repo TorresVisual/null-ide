@@ -105,7 +105,12 @@ function imageFetchPlan(url) {
     if (!m)
         return { kind: 'direct', url: u.href };
     try {
-        return { kind: 'contents', owner: m[1], repo: m[2], ref: decodeURIComponent(m[3]), path: decodeURIComponent(m[4]) };
+        const ref = decodeURIComponent(m[3]);
+        const filePath = decodeURIComponent(m[4]);
+        // `%2F..%2F` decodes to `../`, which `new URL` would later fold into another api.github.com endpoint (with the token).
+        if ([ref, ...filePath.split('/')].some(part => part === '' || part === '.' || part === '..'))
+            return null;
+        return { kind: 'contents', owner: m[1], repo: m[2], ref, path: filePath };
     }
     catch {
         return null; // malformed %-escape

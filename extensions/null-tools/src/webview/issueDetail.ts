@@ -259,6 +259,10 @@ type StateTarget = 'completed' | 'not_planned' | 'reopen';
   function submitComment(then?: StateTarget): void {
     const body = commentComposer ? commentComposer.getValue().trim() : '';
     if (commentBusy || (!body && !then)) return;
+    if (commentComposer?.uploading()) {
+      toast('Wait for the image to finish uploading.');
+      return;
+    }
     if (then) applyState(then);
     if (!body) {
       post({ type: 'setState', to: then });
@@ -271,6 +275,10 @@ type StateTarget = 'completed' | 'not_planned' | 'reopen';
 
   function saveEdit(id: string): void {
     if (!editComposer || root.querySelector<HTMLButtonElement>('[data-act="save-edit"]')?.disabled) return;
+    if (editComposer.uploading()) {
+      toast('Wait for the image to finish uploading.');
+      return;
+    }
     const body = editComposer.getValue();
     const isBody = detail?.post.id === id;
     if (!isBody && !body.trim()) {

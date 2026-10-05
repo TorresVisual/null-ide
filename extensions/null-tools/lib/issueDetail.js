@@ -636,6 +636,15 @@ function replacePlaceholder(value, caret, placeholder, replacement) {
     const moved = caret >= stop ? caret + replacement.length - placeholder.length : caret > at ? at + replacement.length : caret;
     return { value: value.slice(0, at) + replacement + value.slice(stop), start: moved, end: moved };
 }
+const UPLOAD_STANDIN = /!\[Uploading [^\]\n]*…\]\(#upload-(\d+)\)\n?/g;
+/** The ids of the upload stand-ins in `value`: uploads that were started and have not put their result in yet. */
+function uploadIdsIn(value) {
+    return Array.from(value.matchAll(UPLOAD_STANDIN), m => Number(m[1]));
+}
+/** `value` without stand-ins nothing is waiting for (a draft saved mid-upload and restored later would keep them forever). */
+function dropStaleUploads(value, live) {
+    return value.replace(UPLOAD_STANDIN, (standin, id) => (live.includes(Number(id)) ? standin : ''));
+}
 // Thumbnails for the images in rendered markdown (posts and the composer's preview). neutralizeImagesHtml leaves a
 // `.img-placeholder` chip per image; this asks the host for a local copy of each (it downloads with the token, which the
 // webview doesn't have) and swaps the chip for an <img> once the copy exists. DOM only, so no unit tests: which URLs are
@@ -788,7 +797,7 @@ function createComposer(opts) {
     const popup = el.querySelector('.composer-suggest');
     const tools = el.querySelector('.composer-tools');
     const fileInput = el.querySelector('.composer-file');
-    ta.value = opts.value;
+    ta.value = dropStaleUploads(opts.value, Array.from(composerWaiting.keys()));
     ta.placeholder = opts.placeholder;
     ta.setAttribute('aria-label', opts.label);
     let mode = 'write';
@@ -1073,6 +1082,7 @@ function createComposer(opts) {
     return {
         el,
         getValue: () => ta.value,
+        uploading: () => uploadIdsIn(ta.value).some(id => composerWaiting.has(id)),
         setValue(value) {
             if (mode === 'preview')
                 setMode('write');
@@ -1171,6 +1181,10 @@ function renderCreateForm(root, init, io) {
         var _a, _b, _c, _d, _e, _f;
         if (state.busy || !composer)
             return;
+        if (composer.uploading()) {
+            io.toast('Wait for the image to finish uploading.');
+            return;
+        }
         const title = titleInput().value.trim();
         if (!title) {
             byId('title-error').classList.remove('hidden');
@@ -1562,6 +1576,10 @@ function renderCreateForm(root, init, io) {
         const body = commentComposer ? commentComposer.getValue().trim() : '';
         if (commentBusy || (!body && !then))
             return;
+        if (commentComposer === null || commentComposer === void 0 ? void 0 : commentComposer.uploading()) {
+            toast('Wait for the image to finish uploading.');
+            return;
+        }
         if (then)
             applyState(then);
         if (!body) {
@@ -1576,6 +1594,10 @@ function renderCreateForm(root, init, io) {
         var _a;
         if (!editComposer || ((_a = root.querySelector('[data-act="save-edit"]')) === null || _a === void 0 ? void 0 : _a.disabled))
             return;
+        if (editComposer.uploading()) {
+            toast('Wait for the image to finish uploading.');
+            return;
+        }
         const body = editComposer.getValue();
         const isBody = (detail === null || detail === void 0 ? void 0 : detail.post.id) === id;
         if (!isBody && !body.trim()) {

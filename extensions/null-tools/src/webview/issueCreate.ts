@@ -108,6 +108,10 @@ function renderCreateForm(root: HTMLElement, init: CreateInit, io: CreateIo): Cr
 
   function submit(): void {
     if (state.busy || !composer) return;
+    if (composer.uploading()) {
+      io.toast('Wait for the image to finish uploading.');
+      return;
+    }
     const title = titleInput().value.trim();
     if (!title) {
       byId('title-error').classList.remove('hidden');

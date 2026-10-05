@@ -125,4 +125,13 @@ const user = (login) => ({ login, avatar_url: '' });
     node_assert_1.default.strictEqual(text.replacePlaceholder(`a${p}b`, 0, p, '').value, 'ab');
     node_assert_1.default.strictEqual(text.replacePlaceholder('the user deleted it', 3, p, 'x'), null);
 });
+(0, node_test_1.default)('uploadIdsIn finds the upload stand-ins in a text, and dropStaleUploads removes only the ones nothing is waiting for', () => {
+    const live = text.uploadingPlaceholder('a.png', 4);
+    const stale = text.uploadingPlaceholder('b.png', 2);
+    const value = `x\n${stale}\ny\n${live}\nz`;
+    node_assert_1.default.deepStrictEqual(plain(text.uploadIdsIn(value)), [2, 4]);
+    node_assert_1.default.deepStrictEqual(plain(text.uploadIdsIn('no uploads here, ![img](#upload-9) is not one')), []);
+    node_assert_1.default.strictEqual(text.dropStaleUploads(value, [4]), `x\ny\n${live}\nz`);
+    node_assert_1.default.strictEqual(text.dropStaleUploads('plain', []), 'plain');
+});
 //# sourceMappingURL=webviewComposer.test.js.map
