@@ -60,13 +60,16 @@ class IssueDetailPanel {
     static creatingTab;
     /** Where unsent comment text is kept; set once by registerIssuesPanelFeature. */
     static drafts;
-    static configure(drafts) {
+    /** Told about every issue created from the New issue tab, so the lists can show it before GitHub's search index catches up. */
+    static onCreated;
+    static configure(drafts, onCreated) {
         IssueDetailPanel.drafts = drafts;
+        IssueDetailPanel.onCreated = onCreated;
     }
     panel;
     issueNumber = 0;
     creating = false;
-    onCreated;
+    parent = null;
     detail = null;
     loadedAt = 0;
     static async show(extensionUri, store, issueNumber, newTab = false) {
@@ -86,16 +89,17 @@ class IssueDetailPanel {
         }
         await target.openIssue(issueNumber);
     }
-    static async showCreate(extensionUri, store, onCreated) {
+    static async showCreate(extensionUri, store, parent = null) {
         const existing = IssueDetailPanel.creatingTab;
         if (existing) {
-            existing.onCreated = onCreated;
             existing.panel.reveal();
+            if (parent)
+                existing._post({ type: 'setParent', parent }); // keep what the user already typed
             return;
         }
         const tab = new IssueDetailPanel(extensionUri, store);
         IssueDetailPanel.creatingTab = tab;
-        await tab.openCreate(onCreated);
+        await tab.openCreate(parent);
     }
     constructor(extensionUri, store) {
         this.extensionUri = extensionUri;
@@ -134,9 +138,9 @@ class IssueDetailPanel {
         this.panel.title = `Issue #${issueNumber}`;
         await this._load(false);
     }
-    async openCreate(onCreated) {
+    async openCreate(parent) {
         this.creating = true;
-        this.onCreated = onCreated;
+        this.parent = parent;
         this.panel.title = 'New Issue';
         await this._sendCreateForm();
     }
@@ -195,14 +199,17 @@ class IssueDetailPanel {
         }
     }
     async _sendCreateForm() {
-        // Signed-out/offline must still show the form: Create itself prompts for sign-in
-        // (ensureSession(true)), so an empty-picker form beats no form at all.
-        const [repoLabels, assignableUsers] = await Promise.all([
-            Promise.resolve([]),
-            Promise.resolve([]),
-        ]);
+        // Signed-out/offline must still show the form: Create itself prompts for sign-in (ensureSession(true)), so a
+        // form with empty pickers beats no form at all.
+        const m = await this.store.getMetadata().catch(() => null);
         const cwd = this._cwd();
-        this._post({ type: 'createInit', repoLabels, assignableUsers, templates: cwd ? (0, issueTemplates_1.loadIssueTemplates)(cwd) : [] });
+        this._post({
+            type: 'createInit',
+            metadata: { labels: m?.labels ?? [], assignees: m?.assignees ?? [], milestones: m?.milestones ?? [], types: m?.issueTypes ?? [] },
+            templates: cwd ? (0, issueTemplates_1.loadIssueTemplates)(cwd) : [],
+            parent: this.parent,
+            draft: this._readDraft(0),
+        });
     }
     /** Runs one GitHub write, then reloads the issue so the tab shows GitHub's version (and any new timeline events). */
     async _write(action) {
@@ -405,22 +412,35 @@ class IssueDetailPanel {
                 break;
             }
             case 'submitCreate': {
+                let created;
                 try {
-                    const created = await this.store.createIssue({
-                        title: msg.title, body: msg.body, labels: msg.labels, assignees: msg.assignees,
+                    created = await this.store.createIssue({
+                        title: msg.title, body: msg.body, labels: msg.labels, assignees: msg.assignees, milestone: msg.milestone ?? undefined,
                     });
-                    // This tab becomes the new issue's tab. Open it first so the store knows the issue, then let the
-                    // lists insert it: they don't search for it, because GitHub's search index lags a few seconds.
-                    if (IssueDetailPanel.creatingTab === this)
-                        IssueDetailPanel.creatingTab = undefined;
-                    IssueDetailPanel.shared ??= this;
-                    await this.openIssue(created.number);
-                    this.onCreated?.(created);
                 }
                 catch (err) {
                     void vscode.window.showErrorMessage(`Failed to create issue: ${err.message}`);
                     this._post({ type: 'createFailed' });
+                    break;
                 }
+                this._writeDraft(0, ''); // only now that the issue exists
+                const problems = await this.store.applyCreateExtras(created, { typeId: msg.typeId, parent: msg.parent });
+                if (problems.length > 0)
+                    void vscode.window.showWarningMessage(`Created #${created.number}, but ${problems.join(' and ')}.`);
+                if (msg.parent)
+                    void IssueDetailPanel.byNumber.get(msg.parent)?._load(false); // its Sub-issues list just grew
+                if (msg.createMore) {
+                    this._post({ type: 'created', number: created.number });
+                }
+                else {
+                    // This tab becomes the new issue's tab.
+                    if (IssueDetailPanel.creatingTab === this)
+                        IssueDetailPanel.creatingTab = undefined;
+                    IssueDetailPanel.shared ??= this;
+                    await this.openIssue(created.number);
+                }
+                // The store already knows the issue (createIssue remembered it); the lists can't search for it yet, so they insert it.
+                IssueDetailPanel.onCreated?.(created);
                 break;
             }
             case 'cancelCreate':

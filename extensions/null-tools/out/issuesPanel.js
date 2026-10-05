@@ -106,10 +106,12 @@ class IssuesViewProvider {
         await this.refresh();
     }
     async createIssue() {
-        await issueDetailPanel_1.IssueDetailPanel.showCreate(this._extensionUri, this._store, issue => {
-            for (const controller of this._controllers)
-                controller.insertCreated(issue);
-        });
+        await issueDetailPanel_1.IssueDetailPanel.showCreate(this._extensionUri, this._store);
+    }
+    /** The lists show a just-created issue at once instead of waiting for GitHub's search index. */
+    insertCreated(issue) {
+        for (const controller of this._controllers)
+            controller.insertCreated(issue);
     }
     onDefaultResults(items) {
         this._badgeItems = items;

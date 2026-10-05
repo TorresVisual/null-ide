@@ -279,6 +279,25 @@ function openPicker(opts) {
     pop.style.top = `${Math.max(4, Math.min(rect.bottom + 2, window.innerHeight - pop.offsetHeight - 4))}px`;
     (input !== null && input !== void 0 ? input : pop).focus();
 }
+/**
+ * A multi-select picker that reports the final set once it closes (and only if it changed), like github.com, instead
+ * of one request per tick. `items[].selected` is the starting set.
+ */
+function pickMany(anchor, title, items, apply) {
+    const initial = new Set(items.filter(i => i.selected).map(i => i.value));
+    const chosen = new Set(initial);
+    openPicker({
+        anchor, title, items, multi: true,
+        onSelect: v => { if (chosen.has(v))
+            chosen.delete(v);
+        else
+            chosen.add(v); },
+        onClose: () => {
+            if (chosen.size !== initial.size || [...initial].some(v => !chosen.has(v)))
+                apply(chosen);
+        },
+    });
+}
 // Pure HTML builders for the issue detail tab. They take data and return strings (no DOM, no state), so
 // webviewShared tests can run them in a sandbox. Every user-controlled string goes through escapeHtml;
 // `post.bodyHTML` is the exception: GitHub renders it, and the caller sanitizes it before calling postHtml.
@@ -897,135 +916,235 @@ function createComposer(opts) {
         },
     };
 }
-/** Closes the form's open dropdowns. Set while the form is on screen. */
-let closeCreateDropdowns = null;
-document.addEventListener('click', e => {
-    if (e.composedPath().some(n => n instanceof Element && n.classList.contains('dropdown-container')))
-        return;
-    closeCreateDropdowns === null || closeCreateDropdowns === void 0 ? void 0 : closeCreateDropdowns();
-});
-function renderDropdown(containerId, items, selected, isOpen, toggleOpen, placeholder) {
-    const refresh = () => {
-        var _a;
-        const container = document.getElementById(containerId);
-        if (!container)
-            return;
-        const open = isOpen();
-        const selectedItems = items.filter(i => selected.has(i.value));
-        container.innerHTML = `
-      <button type="button" class="dropdown-trigger">
-        ${selectedItems.length > 0 ? `<span class="selected-tags">${selectedItems.map(i => `
-          <span class="tag${i.color ? ' gh-label' : ''}"${i.color ? ` style="${labelStyleVars(i.color)}"` : ''}>${escapeHtml(i.label)}<span class="tag-remove" data-value="${escapeHtml(i.value)}">&times;</span></span>`).join('')}</span>`
-            : `<span class="dropdown-placeholder">${escapeHtml(placeholder)}</span>`}
-        <span class="dropdown-arrow">${open ? '▲' : '▼'}</span>
-      </button>
-      <div class="dropdown-list${open ? '' : ' hidden'}">
-        ${items.length === 0 ? '<span class="muted">None available.</span>' : items.map(i => `
-          <button type="button" class="dropdown-item${selected.has(i.value) ? ' selected' : ''}" data-value="${escapeHtml(i.value)}">
-            <span class="checkbox">${selected.has(i.value) ? '☑' : '☐'}</span>
-            ${i.color ? `<span class="color-dot" style="background:#${i.color}"></span>` : ''}
-            ${escapeHtml(i.label)}
-          </button>`).join('')}
-      </div>`;
-        (_a = container.querySelector('.dropdown-trigger')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', () => {
-            toggleOpen();
-            refresh();
-        });
-        container.querySelectorAll('.tag-remove').forEach(el => el.addEventListener('mousedown', e => {
-            e.preventDefault();
-            selected.delete(el.dataset.value);
-            refresh();
-        }));
-        container.querySelectorAll('.dropdown-item').forEach(el => el.addEventListener('click', () => {
-            const v = el.dataset.value;
-            if (selected.has(v))
-                selected.delete(v);
-            else
-                selected.add(v);
-            refresh();
-        }));
+function renderCreateForm(root, init, io) {
+    const meta = init.metadata;
+    const state = {
+        assignees: [], labels: [], type: null, milestone: null, parent: init.parent, template: null, createMore: false, busy: false,
     };
-    refresh();
-    return refresh;
-}
-function renderCreateForm(root, data, post) {
-    var _a, _b, _c;
-    let labelOpen = false;
-    let assigneeOpen = false;
-    const selectedLabels = new Set();
-    const selectedAssignees = new Set();
-    root.innerHTML = `
-    <div id="create-form">
-      <h1 class="title">New issue</h1>
-      <div class="edit-form">
-        ${data.templates.length > 0 ? `
-        <select id="template-picker">
-          <option value="">Blank issue</option>
-          ${data.templates.map((t, i) => `<option value="${i}">${escapeHtml(t.name)}</option>`).join('')}
-        </select>` : ''}
-        <input id="edit-title" placeholder="Title">
-        <div id="title-error" class="field-error hidden">Title is required.</div>
-        <textarea id="edit-body" placeholder="Description"></textarea>
-        <div class="picker-group">
-          <span class="assignees-label">Labels:</span>
-          <div class="dropdown-container" id="label-picker"></div>
-        </div>
-        <div class="picker-group">
-          <span class="assignees-label">Assignees:</span>
-          <div class="dropdown-container" id="assignee-picker"></div>
-        </div>
-        <div class="btn-row">
-          <button class="btn btn-primary" id="save-btn">Create</button>
-          <button class="btn btn-secondary" id="cancel-btn">Cancel</button>
-        </div>
-      </div>
-    </div>`;
-    const refreshLabels = renderDropdown('label-picker', data.repoLabels.map(l => ({ value: l.name, label: l.name, color: l.color })), selectedLabels, () => labelOpen, () => { labelOpen = !labelOpen; }, 'Select labels…');
-    const refreshAssignees = renderDropdown('assignee-picker', data.assignableUsers.map(u => ({ value: u.login, label: u.login })), selectedAssignees, () => assigneeOpen, () => { assigneeOpen = !assigneeOpen; }, 'Select assignees…');
-    closeCreateDropdowns = () => {
-        if (!labelOpen && !assigneeOpen)
+    let composer = null;
+    let parentAnchor = null;
+    const byId = (id) => document.getElementById(id);
+    const titleInput = () => byId('create-title');
+    function renderSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        if (!sidebar)
             return;
-        labelOpen = false;
-        assigneeOpen = false;
-        refreshLabels();
-        refreshAssignees();
-    };
-    (_a = document.getElementById('template-picker')) === null || _a === void 0 ? void 0 : _a.addEventListener('change', e => {
+        sidebar.innerHTML = createSidebarHtml(state, meta);
+        sidebar.querySelectorAll('.avatar img').forEach(img => img.addEventListener('error', () => { img.style.display = 'none'; }, { once: true }));
+    }
+    function showChooser() {
+        composer = null;
+        root.innerHTML = `<div id="create-form">${templateChooserHtml(init.templates)}</div>`;
+        byId('create-form').addEventListener('click', onFormClick);
+    }
+    function showForm(template) {
         var _a, _b;
-        const index = e.target.value;
-        const template = index ? data.templates[Number(index)] : null;
-        document.getElementById('edit-title').value = (_a = template === null || template === void 0 ? void 0 : template.title) !== null && _a !== void 0 ? _a : '';
-        document.getElementById('edit-body').value = (_b = template === null || template === void 0 ? void 0 : template.body) !== null && _b !== void 0 ? _b : '';
-        selectedLabels.clear();
-        template === null || template === void 0 ? void 0 : template.labels.forEach(l => {
-            const match = data.repoLabels.find(rl => rl.name.toLowerCase() === l.toLowerCase());
-            if (match)
-                selectedLabels.add(match.name);
+        state.template = template;
+        state.labels = ((_a = template === null || template === void 0 ? void 0 : template.labels) !== null && _a !== void 0 ? _a : [])
+            .map(name => meta.labels.find(l => l.name.toLowerCase() === name.toLowerCase()))
+            .filter((l) => !!l);
+        root.innerHTML = `
+      <div id="create-form">
+        <div class="create-head">
+          <h1 class="title">New issue</h1>
+          ${init.templates.length > 0 ? '<button type="button" class="link-btn" data-act="change-template">Choose a different template</button>' : ''}
+        </div>
+        <div id="layout">
+          <main id="main">
+            <input id="create-title" class="create-title" placeholder="Title" aria-label="Title" autocomplete="off">
+            <div id="title-error" class="field-error hidden">Title is required.</div>
+            <div id="create-composer"></div>
+            <div class="create-actions">
+              <label class="create-more"><input type="checkbox" id="create-more"${state.createMore ? ' checked' : ''}> Create more</label>
+              <button type="button" class="btn btn-secondary" data-act="cancel-create">Cancel</button>
+              <button type="button" class="btn btn-primary" id="create-btn" data-act="submit-create">Create</button>
+            </div>
+          </main>
+          <aside id="sidebar"></aside>
+        </div>
+      </div>`;
+        titleInput().value = (_b = template === null || template === void 0 ? void 0 : template.title) !== null && _b !== void 0 ? _b : '';
+        composer = createComposer({
+            value: template ? template.body : init.draft,
+            label: 'Description',
+            placeholder: 'Describe the issue',
+            post: io.post,
+            users: () => meta.assignees,
+            // Only a blank issue is drafted; a template's text is just the starting point. Nothing is queued once Create was pressed.
+            onChange: v => { if (!state.template && !state.busy)
+                io.saveDraftSoon(v); },
+            onSubmit: submit,
         });
-        refreshLabels();
-    });
-    const titleInput = document.getElementById('edit-title');
-    const titleError = document.getElementById('title-error');
-    titleInput.addEventListener('input', () => titleError.classList.add('hidden'));
-    (_b = document.getElementById('save-btn')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', () => {
-        const saveBtn = document.getElementById('save-btn');
-        if (saveBtn.disabled)
+        byId('create-composer').replaceWith(composer.el);
+        renderSidebar();
+        byId('create-form').addEventListener('click', onFormClick);
+        byId('create-more').addEventListener('change', e => { state.createMore = e.target.checked; });
+        titleInput().addEventListener('input', () => byId('title-error').classList.add('hidden'));
+        titleInput().addEventListener('keydown', e => {
+            if (e.isComposing || e.key !== 'Enter')
+                return;
+            e.preventDefault();
+            if (e.ctrlKey || e.metaKey)
+                submit();
+            else
+                composer === null || composer === void 0 ? void 0 : composer.focus();
+        });
+        titleInput().focus();
+    }
+    function submit() {
+        var _a, _b, _c, _d, _e, _f;
+        if (state.busy || !composer)
             return;
-        const title = titleInput.value.trim();
+        const title = titleInput().value.trim();
         if (!title) {
-            titleError.classList.remove('hidden');
-            titleInput.focus();
+            byId('title-error').classList.remove('hidden');
+            titleInput().focus();
             return;
         }
-        saveBtn.disabled = true;
-        saveBtn.textContent = 'Creating…';
-        post({
-            type: 'submitCreate', title,
-            body: document.getElementById('edit-body').value,
-            labels: Array.from(selectedLabels), assignees: Array.from(selectedAssignees),
+        state.busy = true;
+        const button = byId('create-btn');
+        button.disabled = true;
+        button.textContent = 'Creating…';
+        io.dropDraft();
+        io.post({
+            type: 'submitCreate', title, body: composer.getValue(),
+            labels: state.labels.map(l => l.name), assignees: state.assignees.map(a => a.login),
+            milestone: (_b = (_a = state.milestone) === null || _a === void 0 ? void 0 : _a.number) !== null && _b !== void 0 ? _b : null, typeId: (_d = (_c = state.type) === null || _c === void 0 ? void 0 : _c.id) !== null && _d !== void 0 ? _d : null, parent: (_f = (_e = state.parent) === null || _e === void 0 ? void 0 : _e.number) !== null && _f !== void 0 ? _f : null,
+            createMore: state.createMore,
         });
-    });
-    (_c = document.getElementById('cancel-btn')) === null || _c === void 0 ? void 0 : _c.addEventListener('click', () => post({ type: 'cancelCreate' }));
+    }
+    // ---- pickers ------------------------------------------------------------------------------------------------
+    function pickAssignees(anchor) {
+        const items = meta.assignees.map(u => ({
+            value: u.login, label: u.login, html: `${avatarHtml(u)} ${escapeHtml(u.login)}`,
+            selected: state.assignees.some(a => a.login === u.login),
+        }));
+        pickMany(anchor, 'Assign up to 10 people', items, chosen => {
+            state.assignees = meta.assignees.filter(u => chosen.has(u.login));
+            renderSidebar();
+        });
+    }
+    function pickLabels(anchor) {
+        const items = meta.labels.map(l => {
+            var _a;
+            return ({
+                value: l.name, label: l.name, html: `<span class="gh-label" style="${labelStyleVars(l.color)}">${escapeHtml(l.name)}</span>`,
+                description: (_a = l.description) !== null && _a !== void 0 ? _a : undefined, selected: state.labels.some(c => c.name === l.name),
+            });
+        });
+        pickMany(anchor, 'Apply labels', items, chosen => {
+            state.labels = meta.labels.filter(l => chosen.has(l.name));
+            renderSidebar();
+        });
+    }
+    function pickMilestone(anchor) {
+        const items = [{ value: '', label: 'No milestone', selected: state.milestone === null }]
+            .concat(meta.milestones.map(m => { var _a; return ({ value: String(m.number), label: m.title, selected: m.number === ((_a = state.milestone) === null || _a === void 0 ? void 0 : _a.number) }); }));
+        openPicker({
+            anchor, title: 'Set milestone', items, filterable: items.length > 8,
+            onSelect: v => {
+                var _a;
+                state.milestone = v === '' ? null : (_a = meta.milestones.find(m => String(m.number) === v)) !== null && _a !== void 0 ? _a : null;
+                renderSidebar();
+            },
+        });
+    }
+    function pickType(anchor) {
+        const items = [{ value: '', label: 'No type', selected: state.type === null }]
+            .concat(meta.types.map(t => { var _a; return ({ value: t.id, label: t.name, selected: t.id === ((_a = state.type) === null || _a === void 0 ? void 0 : _a.id) }); }));
+        openPicker({
+            anchor, title: 'Set issue type', items, filterable: false,
+            onSelect: v => {
+                var _a;
+                state.type = v === '' ? null : (_a = meta.types.find(t => t.id === v)) !== null && _a !== void 0 ? _a : null;
+                renderSidebar();
+            },
+        });
+    }
+    function onFormClick(e) {
+        const act = e.target.closest('[data-act]');
+        if (!act)
+            return;
+        switch (act.dataset.act) {
+            case 'pick-template': {
+                const index = Number(act.dataset.index);
+                showForm(index >= 0 ? init.templates[index] : null);
+                break;
+            }
+            case 'change-template':
+                showChooser();
+                break;
+            case 'pick-assignees':
+                pickAssignees(act);
+                break;
+            case 'pick-labels':
+                pickLabels(act);
+                break;
+            case 'pick-milestone':
+                pickMilestone(act);
+                break;
+            case 'pick-type':
+                pickType(act);
+                break;
+            case 'pick-parent':
+                parentAnchor = act;
+                io.post({ type: 'requestCandidates' });
+                break;
+            case 'submit-create':
+                submit();
+                break;
+            case 'cancel-create':
+                io.post({ type: 'cancelCreate' });
+                break;
+        }
+    }
+    if (init.templates.length > 0)
+        showChooser();
+    else
+        showForm(null);
+    return {
+        candidates(items) {
+            if (!parentAnchor)
+                return;
+            const picks = [{ value: '', label: 'No parent', selected: state.parent === null }]
+                .concat(items.map(c => { var _a; return ({ value: String(c.number), label: `#${c.number} ${c.title}`, selected: c.number === ((_a = state.parent) === null || _a === void 0 ? void 0 : _a.number) }); }));
+            openPicker({
+                anchor: parentAnchor, title: 'Set parent issue', items: picks, emptyText: 'No other open issues',
+                onSelect: v => {
+                    var _a;
+                    state.parent = v === '' ? null : (_a = items.find(c => String(c.number) === v)) !== null && _a !== void 0 ? _a : null;
+                    renderSidebar();
+                },
+            });
+        },
+        setParent(parent) {
+            state.parent = parent;
+            renderSidebar();
+        },
+        failed() {
+            state.busy = false;
+            const button = document.getElementById('create-btn');
+            if (button) {
+                button.disabled = false;
+                button.textContent = 'Create';
+            }
+        },
+        created(number) {
+            var _a, _b, _c, _d;
+            state.busy = false;
+            io.toast(`Created #${number}`);
+            // Keeps the template, labels, milestone and parent; the next issue starts with a fresh title, text, assignees and type.
+            state.assignees = [];
+            state.type = null;
+            titleInput().value = (_b = (_a = state.template) === null || _a === void 0 ? void 0 : _a.title) !== null && _b !== void 0 ? _b : '';
+            composer === null || composer === void 0 ? void 0 : composer.setValue((_d = (_c = state.template) === null || _c === void 0 ? void 0 : _c.body) !== null && _d !== void 0 ? _d : '');
+            const button = byId('create-btn');
+            button.disabled = false;
+            button.textContent = 'Create';
+            renderSidebar();
+            titleInput().focus();
+        },
+    };
 }
 (function () {
     const vscode = acquireVsCodeApi();
@@ -1059,6 +1178,7 @@ function renderCreateForm(root, data, post) {
     let pageMounted = false;
     let composerFor = 0;
     let candidateAnchor = null;
+    let createForm = null;
     let toastTimer;
     const post = (message) => vscode.postMessage(message);
     const $ = (id) => document.getElementById(id);
@@ -1100,6 +1220,7 @@ function renderCreateForm(root, data, post) {
         clearTimeout(toastTimer);
         toastTimer = setTimeout(() => toastEl.classList.add('hidden'), 5000);
     }
+    const createIo = { post, toast, saveDraftSoon: body => saveDraftSoon(0, body), dropDraft };
     // ---- rendering ----------------------------------------------------------------------------------------------
     /** Server-rendered markdown, minus images the webview can't load, sanitized once more before it touches the DOM. */
     const prepared = (p) => (Object.assign(Object.assign({}, p), { bodyHTML: DOMPurify.sanitize(neutralizeImagesHtml(p.bodyHTML)) }));
@@ -1296,21 +1417,6 @@ function renderCreateForm(root, data, post) {
     /** The target a Close / Reopen click means for the issue's current state. */
     const closeTarget = () => ((detail === null || detail === void 0 ? void 0 : detail.issue.state) === 'closed' ? 'reopen' : 'completed');
     // ---- pickers ------------------------------------------------------------------------------------------------
-    const sameSet = (a, b) => a.size === b.size && [...a].every(v => b.has(v));
-    /** A multi-select picker that applies once it closes, like github.com, instead of one request per tick. */
-    function pickMany(anchor, title, items, apply) {
-        const initial = new Set(items.filter(i => i.selected).map(i => i.value));
-        const chosen = new Set(initial);
-        openPicker({
-            anchor, title, items, multi: true,
-            onSelect: v => { if (chosen.has(v))
-                chosen.delete(v);
-            else
-                chosen.add(v); },
-            onClose: () => { if (!sameSet(chosen, initial))
-                apply(chosen); },
-        });
-    }
     function pickAssignees(anchor) {
         var _a;
         if (!detail)
@@ -1625,7 +1731,8 @@ function renderCreateForm(root, data, post) {
         const target = e.target;
         const actEl = target.closest('[data-act]');
         if (actEl) {
-            handleAction(actEl.dataset.act, actEl, e);
+            if (!createForm)
+                handleAction(actEl.dataset.act, actEl, e);
             return;
         }
         const link = target.closest('a[href]');
@@ -1648,6 +1755,7 @@ function renderCreateForm(root, data, post) {
         const msg = event.data;
         switch (msg.type) {
             case 'detail': {
+                createForm = null;
                 if (!detail || detail.issue.number !== msg.detail.issue.number) {
                     // A different issue (this tab was reused, or the create form just became an issue): nothing in flight applies.
                     pending = 0;
@@ -1738,7 +1846,13 @@ function renderCreateForm(root, data, post) {
                 composerReceive(msg);
                 break;
             case 'candidates':
-                candidatePicker(msg.items);
+                if (createForm)
+                    createForm.candidates(msg.items);
+                else
+                    candidatePicker(msg.items);
+                break;
+            case 'setParent':
+                createForm === null || createForm === void 0 ? void 0 : createForm.setParent(msg.parent);
                 break;
             case 'failed':
                 toast(msg.message);
@@ -1758,6 +1872,7 @@ function renderCreateForm(root, data, post) {
                     renderTimeline();
                 break;
             case 'error':
+                createForm = null;
                 pageMounted = false;
                 root.innerHTML = `<div id="empty">Failed to load issue: ${escapeHtml(msg.message)}
           <div><button type="button" class="btn btn-secondary" data-act="retry">Retry</button></div></div>`;
@@ -1770,16 +1885,14 @@ function renderCreateForm(root, data, post) {
                 detail = null;
                 pending = 0;
                 rollback = null;
-                renderCreateForm(root, msg, post);
+                createForm = renderCreateForm(root, msg, createIo);
                 break;
-            case 'createFailed': {
-                const btn = document.getElementById('save-btn');
-                if (btn) {
-                    btn.disabled = false;
-                    btn.textContent = 'Create';
-                }
+            case 'createFailed':
+                createForm === null || createForm === void 0 ? void 0 : createForm.failed();
                 break;
-            }
+            case 'created':
+                createForm === null || createForm === void 0 ? void 0 : createForm.created(msg.number);
+                break;
         }
     });
     post({ type: 'ready' });

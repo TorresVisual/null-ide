@@ -300,6 +300,25 @@ function openPicker(opts) {
     pop.style.top = `${Math.max(4, Math.min(rect.bottom + 2, window.innerHeight - pop.offsetHeight - 4))}px`;
     (input !== null && input !== void 0 ? input : pop).focus();
 }
+/**
+ * A multi-select picker that reports the final set once it closes (and only if it changed), like github.com, instead
+ * of one request per tick. `items[].selected` is the starting set.
+ */
+function pickMany(anchor, title, items, apply) {
+    const initial = new Set(items.filter(i => i.selected).map(i => i.value));
+    const chosen = new Set(initial);
+    openPicker({
+        anchor, title, items, multi: true,
+        onSelect: v => { if (chosen.has(v))
+            chosen.delete(v);
+        else
+            chosen.add(v); },
+        onClose: () => {
+            if (chosen.size !== initial.size || [...initial].some(v => !chosen.has(v)))
+                apply(chosen);
+        },
+    });
+}
 (function () {
     const vscode = acquireVsCodeApi();
     const el = (id) => document.getElementById(id);

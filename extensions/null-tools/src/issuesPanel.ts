@@ -83,9 +83,12 @@ export class IssuesViewProvider implements vscode.WebviewViewProvider, IssuesLis
   }
 
   async createIssue(): Promise<void> {
-    await IssueDetailPanel.showCreate(this._extensionUri, this._store, issue => {
-      for (const controller of this._controllers) controller.insertCreated(issue);
-    });
+    await IssueDetailPanel.showCreate(this._extensionUri, this._store);
+  }
+
+  /** The lists show a just-created issue at once instead of waiting for GitHub's search index. */
+  insertCreated(issue: GithubIssue): void {
+    for (const controller of this._controllers) controller.insertCreated(issue);
   }
 
   onDefaultResults(items: GithubIssue[]): void {

@@ -119,3 +119,19 @@ function openPicker(opts: PickerOptions): void {
   pop.style.top = `${Math.max(4, Math.min(rect.bottom + 2, window.innerHeight - pop.offsetHeight - 4))}px`;
   (input ?? pop).focus();
 }
+
+/**
+ * A multi-select picker that reports the final set once it closes (and only if it changed), like github.com, instead
+ * of one request per tick. `items[].selected` is the starting set.
+ */
+function pickMany(anchor: HTMLElement, title: string, items: PickerItem[], apply: (chosen: Set<string>) => void): void {
+  const initial = new Set(items.filter(i => i.selected).map(i => i.value));
+  const chosen = new Set(initial);
+  openPicker({
+    anchor, title, items, multi: true,
+    onSelect: v => { if (chosen.has(v)) chosen.delete(v); else chosen.add(v); },
+    onClose: () => {
+      if (chosen.size !== initial.size || [...initial].some(v => !chosen.has(v))) apply(chosen);
+    },
+  });
+}

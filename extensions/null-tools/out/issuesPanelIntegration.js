@@ -44,7 +44,7 @@ const githubApi_1 = require("./github/githubApi");
 function registerIssuesPanelFeature(context) {
     const store = new issuesStore_1.IssuesStore(() => vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? null);
     const provider = new issuesPanel_1.IssuesViewProvider(context.extensionUri, store, context.globalState);
-    issueDetailPanel_1.IssueDetailPanel.configure(context.workspaceState);
+    issueDetailPanel_1.IssueDetailPanel.configure(context.workspaceState, issue => provider.insertCreated(issue));
     context.subscriptions.push(vscode.window.registerWebviewViewProvider('null.issuesView', provider, {
         webviewOptions: { retainContextWhenHidden: true },
     }));

@@ -12,7 +12,7 @@ import { GithubIssue } from './github/types';
 export function registerIssuesPanelFeature(context: vscode.ExtensionContext): void {
   const store = new IssuesStore(() => vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? null);
   const provider = new IssuesViewProvider(context.extensionUri, store, context.globalState);
-  IssueDetailPanel.configure(context.workspaceState);
+  IssueDetailPanel.configure(context.workspaceState, issue => provider.insertCreated(issue));
 
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider('null.issuesView', provider, {

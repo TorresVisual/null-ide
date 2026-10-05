@@ -9,7 +9,7 @@ import { createIssueBranch, getLocallyClosedIssueNumbers } from './github/gitBra
 import { toggleTaskCheckbox } from './github/taskList';
 import { loadIssueTemplates } from './github/issueTemplates';
 import { draftKey } from './github/issueDrafts';
-import { GithubIssue, GithubLabel, GithubUser, ReactionContent } from './github/types';
+import { GithubIssue, ReactionContent } from './github/types';
 
 /** What a close/reopen button asks for. */
 type StateTarget = 'completed' | 'not_planned' | 'reopen';
@@ -48,7 +48,7 @@ type InboundMessage =
   | { type: 'preview'; requestId: number; text: string }
   | { type: 'suggest'; requestId: number; prefix: string }
   | { type: 'saveDraft'; number: number; body: string }
-  | { type: 'submitCreate'; title: string; body: string; labels: string[]; assignees: string[] }
+  | { type: 'submitCreate'; title: string; body: string; labels: string[]; assignees: string[]; milestone: number | null; typeId: string | null; parent: number | null; createMore: boolean }
   | { type: 'cancelCreate' };
 
 /** A tab that regains focus after this long reloads its issue. */
@@ -66,14 +66,18 @@ export class IssueDetailPanel {
   /** Where unsent comment text is kept; set once by registerIssuesPanelFeature. */
   private static drafts: vscode.Memento | undefined;
 
-  static configure(drafts: vscode.Memento): void {
+  /** Told about every issue created from the New issue tab, so the lists can show it before GitHub's search index catches up. */
+  private static onCreated: ((issue: GithubIssue) => void) | undefined;
+
+  static configure(drafts: vscode.Memento, onCreated: (issue: GithubIssue) => void): void {
     IssueDetailPanel.drafts = drafts;
+    IssueDetailPanel.onCreated = onCreated;
   }
 
   private readonly panel: vscode.WebviewPanel;
   private issueNumber = 0;
   private creating = false;
-  private onCreated?: (issue: GithubIssue) => void;
+  private parent: { number: number; title: string } | null = null;
   private detail: { id: string; timelineCursor: string | null } | null = null;
   private loadedAt = 0;
 
@@ -93,16 +97,18 @@ export class IssueDetailPanel {
     await target.openIssue(issueNumber);
   }
 
-  static async showCreate(extensionUri: vscode.Uri, store: IssuesStore, onCreated?: (issue: GithubIssue) => void): Promise<void> {
+  static async showCreate(
+    extensionUri: vscode.Uri, store: IssuesStore, parent: { number: number; title: string } | null = null,
+  ): Promise<void> {
     const existing = IssueDetailPanel.creatingTab;
     if (existing) {
-      existing.onCreated = onCreated;
       existing.panel.reveal();
+      if (parent) existing._post({ type: 'setParent', parent }); // keep what the user already typed
       return;
     }
     const tab = new IssueDetailPanel(extensionUri, store);
     IssueDetailPanel.creatingTab = tab;
-    await tab.openCreate(onCreated);
+    await tab.openCreate(parent);
   }
 
   private constructor(private readonly extensionUri: vscode.Uri, private readonly store: IssuesStore) {
@@ -138,9 +144,9 @@ export class IssueDetailPanel {
     await this._load(false);
   }
 
-  private async openCreate(onCreated?: (issue: GithubIssue) => void): Promise<void> {
+  private async openCreate(parent: { number: number; title: string } | null): Promise<void> {
     this.creating = true;
-    this.onCreated = onCreated;
+    this.parent = parent;
     this.panel.title = 'New Issue';
     await this._sendCreateForm();
   }
@@ -202,14 +208,17 @@ export class IssueDetailPanel {
   }
 
   private async _sendCreateForm(): Promise<void> {
-    // Signed-out/offline must still show the form: Create itself prompts for sign-in
-    // (ensureSession(true)), so an empty-picker form beats no form at all.
-    const [repoLabels, assignableUsers] = await Promise.all([
-      Promise.resolve([] as GithubLabel[]),
-      Promise.resolve([] as GithubUser[]),
-    ]);
+    // Signed-out/offline must still show the form: Create itself prompts for sign-in (ensureSession(true)), so a
+    // form with empty pickers beats no form at all.
+    const m = await this.store.getMetadata().catch((): null => null);
     const cwd = this._cwd();
-    this._post({ type: 'createInit', repoLabels, assignableUsers, templates: cwd ? loadIssueTemplates(cwd) : [] });
+    this._post({
+      type: 'createInit',
+      metadata: { labels: m?.labels ?? [], assignees: m?.assignees ?? [], milestones: m?.milestones ?? [], types: m?.issueTypes ?? [] },
+      templates: cwd ? loadIssueTemplates(cwd) : [],
+      parent: this.parent,
+      draft: this._readDraft(0),
+    });
   }
 
   /** Runs one GitHub write, then reloads the issue so the tab shows GitHub's version (and any new timeline events). */
@@ -389,20 +398,30 @@ export class IssueDetailPanel {
         break;
       }
       case 'submitCreate': {
+        let created: GithubIssue;
         try {
-          const created = await this.store.createIssue({
-            title: msg.title, body: msg.body, labels: msg.labels, assignees: msg.assignees,
+          created = await this.store.createIssue({
+            title: msg.title, body: msg.body, labels: msg.labels, assignees: msg.assignees, milestone: msg.milestone ?? undefined,
           });
-          // This tab becomes the new issue's tab. Open it first so the store knows the issue, then let the
-          // lists insert it: they don't search for it, because GitHub's search index lags a few seconds.
-          if (IssueDetailPanel.creatingTab === this) IssueDetailPanel.creatingTab = undefined;
-          IssueDetailPanel.shared ??= this;
-          await this.openIssue(created.number);
-          this.onCreated?.(created);
         } catch (err) {
           void vscode.window.showErrorMessage(`Failed to create issue: ${(err as Error).message}`);
           this._post({ type: 'createFailed' });
+          break;
         }
+        this._writeDraft(0, ''); // only now that the issue exists
+        const problems = await this.store.applyCreateExtras(created, { typeId: msg.typeId, parent: msg.parent });
+        if (problems.length > 0) void vscode.window.showWarningMessage(`Created #${created.number}, but ${problems.join(' and ')}.`);
+        if (msg.parent) void IssueDetailPanel.byNumber.get(msg.parent)?._load(false); // its Sub-issues list just grew
+        if (msg.createMore) {
+          this._post({ type: 'created', number: created.number });
+        } else {
+          // This tab becomes the new issue's tab.
+          if (IssueDetailPanel.creatingTab === this) IssueDetailPanel.creatingTab = undefined;
+          IssueDetailPanel.shared ??= this;
+          await this.openIssue(created.number);
+        }
+        // The store already knows the issue (createIssue remembered it); the lists can't search for it yet, so they insert it.
+        IssueDetailPanel.onCreated?.(created);
         break;
       }
       case 'cancelCreate':

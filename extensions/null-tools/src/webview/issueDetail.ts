@@ -39,6 +39,7 @@ type StateTarget = 'completed' | 'not_planned' | 'reopen';
   let pageMounted = false;
   let composerFor = 0;
   let candidateAnchor: HTMLElement | null = null;
+  let createForm: CreateForm | null = null;
   let toastTimer: ReturnType<typeof setTimeout> | undefined;
 
   const post = (message: unknown): void => vscode.postMessage(message);
@@ -87,6 +88,8 @@ type StateTarget = 'completed' | 'not_planned' | 'reopen';
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => toastEl.classList.add('hidden'), 5000);
   }
+
+  const createIo: CreateIo = { post, toast, saveDraftSoon: body => saveDraftSoon(0, body), dropDraft };
 
   // ---- rendering ----------------------------------------------------------------------------------------------
 
@@ -286,19 +289,6 @@ type StateTarget = 'completed' | 'not_planned' | 'reopen';
   const closeTarget = (): StateTarget => (detail?.issue.state === 'closed' ? 'reopen' : 'completed');
 
   // ---- pickers ------------------------------------------------------------------------------------------------
-
-  const sameSet = (a: Set<string>, b: Set<string>): boolean => a.size === b.size && [...a].every(v => b.has(v));
-
-  /** A multi-select picker that applies once it closes, like github.com, instead of one request per tick. */
-  function pickMany(anchor: HTMLElement, title: string, items: PickerItem[], apply: (chosen: Set<string>) => void): void {
-    const initial = new Set(items.filter(i => i.selected).map(i => i.value));
-    const chosen = new Set(initial);
-    openPicker({
-      anchor, title, items, multi: true,
-      onSelect: v => { if (chosen.has(v)) chosen.delete(v); else chosen.add(v); },
-      onClose: () => { if (!sameSet(chosen, initial)) apply(chosen); },
-    });
-  }
 
   function pickAssignees(anchor: HTMLElement): void {
     if (!detail) return;
@@ -543,7 +533,7 @@ type StateTarget = 'completed' | 'not_planned' | 'reopen';
     const target = e.target as HTMLElement;
     const actEl = target.closest<HTMLElement>('[data-act]');
     if (actEl) {
-      handleAction(actEl.dataset.act!, actEl, e);
+      if (!createForm) handleAction(actEl.dataset.act!, actEl, e);
       return;
     }
     const link = target.closest<HTMLAnchorElement>('a[href]');
@@ -565,6 +555,7 @@ type StateTarget = 'completed' | 'not_planned' | 'reopen';
     const msg = event.data;
     switch (msg.type) {
       case 'detail': {
+        createForm = null;
         if (!detail || detail.issue.number !== msg.detail.issue.number) {
           // A different issue (this tab was reused, or the create form just became an issue): nothing in flight applies.
           pending = 0;
@@ -644,7 +635,10 @@ type StateTarget = 'completed' | 'not_planned' | 'reopen';
       case 'suggestions':
         composerReceive(msg);
         break;
-      case 'candidates': candidatePicker(msg.items); break;
+      case 'candidates':
+        if (createForm) createForm.candidates(msg.items); else candidatePicker(msg.items);
+        break;
+      case 'setParent': createForm?.setParent(msg.parent); break;
       case 'failed':
         toast(msg.message);
         if (msg.what === 'write' || msg.what === 'refresh') pending = Math.max(0, pending - 1);
@@ -658,6 +652,7 @@ type StateTarget = 'completed' | 'not_planned' | 'reopen';
         if (msg.what === 'edit' || msg.what === 'timeline') renderTimeline();
         break;
       case 'error':
+        createForm = null;
         pageMounted = false;
         root.innerHTML = `<div id="empty">Failed to load issue: ${escapeHtml(msg.message)}
           <div><button type="button" class="btn btn-secondary" data-act="retry">Retry</button></div></div>`;
@@ -668,16 +663,10 @@ type StateTarget = 'completed' | 'not_planned' | 'reopen';
         detail = null;
         pending = 0;
         rollback = null;
-        renderCreateForm(root, msg, post);
+        createForm = renderCreateForm(root, msg, createIo);
         break;
-      case 'createFailed': {
-        const btn = document.getElementById('save-btn') as HTMLButtonElement | null;
-        if (btn) {
-          btn.disabled = false;
-          btn.textContent = 'Create';
-        }
-        break;
-      }
+      case 'createFailed': createForm?.failed(); break;
+      case 'created': createForm?.created(msg.number); break;
     }
   });
 
