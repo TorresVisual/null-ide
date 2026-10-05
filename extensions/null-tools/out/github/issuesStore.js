@@ -5,6 +5,7 @@ const githubRemote_1 = require("./githubRemote");
 const githubAuth_1 = require("./githubAuth");
 const createExtras_1 = require("./createExtras");
 const githubApi_1 = require("./githubApi");
+const imageCache_1 = require("./imageCache");
 const detailQueries_1 = require("./detailQueries");
 const githubQueries_1 = require("./githubQueries");
 const issueSuggest_1 = require("./issueSuggest");
@@ -114,6 +115,11 @@ class IssuesStore {
     async renderPreview(text) {
         const { repo, token } = await this.ensureSession(false);
         return (0, githubApi_1.renderMarkdown)(text, `${repo.owner}/${repo.repo}`, token);
+    }
+    /** Local file for an image shown in a post or the preview; downloads it once into `.null/issue-images`. */
+    async resolveImage(url) {
+        const { token } = await this.ensureSession(false);
+        return (0, imageCache_1.resolveImage)(url, { root: this.getCwd(), token }); // ensureSession succeeded, so there is a workspace folder
     }
     /** Issues for the composer's `#` popup: what is already loaded first, then (from 2 characters) a server search. */
     async suggestIssues(prefix) {

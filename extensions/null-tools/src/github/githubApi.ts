@@ -4,6 +4,7 @@ import * as https from 'https';
 import type { IncomingHttpHeaders } from 'http';
 import { GithubIssue, IssueState } from './types';
 import { stripPullRequests } from './issueFilter';
+import { tokenForUrl } from './imageUrls';
 
 interface ApiErrorBody {
   message?: string;
@@ -138,4 +139,78 @@ export function createIssue(
   token: string | null,
 ): Promise<GithubIssue> {
   return requestJson<GithubIssue>(`/repos/${owner}/${repo}/issues`, token, 'POST', data);
+}
+
+export interface FetchedBytes { bytes: Buffer; contentType: string | null }
+
+/**
+ * GET a file as bytes (an image). `request()` above decodes the body as UTF-8, which would corrupt binary, so this is its
+ * own transport. Redirects are followed by hand, up to 5, so the token (see `tokenForUrl`) is only ever sent on the first
+ * request. A body past `maxBytes` aborts the download. Not unit-tested: it needs HTTPS (Task 7, scenario 1).
+ */
+export function fetchBytes(url: string, token: string | null, accept: string, maxBytes: number, hop = 0): Promise<FetchedBytes> {
+  return new Promise((resolve, reject) => {
+    if (hop > 5) {
+      reject(new Error('Too many redirects'));
+      return;
+    }
+    let target: URL;
+    try {
+      target = new URL(url);
+    } catch {
+      reject(new Error('Invalid image URL'));
+      return;
+    }
+    if (target.protocol !== 'https:') {
+      reject(new Error('Only https images can be fetched'));
+      return;
+    }
+    const headers: Record<string, string> = { Accept: accept, 'User-Agent': 'Null-IDE' };
+    const auth = tokenForUrl(url, token, hop);
+    if (auth) headers.Authorization = `Bearer ${auth}`;
+    const req = https.get(target, { headers }, res => {
+      const status = res.statusCode ?? 0;
+      if (status >= 300 && status < 400 && res.headers.location) {
+        res.resume();
+        fetchBytes(new URL(res.headers.location, target).href, token, accept, maxBytes, hop + 1).then(resolve, reject);
+        return;
+      }
+      if (status < 200 || status >= 300) {
+        let data = '';
+        res.setEncoding('utf8');
+        res.on('data', chunk => { if (data.length < 2000) data += chunk; });
+        res.on('end', () => reject(new ApiError(formatApiError(status, data), status)));
+        return;
+      }
+      const tooBig = (): void => {
+        res.destroy();
+        reject(new Error(`Image is larger than ${Math.round(maxBytes / (1024 * 1024))} MB`));
+      };
+      if (Number(res.headers['content-length']) > maxBytes) {
+        tooBig();
+        return;
+      }
+      const chunks: Buffer[] = [];
+      let size = 0;
+      res.on('data', (chunk: Buffer) => {
+        size += chunk.length;
+        if (size > maxBytes) tooBig();
+        else chunks.push(chunk);
+      });
+      res.on('end', () => resolve({ bytes: Buffer.concat(chunks), contentType: res.headers['content-type'] ?? null }));
+      res.on('error', reject);
+    });
+    req.on('error', reject);
+    req.setTimeout(15000, () => req.destroy(new Error('Image request timed out')));
+  });
+}
+
+/** A file of a repo at `ref`, as bytes, through the Contents API's raw media type (works for private repos, unlike a github.com page URL). */
+export function fetchRepoFile(
+  owner: string, repo: string, ref: string, filePath: string, token: string | null, maxBytes: number,
+): Promise<FetchedBytes> {
+  const apiPath = filePath.split('/').map(encodeURIComponent).join('/');
+  return fetchBytes(
+    `https://api.github.com/repos/${owner}/${repo}/contents/${apiPath}?ref=${encodeURIComponent(ref)}`,
+    token, 'application/vnd.github.raw+json', maxBytes);
 }

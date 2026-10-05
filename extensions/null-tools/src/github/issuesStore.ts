@@ -4,6 +4,7 @@ import { getWorkspaceGithubRepo } from './githubRemote';
 import { getGithubSession } from './githubAuth';
 import { CreateExtraStep, runCreateExtras } from './createExtras';
 import { IssuePatch, createIssue, renderMarkdown, requestGraphql, updateIssue } from './githubApi';
+import { resolveImage } from './imageCache';
 import {
   ADD_COMMENT, ADD_REACTION, ADD_SUB_ISSUE, DELETE_COMMENT, GqlComment, GqlReactionGroup, ISSUE_DETAIL, ISSUE_TIMELINE,
   IssueDetailData, IssueTimelineData, REMOVE_REACTION, REMOVE_SUB_ISSUE, SET_ISSUE_TYPE, UPDATE_COMMENT, mapComment,
@@ -129,6 +130,12 @@ export class IssuesStore {
   async renderPreview(text: string): Promise<string> {
     const { repo, token } = await this.ensureSession(false);
     return renderMarkdown(text, `${repo.owner}/${repo.repo}`, token);
+  }
+
+  /** Local file for an image shown in a post or the preview; downloads it once into `.null/issue-images`. */
+  async resolveImage(url: string): Promise<string> {
+    const { token } = await this.ensureSession(false);
+    return resolveImage(url, { root: this.getCwd()!, token }); // ensureSession succeeded, so there is a workspace folder
   }
 
   /** Issues for the composer's `#` popup: what is already loaded first, then (from 2 characters) a server search. */
