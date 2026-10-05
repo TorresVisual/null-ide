@@ -123,3 +123,28 @@ function userSuggestion(u: GithubUser): ComposerSuggestion {
 function issueSuggestion(i: { number: number; title: string; state: string }): ComposerSuggestion {
   return { insert: `#${i.number}`, html: `${issueStateIcon(i.state, null)} <b>#${i.number}</b> ${escapeHtml(i.title)}` };
 }
+
+/** The text that stands in for an image while it uploads. The id makes it unique, so two uploads of `image.png` can't swap results. */
+function uploadingPlaceholder(name: string, id: number): string {
+  return `![Uploading ${name.replace(/[[\]\r\n]/g, ' ')}…](#upload-${id})`;
+}
+
+/** Replaces the selection with `text`, on a line of its own: a newline is added on a side that isn't already at a line break. */
+function insertAtCaret(value: string, start: number, end: number, text: string): ComposerEdit {
+  const before = start > 0 && value[start - 1] !== '\n' ? '\n' : '';
+  const after = end < value.length && value[end] !== '\n' ? '\n' : '';
+  const caret = start + before.length + text.length;
+  return { value: value.slice(0, start) + before + text + after + value.slice(end), start: caret, end: caret };
+}
+
+/**
+ * Swaps `placeholder` for `replacement` (empty removes it) and moves the caret so the user's place in the text survives.
+ * null when the placeholder is gone, so a stand-in the user already deleted is not put back.
+ */
+function replacePlaceholder(value: string, caret: number, placeholder: string, replacement: string): ComposerEdit | null {
+  const at = value.indexOf(placeholder);
+  if (at < 0) return null;
+  const stop = at + placeholder.length;
+  const moved = caret >= stop ? caret + replacement.length - placeholder.length : caret > at ? at + replacement.length : caret;
+  return { value: value.slice(0, at) + replacement + value.slice(stop), start: moved, end: moved };
+}

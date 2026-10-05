@@ -76,7 +76,7 @@ function createComposer(opts: ComposerOptions): Composer {
         <button type="button" class="composer-tab" role="tab" aria-selected="false" data-tab="preview">Preview</button>
       </div>
       <div class="composer-tools">${COMPOSER_TOOLS.map(t =>
-        `<button type="button" class="icon-btn" data-tool="${t.id}" title="${t.title}" aria-label="${t.title}">${octicon(t.icon)}</button>`).join('')}</div>
+        `<button type="button" class="icon-btn" data-tool="${t.id}" title="${t.title}" aria-label="${t.title}">${octicon(t.icon)}</button>`).join('')}<button type="button" class="icon-btn" data-attach title="Attach an image" aria-label="Attach an image">${octicon('image')}</button><input type="file" class="composer-file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" multiple hidden></div>
     </div>
     <textarea class="composer-input" spellcheck="true"></textarea>
     <div class="composer-preview post-body hidden"></div>
@@ -87,6 +87,7 @@ function createComposer(opts: ComposerOptions): Composer {
   const hint = el.querySelector('.composer-hint') as HTMLElement;
   const popup = el.querySelector('.composer-suggest') as HTMLElement;
   const tools = el.querySelector('.composer-tools') as HTMLElement;
+  const fileInput = el.querySelector('.composer-file') as HTMLInputElement;
   ta.value = opts.value;
   ta.placeholder = opts.placeholder;
   ta.setAttribute('aria-label', opts.label);
@@ -224,6 +225,61 @@ function createComposer(opts: ComposerOptions): Composer {
     replaceAll(applySuggestion(ta.value, trigger.start, ta.selectionStart, s.insert));
   }
 
+  // ---- image upload -------------------------------------------------------------------------------------------
+
+  const IMAGE_LIMIT = 10 * 1024 * 1024; // the host checks this again, and the allowed types
+
+  function showHint(message: string): void {
+    hint.textContent = message;
+    hint.classList.remove('hidden');
+  }
+
+  function readBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result).slice(String(reader.result).indexOf(',') + 1));
+      reader.onerror = () => reject(reader.error ?? new Error('Could not read the file.'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  /**
+   * Puts a stand-in at the caret right away, uploads in the background, then swaps in the markdown, or removes the stand-in
+   * and says why. The result is written without refocusing: the user may be typing in another field by then.
+   * ponytail: an upload that finishes after this composer was re-rendered (an edit form, on a refresh) leaves its stand-in in the text.
+   */
+  function attach(files: File[]): void {
+    if (mode === 'preview') setMode('write');
+    for (const file of files) {
+      const name = file.name || 'image.png';
+      if (file.size > IMAGE_LIMIT) {
+        showHint(`${name} is larger than 10 MB.`);
+        continue;
+      }
+      const id = ++composerSeq;
+      const placeholder = uploadingPlaceholder(name, id);
+      replaceAll(insertAtCaret(ta.value, ta.selectionStart, ta.selectionEnd, placeholder));
+      composerWaiting.set(id, msg => {
+        const done = replacePlaceholder(ta.value, ta.selectionStart, placeholder, msg.error ? '' : msg.markdown);
+        if (done) {
+          ta.value = done.value;
+          ta.setSelectionRange(done.start, done.end);
+          changed();
+        }
+        if (msg.error) showHint(msg.error);
+      });
+      readBase64(file).then(
+        dataBase64 => opts.post({ type: 'uploadImage', requestId: id, name, mime: file.type, dataBase64 }),
+        () => composerReceive({ requestId: id, error: 'Could not read the file.' } as { requestId: number }),
+      );
+    }
+  }
+
+  /** Image files in a paste or drop; a paste that also carries text (a copied spreadsheet cell) is a text paste. */
+  function imageFiles(transfer: DataTransfer | null, ignoreIfText: boolean): File[] {
+    if (!transfer || (ignoreIfText && transfer.getData('text/plain'))) return [];
+    return Array.from(transfer.files).filter(f => f.type.startsWith('image/'));
+  }
   // ---- events -------------------------------------------------------------------------------------------------
 
   ta.addEventListener('input', () => {
@@ -232,6 +288,25 @@ function createComposer(opts: ComposerOptions): Composer {
   });
   ta.addEventListener('click', updateSuggest);
   ta.addEventListener('blur', closeSuggest);
+  ta.addEventListener('paste', e => {
+    const files = imageFiles(e.clipboardData, true);
+    if (files.length === 0) return;
+    e.preventDefault();
+    attach(files);
+  });
+  ta.addEventListener('dragover', e => {
+    if (e.dataTransfer?.types.includes('Files')) e.preventDefault(); // without this the browser never offers a drop
+  });
+  ta.addEventListener('drop', e => {
+    const files = imageFiles(e.dataTransfer, false);
+    if (files.length === 0) return;
+    e.preventDefault();
+    attach(files);
+  });
+  fileInput.addEventListener('change', () => {
+    attach(Array.from(fileInput.files ?? []));
+    fileInput.value = ''; // picking the same file again must fire `change` again
+  });
 
   ta.addEventListener('keydown', e => {
     if (e.isComposing) return; // an input method is still choosing characters
@@ -284,6 +359,10 @@ function createComposer(opts: ComposerOptions): Composer {
     const tab = target.closest<HTMLElement>('[data-tab]');
     if (tab) {
       setMode(tab.dataset.tab as 'write' | 'preview');
+      return;
+    }
+    if (target.closest('[data-attach]')) {
+      fileInput.click();
       return;
     }
     const tool = target.closest<HTMLElement>('[data-tool]');

@@ -639,6 +639,7 @@ type StateTarget = 'completed' | 'not_planned' | 'reopen';
       }
       case 'previewResult':
       case 'suggestions':
+      case 'uploadResult':
         composerReceive(msg);
         break;
       case 'imageResolved': imageResolved(msg.url, msg.src); break;

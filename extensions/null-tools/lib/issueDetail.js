@@ -613,6 +613,29 @@ function userSuggestion(u) {
 function issueSuggestion(i) {
     return { insert: `#${i.number}`, html: `${issueStateIcon(i.state, null)} <b>#${i.number}</b> ${escapeHtml(i.title)}` };
 }
+/** The text that stands in for an image while it uploads. The id makes it unique, so two uploads of `image.png` can't swap results. */
+function uploadingPlaceholder(name, id) {
+    return `![Uploading ${name.replace(/[[\]\r\n]/g, ' ')}…](#upload-${id})`;
+}
+/** Replaces the selection with `text`, on a line of its own: a newline is added on a side that isn't already at a line break. */
+function insertAtCaret(value, start, end, text) {
+    const before = start > 0 && value[start - 1] !== '\n' ? '\n' : '';
+    const after = end < value.length && value[end] !== '\n' ? '\n' : '';
+    const caret = start + before.length + text.length;
+    return { value: value.slice(0, start) + before + text + after + value.slice(end), start: caret, end: caret };
+}
+/**
+ * Swaps `placeholder` for `replacement` (empty removes it) and moves the caret so the user's place in the text survives.
+ * null when the placeholder is gone, so a stand-in the user already deleted is not put back.
+ */
+function replacePlaceholder(value, caret, placeholder, replacement) {
+    const at = value.indexOf(placeholder);
+    if (at < 0)
+        return null;
+    const stop = at + placeholder.length;
+    const moved = caret >= stop ? caret + replacement.length - placeholder.length : caret > at ? at + replacement.length : caret;
+    return { value: value.slice(0, at) + replacement + value.slice(stop), start: moved, end: moved };
+}
 // Thumbnails for the images in rendered markdown (posts and the composer's preview). neutralizeImagesHtml leaves a
 // `.img-placeholder` chip per image; this asks the host for a local copy of each (it downloads with the token, which the
 // webview doesn't have) and swaps the chip for an <img> once the copy exists. DOM only, so no unit tests: which URLs are
@@ -753,7 +776,7 @@ function createComposer(opts) {
         <button type="button" class="composer-tab active" role="tab" aria-selected="true" data-tab="write">Write</button>
         <button type="button" class="composer-tab" role="tab" aria-selected="false" data-tab="preview">Preview</button>
       </div>
-      <div class="composer-tools">${COMPOSER_TOOLS.map(t => `<button type="button" class="icon-btn" data-tool="${t.id}" title="${t.title}" aria-label="${t.title}">${octicon(t.icon)}</button>`).join('')}</div>
+      <div class="composer-tools">${COMPOSER_TOOLS.map(t => `<button type="button" class="icon-btn" data-tool="${t.id}" title="${t.title}" aria-label="${t.title}">${octicon(t.icon)}</button>`).join('')}<button type="button" class="icon-btn" data-attach title="Attach an image" aria-label="Attach an image">${octicon('image')}</button><input type="file" class="composer-file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" multiple hidden></div>
     </div>
     <textarea class="composer-input" spellcheck="true"></textarea>
     <div class="composer-preview post-body hidden"></div>
@@ -764,6 +787,7 @@ function createComposer(opts) {
     const hint = el.querySelector('.composer-hint');
     const popup = el.querySelector('.composer-suggest');
     const tools = el.querySelector('.composer-tools');
+    const fileInput = el.querySelector('.composer-file');
     ta.value = opts.value;
     ta.placeholder = opts.placeholder;
     ta.setAttribute('aria-label', opts.label);
@@ -895,6 +919,56 @@ function createComposer(opts) {
             return;
         replaceAll(applySuggestion(ta.value, trigger.start, ta.selectionStart, s.insert));
     }
+    // ---- image upload -------------------------------------------------------------------------------------------
+    const IMAGE_LIMIT = 10 * 1024 * 1024; // the host checks this again, and the allowed types
+    function showHint(message) {
+        hint.textContent = message;
+        hint.classList.remove('hidden');
+    }
+    function readBase64(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result).slice(String(reader.result).indexOf(',') + 1));
+            reader.onerror = () => { var _a; return reject((_a = reader.error) !== null && _a !== void 0 ? _a : new Error('Could not read the file.')); };
+            reader.readAsDataURL(file);
+        });
+    }
+    /**
+     * Puts a stand-in at the caret right away, uploads in the background, then swaps in the markdown, or removes the stand-in
+     * and says why. The result is written without refocusing: the user may be typing in another field by then.
+     * ponytail: an upload that finishes after this composer was re-rendered (an edit form, on a refresh) leaves its stand-in in the text.
+     */
+    function attach(files) {
+        if (mode === 'preview')
+            setMode('write');
+        for (const file of files) {
+            const name = file.name || 'image.png';
+            if (file.size > IMAGE_LIMIT) {
+                showHint(`${name} is larger than 10 MB.`);
+                continue;
+            }
+            const id = ++composerSeq;
+            const placeholder = uploadingPlaceholder(name, id);
+            replaceAll(insertAtCaret(ta.value, ta.selectionStart, ta.selectionEnd, placeholder));
+            composerWaiting.set(id, msg => {
+                const done = replacePlaceholder(ta.value, ta.selectionStart, placeholder, msg.error ? '' : msg.markdown);
+                if (done) {
+                    ta.value = done.value;
+                    ta.setSelectionRange(done.start, done.end);
+                    changed();
+                }
+                if (msg.error)
+                    showHint(msg.error);
+            });
+            readBase64(file).then(dataBase64 => opts.post({ type: 'uploadImage', requestId: id, name, mime: file.type, dataBase64 }), () => composerReceive({ requestId: id, error: 'Could not read the file.' }));
+        }
+    }
+    /** Image files in a paste or drop; a paste that also carries text (a copied spreadsheet cell) is a text paste. */
+    function imageFiles(transfer, ignoreIfText) {
+        if (!transfer || (ignoreIfText && transfer.getData('text/plain')))
+            return [];
+        return Array.from(transfer.files).filter(f => f.type.startsWith('image/'));
+    }
     // ---- events -------------------------------------------------------------------------------------------------
     ta.addEventListener('input', () => {
         changed();
@@ -902,6 +976,30 @@ function createComposer(opts) {
     });
     ta.addEventListener('click', updateSuggest);
     ta.addEventListener('blur', closeSuggest);
+    ta.addEventListener('paste', e => {
+        const files = imageFiles(e.clipboardData, true);
+        if (files.length === 0)
+            return;
+        e.preventDefault();
+        attach(files);
+    });
+    ta.addEventListener('dragover', e => {
+        var _a;
+        if ((_a = e.dataTransfer) === null || _a === void 0 ? void 0 : _a.types.includes('Files'))
+            e.preventDefault(); // without this the browser never offers a drop
+    });
+    ta.addEventListener('drop', e => {
+        const files = imageFiles(e.dataTransfer, false);
+        if (files.length === 0)
+            return;
+        e.preventDefault();
+        attach(files);
+    });
+    fileInput.addEventListener('change', () => {
+        var _a;
+        attach(Array.from((_a = fileInput.files) !== null && _a !== void 0 ? _a : []));
+        fileInput.value = ''; // picking the same file again must fire `change` again
+    });
     ta.addEventListener('keydown', e => {
         var _a, _b;
         if (e.isComposing)
@@ -955,6 +1053,10 @@ function createComposer(opts) {
         const tab = target.closest('[data-tab]');
         if (tab) {
             setMode(tab.dataset.tab);
+            return;
+        }
+        if (target.closest('[data-attach]')) {
+            fileInput.click();
             return;
         }
         const tool = target.closest('[data-tool]');
@@ -1926,6 +2028,7 @@ function renderCreateForm(root, init, io) {
             }
             case 'previewResult':
             case 'suggestions':
+            case 'uploadResult':
                 composerReceive(msg);
                 break;
             case 'imageResolved':

@@ -98,4 +98,31 @@ const user = (login) => ({ login, avatar_url: '' });
     node_assert_1.default.ok(!i.html.includes('<img'));
     node_assert_1.default.ok(i.html.includes('&lt;img'));
 });
+(0, node_test_1.default)('uploadingPlaceholder is unique per upload and cannot break out of the image syntax', () => {
+    node_assert_1.default.strictEqual(text.uploadingPlaceholder('image.png', 3), '![Uploading image.png…](#upload-3)');
+    node_assert_1.default.notStrictEqual(text.uploadingPlaceholder('image.png', 3), text.uploadingPlaceholder('image.png', 4));
+    node_assert_1.default.strictEqual(text.uploadingPlaceholder('a]b[c\nd.png', 1), '![Uploading a b c d.png…](#upload-1)');
+});
+(0, node_test_1.default)('insertAtCaret puts the stand-in on its own line and the caret just after it', () => {
+    node_assert_1.default.deepStrictEqual(plain(text.insertAtCaret('', 0, 0, 'X')), { value: 'X', start: 1, end: 1 });
+    node_assert_1.default.deepStrictEqual(plain(text.insertAtCaret('see:', 4, 4, 'X')), { value: 'see:\nX', start: 6, end: 6 });
+    node_assert_1.default.deepStrictEqual(plain(text.insertAtCaret('ab', 1, 1, 'X')), { value: 'a\nX\nb', start: 3, end: 3 });
+    node_assert_1.default.deepStrictEqual(plain(text.insertAtCaret('a\nb', 2, 2, 'X')), { value: 'a\nX\nb', start: 3, end: 3 });
+    node_assert_1.default.deepStrictEqual(plain(text.insertAtCaret('hello world', 0, 5, 'X')), { value: 'X\n world', start: 1, end: 1 });
+});
+(0, node_test_1.default)('replacePlaceholder swaps the stand-in for the markdown and keeps the caret where the user left it', () => {
+    const p = '![Uploading a.png…](#upload-1)';
+    const r = '![a](https://x)';
+    const before = `hi\n${p}\nbye`;
+    const atEnd = text.replacePlaceholder(before, before.length, p, r);
+    node_assert_1.default.strictEqual(atEnd.value, `hi\n${r}\nbye`);
+    node_assert_1.default.strictEqual(atEnd.start, atEnd.value.length); // moved by the length difference
+    node_assert_1.default.strictEqual(text.replacePlaceholder(before, 1, p, r).start, 1); // before the stand-in: untouched
+    node_assert_1.default.strictEqual(text.replacePlaceholder(before, 5, p, r).start, 3 + r.length); // inside it: right after the result
+});
+(0, node_test_1.default)('replacePlaceholder with an empty replacement removes the stand-in; one the user deleted is left alone', () => {
+    const p = '![Uploading a.png…](#upload-1)';
+    node_assert_1.default.strictEqual(text.replacePlaceholder(`a${p}b`, 0, p, '').value, 'ab');
+    node_assert_1.default.strictEqual(text.replacePlaceholder('the user deleted it', 3, p, 'x'), null);
+});
 //# sourceMappingURL=webviewComposer.test.js.map

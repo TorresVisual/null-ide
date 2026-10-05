@@ -21,6 +21,9 @@ const text = sandbox as unknown as {
   applySuggestion(v: string, start: number, caret: number, insert: string): Edit;
   matchUsers(users: User[], prefix: string, limit?: number): User[];
   quoteMarkdown(t: string): string;
+  uploadingPlaceholder(name: string, id: number): string;
+  insertAtCaret(v: string, start: number, end: number, t: string): Edit;
+  replacePlaceholder(v: string, caret: number, placeholder: string, replacement: string): Edit | null;
   userSuggestion(u: User): { insert: string; html: string };
   issueSuggestion(i: { number: number; title: string; state: string }): { insert: string; html: string };
 };
@@ -122,4 +125,35 @@ test('userSuggestion and issueSuggestion escape logins and titles', () => {
   assert.strictEqual(i.insert, '#7');
   assert.ok(!i.html.includes('<img'));
   assert.ok(i.html.includes('&lt;img'));
+});
+
+test('uploadingPlaceholder is unique per upload and cannot break out of the image syntax', () => {
+  assert.strictEqual(text.uploadingPlaceholder('image.png', 3), '![Uploading image.png…](#upload-3)');
+  assert.notStrictEqual(text.uploadingPlaceholder('image.png', 3), text.uploadingPlaceholder('image.png', 4));
+  assert.strictEqual(text.uploadingPlaceholder('a]b[c\nd.png', 1), '![Uploading a b c d.png…](#upload-1)');
+});
+
+test('insertAtCaret puts the stand-in on its own line and the caret just after it', () => {
+  assert.deepStrictEqual(plain(text.insertAtCaret('', 0, 0, 'X')), { value: 'X', start: 1, end: 1 });
+  assert.deepStrictEqual(plain(text.insertAtCaret('see:', 4, 4, 'X')), { value: 'see:\nX', start: 6, end: 6 });
+  assert.deepStrictEqual(plain(text.insertAtCaret('ab', 1, 1, 'X')), { value: 'a\nX\nb', start: 3, end: 3 });
+  assert.deepStrictEqual(plain(text.insertAtCaret('a\nb', 2, 2, 'X')), { value: 'a\nX\nb', start: 3, end: 3 });
+  assert.deepStrictEqual(plain(text.insertAtCaret('hello world', 0, 5, 'X')), { value: 'X\n world', start: 1, end: 1 });
+});
+
+test('replacePlaceholder swaps the stand-in for the markdown and keeps the caret where the user left it', () => {
+  const p = '![Uploading a.png…](#upload-1)';
+  const r = '![a](https://x)';
+  const before = `hi\n${p}\nbye`;
+  const atEnd = text.replacePlaceholder(before, before.length, p, r)!;
+  assert.strictEqual(atEnd.value, `hi\n${r}\nbye`);
+  assert.strictEqual(atEnd.start, atEnd.value.length); // moved by the length difference
+  assert.strictEqual(text.replacePlaceholder(before, 1, p, r)!.start, 1); // before the stand-in: untouched
+  assert.strictEqual(text.replacePlaceholder(before, 5, p, r)!.start, 3 + r.length); // inside it: right after the result
+});
+
+test('replacePlaceholder with an empty replacement removes the stand-in; one the user deleted is left alone', () => {
+  const p = '![Uploading a.png…](#upload-1)';
+  assert.strictEqual(text.replacePlaceholder(`a${p}b`, 0, p, '')!.value, 'ab');
+  assert.strictEqual(text.replacePlaceholder('the user deleted it', 3, p, 'x'), null);
 });
