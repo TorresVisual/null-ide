@@ -10,6 +10,7 @@ import { toggleTaskCheckbox } from './github/taskList';
 import { loadIssueTemplates } from './github/issueTemplates';
 import { draftKey } from './github/issueDrafts';
 import { issueImagesDir, mapLimit } from './github/imageCache';
+import { UploadRejected } from './github/imageUpload';
 import { GithubIssue, ReactionContent } from './github/types';
 
 /** What a close/reopen button asks for. */
@@ -50,6 +51,7 @@ type InboundMessage =
   | { type: 'suggest'; requestId: number; prefix: string }
   | { type: 'saveDraft'; number: number; body: string }
   | { type: 'resolveImages'; urls: string[] }
+  | { type: 'uploadImage'; requestId: number; name: string; mime: string; dataBase64: string }
   | { type: 'submitCreate'; title: string; body: string; labels: string[]; assignees: string[]; milestone: number | null; typeId: string | null; parent: number | null; createMore: boolean }
   | { type: 'createSubIssue' }
   | { type: 'cancelCreate' };
@@ -161,6 +163,18 @@ export class IssueDetailPanel {
 
   private _cwd(): string | undefined {
     return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  }
+
+  /** An upload failed (no push access, offline): github.com can still take the image, so offer to open the page that does. */
+  private async _offerAttachOnGithub(message: string): Promise<void> {
+    const repo = this.store.getRepo();
+    if (!repo) return;
+    const url = this.creating || !this.issueNumber
+      ? `https://github.com/${repo.owner}/${repo.repo}/issues/new`
+      : this.store.getByNumber(this.issueNumber)?.html_url;
+    if (!url) return;
+    const choice = await vscode.window.showErrorMessage(`Couldn't attach the image: ${message}`, 'Attach on github.com');
+    if (choice) await vscode.env.openExternal(vscode.Uri.parse(url));
   }
 
   /** `number` 0 is the New issue form. */
@@ -379,6 +393,17 @@ export class IssueDetailPanel {
         });
         break;
       }
+      case 'uploadImage':
+        try {
+          const bytes = Buffer.from(String(msg.dataBase64), 'base64');
+          this._post({ type: 'uploadResult', requestId: msg.requestId, markdown: await this.store.uploadImage(String(msg.name), String(msg.mime), bytes) });
+        } catch (err) {
+          const message = (err as Error).message;
+          this._post({ type: 'uploadResult', requestId: msg.requestId, error: message });
+          if (err instanceof UploadRejected) void vscode.window.showErrorMessage(message);
+          else void this._offerAttachOnGithub(message);
+        }
+        break;
       case 'saveDraft':
         this._writeDraft(msg.number, msg.body);
         break;

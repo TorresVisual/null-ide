@@ -5,6 +5,7 @@ import { getGithubSession } from './githubAuth';
 import { CreateExtraStep, runCreateExtras } from './createExtras';
 import { IssuePatch, createIssue, renderMarkdown, requestGraphql, updateIssue } from './githubApi';
 import { resolveImage } from './imageCache';
+import { uploadImage } from './imageUpload';
 import {
   ADD_COMMENT, ADD_REACTION, ADD_SUB_ISSUE, DELETE_COMMENT, GqlComment, GqlReactionGroup, ISSUE_DETAIL, ISSUE_TIMELINE,
   IssueDetailData, IssueTimelineData, REMOVE_REACTION, REMOVE_SUB_ISSUE, SET_ISSUE_TYPE, UPDATE_COMMENT, mapComment,
@@ -154,6 +155,12 @@ export class IssuesStore {
   async resolveImage(url: string): Promise<string> {
     const { token } = await this.ensureSession(false);
     return resolveImage(url, { root: this.getCwd()!, token }); // ensureSession succeeded, so there is a workspace folder
+  }
+
+  /** Commits an image to the repo's `null-issue-assets` branch and returns the markdown that links it. Prompts for sign-in like every write. */
+  async uploadImage(name: string, mime: string, bytes: Buffer): Promise<string> {
+    const { repo, token } = await this.ensureSession(true);
+    return uploadImage(repo, token, { name, mime, bytes });
   }
 
   /** Issues for the composer's `#` popup: what is already loaded first, then (from 2 characters) a server search. */

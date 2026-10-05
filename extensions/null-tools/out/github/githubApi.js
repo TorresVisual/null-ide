@@ -43,6 +43,9 @@ exports.updateIssue = updateIssue;
 exports.createIssue = createIssue;
 exports.fetchBytes = fetchBytes;
 exports.fetchRepoFile = fetchRepoFile;
+exports.getRefSha = getRefSha;
+exports.createOrphanBranch = createOrphanBranch;
+exports.putFile = putFile;
 const https = __importStar(require("https"));
 const issueFilter_1 = require("./issueFilter");
 const imageUrls_1 = require("./imageUrls");
@@ -217,5 +220,41 @@ function fetchBytes(url, token, accept, maxBytes, hop = 0) {
 function fetchRepoFile(owner, repo, ref, filePath, token, maxBytes) {
     const apiPath = filePath.split('/').map(encodeURIComponent).join('/');
     return fetchBytes(`https://api.github.com/repos/${owner}/${repo}/contents/${apiPath}?ref=${encodeURIComponent(ref)}`, token, 'application/vnd.github.raw+json', maxBytes);
+}
+/** The commit a branch points at, or null when the branch doesn't exist. */
+async function getRefSha(owner, repo, branch, token) {
+    try {
+        const ref = await requestJson(`/repos/${owner}/${repo}/git/ref/heads/${encodeURIComponent(branch)}`, token);
+        return ref.object.sha;
+    }
+    catch (err) {
+        if (err instanceof ApiError && err.status === 404)
+            return null;
+        throw err;
+    }
+}
+/** Creates `branch` with a single commit that has no parent (so it carries none of the repo's history): blob → tree → commit → ref. */
+async function createOrphanBranch(owner, repo, branch, readme, token) {
+    const git = `/repos/${owner}/${repo}/git`;
+    const blob = await requestJson(`${git}/blobs`, token, 'POST', { content: readme, encoding: 'utf-8' });
+    const tree = await requestJson(`${git}/trees`, token, 'POST', {
+        tree: [{ path: 'README.md', mode: '100644', type: 'blob', sha: blob.sha }],
+    });
+    const commit = await requestJson(`${git}/commits`, token, 'POST', {
+        message: 'Create the issue assets branch', tree: tree.sha, parents: [],
+    });
+    try {
+        await requestJson(`${git}/refs`, token, 'POST', { ref: `refs/heads/${branch}`, sha: commit.sha });
+    }
+    catch (err) {
+        // Another window created it a moment ago: that is the outcome we wanted.
+        if (!(err instanceof ApiError && err.status === 422 && /already exists/i.test(err.message)))
+            throw err;
+    }
+}
+/** Creates a file on `branch` (Contents API). `base64` is the file's bytes. */
+async function putFile(owner, repo, branch, filePath, base64, message, token) {
+    const apiPath = filePath.split('/').map(encodeURIComponent).join('/');
+    await requestJson(`/repos/${owner}/${repo}/contents/${apiPath}`, token, 'PUT', { message, content: base64, branch });
 }
 //# sourceMappingURL=githubApi.js.map

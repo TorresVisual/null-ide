@@ -45,7 +45,7 @@ export function rateLimitRetryAt(headers: IncomingHttpHeaders, now: number = Dat
 interface RawResponse { status: number; headers: IncomingHttpHeaders; body: string }
 
 function request(
-  path: string, token: string | null, method: 'GET' | 'PATCH' | 'POST' | 'DELETE', body?: unknown,
+  path: string, token: string | null, method: 'GET' | 'PATCH' | 'POST' | 'PUT' | 'DELETE', body?: unknown,
 ): Promise<RawResponse> {
   return new Promise((resolve, reject) => {
     const headers: Record<string, string> = {
@@ -76,7 +76,7 @@ function failure(res: RawResponse): ApiError {
 }
 
 async function requestJson<T>(
-  path: string, token: string | null, method: 'GET' | 'PATCH' | 'POST' | 'DELETE' = 'GET', body?: unknown,
+  path: string, token: string | null, method: 'GET' | 'PATCH' | 'POST' | 'PUT' | 'DELETE' = 'GET', body?: unknown,
 ): Promise<T> {
   const res = await request(path, token, method, body);
   if (res.status < 200 || res.status >= 300) throw failure(res);
@@ -213,4 +213,41 @@ export function fetchRepoFile(
   return fetchBytes(
     `https://api.github.com/repos/${owner}/${repo}/contents/${apiPath}?ref=${encodeURIComponent(ref)}`,
     token, 'application/vnd.github.raw+json', maxBytes);
+}
+
+/** The commit a branch points at, or null when the branch doesn't exist. */
+export async function getRefSha(owner: string, repo: string, branch: string, token: string | null): Promise<string | null> {
+  try {
+    const ref = await requestJson<{ object: { sha: string } }>(`/repos/${owner}/${repo}/git/ref/heads/${encodeURIComponent(branch)}`, token);
+    return ref.object.sha;
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) return null;
+    throw err;
+  }
+}
+
+/** Creates `branch` with a single commit that has no parent (so it carries none of the repo's history): blob → tree → commit → ref. */
+export async function createOrphanBranch(owner: string, repo: string, branch: string, readme: string, token: string | null): Promise<void> {
+  const git = `/repos/${owner}/${repo}/git`;
+  const blob = await requestJson<{ sha: string }>(`${git}/blobs`, token, 'POST', { content: readme, encoding: 'utf-8' });
+  const tree = await requestJson<{ sha: string }>(`${git}/trees`, token, 'POST', {
+    tree: [{ path: 'README.md', mode: '100644', type: 'blob', sha: blob.sha }],
+  });
+  const commit = await requestJson<{ sha: string }>(`${git}/commits`, token, 'POST', {
+    message: 'Create the issue assets branch', tree: tree.sha, parents: [],
+  });
+  try {
+    await requestJson(`${git}/refs`, token, 'POST', { ref: `refs/heads/${branch}`, sha: commit.sha });
+  } catch (err) {
+    // Another window created it a moment ago: that is the outcome we wanted.
+    if (!(err instanceof ApiError && err.status === 422 && /already exists/i.test(err.message))) throw err;
+  }
+}
+
+/** Creates a file on `branch` (Contents API). `base64` is the file's bytes. */
+export async function putFile(
+  owner: string, repo: string, branch: string, filePath: string, base64: string, message: string, token: string | null,
+): Promise<void> {
+  const apiPath = filePath.split('/').map(encodeURIComponent).join('/');
+  await requestJson(`/repos/${owner}/${repo}/contents/${apiPath}`, token, 'PUT', { message, content: base64, branch });
 }

@@ -42,6 +42,7 @@ const taskList_1 = require("./github/taskList");
 const issueTemplates_1 = require("./github/issueTemplates");
 const issueDrafts_1 = require("./github/issueDrafts");
 const imageCache_1 = require("./github/imageCache");
+const imageUpload_1 = require("./github/imageUpload");
 const STATE_PATCHES = {
     completed: { state: 'closed', state_reason: 'completed' },
     not_planned: { state: 'closed', state_reason: 'not_planned' },
@@ -153,6 +154,20 @@ class IssueDetailPanel {
     }
     _cwd() {
         return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    }
+    /** An upload failed (no push access, offline): github.com can still take the image, so offer to open the page that does. */
+    async _offerAttachOnGithub(message) {
+        const repo = this.store.getRepo();
+        if (!repo)
+            return;
+        const url = this.creating || !this.issueNumber
+            ? `https://github.com/${repo.owner}/${repo.repo}/issues/new`
+            : this.store.getByNumber(this.issueNumber)?.html_url;
+        if (!url)
+            return;
+        const choice = await vscode.window.showErrorMessage(`Couldn't attach the image: ${message}`, 'Attach on github.com');
+        if (choice)
+            await vscode.env.openExternal(vscode.Uri.parse(url));
     }
     /** `number` 0 is the New issue form. */
     _draftKey(number) {
@@ -386,6 +401,20 @@ class IssueDetailPanel {
                 });
                 break;
             }
+            case 'uploadImage':
+                try {
+                    const bytes = Buffer.from(String(msg.dataBase64), 'base64');
+                    this._post({ type: 'uploadResult', requestId: msg.requestId, markdown: await this.store.uploadImage(String(msg.name), String(msg.mime), bytes) });
+                }
+                catch (err) {
+                    const message = err.message;
+                    this._post({ type: 'uploadResult', requestId: msg.requestId, error: message });
+                    if (err instanceof imageUpload_1.UploadRejected)
+                        void vscode.window.showErrorMessage(message);
+                    else
+                        void this._offerAttachOnGithub(message);
+                }
+                break;
             case 'saveDraft':
                 this._writeDraft(msg.number, msg.body);
                 break;

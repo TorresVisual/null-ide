@@ -6,6 +6,7 @@ const githubAuth_1 = require("./githubAuth");
 const createExtras_1 = require("./createExtras");
 const githubApi_1 = require("./githubApi");
 const imageCache_1 = require("./imageCache");
+const imageUpload_1 = require("./imageUpload");
 const detailQueries_1 = require("./detailQueries");
 const githubQueries_1 = require("./githubQueries");
 const issueSuggest_1 = require("./issueSuggest");
@@ -137,6 +138,11 @@ class IssuesStore {
     async resolveImage(url) {
         const { token } = await this.ensureSession(false);
         return (0, imageCache_1.resolveImage)(url, { root: this.getCwd(), token }); // ensureSession succeeded, so there is a workspace folder
+    }
+    /** Commits an image to the repo's `null-issue-assets` branch and returns the markdown that links it. Prompts for sign-in like every write. */
+    async uploadImage(name, mime, bytes) {
+        const { repo, token } = await this.ensureSession(true);
+        return (0, imageUpload_1.uploadImage)(repo, token, { name, mime, bytes });
     }
     /** Issues for the composer's `#` popup: what is already loaded first, then (from 2 characters) a server search. */
     async suggestIssues(prefix) {
