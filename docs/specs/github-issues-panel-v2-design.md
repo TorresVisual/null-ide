@@ -48,8 +48,8 @@ All code stays in `extensions/null-tools/`. No new dependencies.
 | `githubQueries.ts` *(new)* | GraphQL query strings (`SEARCH_ISSUES`, `ISSUE_DETAIL`, `REPO_METADATA`) and pure mappers from response to view model: `mapSearchPage`, `mapIssueDetail`, `collapseTimeline`. |
 | `searchQuery.ts` *(new, pure)* | Qualifier editing on the user-visible query string: `toggleQualifier(q, key, value)`, `setQualifier(q, key, value)`, `removeQualifier(q, key)`, `getQualifierValues(q, key)`. Handles quoted values (`label:"good first issue"`) and negation (`-label:bug`). `toApiQuery(repo, q)` prepends `repo:owner/name is:issue`. |
 | `issuesStore.ts` | Per-repo data owner. **`ensureSession()`** resolves repo + token when needed and is awaited by every read and write (the #106 root fix). `search(query, cursor)`, `getDetail(number, timelineCursor?)`, cached `getMetadata()` (labels, assignable users, milestones, issue types, viewer login), and all mutations. |
-| `imageCache.ts` *(new)* | `resolveImage(url)` downloads an image with the token when the host is GitHub-owned, writes it to `.null/issue-images/<sha1(url)>.<ext>` (via the existing `getNullDir()`), and returns the file path. On first write it calls `ensureExcluded(repoRoot)`. Pure helpers: `cacheFileName(url, contentType)`, `withExcludeLine(existing, line)`. |
-| `imageUpload.ts` *(new)* | `uploadImage(bytes, filename)` creates `null-issue-assets` as an orphan branch on first use, then PUTs `yyyy/mm/<uuid>.<ext>` via the Contents API and returns the markdown link. |
+| `imageCache.ts` *(new)* | `resolveImage(url, { root, token })` downloads an image (the token goes only to github.com / api.github.com), writes it to `.null/issue-images/<sha1(url)>.<ext>` (via the existing `getNullDir()`), and returns the file path. On first write it calls `ensureExcluded(repoRoot)`. Pure helpers: `cacheFileName(url, ext)`, `withExcludeLine(existing, line)`. |
+| `imageUpload.ts` *(new)* | `uploadImage(repo, token, { name, mime, bytes })` creates `null-issue-assets` as an orphan branch on first use, then PUTs `yyyy/mm/<uuid>.<ext>` via the Contents API and returns the markdown link. |
 | `promptFormat.ts` | `formatIssueAsPrompt(issue, comments, imagePaths)` returns title, body, comments as plain text, the URL, and an `Images:` list of absolute local paths. |
 | `gitBranch.ts` | Adds pure `issueNumberFromBranch(name)` for the existing `issue-<n>-<slug>` scheme (#54). |
 | `issueFilter.ts` | Delete `filterIssues` and its tests (replaced by server search). Keep `relevantToViewer` and `newestUpdateTime` for the unread badge. |
@@ -301,15 +301,13 @@ required" (4), and a dedicated create tab (5).
 1. Posts render immediately. Each `<img>` in `bodyHTML` gets a sized
    placeholder and its original URL in `data-src`, and the webview sends
    `resolveImages{urls}`.
-2. The host calls `imageCache.resolveImage(url)` for each one. GitHub-owned
-   hosts (`github.com`, `*.githubusercontent.com`) are fetched with the token;
+2. The host calls `imageCache.resolveImage(url)` for each one. Only `github.com` and `api.github.com` get the token, and only on the first request (a redirect never carries it);
    repo `blob/…?raw=true` links go through the Contents API (`raw` media type).
    Private-user-image signed URLs are fetched as-is (they are valid for a few
    minutes after the detail request).
 3. The host replies `imageResolved{url, src}` with `asWebviewUri(localPath)`.
-   The webview CSP stays `img-src ${cspSource} https://avatars.githubusercontent.com`.
-4. On first write, `.null/issue-images/` is appended to `.git/info/exclude`
-   (idempotent; no `.gitignore` edit).
+   The webview CSP stays `img-src ${cspSource} https://avatars.githubusercontent.com`, and the detail webview's `localResourceRoots` gains `.null/issue-images/` (files outside `lib/` are not served otherwise).
+4. On first write, `**/.null/issue-images/` is appended to the repository's `info/exclude` (found with `git rev-parse --git-path`, so linked worktrees work; idempotent; no `.gitignore` edit).
 
 **Known limit:** the image cache is never cleaned up (mark it with a `ponytail:`
 comment in `imageCache.ts`). Add an age-based sweep if `.null/issue-images`
