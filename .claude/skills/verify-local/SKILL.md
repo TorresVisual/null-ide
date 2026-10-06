@@ -13,7 +13,7 @@ Verifies a source change by syncing it into the real, already-installed local Nu
 
 2. **Resolve the target extension.** Use the extension folder name passed as this skill's argument (e.g. `/verify-local null-actions`). If no argument was given, default to `null-actions`.
 
-3. **Check for integration specs.** Read `extensions/<name>/package.json`. If it has no `test:integration` script, tell the user this extension has no integration specs yet (only `null-actions` does today — see `docs/specs/local-verification-tooling-design.md`), offer to run its `npm test` unit tests instead if it has one, and stop.
+3. **Check for integration specs.** Read `extensions/<name>/package.json`. If it has no `test:integration` script, tell the user this extension has no integration specs yet (only `null-actions` and `null-tools` do today — see `docs/specs/local-verification-tooling-design.md`), offer to run its `npm test` unit tests instead if it has one, and stop.
 
 4. **Run the specs.** Run `npm --prefix extensions/<name> run test:integration`. Note this launches a separately downloaded vanilla VS Code build to host the test run (not the real `Null.exe`) — the real `Null.exe` collides with the Null IDE window this skill is normally invoked from (a fixed `win32MutexName` in `product.json`, the same for every build regardless of install path). The extension code under test is still the exact code `sync-local.ps1` just synced; only the host shell differs. The first run downloads and caches that build (~300MB), so it can take noticeably longer than subsequent runs.
 
