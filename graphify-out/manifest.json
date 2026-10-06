@@ -44,8 +44,8 @@
   ".claude/skills/impeccable/scripts/data/font-index.json": {
     "mtime": 1790165015.8422642,
     "seen": 1791237712.9039006,
-    "ast_hash": "4a4426c85ec12df1d9a487a39d656ff4",
-    "semantic_hash": "4a4426c85ec12df1d9a487a39d656ff4"
+    "ast_hash": "",
+    "semantic_hash": ""
   },
   ".claude/skills/impeccable/scripts/impeccable": {
     "mtime": 1790165015.8422642,
@@ -174,8 +174,8 @@
     "semantic_hash": "ee0178cae4c70f5f013bb603bd5f2728"
   },
   "extensions/null-actions/lib/colorPicker.js": {
-    "mtime": 1791237101.009448,
-    "seen": 1791237712.9039335,
+    "mtime": 1791307035.691062,
+    "seen": 1791307129.7677622,
     "ast_hash": "414c6725cba3e6dce1a66a71fe7bcb38",
     "semantic_hash": "414c6725cba3e6dce1a66a71fe7bcb38"
   },
@@ -762,20 +762,20 @@
     "semantic_hash": "db15aff69420cd5f6b14ca6fc046a675"
   },
   "extensions/null-tools/lib/dashboard.js": {
-    "mtime": 1791237091.3508613,
-    "seen": 1791237712.9040265,
+    "mtime": 1791307031.3529284,
+    "seen": 1791307129.791665,
     "ast_hash": "eefdd2b1c53c5975b28e4ec4b9e75f15",
     "semantic_hash": "eefdd2b1c53c5975b28e4ec4b9e75f15"
   },
   "extensions/null-tools/lib/issueDetail.js": {
-    "mtime": 1791237090.3375094,
-    "seen": 1791237712.9040275,
+    "mtime": 1791307030.3883934,
+    "seen": 1791307129.7916672,
     "ast_hash": "e46964b4446b4793dec967711ba8dfe0",
     "semantic_hash": "e46964b4446b4793dec967711ba8dfe0"
   },
   "extensions/null-tools/lib/issues.js": {
-    "mtime": 1791237088.9775212,
-    "seen": 1791237712.9040284,
+    "mtime": 1791307029.0214305,
+    "seen": 1791307129.791669,
     "ast_hash": "5227347cb6be73e01be0ace635010dee",
     "semantic_hash": "5227347cb6be73e01be0ace635010dee"
   },
@@ -936,16 +936,16 @@
     "semantic_hash": "224c39fa714d16c568709ed853111983"
   },
   "extensions/null-tools/src/github/gitBranch.test.ts": {
-    "mtime": 1790040206.9528947,
-    "seen": 1791237712.9040549,
-    "ast_hash": "7bf1d18282fc1ce085942b3fd2de6d10",
-    "semantic_hash": "7bf1d18282fc1ce085942b3fd2de6d10"
+    "mtime": 1791306675.2099063,
+    "seen": 1791307129.7979994,
+    "ast_hash": "c4360c86343bd295ebd2beac2612eeaa",
+    "semantic_hash": ""
   },
   "extensions/null-tools/src/github/gitBranch.ts": {
-    "mtime": 1790040056.3737247,
-    "seen": 1791237712.9040556,
-    "ast_hash": "f5a227fccc101498ac85d59bf4aeb9f3",
-    "semantic_hash": "f5a227fccc101498ac85d59bf4aeb9f3"
+    "mtime": 1791306687.6142728,
+    "seen": 1791307129.7980027,
+    "ast_hash": "321fcfaa87d95c1ce8c53f1938263629",
+    "semantic_hash": ""
   },
   "extensions/null-tools/src/github/githubApi.test.ts": {
     "mtime": 1791129113.5313754,
@@ -1158,10 +1158,10 @@
     "semantic_hash": "ff7095ead44a4b17b1db9e350042063e"
   },
   "extensions/null-tools/src/issuesPanelIntegration.ts": {
-    "mtime": 1791217011.0598862,
-    "seen": 1791237712.9040885,
-    "ast_hash": "4e1a307f04861bba33b431278006c3fa",
-    "semantic_hash": "4e1a307f04861bba33b431278006c3fa"
+    "mtime": 1791306730.6462276,
+    "seen": 1791307129.806255,
+    "ast_hash": "9c85c9c7e833f94b08f0e6511e5073f1",
+    "semantic_hash": ""
   },
   "extensions/null-tools/src/nullNotes.test.ts": {
     "mtime": 1789928234.5953512,
@@ -1968,10 +1968,10 @@
     "semantic_hash": "760a9bb43e872dd787e22468f76ee823"
   },
   "CLAUDE.md": {
-    "mtime": 1791238042.8011634,
-    "seen": 1791238365.7156298,
-    "ast_hash": "c8adc7c92987c8e1f75b05da40189491",
-    "semantic_hash": "c8adc7c92987c8e1f75b05da40189491"
+    "mtime": 1791306762.4743786,
+    "seen": 1791307129.838027,
+    "ast_hash": "7504034ec3200ca3db25656614424224",
+    "semantic_hash": ""
   },
   "DESIGN.md": {
     "mtime": 1790625157.9495373,
@@ -2358,9 +2358,9 @@
     "semantic_hash": "8f1638280b7e37268f3f69bb3893595a"
   },
   "docs/plans/github-issues-panel-v2-phase6-branch-to-issue.md": {
-    "mtime": 1791237474.992337,
-    "seen": 1791238365.7156317,
-    "ast_hash": "0627df2461b97502d3e4619259b8f636",
-    "semantic_hash": "0627df2461b97502d3e4619259b8f636"
+    "mtime": 1791306643.1721892,
+    "seen": 1791307129.8424647,
+    "ast_hash": "73419bf5eb912dd95a35836ab4ff7684",
+    "semantic_hash": ""
   }
 }
