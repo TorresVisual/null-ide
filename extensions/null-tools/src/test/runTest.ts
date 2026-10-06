@@ -9,12 +9,14 @@ async function main(): Promise<void> {
   const installDir = process.env.NULL_IDE_INSTALL_DIR
     ?? path.join(process.env.LOCALAPPDATA ?? '', 'Programs', 'Null IDE');
 
-  const extensionDevelopmentPath = path.join(installDir, 'resources', 'app', 'extensions', 'null-tools');
-  if (!fs.existsSync(extensionDevelopmentPath)) {
-    throw new Error(
-      `Synced null-tools not found at '${extensionDevelopmentPath}'. Run scripts/sync-local.ps1 first.`,
-    );
-  }
+  // null-tools lists null-accounts in extensionDependencies, so the vanilla host must load it too.
+  const extensionDevelopmentPath = ['null-tools', 'null-accounts'].map(name => {
+    const dir = path.join(installDir, 'resources', 'app', 'extensions', name);
+    if (!fs.existsSync(dir)) {
+      throw new Error(`Synced ${name} not found at '${dir}'. Run scripts/sync-local.ps1 first.`);
+    }
+    return dir;
+  });
 
   // Null IDE's own executable can't host this run: its product.json bakes
   // in a fixed win32MutexName ("nullide"), shared by every build regardless
