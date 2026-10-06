@@ -60,6 +60,16 @@ test('getToken dispatches to the provider for the account and passes scopes and 
   assert.deepStrictEqual(calls, [['a1', ['repo'], { interactive: true }]]);
 });
 
+test('getToken uses the stored account, not the caller-supplied fields, and refuses unknown accounts', async () => {
+  const seen: Account[] = [];
+  const github: TokenProvider = { getToken: async a => { seen.push(a); return 'tok-gh'; } };
+  const api = createApi(makeDeps({ tokenProviders: { github } }));
+  assert.strictEqual(await api.getToken({ ...gh, externalId: 'forged', username: 'mallory' }), 'tok-gh');
+  assert.deepStrictEqual(seen, [gh]);
+  assert.strictEqual(await api.getToken({ ...gh, id: 'not-stored' }), undefined);
+  assert.strictEqual(seen.length, 1);
+});
+
 test('getToken resolves undefined when no provider is registered for the account', async () => {
   const api = createApi(makeDeps({ tokenProviders: { github: { getToken: async () => 'x' } } }));
   assert.strictEqual(await api.getToken(gl), undefined);
