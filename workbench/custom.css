@@ -173,8 +173,13 @@
 /* Icon ::before has height:22px in compiled CSS — shrink to fit our compact tab.
    .monaco-icon-label is already display:flex in VS Code's own iconlabel.css,
    so align-self here is what actually centers the box — this was already
-   correct before touching it. */
-.tabs-container .tab .monaco-icon-label.tab-label::before {
+   correct before touching it.
+   Webview/custom-editor tabs (GitHub issues, dashboard, Simple Browser, ...)
+   draw their icon in a separate .monaco-icon-label-iconpath element whose
+   height is var(--editor-group-tab-height) (35px), so it needs the same
+   treatment or the icon sits ~2.5px below the label's center. */
+.tabs-container .tab .monaco-icon-label.tab-label::before,
+.tabs-container .tab .monaco-icon-label.tab-label > .monaco-icon-label-iconpath {
   height: 16px !important;
   align-self: center !important;
   vertical-align: middle !important;
