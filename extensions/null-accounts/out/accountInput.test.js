@@ -1,0 +1,54 @@
+'use strict';
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const node_assert_1 = __importDefault(require("node:assert"));
+const node_test_1 = require("node:test");
+const accountInput_1 = require("./accountInput");
+const base = {
+    provider: 'github',
+    host: 'github.com',
+    username: 'octocat',
+    email: 'octocat@example.com',
+    authMethod: 'oauth',
+};
+(0, node_test_1.test)('normalizeHost lowercases and strips scheme, trailing slashes and whitespace', () => {
+    node_assert_1.default.strictEqual((0, accountInput_1.normalizeHost)('  https://GitLab.com/ '), 'gitlab.com');
+    node_assert_1.default.strictEqual((0, accountInput_1.normalizeHost)('GitHub.com'), 'github.com');
+});
+(0, node_test_1.test)('normalizeHost keeps an explicit port', () => {
+    node_assert_1.default.strictEqual((0, accountInput_1.normalizeHost)('gitlab.example.org:8443'), 'gitlab.example.org:8443');
+});
+(0, node_test_1.test)('normalizeHost rejects http://', () => {
+    node_assert_1.default.throws(() => (0, accountInput_1.normalizeHost)('http://gitlab.example.org'), /http/i);
+    node_assert_1.default.throws(() => (0, accountInput_1.normalizeHost)('HTTP://gitlab.example.org'), /http/i);
+});
+(0, node_test_1.test)('normalizeHost rejects empty input, paths, spaces and bad ports', () => {
+    for (const bad of ['', '   ', 'https://', 'gitlab.com/group', 'git lab.com', 'gitlab.com:abc', 'ftp://gitlab.com']) {
+        node_assert_1.default.throws(() => (0, accountInput_1.normalizeHost)(bad), `expected "${bad}" to be rejected`);
+    }
+});
+(0, node_test_1.test)('validateNewAccount trims fields and normalises the host', () => {
+    const out = (0, accountInput_1.validateNewAccount)({ ...base, host: ' https://GitHub.com/ ', username: '  octocat ', email: ' octocat@example.com ' });
+    node_assert_1.default.deepStrictEqual(out, base);
+});
+(0, node_test_1.test)('validateNewAccount rejects a blank username or an email without @', () => {
+    node_assert_1.default.throws(() => (0, accountInput_1.validateNewAccount)({ ...base, username: '   ' }), /username/i);
+    node_assert_1.default.throws(() => (0, accountInput_1.validateNewAccount)({ ...base, email: 'nope' }), /email/i);
+    node_assert_1.default.throws(() => (0, accountInput_1.validateNewAccount)({ ...base, email: '' }), /email/i);
+});
+(0, node_test_1.test)('validateNewAccount rejects unknown provider and auth method', () => {
+    node_assert_1.default.throws(() => (0, accountInput_1.validateNewAccount)({ ...base, provider: 'bitbucket' }), /provider/i);
+    node_assert_1.default.throws(() => (0, accountInput_1.validateNewAccount)({ ...base, authMethod: 'magic' }), /auth/i);
+});
+(0, node_test_1.test)('validateNewAccount requires an SSH key path for ssh accounts only', () => {
+    node_assert_1.default.throws(() => (0, accountInput_1.validateNewAccount)({ ...base, authMethod: 'ssh' }), /ssh key/i);
+    node_assert_1.default.throws(() => (0, accountInput_1.validateNewAccount)({ ...base, authMethod: 'ssh', sshKeyPath: '  ' }), /ssh key/i);
+    const ssh = (0, accountInput_1.validateNewAccount)({ ...base, authMethod: 'ssh', sshKeyPath: ' C:\keys\id_ed25519 ' });
+    node_assert_1.default.strictEqual(ssh.sshKeyPath, 'C:\keys\id_ed25519');
+    // A stray key path on a non-ssh account is dropped, not stored.
+    const oauth = (0, accountInput_1.validateNewAccount)({ ...base, sshKeyPath: 'C:\keys\id_ed25519' });
+    node_assert_1.default.strictEqual('sshKeyPath' in oauth, false);
+});
+//# sourceMappingURL=accountInput.test.js.map

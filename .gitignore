@@ -34,6 +34,7 @@ node_modules/
 
 # null-actions: downloaded VS Code build used to host integration specs
 extensions/null-actions/.vscode-test/
+extensions/null-accounts/.vscode-test/
 
 # OS
 .DS_Store

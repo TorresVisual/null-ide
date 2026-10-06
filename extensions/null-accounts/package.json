@@ -1,0 +1,26 @@
+{
+  "name": "null-accounts",
+  "displayName": "Null Accounts",
+  "description": "GitHub and GitLab account manager for Null IDE — multiple identities, per-project binding, and a token API for other Null IDE features",
+  "version": "1.0.0",
+  "publisher": "null",
+  "license": "MIT",
+  "engines": { "vscode": "^1.85.0" },
+  "main": "./out/extension.js",
+  "activationEvents": ["onStartupFinished"],
+  "scripts": {
+    "compile": "tsc -p tsconfig.json",
+    "test": "tsc -p tsconfig.json && node --test out/accountInput.test.js",
+    "pretest:integration": "tsc -p tsconfig.json",
+    "test:integration": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0",
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^22.0.0",
+    "@vscode/test-electron": "^3.1.0",
+    "mocha": "^11.8.0",
+    "@types/mocha": "^10.0.10",
+    "glob": "^13.0.6"
+  }
+}
