@@ -251,6 +251,15 @@ $Extensions = [ordered]@{
         )
     }
 
+    "null-accounts" = @{
+        Compile       = $true
+        CompileScript = "compile"
+        Copy          = @(
+            "package.json",
+            "out"
+        )
+    }
+
     "null-format" = @{
         Compile       = $true
         CompileScript = "compile"
