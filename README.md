@@ -103,6 +103,8 @@ Null IDE uses the VS Marketplace. Install extensions from the Extensions view (`
 null --install-extension <publisher.extension-id>
 ```
 
+Extensions are checked for updates at startup and every few hours, and update automatically (`extensions.autoCheckUpdates` / `extensions.autoUpdate`). Extensions installed from a local `.vsix` are pinned and never auto-update; uninstall and reinstall them from the Marketplace to unpin.
+
 Suggested on first launch: `llvm-vs-code-extensions.vscode-clangd`, `twxs.cmake`, `ms-python.python`.
 
 ---

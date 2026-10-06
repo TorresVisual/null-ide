@@ -681,7 +681,8 @@ function Set-DefaultSettings {
         "telemetry.telemetryLevel"                   = "off"
         "update.mode"                                = "none"
         "update.showReleaseNotes"                    = $false
-        "extensions.autoCheckUpdates"                = $false
+        "extensions.autoCheckUpdates"                = $true
+        "extensions.autoUpdate"                      = $true
         "security.workspace.trust.untrustedFiles"    = "open"
         "security.workspace.trust.enabled"           = $false
         "workbench.enableExperiments"                = $false
@@ -705,6 +706,11 @@ function Set-DefaultSettings {
     }
 
     $changed = $false
+    # Older installs seeded autoCheckUpdates=false, which froze every extension; flip that one stale default.
+    if ($existing.Contains("extensions.autoCheckUpdates") -and $existing["extensions.autoCheckUpdates"] -eq $false) {
+        $existing["extensions.autoCheckUpdates"] = $true
+        $changed = $true
+    }
     foreach ($key in $defaults.Keys) {
         if (-not $existing.Contains($key)) {
             $existing[$key] = $defaults[$key]
