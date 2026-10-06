@@ -369,6 +369,7 @@ function pickMany(anchor, title, items, apply) {
     markReadBtn.innerHTML = octicon('check');
     fullViewBtn.innerHTML = octicon('screen-full');
     presetsBtn.innerHTML = `Filters ${octicon('triangle-down')}`;
+    el('search-icon').innerHTML = octicon('search');
     function avatarHtml(user) {
         if (!user.avatar_url)
             return '';
@@ -440,8 +441,8 @@ function pickMany(anchor, title, items, apply) {
     }
     function renderTabs() {
         const count = (n) => (n === null ? '' : ` <span class="tab-count">${n}</span>`);
-        tabOpen.innerHTML = `${octicon('issue-opened')} Open${count(openCount)}`;
-        tabClosed.innerHTML = `${octicon('issue-closed')} Closed${count(closedCount)}`;
+        tabOpen.innerHTML = `${octicon('issue-opened', 'tab-icon')} Open${count(openCount)}`;
+        tabClosed.innerHTML = `${octicon('issue-closed', 'tab-icon')} Closed${count(closedCount)}`;
         tabOpen.classList.toggle('active', view.state === 'open');
         tabClosed.classList.toggle('active', view.state === 'closed');
     }
@@ -454,8 +455,13 @@ function pickMany(anchor, title, items, apply) {
             return true;
         });
         dropdownsEl.innerHTML = shown.map(d => {
-            const active = d.key === 'sort' ? view.sort !== null : (view.selected[d.key] || []).length > 0;
-            return `<button type="button" class="gh-btn filter-btn${active ? ' active' : ''}" data-key="${d.key}">${d.title} ${octicon('triangle-down')}</button>`;
+            var _a, _b;
+            // A set filter names its value (or how many) so the row reads as a summary of the query.
+            const values = d.key === 'sort' ? (view.sort === null ? [] : [(_b = (_a = SORTS.find(([v]) => v === view.sort)) === null || _a === void 0 ? void 0 : _a[1]) !== null && _b !== void 0 ? _b : view.sort])
+                : view.selected[d.key] || [];
+            const value = values.length === 0 ? '' : values.length === 1 ? values[0] : String(values.length);
+            const text = value ? `${d.title}<span class="chip-value">${escapeHtml(value)}</span>` : d.title;
+            return `<button type="button" class="filter-btn${value ? ' active' : ''}" data-key="${d.key}">${text}${octicon('triangle-down')}</button>`;
         }).join('');
     }
     function isSelected(key, value) {

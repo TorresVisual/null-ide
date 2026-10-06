@@ -73,6 +73,7 @@ declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
   markReadBtn.innerHTML = octicon('check');
   fullViewBtn.innerHTML = octicon('screen-full');
   presetsBtn.innerHTML = `Filters ${octicon('triangle-down')}`;
+  el('search-icon').innerHTML = octicon('search');
 
   function avatarHtml(user: GithubUser): string {
     if (!user.avatar_url) return '';
@@ -153,8 +154,8 @@ declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
 
   function renderTabs(): void {
     const count = (n: number | null): string => (n === null ? '' : ` <span class="tab-count">${n}</span>`);
-    tabOpen.innerHTML = `${octicon('issue-opened')} Open${count(openCount)}`;
-    tabClosed.innerHTML = `${octicon('issue-closed')} Closed${count(closedCount)}`;
+    tabOpen.innerHTML = `${octicon('issue-opened', 'tab-icon')} Open${count(openCount)}`;
+    tabClosed.innerHTML = `${octicon('issue-closed', 'tab-icon')} Closed${count(closedCount)}`;
     tabOpen.classList.toggle('active', view.state === 'open');
     tabClosed.classList.toggle('active', view.state === 'closed');
   }
@@ -166,8 +167,12 @@ declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
       return true;
     });
     dropdownsEl.innerHTML = shown.map(d => {
-      const active = d.key === 'sort' ? view.sort !== null : (view.selected[d.key] || []).length > 0;
-      return `<button type="button" class="gh-btn filter-btn${active ? ' active' : ''}" data-key="${d.key}">${d.title} ${octicon('triangle-down')}</button>`;
+      // A set filter names its value (or how many) so the row reads as a summary of the query.
+      const values = d.key === 'sort' ? (view.sort === null ? [] : [SORTS.find(([v]) => v === view.sort)?.[1] ?? view.sort])
+        : view.selected[d.key] || [];
+      const value = values.length === 0 ? '' : values.length === 1 ? values[0] : String(values.length);
+      const text = value ? `${d.title}<span class="chip-value">${escapeHtml(value)}</span>` : d.title;
+      return `<button type="button" class="filter-btn${value ? ' active' : ''}" data-key="${d.key}">${text}${octicon('triangle-down')}</button>`;
     }).join('');
   }
 

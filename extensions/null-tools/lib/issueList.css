@@ -13,44 +13,61 @@ html, body { margin:0; padding:0; height:100%; background:var(--vscode-editor-ba
 @keyframes progress-sweep { from { left:-40%; } to { left:100%; } }
 @media (prefers-reduced-motion: reduce) { #progress::after { animation:none; left:0; width:100%; opacity:.5; } }
 
-#toolbar { display:flex; align-items:center; gap:2px; padding:6px 8px 2px; flex-shrink:0; }
+#toolbar { display:flex; align-items:center; gap:2px; padding:6px 8px 2px 12px; flex-shrink:0; }
 #toolbar-title { flex:1; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--vscode-descriptionForeground); }
 .icon-btn {
-  background:transparent; border:none; color:var(--vscode-foreground); cursor:pointer;
-  padding:4px 6px; border-radius:4px; line-height:0;
+  background:transparent; border:none; color:var(--vscode-icon-foreground, var(--vscode-foreground)); cursor:pointer;
+  width:24px; height:24px; padding:0; display:inline-flex; align-items:center; justify-content:center; border-radius:4px; line-height:0;
 }
 .icon-btn:hover { background:var(--vscode-toolbar-hoverBackground, color-mix(in srgb, var(--vscode-foreground) 8%, transparent)); }
-.icon-btn:focus-visible, .gh-btn:focus-visible, .tab:focus-visible, button.link:focus-visible { outline:1px solid var(--vscode-focusBorder); outline-offset:1px; }
+.icon-btn:focus-visible, #presets-btn:focus-visible, .filter-btn:focus-visible, .tab:focus-visible, button.link:focus-visible { outline:1px solid var(--vscode-focusBorder); outline-offset:-1px; }
 
-#searchrow { display:flex; gap:6px; padding:4px 8px; flex-shrink:0; }
+/* One field: search glyph, query, saved-filters trigger. The border lights up for the whole group. */
+#searchrow { padding:4px 12px 8px; flex-shrink:0; }
+#searchbox {
+  display:flex; align-items:center; gap:6px; padding:0 2px 0 8px; border-radius:4px;
+  background:var(--vscode-input-background); border:1px solid var(--vscode-input-border, transparent);
+}
+#searchbox:focus-within { border-color:var(--vscode-focusBorder); }
+#search-icon { display:inline-flex; line-height:0; color:var(--vscode-input-placeholderForeground); }
 #search-input {
-  flex:1; min-width:0; background:var(--vscode-input-background); border:1px solid var(--vscode-input-border, transparent);
-  color:var(--vscode-input-foreground); padding:4px 8px; font:inherit; border-radius:4px;
+  flex:1; min-width:0; background:transparent; border:none; outline:none; color:var(--vscode-input-foreground);
+  padding:5px 0; font:inherit;
 }
 #search-input::placeholder { color:var(--vscode-input-placeholderForeground); }
-#search-input:focus { outline:none; border-color:var(--vscode-focusBorder); }
-
-.gh-btn {
-  display:inline-flex; align-items:center; gap:4px; white-space:nowrap; cursor:pointer; font:inherit;
-  background:var(--vscode-button-secondaryBackground); color:var(--vscode-button-secondaryForeground);
-  border:1px solid transparent; border-radius:4px; padding:3px 8px;
+#presets-btn {
+  display:inline-flex; align-items:center; gap:2px; flex-shrink:0; white-space:nowrap; cursor:pointer; font:inherit; font-size:12px;
+  background:transparent; color:var(--vscode-descriptionForeground); border:none; border-radius:3px; padding:2px 6px;
 }
-.gh-btn:hover { background:var(--vscode-button-secondaryHoverBackground); }
-.gh-btn.active { border-color:var(--vscode-focusBorder); }
+#presets-btn:hover { color:var(--vscode-foreground); background:var(--vscode-toolbar-hoverBackground, color-mix(in srgb, var(--vscode-foreground) 8%, transparent)); }
 
-#filters {
-  display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:4px 8px; padding:4px 8px 6px;
-  border-bottom:1px solid var(--vscode-widget-border, rgba(128,128,128,.2)); flex-shrink:0;
-}
-#tabs { display:flex; gap:2px; }
+/* State tabs: underline marks the one you are on; the colored glyph already says which state it is. */
+#filters { flex-shrink:0; }
+#tabs { display:flex; gap:16px; padding:0 12px; border-bottom:1px solid var(--vscode-widget-border, rgba(128,128,128,.2)); }
 .tab {
-  display:inline-flex; align-items:center; gap:4px; background:transparent; border:none; border-radius:4px; cursor:pointer;
-  color:var(--vscode-descriptionForeground); font:inherit; padding:3px 8px;
+  display:inline-flex; align-items:center; gap:6px; background:transparent; border:none; border-bottom:2px solid transparent;
+  margin-bottom:-1px; padding:5px 0 6px; cursor:pointer; font:inherit; color:var(--vscode-descriptionForeground);
 }
-.tab:hover { color:var(--vscode-foreground); background:var(--vscode-toolbar-hoverBackground, color-mix(in srgb, var(--vscode-foreground) 8%, transparent)); }
-.tab.active { color:var(--vscode-foreground); font-weight:600; }
-.tab-count { background:var(--vscode-badge-background); color:var(--vscode-badge-foreground); border-radius:999px; padding:0 6px; font-size:.85em; font-weight:400; }
-#dropdowns { display:flex; flex-wrap:wrap; gap:4px; }
+.tab:hover { color:var(--vscode-foreground); }
+.tab.active { color:var(--vscode-foreground); font-weight:600; border-bottom-color:var(--vscode-focusBorder); }
+.tab-icon { opacity:.9; }
+#tab-open .tab-icon { color:var(--gh-open); }
+#tab-closed .tab-icon { color:var(--gh-done); }
+.tab-count { font-size:.92em; font-weight:400; font-variant-numeric:tabular-nums; color:var(--vscode-descriptionForeground); }
+.tab.active .tab-count { color:var(--vscode-foreground); }
+
+/* Filter chips: ghost until set; a set chip shows its value and takes the one accent tint. */
+#dropdowns { display:flex; flex-wrap:wrap; gap:2px 4px; padding:6px 8px; border-bottom:1px solid var(--vscode-widget-border, rgba(128,128,128,.2)); }
+#dropdowns:empty { display:none; }
+.filter-btn {
+  display:inline-flex; align-items:center; gap:3px; max-width:100%; cursor:pointer; font:inherit; font-size:12px;
+  background:transparent; color:var(--vscode-descriptionForeground); border:none; border-radius:4px; padding:2px 6px;
+}
+.filter-btn .octicon { width:12px; height:12px; opacity:.7; }
+.filter-btn:hover { color:var(--vscode-foreground); background:var(--vscode-toolbar-hoverBackground, color-mix(in srgb, var(--vscode-foreground) 8%, transparent)); }
+.filter-btn.active { color:var(--vscode-foreground); background:color-mix(in srgb, var(--vscode-focusBorder) 22%, transparent); }
+.chip-value { max-width:84px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
+.chip-value::before { content:'·'; margin:0 4px 0 3px; font-weight:400; opacity:.6; }
 
 #banner {
   padding:6px 10px; font-size:.95em; flex-shrink:0;

@@ -156,8 +156,11 @@ function buildListHtml(webview: vscode.Webview, extensionUri: vscode.Uri): strin
     <button type="button" class="icon-btn hidden" id="full-view-btn" title="Open in full view"></button>
   </div>
   <div id="searchrow">
-    <button type="button" class="gh-btn" id="presets-btn">Filters</button>
-    <input id="search-input" placeholder="Search issues (/)" spellcheck="false" autocomplete="off">
+    <div id="searchbox">
+      <span id="search-icon"></span>
+      <input id="search-input" placeholder="Search issues (/)" spellcheck="false" autocomplete="off">
+      <button type="button" id="presets-btn" title="Saved filters"></button>
+    </div>
   </div>
   <div id="filters">
     <div id="tabs">
