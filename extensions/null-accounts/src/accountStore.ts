@@ -1,8 +1,8 @@
 'use strict';
 
 import { randomUUID } from 'node:crypto';
-import type { Event } from 'vscode';
 import { validateNewAccount } from './accountInput';
+import { ChangeEmitter } from './changeEmitter';
 import { Account, NewAccount } from './types';
 
 /** The slice of vscode.Memento the store needs, so tests need no VS Code host. */
@@ -32,26 +32,12 @@ function isAccount(value: unknown): value is Account {
     && typeof a.host === 'string'
     && typeof a.username === 'string'
     && typeof a.email === 'string'
-    && AUTH_METHODS.includes(a.authMethod as string);
+    && AUTH_METHODS.includes(a.authMethod as string)
+    && (a.externalId === undefined || typeof a.externalId === 'string');
 }
 
 const sameIdentity = (a: NewAccount, b: NewAccount): boolean =>
   a.provider === b.provider && a.host === b.host && a.username.toLowerCase() === b.username.toLowerCase();
-
-class ChangeEmitter {
-  private readonly listeners = new Set<(e: void) => unknown>();
-
-  readonly event: Event<void> = listener => {
-    this.listeners.add(listener);
-    return { dispose: () => { this.listeners.delete(listener); } };
-  };
-
-  fire(): void {
-    for (const listener of [...this.listeners]) {
-      try { listener(); } catch { /* one bad listener must not break the others or the write that fired it */ }
-    }
-  }
-}
 
 export class AccountStore {
   private readonly emitter = new ChangeEmitter();

@@ -2,21 +2,9 @@
 
 import assert from 'node:assert';
 import { test } from 'node:test';
-import { ACCOUNTS_KEY, AccountStore, MetadataStore, SecretVault } from './accountStore';
+import { ACCOUNTS_KEY, AccountStore } from './accountStore';
+import { FakeMeta, FakeVault } from './testFakes';
 import { NewAccount } from './types';
-
-class FakeMeta implements MetadataStore {
-  data = new Map<string, unknown>();
-  get<T>(key: string): T | undefined { return this.data.get(key) as T | undefined; }
-  async update(key: string, value: unknown): Promise<void> { this.data.set(key, structuredClone(value)); }
-}
-
-class FakeVault implements SecretVault {
-  data = new Map<string, string>();
-  async get(key: string): Promise<string | undefined> { return this.data.get(key); }
-  async store(key: string, value: string): Promise<void> { this.data.set(key, value); }
-  async delete(key: string): Promise<void> { this.data.delete(key); }
-}
 
 function makeStore() {
   let n = 0;
@@ -155,4 +143,11 @@ test('add removes its freshly stored secret when the metadata write fails', asyn
   meta.update = async () => { throw new Error('disk full'); };
   await assert.rejects(store.add(octocat, 'tok'), /disk full/);
   assert.strictEqual(vault.data.size, 0);
+});
+
+test('list skips an entry whose externalId is not a string', async () => {
+  const { store, meta } = makeStore();
+  const good = { id: 'g', provider: 'github', host: 'github.com', username: 'u', email: 'u@e.com', authMethod: 'oauth', externalId: '42' };
+  meta.data.set(ACCOUNTS_KEY, [good, { ...good, id: 'bad', externalId: 42 }]);
+  assert.deepStrictEqual(store.list(), [good]);
 });

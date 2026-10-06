@@ -51,5 +51,9 @@ export function validateNewAccount(input: NewAccount): NewAccount {
     }
     out.sshKeyPath = key;
   }
+  const externalId = input.externalId?.trim();
+  if (externalId) {
+    out.externalId = externalId;
+  }
   return out;
 }

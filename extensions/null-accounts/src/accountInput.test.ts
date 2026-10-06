@@ -58,3 +58,8 @@ test('validateNewAccount requires an SSH key path for ssh accounts only', () => 
   const oauth = validateNewAccount({ ...base, sshKeyPath: 'C:\keys\id_ed25519' });
   assert.strictEqual('sshKeyPath' in oauth, false);
 });
+
+test('validateNewAccount keeps a trimmed externalId and drops a blank one', () => {
+  assert.strictEqual(validateNewAccount({ ...base, externalId: ' 583231 ' }).externalId, '583231');
+  assert.strictEqual('externalId' in validateNewAccount({ ...base, externalId: '  ' }), false);
+});
