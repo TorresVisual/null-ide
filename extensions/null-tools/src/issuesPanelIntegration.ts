@@ -8,6 +8,7 @@ import { getWorkspaceGithubRepo } from './github/githubRemote';
 import { getGithubSession } from './github/githubAuth';
 import { fetchIssues } from './github/githubApi';
 import { GithubIssue } from './github/types';
+import { branchIssueTracker } from './github/gitBranch';
 
 export function registerIssuesPanelFeature(context: vscode.ExtensionContext): void {
   const store = new IssuesStore(() => vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? null);
@@ -47,6 +48,8 @@ export function registerIssuesPanelFeature(context: vscode.ExtensionContext): vo
   context.subscriptions.push(
     vscode.commands.registerCommand('null.issues.insertReference', insertIssueReference),
   );
+
+  watchIssueBranches(context, store);
 
   const countBar = vscode.window.createStatusBarItem('null.issuesCount', vscode.StatusBarAlignment.Left, 4);
   countBar.command = 'null.issuesView.focus';
@@ -160,4 +163,52 @@ async function getScmRepo(cwd: string): Promise<{ inputBox: { value: string } } 
   if (!gitExt) { void vscode.window.showErrorMessage('Built-in git extension not found.'); return undefined; }
   const git = gitExt.isActive ? gitExt.exports.getAPI(1) : (await gitExt.activate()).getAPI(1);
   return git.repositories.find((r: { rootUri: vscode.Uri }) => r.rootUri.fsPath === cwd) ?? git.repositories[0];
+}
+
+interface GitRepo {
+  rootUri: vscode.Uri;
+  state: { HEAD?: { name?: string }; onDidChange: vscode.Event<void> };
+}
+
+/** #54: offer to open the issue when the user switches to an `issue-<n>-…` branch. */
+function watchIssueBranches(context: vscode.ExtensionContext, store: IssuesStore): void {
+  const gitExt = vscode.extensions.getExtension('vscode.git');
+  if (!gitExt) return;
+
+  const sameRepoAsWorkspace = (root: string): boolean => {
+    const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const mine = cwd ? getWorkspaceGithubRepo(cwd) : null;
+    const theirs = getWorkspaceGithubRepo(root);
+    return !!mine && !!theirs && mine.owner === theirs.owner && mine.repo === theirs.repo;
+  };
+
+  const offer = async (n: number): Promise<void> => {
+    let title: string;
+    try {
+      title = (await store.getDetail(n)).issue.title;
+    } catch {
+      return; // signed out, offline, a PR number, a deleted issue: a courtesy prompt stays quiet
+    }
+    const pick = await vscode.window.showInformationMessage(`Branch refers to #${n}: ${title}`, 'Open', 'Not now');
+    if (pick === 'Open') await IssueDetailPanel.show(context.extensionUri, store, n);
+  };
+
+  const watch = (repo: GitRepo): void => {
+    const root = repo.rootUri.fsPath;
+    branchIssueTracker.onHead(root, repo.state.HEAD?.name); // records the starting branch
+    context.subscriptions.push(repo.state.onDidChange(() => {
+      const n = branchIssueTracker.onHead(root, repo.state.HEAD?.name);
+      if (n !== null && sameRepoAsWorkspace(root)) void offer(n);
+    }));
+  };
+
+  void (async () => {
+    try {
+      const git = (gitExt.isActive ? gitExt.exports : await gitExt.activate()).getAPI(1);
+      (git.repositories as GitRepo[]).forEach(watch);
+      context.subscriptions.push(git.onDidOpenRepository(watch));
+    } catch {
+      // git extension disabled: no branch prompts
+    }
+  })();
 }
