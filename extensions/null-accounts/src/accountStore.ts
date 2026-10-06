@@ -36,7 +36,7 @@ function isAccount(value: unknown): value is Account {
     && (a.externalId === undefined || typeof a.externalId === 'string');
 }
 
-const sameIdentity = (a: NewAccount, b: NewAccount): boolean =>
+export const sameIdentity = (a: NewAccount, b: NewAccount): boolean =>
   a.provider === b.provider && a.host === b.host && a.username.toLowerCase() === b.username.toLowerCase();
 
 export class AccountStore {

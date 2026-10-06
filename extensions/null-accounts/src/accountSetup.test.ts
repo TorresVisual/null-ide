@@ -1,0 +1,52 @@
+'use strict';
+
+import assert from 'node:assert';
+import { test } from 'node:test';
+import { AccountStore } from './accountStore';
+import { addOrReuse, findAccount, importExisting } from './accountSetup';
+import { ProjectBinding } from './projectBinding';
+import { FakeMeta, FakeVault } from './testFakes';
+import { NewAccount } from './types';
+
+function setup() {
+  let n = 0;
+  const meta = new FakeMeta();
+  const accounts = new AccountStore(meta, new FakeVault(), () => `id-${++n}`);
+  const bindings = new ProjectBinding(meta, 'win32');
+  return { accounts, bindings };
+}
+
+const octocat: NewAccount = {
+  provider: 'github', host: 'github.com', username: 'octocat', email: 'o@e.com', authMethod: 'oauth', externalId: 'vsc-1',
+};
+
+test('addOrReuse adds a new account', async () => {
+  const { accounts } = setup();
+  const account = await addOrReuse(accounts, octocat);
+  assert.strictEqual(account.id, 'id-1');
+  assert.strictEqual(accounts.list().length, 1);
+});
+
+test('addOrReuse reuses an existing account instead of rejecting a duplicate', async () => {
+  const { accounts } = setup();
+  const first = await addOrReuse(accounts, octocat);
+  const again = await addOrReuse(accounts, { ...octocat, username: 'OctoCat' });
+  assert.strictEqual(again.id, first.id);
+  assert.strictEqual(accounts.list().length, 1);
+  assert.strictEqual(findAccount(accounts.list(), { ...octocat, username: 'hubot' }), undefined);
+});
+
+test('importExisting binds unbound open folders and leaves existing bindings alone', async () => {
+  const { accounts, bindings } = setup();
+  await bindings.bind('C:\\a', 'someone-else');
+  const account = await importExisting(octocat, ['C:\\a', 'C:\\b'], accounts, bindings);
+  assert.strictEqual(bindings.accountIdFor('C:\\a'), 'someone-else');
+  assert.strictEqual(bindings.accountIdFor('C:\\b'), account.id);
+});
+
+test('importExisting twice does not duplicate the account', async () => {
+  const { accounts, bindings } = setup();
+  await importExisting(octocat, ['C:\\a'], accounts, bindings);
+  await importExisting(octocat, ['C:\\a'], accounts, bindings);
+  assert.strictEqual(accounts.list().length, 1);
+});
