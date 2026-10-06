@@ -8,7 +8,7 @@ import { Account } from './types';
 
 const gh: Account = { id: 'a1', provider: 'github', host: 'github.com', username: 'octocat', email: 'o@e.com', authMethod: 'oauth' };
 const gl: Account = { id: 'a2', provider: 'gitlab', host: 'gitlab.com', username: 'tanuki', email: 't@e.com', authMethod: 'oauth' };
-const folder = { fsPath: 'C:\repo' } as vscode.Uri;
+const folder = { fsPath: 'C:\\repo' } as vscode.Uri;
 const noopEvent: vscode.Event<void> = () => ({ dispose() {} });
 
 function makeDeps(overrides: Partial<ApiDeps> = {}): ApiDeps {
