@@ -1,6 +1,6 @@
 'use strict';
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.GHOST = exports.toUser = exports.REPO_METADATA = exports.SEARCH_ISSUES = void 0;
+exports.GHOST = exports.toUser = exports.REPO_METADATA = exports.ISSUE_COUNTS = exports.SEARCH_ISSUES = void 0;
 exports.mapIssue = mapIssue;
 exports.mapSearchPage = mapSearchPage;
 exports.mapMetadata = mapMetadata;
@@ -24,6 +24,12 @@ query SearchIssues($q: String!, $qOpen: String!, $qClosed: String!, $first: Int!
   }
   open: search(query: $qOpen, type: ISSUE, first: 0) @include(if: $withCounts) { issueCount }
   closed: search(query: $qClosed, type: ISSUE, first: 0) @include(if: $withCounts) { issueCount }
+}`;
+/** Counts only (no nodes): the status bar's open total and how many of those are assigned to the viewer. */
+exports.ISSUE_COUNTS = `
+query IssueCounts($open: String!, $mine: String!) {
+  open: search(query: $open, type: ISSUE, first: 0) { issueCount }
+  mine: search(query: $mine, type: ISSUE, first: 0) { issueCount }
 }`;
 /** Everything the filter dropdowns offer. `issueTypes` is null on repos (e.g. user-owned) without issue types. */
 exports.REPO_METADATA = `

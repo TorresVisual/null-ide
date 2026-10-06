@@ -25,6 +25,15 @@ query SearchIssues($q: String!, $qOpen: String!, $qClosed: String!, $first: Int!
   closed: search(query: $qClosed, type: ISSUE, first: 0) @include(if: $withCounts) { issueCount }
 }`;
 
+/** Counts only (no nodes): the status bar's open total and how many of those are assigned to the viewer. */
+export const ISSUE_COUNTS = `
+query IssueCounts($open: String!, $mine: String!) {
+  open: search(query: $open, type: ISSUE, first: 0) { issueCount }
+  mine: search(query: $mine, type: ISSUE, first: 0) { issueCount }
+}`;
+
+export interface IssueCountsData { open: { issueCount: number }; mine: { issueCount: number } }
+
 /** Everything the filter dropdowns offer. `issueTypes` is null on repos (e.g. user-owned) without issue types. */
 export const REPO_METADATA = `
 query RepoMetadata($owner: String!, $name: String!) {

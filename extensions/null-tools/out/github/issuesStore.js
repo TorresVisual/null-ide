@@ -33,8 +33,27 @@ class IssuesStore {
     repo = null;
     metadata = null;
     viewerLogin = null;
+    listeners = new Set();
     constructor(getCwd) {
         this.getCwd = getCwd;
+    }
+    /** Fires after anything that can move the issue counts: a fresh first page, a create, a state/assignee edit. */
+    onDidChange(listener) {
+        this.listeners.add(listener);
+        return () => { this.listeners.delete(listener); };
+    }
+    changed() {
+        this.listeners.forEach(l => l());
+    }
+    /** Open issues in the workspace repo and how many are assigned to the viewer: exact search totals, not a page length. */
+    async getOpenCounts() {
+        const { repo, token } = await this.ensureSession(false);
+        const name = `${repo.owner}/${repo.repo}`;
+        const data = await (0, githubApi_1.requestGraphql)(githubQueries_1.ISSUE_COUNTS, {
+            open: (0, searchQuery_1.toApiQuery)(name, 'is:open'),
+            mine: (0, searchQuery_1.toApiQuery)(name, 'is:open assignee:@me'),
+        }, token);
+        return { repo, open: data.open.issueCount, mine: data.mine.issueCount };
     }
     /** Seeds in-memory state from a persisted cache, without a network call. */
     hydrateFromCache(repo, issues) {
@@ -87,6 +106,8 @@ class IssuesStore {
         }, token);
         const page = (0, githubQueries_1.mapSearchPage)(data);
         this.remember(page.items);
+        if (withCounts)
+            this.changed();
         return page;
     }
     /** Labels, assignable users, milestones and issue types for the filter dropdowns. Cached until `force`. */
@@ -209,12 +230,14 @@ class IssuesStore {
         const { repo, token } = await this.ensureSession(true);
         const updated = await (0, githubApi_1.updateIssue)(repo.owner, repo.repo, issueNumber, patch, token);
         this.remember([updated]);
+        this.changed();
         return updated;
     }
     async createIssue(data) {
         const { repo, token } = await this.ensureSession(true);
         const created = await (0, githubApi_1.createIssue)(repo.owner, repo.repo, data, token);
         this.remember([created]);
+        this.changed();
         return created;
     }
     /**

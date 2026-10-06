@@ -56,26 +56,31 @@ export function registerIssuesPanelFeature(context: vscode.ExtensionContext): vo
   context.subscriptions.push(countBar);
 
   async function refreshIssueCountBar(): Promise<void> {
-    const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    const repo = cwd ? getWorkspaceGithubRepo(cwd) : null;
-    if (!repo) { countBar.hide(); return; }
-
-    const session = await getGithubSession(false);
-    if (!session) { countBar.hide(); return; }
-
     try {
-      const issues = await fetchIssues(repo.owner, repo.repo, 'open', session.accessToken);
-      const mine = issues.filter(issue => issue.assignees.some(a => a.login === session.account.label)).length;
-      countBar.text = mine > 0 ? `$(issues) ${issues.length} (${mine} mine)` : `$(issues) ${issues.length}`;
-      countBar.tooltip = `${issues.length} open issue${issues.length === 1 ? '' : 's'} in ${repo.owner}/${repo.repo}`
+      const { repo, open, mine } = await store.getOpenCounts();
+      countBar.text = mine > 0 ? `$(issues) ${open} (${mine} mine)` : `$(issues) ${open}`;
+      countBar.tooltip = `${open} open issue${open === 1 ? '' : 's'} in ${repo.owner}/${repo.repo}`
         + (mine > 0 ? ` (${mine} assigned to you)` : '');
       countBar.show();
     } catch {
-      countBar.hide();
+      countBar.hide(); // no folder, no GitHub remote, signed out, offline: nothing trustworthy to show
     }
   }
 
-  context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(() => refreshIssueCountBar()));
+  // GitHub's search index lags a few seconds behind writes, so a change waits before re-counting, and bursts collapse.
+  let recount: ReturnType<typeof setTimeout> | undefined;
+  const scheduleRecount = (): void => {
+    clearTimeout(recount);
+    recount = setTimeout(() => void refreshIssueCountBar(), 3000);
+  };
+  const REFRESH_MS = 5 * 60 * 1000;
+  const poll = setInterval(() => void refreshIssueCountBar(), REFRESH_MS);
+  context.subscriptions.push(
+    { dispose: store.onDidChange(scheduleRecount) },
+    { dispose: () => { clearTimeout(recount); clearInterval(poll); } },
+    vscode.workspace.onDidChangeWorkspaceFolders(() => refreshIssueCountBar()),
+    vscode.window.onDidChangeWindowState(state => { if (state.focused) void refreshIssueCountBar(); }),
+  );
   void refreshIssueCountBar();
 }
 

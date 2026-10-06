@@ -11,7 +11,9 @@ import {
   IssueDetailData, IssueTimelineData, REMOVE_REACTION, REMOVE_SUB_ISSUE, SET_ISSUE_TYPE, UPDATE_COMMENT, mapComment,
   mapIssueDetail, mapReactions, mapTimelinePage,
 } from './detailQueries';
-import { MetadataData, REPO_METADATA, SEARCH_ISSUES, SearchData, mapMetadata, mapSearchPage } from './githubQueries';
+import {
+  ISSUE_COUNTS, IssueCountsData, MetadataData, REPO_METADATA, SEARCH_ISSUES, SearchData, mapMetadata, mapSearchPage,
+} from './githubQueries';
 import { IssueSuggestion, matchIssues, toSuggestion } from './issueSuggest';
 import { toApiQuery, withState } from './searchQuery';
 import {
@@ -43,7 +45,30 @@ export class IssuesStore {
   private metadata: RepoMetadata | null = null;
   private viewerLogin: string | null = null;
 
+  private readonly listeners = new Set<() => void>();
+
   constructor(private readonly getCwd: () => string | null) {}
+
+  /** Fires after anything that can move the issue counts: a fresh first page, a create, a state/assignee edit. */
+  onDidChange(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => { this.listeners.delete(listener); };
+  }
+
+  private changed(): void {
+    this.listeners.forEach(l => l());
+  }
+
+  /** Open issues in the workspace repo and how many are assigned to the viewer: exact search totals, not a page length. */
+  async getOpenCounts(): Promise<{ repo: GithubRepoRef; open: number; mine: number }> {
+    const { repo, token } = await this.ensureSession(false);
+    const name = `${repo.owner}/${repo.repo}`;
+    const data = await requestGraphql<IssueCountsData>(ISSUE_COUNTS, {
+      open: toApiQuery(name, 'is:open'),
+      mine: toApiQuery(name, 'is:open assignee:@me'),
+    }, token);
+    return { repo, open: data.open.issueCount, mine: data.mine.issueCount };
+  }
 
   /** Seeds in-memory state from a persisted cache, without a network call. */
   hydrateFromCache(repo: GithubRepoRef, issues: GithubIssue[]): void {
@@ -96,6 +121,7 @@ export class IssuesStore {
     }, token);
     const page = mapSearchPage(data);
     this.remember(page.items);
+    if (withCounts) this.changed();
     return page;
   }
 
@@ -240,6 +266,7 @@ export class IssuesStore {
     const { repo, token } = await this.ensureSession(true);
     const updated = await updateIssue(repo.owner, repo.repo, issueNumber, patch, token);
     this.remember([updated]);
+    this.changed();
     return updated;
   }
 
@@ -249,6 +276,7 @@ export class IssuesStore {
     const { repo, token } = await this.ensureSession(true);
     const created = await createIssue(repo.owner, repo.repo, data, token);
     this.remember([created]);
+    this.changed();
     return created;
   }
 
