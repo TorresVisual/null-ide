@@ -125,4 +125,17 @@ const octocat = {
     node_assert_1.default.strictEqual(kept, 1);
     node_assert_1.default.strictEqual(disposed, 0);
 });
+(0, node_test_1.test)('two overlapping adds of the same account with a secret store only one and leave no orphan secret', async () => {
+    const { store, vault } = makeStore();
+    const results = await Promise.allSettled([store.add(octocat, 'tok-a'), store.add(octocat, 'tok-b')]);
+    node_assert_1.default.deepStrictEqual(results.map(r => r.status).sort(), ['fulfilled', 'rejected']);
+    node_assert_1.default.strictEqual(store.list().length, 1);
+    node_assert_1.default.strictEqual(vault.data.size, 1);
+});
+(0, node_test_1.test)('add removes its freshly stored secret when the metadata write fails', async () => {
+    const { store, meta, vault } = makeStore();
+    meta.update = async () => { throw new Error('disk full'); };
+    await node_assert_1.default.rejects(store.add(octocat, 'tok'), /disk full/);
+    node_assert_1.default.strictEqual(vault.data.size, 0);
+});
 //# sourceMappingURL=accountStore.test.js.map

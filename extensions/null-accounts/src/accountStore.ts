@@ -77,12 +77,20 @@ export class AccountStore {
     const valid = validateNewAccount(input);
     this.assertUnique(valid);
     const account: Account = { id: this.newId(), ...valid };
-    // Secret first: if the metadata write then fails, the leftover secret is unreachable
-    // (nothing references its id); the reverse order would leave an account with no token.
+    // Secret first: the reverse order would leave an account with no token.
     if (secret !== undefined) {
       await this.secrets.store(secretKey(account.id), secret);
     }
-    await this.meta.update(ACCOUNTS_KEY, [...this.list(), account]);
+    try {
+      // Re-check: an overlapping add of the same identity may have landed during the await above.
+      this.assertUnique(valid);
+      await this.meta.update(ACCOUNTS_KEY, [...this.list(), account]);
+    } catch (err) {
+      if (secret !== undefined) {
+        await this.secrets.delete(secretKey(account.id)).then(undefined, () => { /* best effort; surface the original error */ });
+      }
+      throw err;
+    }
     this.emitter.fire();
     return { ...account };
   }

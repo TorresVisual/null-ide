@@ -141,3 +141,18 @@ test('onDidChange listeners can be disposed, and a throwing listener does not br
   assert.strictEqual(kept, 1);
   assert.strictEqual(disposed, 0);
 });
+
+test('two overlapping adds of the same account with a secret store only one and leave no orphan secret', async () => {
+  const { store, vault } = makeStore();
+  const results = await Promise.allSettled([store.add(octocat, 'tok-a'), store.add(octocat, 'tok-b')]);
+  assert.deepStrictEqual(results.map(r => r.status).sort(), ['fulfilled', 'rejected']);
+  assert.strictEqual(store.list().length, 1);
+  assert.strictEqual(vault.data.size, 1);
+});
+
+test('add removes its freshly stored secret when the metadata write fails', async () => {
+  const { store, meta, vault } = makeStore();
+  meta.update = async () => { throw new Error('disk full'); };
+  await assert.rejects(store.add(octocat, 'tok'), /disk full/);
+  assert.strictEqual(vault.data.size, 0);
+});
