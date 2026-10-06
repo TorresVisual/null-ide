@@ -274,6 +274,7 @@ declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
     hasMore: boolean; append: boolean;
   }): void {
     clearStatus();
+    listEl.classList.remove('stale');
     query = msg.query;
     view = { state: msg.state, selected: msg.selected, sort: msg.sort };
     if (msg.viewerLogin) viewerLogin = msg.viewerLogin;
@@ -325,8 +326,17 @@ declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
     onSelect: value => vscode.postMessage({ type: 'query', text: value }),
   }));
 
-  tabOpen.addEventListener('click', () => vscode.postMessage({ type: 'editQuery', op: 'set', key: 'state', value: 'open' }));
-  tabClosed.addEventListener('click', () => vscode.postMessage({ type: 'editQuery', op: 'set', key: 'state', value: 'closed' }));
+  /** The tab flips at once; the old rows stay (dimmed) until the new query answers, since the round trip takes a while. */
+  function switchState(state: 'open' | 'closed'): void {
+    if (view.state === state) return;
+    view = { ...view, state };
+    renderTabs();
+    listEl.classList.add('stale');
+    listEl.scrollTop = 0;
+    vscode.postMessage({ type: 'editQuery', op: 'set', key: 'state', value: state });
+  }
+  tabOpen.addEventListener('click', () => switchState('open'));
+  tabClosed.addEventListener('click', () => switchState('closed'));
   dropdownsEl.addEventListener('click', e => {
     const button = (e.target as HTMLElement).closest<HTMLElement>('.filter-btn');
     if (button) openDropdown(button.dataset.key!, button);

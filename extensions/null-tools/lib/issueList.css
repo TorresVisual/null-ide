@@ -49,7 +49,7 @@ html, body { margin:0; padding:0; height:100%; background:var(--vscode-editor-ba
   margin-bottom:-1px; padding:5px 0 6px; cursor:pointer; font:inherit; color:var(--vscode-descriptionForeground);
 }
 .tab:hover { color:var(--vscode-foreground); }
-.tab.active { color:var(--vscode-foreground); font-weight:600; border-bottom-color:var(--vscode-focusBorder); }
+.tab.active { color:var(--vscode-foreground); border-bottom-color:var(--vscode-focusBorder); }
 .tab-icon { opacity:.9; }
 #tab-open .tab-icon { color:var(--gh-open); }
 #tab-closed .tab-icon { color:var(--gh-done); }
@@ -78,6 +78,8 @@ button.link { background:none; border:none; padding:0; color:var(--vscode-textLi
 button.link:hover { text-decoration:underline; }
 
 #list { flex:1; overflow-y:auto; container-type:inline-size; }
+/* Rows of the previous query while the next one loads. */
+#list.stale #rows { opacity:.4; pointer-events:none; transition:opacity .15s ease-out; }
 #message { padding:24px 16px; text-align:center; color:var(--vscode-descriptionForeground); }
 button.action { background:var(--vscode-button-background); color:var(--vscode-button-foreground); border:none; padding:5px 12px; border-radius:4px; cursor:pointer; margin-top:8px; font:inherit; }
 button.action:hover { background:var(--vscode-button-hoverBackground); }
