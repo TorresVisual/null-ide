@@ -6,21 +6,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const node_assert_1 = __importDefault(require("node:assert"));
 const node_test_1 = require("node:test");
 const accountStore_1 = require("./accountStore");
-class FakeMeta {
-    data = new Map();
-    get(key) { return this.data.get(key); }
-    async update(key, value) { this.data.set(key, structuredClone(value)); }
-}
-class FakeVault {
-    data = new Map();
-    async get(key) { return this.data.get(key); }
-    async store(key, value) { this.data.set(key, value); }
-    async delete(key) { this.data.delete(key); }
-}
+const testFakes_1 = require("./testFakes");
 function makeStore() {
     let n = 0;
-    const meta = new FakeMeta();
-    const vault = new FakeVault();
+    const meta = new testFakes_1.FakeMeta();
+    const vault = new testFakes_1.FakeVault();
     const store = new accountStore_1.AccountStore(meta, vault, () => `id-${++n}`);
     return { store, meta, vault };
 }
@@ -137,5 +127,11 @@ const octocat = {
     meta.update = async () => { throw new Error('disk full'); };
     await node_assert_1.default.rejects(store.add(octocat, 'tok'), /disk full/);
     node_assert_1.default.strictEqual(vault.data.size, 0);
+});
+(0, node_test_1.test)('list skips an entry whose externalId is not a string', async () => {
+    const { store, meta } = makeStore();
+    const good = { id: 'g', provider: 'github', host: 'github.com', username: 'u', email: 'u@e.com', authMethod: 'oauth', externalId: '42' };
+    meta.data.set(accountStore_1.ACCOUNTS_KEY, [good, { ...good, id: 'bad', externalId: 42 }]);
+    node_assert_1.default.deepStrictEqual(store.list(), [good]);
 });
 //# sourceMappingURL=accountStore.test.js.map

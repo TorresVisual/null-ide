@@ -1,0 +1,49 @@
+'use strict';
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const node_assert_1 = __importDefault(require("node:assert"));
+const node_test_1 = require("node:test");
+const accountStore_1 = require("./accountStore");
+const accountSetup_1 = require("./accountSetup");
+const projectBinding_1 = require("./projectBinding");
+const testFakes_1 = require("./testFakes");
+function setup() {
+    let n = 0;
+    const meta = new testFakes_1.FakeMeta();
+    const accounts = new accountStore_1.AccountStore(meta, new testFakes_1.FakeVault(), () => `id-${++n}`);
+    const bindings = new projectBinding_1.ProjectBinding(meta, 'win32');
+    return { accounts, bindings };
+}
+const octocat = {
+    provider: 'github', host: 'github.com', username: 'octocat', email: 'o@e.com', authMethod: 'oauth', externalId: 'vsc-1',
+};
+(0, node_test_1.test)('addOrReuse adds a new account', async () => {
+    const { accounts } = setup();
+    const account = await (0, accountSetup_1.addOrReuse)(accounts, octocat);
+    node_assert_1.default.strictEqual(account.id, 'id-1');
+    node_assert_1.default.strictEqual(accounts.list().length, 1);
+});
+(0, node_test_1.test)('addOrReuse reuses an existing account instead of rejecting a duplicate', async () => {
+    const { accounts } = setup();
+    const first = await (0, accountSetup_1.addOrReuse)(accounts, octocat);
+    const again = await (0, accountSetup_1.addOrReuse)(accounts, { ...octocat, username: 'OctoCat' });
+    node_assert_1.default.strictEqual(again.id, first.id);
+    node_assert_1.default.strictEqual(accounts.list().length, 1);
+    node_assert_1.default.strictEqual((0, accountSetup_1.findAccount)(accounts.list(), { ...octocat, username: 'hubot' }), undefined);
+});
+(0, node_test_1.test)('importExisting binds unbound open folders and leaves existing bindings alone', async () => {
+    const { accounts, bindings } = setup();
+    await bindings.bind('C:\\a', 'someone-else');
+    const account = await (0, accountSetup_1.importExisting)(octocat, ['C:\\a', 'C:\\b'], accounts, bindings);
+    node_assert_1.default.strictEqual(bindings.accountIdFor('C:\\a'), 'someone-else');
+    node_assert_1.default.strictEqual(bindings.accountIdFor('C:\\b'), account.id);
+});
+(0, node_test_1.test)('importExisting twice does not duplicate the account', async () => {
+    const { accounts, bindings } = setup();
+    await (0, accountSetup_1.importExisting)(octocat, ['C:\\a'], accounts, bindings);
+    await (0, accountSetup_1.importExisting)(octocat, ['C:\\a'], accounts, bindings);
+    node_assert_1.default.strictEqual(accounts.list().length, 1);
+});
+//# sourceMappingURL=accountSetup.test.js.map

@@ -1,8 +1,9 @@
 'use strict';
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.AccountStore = exports.ACCOUNTS_KEY = void 0;
+exports.AccountStore = exports.sameIdentity = exports.ACCOUNTS_KEY = void 0;
 const node_crypto_1 = require("node:crypto");
 const accountInput_1 = require("./accountInput");
+const changeEmitter_1 = require("./changeEmitter");
 exports.ACCOUNTS_KEY = 'null-accounts.accounts';
 const secretKey = (id) => `null-accounts/${id}`;
 const PROVIDERS = ['github', 'gitlab'];
@@ -17,29 +18,16 @@ function isAccount(value) {
         && typeof a.host === 'string'
         && typeof a.username === 'string'
         && typeof a.email === 'string'
-        && AUTH_METHODS.includes(a.authMethod);
+        && AUTH_METHODS.includes(a.authMethod)
+        && (a.externalId === undefined || typeof a.externalId === 'string');
 }
 const sameIdentity = (a, b) => a.provider === b.provider && a.host === b.host && a.username.toLowerCase() === b.username.toLowerCase();
-class ChangeEmitter {
-    listeners = new Set();
-    event = listener => {
-        this.listeners.add(listener);
-        return { dispose: () => { this.listeners.delete(listener); } };
-    };
-    fire() {
-        for (const listener of [...this.listeners]) {
-            try {
-                listener();
-            }
-            catch { /* one bad listener must not break the others or the write that fired it */ }
-        }
-    }
-}
+exports.sameIdentity = sameIdentity;
 class AccountStore {
     meta;
     secrets;
     newId;
-    emitter = new ChangeEmitter();
+    emitter = new changeEmitter_1.ChangeEmitter();
     onDidChange = this.emitter.event;
     constructor(meta, secrets, newId = node_crypto_1.randomUUID) {
         this.meta = meta;
@@ -108,7 +96,7 @@ class AccountStore {
         await this.secrets.store(secretKey(id), value);
     }
     assertUnique(candidate, ignoreId) {
-        if (this.list().some(a => a.id !== ignoreId && sameIdentity(a, candidate))) {
+        if (this.list().some(a => a.id !== ignoreId && (0, exports.sameIdentity)(a, candidate))) {
             throw new Error(`${candidate.username}@${candidate.host} is already added.`);
         }
     }

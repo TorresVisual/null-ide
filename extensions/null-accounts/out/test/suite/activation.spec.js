@@ -46,6 +46,10 @@ suite('null-accounts activation', () => {
         assert.strictEqual(api.getAccountForFolder(vscode.Uri.file(process.cwd())), undefined);
         const stranger = { id: 'x', provider: 'github', host: 'github.com', username: 'u', email: 'u@e.com', authMethod: 'oauth' };
         assert.strictEqual(await api.getToken(stranger), undefined);
+        // Phase 2: an unbound folder has no account, and a silent token request for an unknown
+        // GitHub account (no externalId) resolves undefined instead of prompting or throwing.
+        assert.strictEqual(typeof api.ensureAccountForFolder, 'function');
+        assert.strictEqual(await api.getToken(stranger, ['repo'], { interactive: false }), undefined);
     });
 });
 //# sourceMappingURL=activation.spec.js.map

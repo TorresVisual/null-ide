@@ -49,6 +49,10 @@ function validateNewAccount(input) {
         }
         out.sshKeyPath = key;
     }
+    const externalId = input.externalId?.trim();
+    if (externalId) {
+        out.externalId = externalId;
+    }
     return out;
 }
 //# sourceMappingURL=accountInput.js.map

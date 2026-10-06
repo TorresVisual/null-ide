@@ -77,7 +77,7 @@ class IssuesStore {
         if (!session)
             throw new SessionError('signed-out');
         this.setRepo(repo);
-        this.viewerLogin = session.account.label;
+        this.viewerLogin = session.login;
         return { repo, token: session.accessToken };
     }
     /** Switches the active repo, dropping every per-repo cache when it actually changes. */

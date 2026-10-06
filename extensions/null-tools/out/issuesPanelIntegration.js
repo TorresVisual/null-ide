@@ -88,6 +88,14 @@ function registerIssuesPanelFeature(context) {
     const poll = setInterval(() => void refreshIssueCountBar(), REFRESH_MS);
     context.subscriptions.push({ dispose: store.onDidChange(scheduleRecount) }, { dispose: () => { clearTimeout(recount); clearInterval(poll); } }, vscode.workspace.onDidChangeWorkspaceFolders(() => refreshIssueCountBar()), vscode.window.onDidChangeWindowState(state => { if (state.focused)
         void refreshIssueCountBar(); }));
+    // Importing or binding an account must show up without a manual refresh.
+    const accountsChanged = (0, githubAuth_1.getAccountsApi)()?.onDidChange(() => {
+        void provider.refresh();
+        void refreshIssueCountBar();
+    });
+    if (accountsChanged) {
+        context.subscriptions.push(accountsChanged);
+    }
     void refreshIssueCountBar();
 }
 // ponytail: VS Code's SCM input box exposes only `.value` (a string) to

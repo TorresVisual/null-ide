@@ -33,10 +33,15 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.getAccountsApi = getAccountsApi;
 exports.getGithubSession = getGithubSession;
 const vscode = __importStar(require("vscode"));
-const SCOPES = ['repo'];
+const githubSession_1 = require("./githubSession");
+/** null-accounts' exported API. null-tools lists it in `extensionDependencies`, so it is active by now. */
+function getAccountsApi() {
+    return vscode.extensions.getExtension('null.null-accounts')?.exports;
+}
 function getGithubSession(createIfNone) {
-    return vscode.authentication.getSession('github', SCOPES, { createIfNone, silent: !createIfNone });
+    return (0, githubSession_1.resolveGithubSession)(getAccountsApi(), vscode.workspace.workspaceFolders?.[0]?.uri, createIfNone);
 }
 //# sourceMappingURL=githubAuth.js.map

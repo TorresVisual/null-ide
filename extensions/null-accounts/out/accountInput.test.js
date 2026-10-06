@@ -51,4 +51,8 @@ const base = {
     const oauth = (0, accountInput_1.validateNewAccount)({ ...base, sshKeyPath: 'C:\keys\id_ed25519' });
     node_assert_1.default.strictEqual('sshKeyPath' in oauth, false);
 });
+(0, node_test_1.test)('validateNewAccount keeps a trimmed externalId and drops a blank one', () => {
+    node_assert_1.default.strictEqual((0, accountInput_1.validateNewAccount)({ ...base, externalId: ' 583231 ' }).externalId, '583231');
+    node_assert_1.default.strictEqual('externalId' in (0, accountInput_1.validateNewAccount)({ ...base, externalId: '  ' }), false);
+});
 //# sourceMappingURL=accountInput.test.js.map
