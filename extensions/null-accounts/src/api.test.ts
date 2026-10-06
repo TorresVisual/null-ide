@@ -1,0 +1,56 @@
+'use strict';
+
+import assert from 'node:assert';
+import { test } from 'node:test';
+import type * as vscode from 'vscode';
+import { ApiDeps, createApi, TokenProvider } from './api';
+import { Account } from './types';
+
+const gh: Account = { id: 'a1', provider: 'github', host: 'github.com', username: 'octocat', email: 'o@e.com', authMethod: 'oauth' };
+const gl: Account = { id: 'a2', provider: 'gitlab', host: 'gitlab.com', username: 'tanuki', email: 't@e.com', authMethod: 'oauth' };
+const folder = { fsPath: 'C:\repo' } as vscode.Uri;
+const noopEvent: vscode.Event<void> = () => ({ dispose() {} });
+
+function makeDeps(overrides: Partial<ApiDeps> = {}): ApiDeps {
+  const all = [gh, gl];
+  return {
+    accounts: { list: () => all, get: id => all.find(a => a.id === id), onDidChange: noopEvent },
+    accountIdForFolder: () => undefined,
+    tokenProviders: {},
+    ...overrides,
+  };
+}
+
+test('getAccounts returns the stored accounts', () => {
+  assert.deepStrictEqual(createApi(makeDeps()).getAccounts(), [gh, gl]);
+});
+
+test('getAccountForFolder resolves the bound account, and undefined when unbound or dangling', () => {
+  assert.strictEqual(createApi(makeDeps({ accountIdForFolder: () => 'a2' })).getAccountForFolder(folder), gl);
+  assert.strictEqual(createApi(makeDeps()).getAccountForFolder(folder), undefined);
+  // A binding that points at an account that has since been removed.
+  assert.strictEqual(createApi(makeDeps({ accountIdForFolder: () => 'gone' })).getAccountForFolder(folder), undefined);
+});
+
+test('getToken dispatches to the provider for the account and passes scopes through', async () => {
+  const calls: Array<[string, string[] | undefined]> = [];
+  const github: TokenProvider = { getToken: async (a, scopes) => { calls.push([a.id, scopes]); return 'tok-gh'; } };
+  const api = createApi(makeDeps({ tokenProviders: { github } }));
+  assert.strictEqual(await api.getToken(gh, ['repo']), 'tok-gh');
+  assert.deepStrictEqual(calls, [['a1', ['repo']]]);
+});
+
+test('getToken resolves undefined when no provider is registered for the account', async () => {
+  const api = createApi(makeDeps({ tokenProviders: { github: { getToken: async () => 'x' } } }));
+  assert.strictEqual(await api.getToken(gl), undefined);
+});
+
+test('getToken resolves undefined, never rejects, when the provider throws', async () => {
+  const api = createApi(makeDeps({ tokenProviders: { github: { getToken: async () => { throw new Error('offline'); } } } }));
+  assert.strictEqual(await api.getToken(gh), undefined);
+});
+
+test('onDidChange is the accounts source event', () => {
+  const api = createApi(makeDeps());
+  assert.strictEqual(api.onDidChange, noopEvent);
+});
