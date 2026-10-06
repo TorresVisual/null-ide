@@ -174,8 +174,8 @@
     "semantic_hash": "ee0178cae4c70f5f013bb603bd5f2728"
   },
   "extensions/null-actions/lib/colorPicker.js": {
-    "mtime": 1791307035.691062,
-    "seen": 1791307129.7677622,
+    "mtime": 1791307360.9439962,
+    "seen": 1791307715.261825,
     "ast_hash": "414c6725cba3e6dce1a66a71fe7bcb38",
     "semantic_hash": "414c6725cba3e6dce1a66a71fe7bcb38"
   },
@@ -762,28 +762,28 @@
     "semantic_hash": "db15aff69420cd5f6b14ca6fc046a675"
   },
   "extensions/null-tools/lib/dashboard.js": {
-    "mtime": 1791307031.3529284,
-    "seen": 1791307129.791665,
+    "mtime": 1791307356.6774225,
+    "seen": 1791307715.2837114,
     "ast_hash": "eefdd2b1c53c5975b28e4ec4b9e75f15",
     "semantic_hash": "eefdd2b1c53c5975b28e4ec4b9e75f15"
   },
   "extensions/null-tools/lib/issueDetail.js": {
-    "mtime": 1791307030.3883934,
-    "seen": 1791307129.7916672,
+    "mtime": 1791307355.696431,
+    "seen": 1791307715.2837133,
     "ast_hash": "e46964b4446b4793dec967711ba8dfe0",
     "semantic_hash": "e46964b4446b4793dec967711ba8dfe0"
   },
   "extensions/null-tools/lib/issues.js": {
-    "mtime": 1791307029.0214305,
-    "seen": 1791307129.791669,
+    "mtime": 1791307354.3462965,
+    "seen": 1791307715.283715,
     "ast_hash": "5227347cb6be73e01be0ace635010dee",
     "semantic_hash": "5227347cb6be73e01be0ace635010dee"
   },
   "extensions/null-tools/package.json": {
-    "mtime": 1791218608.0787323,
-    "seen": 1791237712.9040298,
-    "ast_hash": "991cc5646dc1509e8d14fc9d45f9aadb",
-    "semantic_hash": "991cc5646dc1509e8d14fc9d45f9aadb"
+    "mtime": 1791307167.3754518,
+    "seen": 1791307715.2837172,
+    "ast_hash": "96cb622bb564ceab113edad94aed01c7",
+    "semantic_hash": ""
   },
   "extensions/null-tools/scripts/gen-octicons.js": {
     "mtime": 1791216543.4397857,
@@ -1458,10 +1458,10 @@
     "semantic_hash": "68977f41c02ab7bb36c4e3ac2f25caa0"
   },
   "extensions/null-tools/tsconfig.json": {
-    "mtime": 1791218608.0781999,
-    "seen": 1791237712.9041326,
-    "ast_hash": "e36da1444bf659fa6a4dd027f8e836ea",
-    "semantic_hash": "e36da1444bf659fa6a4dd027f8e836ea"
+    "mtime": 1791307148.4579065,
+    "seen": 1791307715.309164,
+    "ast_hash": "117393d540e9a33dae54c6f36a179122",
+    "semantic_hash": ""
   },
   "extensions/null-tools/tsconfig.webview-dashboard.json": {
     "mtime": 1790293562.9688308,
@@ -1944,10 +1944,10 @@
     "semantic_hash": "2985f53199ff8ce1247e7a4761803b02"
   },
   ".claude/skills/verify-local/SKILL.md": {
-    "mtime": 1788019048.5454576,
-    "seen": 1791237712.9042215,
-    "ast_hash": "087f08563523de9f3067251f539e2aa5",
-    "semantic_hash": "087f08563523de9f3067251f539e2aa5"
+    "mtime": 1791307569.7643185,
+    "seen": 1791307715.3269193,
+    "ast_hash": "99f03f0e4dc5d263424000c1b63acb9c",
+    "semantic_hash": ""
   },
   ".github/ISSUE_TEMPLATE/bug_report.md": {
     "mtime": 1790098546.7282934,
@@ -2361,6 +2361,24 @@
     "mtime": 1791306643.1721892,
     "seen": 1791307129.8424647,
     "ast_hash": "73419bf5eb912dd95a35836ab4ff7684",
+    "semantic_hash": ""
+  },
+  "extensions/null-tools/src/test/runTest.ts": {
+    "mtime": 1791307539.9808047,
+    "seen": 1791307715.3008606,
+    "ast_hash": "1d5218afe813a3f032e1022cf0ce7063",
+    "semantic_hash": ""
+  },
+  "extensions/null-tools/src/test/suite/activation.spec.ts": {
+    "mtime": 1791307451.9231458,
+    "seen": 1791307715.3008628,
+    "ast_hash": "394931db82a49a00429b91394b9a62ba",
+    "semantic_hash": ""
+  },
+  "extensions/null-tools/src/test/suite/index.ts": {
+    "mtime": 1791307148.3333104,
+    "seen": 1791307715.3008642,
+    "ast_hash": "0136c526daf335a30588e0ef2abc1c1d",
     "semantic_hash": ""
   }
 }

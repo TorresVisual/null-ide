@@ -1,17 +1,17 @@
 # Graph Report - null-ide  (2026-10-06)
 
 ## Corpus Check
-- 379 files · ~460,029 words
+- 382 files · ~460,628 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 65 file(s) not represented in the graph (top: .ico 33, (none) 9, .patch 6)
 
 ## Summary
-- 3826 nodes · 7994 edges · 269 communities (208 shown, 61 thin omitted)
+- 3844 nodes · 8016 edges · 275 communities (211 shown, 64 thin omitted)
 - Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 285 edges (avg confidence: 0.84)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `04223dbc`
+- Built from commit: `247c1503`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -19,7 +19,7 @@
 - live-browser.js
 - resumeSession
 - issuesStore.ts
-- imageCache.ts
+- githubApi.ts
 - setLiveState
 - updater.ts
 - configurationDefaults
@@ -34,11 +34,11 @@
 - wooting-analog/package.json
 - issueDetail.ts
 - worktrees.ts
-- whyIsThisHereIntegration.ts
-- terminalRegistry.ts
+- whyIsThisHere.ts
+- null-actions/src/extension.ts
 - mountSvelteComponentVariant
-- issuesPanelIntegration.ts
-- scratchNotesIntegration.ts
+- GithubIssue
+- whyIsThisHereIntegration.ts
 - explorer_command.cc
 - generate-file-assoc-icons.js
 - wooting-analog/src/extension.ts
@@ -57,7 +57,7 @@
 - null-tools/src/extension.ts
 - cmakeToolbar.ts
 - discordPresence.ts
-- GithubIssue
+- issueDetailPanel.ts
 - escapeHtml
 - portsTreeView.ts
 - NULL IDE Architecture (product audit)
@@ -86,11 +86,11 @@
 - Live variant mode reference (live.md)
 - createLiveBrowserSessionState
 - sync-local.ps1
-- githubApi.ts
+- projectDetectionScan.ts
 - properties
 - properties
-- ref_child_process
-- imageUpload.ts
+- null-format/src/extension.ts
+- scheduleAcceptCleanup
 - onAnnotDown
 - renderCreateForm
 - discordRpcClient.ts
@@ -111,7 +111,7 @@
 - New visual work reference (new-work.md)
 - null-updater.exe (updater/src/main.cpp)
 - properties
-- null-actions/src/extension.ts
+- projectDetector.ts
 - null-cpp/package.json
 - detailTypes.ts
 - compilerOptions
@@ -134,12 +134,14 @@
 - null-markdown extension
 - pairedSplit.ts (auto-pair + scroll sync)
 - Null symbol (empty-set glyph: ring with diagonal slash, rounded caps)
-- properties
+- null.discord.clientId
 - null.gitignore.ignoredPatterns
 - PresenceOwnership
 - One Accent Rule (Signal Blue only)
 - null.dashboard custom editor (dashboard.ts)
 - compilerOptions
+- menus
+- clangdCompileDb.ts
 - .prettierrc.json
 - imageResolve.ts
 - compilerOptions
@@ -167,12 +169,16 @@
 - properties
 - contributes
 - mountComposer
+- scripts
+- null.discord.privacyMode
 - null-cpp.compile.clangArgs
+- dependencies
 - cppConfigState.ts
 - build-local.ps1
 - merge-json.js
 - bolder reference
-- enableInlineEdit
+- documentRefForElement
+- engines
 - scripts
 - null-cpp.projectDetection.override
 - endOfLine
@@ -187,7 +193,7 @@
 - splash.js
 - build.sh
 - 003-null-dashboard-startup.patch
-- index.ts
+- null-actions/src/test/suite/index.ts
 - devDependencies
 - null-cpp.autoPairSplit.enabled
 - null-cpp.compile.clangPath
@@ -213,7 +219,7 @@
 - null.discord.showRepositoryButton
 - null.discord.showWorkspace
 - null.gitignore.autoCommit
-- null.gitignore.autoUpdate
+- properties
 - null.nullNotes.exePath
 - null.plans.autoOpen
 - null.ports.filterDevOnly
@@ -321,27 +327,27 @@
 - **Windows shell integration (file associations, preview handler, jump list)** — docs_specs_file_association_design, docs_specs_explorer_preview_integration_design, docs_specs_jumplist_recent_projects_design [INFERRED 0.75]
 - **Windows shell integration (context menu, file associations, preview handler)** — docs_plans_file_association_icons_register_file_associations, docs_plans_explorer_preview_integration_register_preview_handler, docs_plans_explorer_preview_integration_preview_handler_com_class [INFERRED 0.85]
 
-## Communities (269 total, 61 thin omitted)
+## Communities (275 total, 64 thin omitted)
 
 ### Community 0 - "live-browser.js"
 Cohesion: 0.03
-Nodes (142): addManualContextText(), applyGlobalBarLabelState(), applyPlaceholderSizingStyles(), averageRgb01(), bindEditBadgeProxy(), bufferToBase64(), buildCollapsible(), buildColorModels() (+134 more)
+Nodes (121): applyGlobalBarLabelState(), applyPlaceholderSizingStyles(), averageRgb01(), bindEditBadgeProxy(), bufferToBase64(), buildCollapsible(), buildColorModels(), buildInsertPlaceholderSnapshotFromDom() (+113 more)
 
 ### Community 1 - "resumeSession"
-Cohesion: 0.06
-Nodes (86): applyParamDefaults(), applyParamValue(), applyPlaceholderDimensions(), applySavedSessionMeta(), clampVariantIndex(), clearHandled(), clearSession(), closedClipPath() (+78 more)
+Cohesion: 0.05
+Nodes (97): abandonForeignSession(), abortSvelteComponentInjection(), applyParamDefaults(), applyParamValue(), applyPlaceholderDimensions(), applySavedSessionMeta(), buildParamsPanel(), checkpointPayload() (+89 more)
 
 ### Community 2 - "issuesStore.ts"
 Cohesion: 0.05
 Nodes (66): CreateExtraStep, runCreateExtras(), ADD_COMMENT, ADD_REACTION, ADD_SUB_ISSUE, collapseTimeline(), COMMENT_FIELDS, DELETE_COMMENT (+58 more)
 
-### Community 3 - "imageCache.ts"
-Cohesion: 0.14
-Nodes (23): FetchedBytes, download(), ensureExcluded(), EXCLUDE_LINE, excludedRoots, ImageSource, inFlight, issueImagesDir() (+15 more)
+### Community 3 - "githubApi.ts"
+Cohesion: 0.06
+Nodes (55): ApiError, ApiErrorBody, createIssue(), createOrphanBranch(), failure(), fetchBytes(), FetchedBytes, fetchRepoFile() (+47 more)
 
 ### Community 4 - "setLiveState"
-Cohesion: 0.09
-Nodes (71): abandonForeignSession(), abortSvelteComponentInjection(), applyEditing(), beginNewLiveConfiguration(), cancelEditing(), cancelEditingToPicking(), cancelInsertConfigure(), cleanup() (+63 more)
+Cohesion: 0.11
+Nodes (61): applyEditing(), beginNewLiveConfiguration(), cancelEditing(), cancelEditingToPicking(), cancelInsertConfigure(), cleanup(), cleanupAcceptedSession(), clearAnnotations() (+53 more)
 
 ### Community 5 - "updater.ts"
 Cohesion: 0.10
@@ -352,12 +358,12 @@ Cohesion: 0.04
 Nodes (55): C_Cpp.intelliSenseEngine, clangd.arguments, clangd.onConfigChanged, claudeCode.preferredLocation, cmake.buildDirectory, cmake.configureOnOpen, editor.acceptSuggestionOnCommitCharacter, editor.bracketPairColorization.enabled (+47 more)
 
 ### Community 7 - "el"
-Cohesion: 0.08
-Nodes (54): actionLabel(), applyConfigureBarChrome(), bindConfigureCountPillTooltip(), bindConfigureInlineControlHover(), bindConfigureModifierPillHover(), buildConfigureActionControl(), buildConfigureCountControl(), buildConfigureRow() (+46 more)
+Cohesion: 0.07
+Nodes (53): actionLabel(), applyConfigureBarChrome(), bindConfigureCountPillTooltip(), bindConfigureInlineControlHover(), bindConfigureModifierPillHover(), buildConfigureActionControl(), buildConfigureCountControl(), buildConfigureRow() (+45 more)
 
 ### Community 8 - "initPageChat"
-Cohesion: 0.07
-Nodes (54): agentHasWorkInFlight(), armPageChatForTyping(), attachSteerFocusDebug(), attachSteerFocusGuard(), buildSteerProcessingDots(), buildSteerQueueHint(), clearSteerAwaitTimer(), clearSteerFocusRecoverTimer() (+46 more)
+Cohesion: 0.08
+Nodes (47): armPageChatForTyping(), attachSteerFocusDebug(), attachSteerFocusGuard(), clearSteerAwaitTimer(), clearSteerFocusRecoverTimer(), collapsePageChat(), expandPageChat(), finishVoiceSession() (+39 more)
 
 ### Community 9 - "PreviewHandler"
 Cohesion: 0.06
@@ -377,11 +383,11 @@ Nodes (5): IssuesStore, GithubRepoRef, IssuePost, RepoMetadata, IssueDetailPanel
 
 ### Community 13 - "initGlobalBar"
 Cohesion: 0.08
-Nodes (41): agentStatusText(), barPaletteForTheme(), brandMarkSvg(), buildDesignHeader(), buildParamsPanel(), cursorForInsertAxis(), designPanelCss(), detectPageTheme() (+33 more)
+Nodes (42): agentHasWorkInFlight(), agentStatusText(), barPaletteForTheme(), brandMarkSvg(), buildDesignHeader(), buildSteerProcessingDots(), buildSteerQueueHint(), cursorForInsertAxis() (+34 more)
 
 ### Community 14 - "src/dashboard.ts"
 Cohesion: 0.10
-Nodes (17): DashboardEditorProvider, InboundMessage, OutboundMessage, createProjectDirectory(), getCloneTerminal(), runCloneRepoFlow(), runNewProjectFlow(), computeGitStatuses() (+9 more)
+Nodes (16): DashboardEditorProvider, InboundMessage, OutboundMessage, createProjectDirectory(), getCloneTerminal(), runCloneRepoFlow(), runNewProjectFlow(), computeGitStatuses() (+8 more)
 
 ### Community 15 - "wooting-analog/package.json"
 Cohesion: 0.05
@@ -392,28 +398,28 @@ Cohesion: 0.13
 Nodes (33): applyState(), beginWrite(), bindAvatarFallbacks(), candidatePicker(), findPost(), flushDraft(), handleAction(), handleLink() (+25 more)
 
 ### Community 17 - "worktrees.ts"
+Cohesion: 0.07
+Nodes (53): deleteItem(), getWorkspaceRoot(), isRunnableScratchFile(), output, readFileSafe(), registerScratchAndNotesFeature(), renameItem(), tryEnsureGitignoreEntry() (+45 more)
+
+### Community 18 - "whyIsThisHere.ts"
+Cohesion: 0.11
+Nodes (14): AddedLine, assistantTextBefore(), ContentBlock, extractAddedLines(), FileEdit, isRealUserPrompt(), isTranscriptLine(), TranscriptLine (+6 more)
+
+### Community 19 - "null-actions/src/extension.ts"
 Cohesion: 0.13
-Nodes (27): branchExists(), createWorktree(), CreateWorktreeOptions, ensureWorktreesIgnored(), execFileAsync, fetchWorktreeStatus(), getBaseBranch(), listLocalBranches() (+19 more)
-
-### Community 18 - "whyIsThisHereIntegration.ts"
-Cohesion: 0.08
-Nodes (29): AppendedLines, classifyHunkLines(), encodeProjectPath(), extractEdits(), findProjectDir(), isPathInWorkspace(), parseAppendedLines(), pickNewestTranscript() (+21 more)
-
-### Community 19 - "terminalRegistry.ts"
-Cohesion: 0.14
-Nodes (7): VscodeTerminalHost, TerminalHandle, TerminalHost, terminalNameForLabel(), TerminalRegistry, FakeTerminal, FakeTerminalHost
+Nodes (8): activate(), VscodeTerminalHost, TerminalHandle, TerminalHost, terminalNameForLabel(), TerminalRegistry, FakeTerminal, FakeTerminalHost
 
 ### Community 20 - "mountSvelteComponentVariant"
-Cohesion: 0.08
-Nodes (33): acceptedDomAlreadyClean(), applyOriginalAttrsToSvelteAnchor(), captureAndEmit(), checkpointPayload(), clearHandledWrapperReloadStamp(), commitAcceptedSvelteComponentToDom(), compileShader(), componentModuleCandidates() (+25 more)
+Cohesion: 0.18
+Nodes (15): applyOriginalAttrsToSvelteAnchor(), commitAcceptedSvelteComponentToDom(), componentModuleCandidates(), describeMountFailure(), detectDevServerBase(), getMountedSvelteComponentAnchor(), importFirstReachable(), loadSvelteRuntime() (+7 more)
 
-### Community 21 - "issuesPanelIntegration.ts"
-Cohesion: 0.11
-Nodes (21): Built-in vscode.git extension API (state.onDidChange), fetchIssues(), getGithubSession(), SCOPES, getWorkspaceGithubRepo(), parseGithubRemote(), newestUpdateTime(), relevantToViewer() (+13 more)
+### Community 21 - "GithubIssue"
+Cohesion: 0.13
+Nodes (18): fetchIssues(), getGithubSession(), SCOPES, getWorkspaceGithubRepo(), parseGithubRemote(), newestUpdateTime(), relevantToViewer(), stripPullRequests() (+10 more)
 
-### Community 22 - "scratchNotesIntegration.ts"
-Cohesion: 0.15
-Nodes (25): deleteItem(), getWorkspaceRoot(), isRunnableScratchFile(), output, readFileSafe(), registerScratchAndNotesFeature(), renameItem(), tryEnsureGitignoreEntry() (+17 more)
+### Community 22 - "whyIsThisHereIntegration.ts"
+Cohesion: 0.19
+Nodes (14): AppendedLines, classifyHunkLines(), encodeProjectPath(), extractEdits(), findProjectDir(), isPathInWorkspace(), parseAppendedLines(), pickNewestTranscript() (+6 more)
 
 ### Community 23 - "explorer_command.cc"
 Cohesion: 0.10
@@ -441,7 +447,7 @@ Nodes (17): MakeTarget, parseMakeTargets(), makefileContent(), detectWslMakeEnv(
 
 ### Community 29 - "cmakeModel.ts"
 Cohesion: 0.13
-Nodes (30): assertNotFlag(), build(), BuildOptions, cleanTarget(), colorizeChunk(), CommandResult, configure(), ensureTerminal() (+22 more)
+Nodes (26): assertNotFlag(), build(), BuildOptions, colorizeChunk(), CommandResult, configure(), ensureTerminal(), readCodemodelTargets() (+18 more)
 
 ### Community 30 - "issuesListController.ts"
 Cohesion: 0.19
@@ -460,11 +466,11 @@ Cohesion: 0.07
 Nodes (28): activationEvents, contributes, commands, keybindings, dependencies, highlight.js, katex, markdown-it (+20 more)
 
 ### Community 34 - "singleFileCompile.ts"
-Cohesion: 0.17
-Nodes (19): BuildDiagnostic, parseBuildDiagnosticLine(), parseBuildOutput(), resolveBuildDiagnostics(), ResolvedBuildDiagnostic, resolveDiagnosticPath(), severityOf(), applyDiagnostics() (+11 more)
+Cohesion: 0.16
+Nodes (20): BuildDiagnostic, parseBuildDiagnosticLine(), parseBuildOutput(), resolveBuildDiagnostics(), ResolvedBuildDiagnostic, resolveDiagnosticPath(), severityOf(), applyDiagnostics() (+12 more)
 
 ### Community 35 - "ref_vscode"
-Cohesion: 0.10
+Cohesion: 0.09
 Nodes (28): ClangdApiV1, ClangdExtensionExports, ClangdLanguageClient, switchSourceHeader(), SwitchSourceHeaderResult, isCppDocument(), findVisibleEditor(), closeTab() (+20 more)
 
 ### Community 36 - "issues.ts"
@@ -472,24 +478,24 @@ Cohesion: 0.12
 Nodes (26): applyLocalFilter(), avatarHtml(), clearStatus(), dropdownItems(), GithubLabel, GithubUser, isSelected(), ListIssue (+18 more)
 
 ### Community 37 - "ref_path"
-Cohesion: 0.09
-Nodes (23): { execSync }, fs, path, isStrongEvidence(), isWeakEvidence(), PRUNED_DIRS, scanDirectoryForCppProject(), STRONG_EXTENSIONS (+15 more)
+Cohesion: 0.11
+Nodes (20): { execSync }, fs, path, ClangFormatConfigResolution, findConfigFileUpwards(), formatTomlToRustfmtConfigArg(), formatYamlToClangFormatStyleArg(), resolveClangFormatStyle() (+12 more)
 
 ### Community 38 - "null-tools/src/extension.ts"
-Cohesion: 0.15
-Nodes (13): ClaudeTab, FOCUS_GROUP_COMMANDS, registerClaudeTabFeature(), getStagedDiff(), runClaude(), activate(), disableRestrictedMode(), ensureWindowTitleFormat() (+5 more)
+Cohesion: 0.13
+Nodes (15): ClaudeTab, FOCUS_GROUP_COMMANDS, registerClaudeTabFeature(), getStagedDiff(), runClaude(), registerDashboardFeature(), activate(), disableRestrictedMode() (+7 more)
 
 ### Community 39 - "cmakeToolbar.ts"
-Cohesion: 0.16
-Nodes (32): cancelActive(), activePreset(), activeTarget(), applyBuildDiagnostics(), cmdBuild(), cmdBuildAndDebug(), cmdBuildAndRun(), cmdClean() (+24 more)
+Cohesion: 0.14
+Nodes (35): cancelActive(), cleanTarget(), run(), activePreset(), activeTarget(), applyBuildDiagnostics(), cmdBuild(), cmdBuildAndDebug() (+27 more)
 
 ### Community 40 - "discordPresence.ts"
-Cohesion: 0.15
-Nodes (18): DiscordAppInfo, fetchDiscordAppInfo(), getJson(), resolveAssetKey(), buttonLabelForUrl(), clampField(), fileLabel(), gitRemoteUrl() (+10 more)
+Cohesion: 0.13
+Nodes (19): DiscordAppInfo, fetchDiscordAppInfo(), getJson(), resolveAssetKey(), buttonLabelForUrl(), clampField(), fileLabel(), getConfig() (+11 more)
 
-### Community 41 - "GithubIssue"
-Cohesion: 0.18
-Nodes (11): IssuePatch, mapLimit(), formatIssueAsPrompt(), PromptComment, GithubIssue, InboundMessage, shortTitle(), STATE_PATCHES (+3 more)
+### Community 41 - "issueDetailPanel.ts"
+Cohesion: 0.15
+Nodes (11): IssuePatch, mapLimit(), draftKey(), formatIssueAsPrompt(), PromptComment, toggleTaskCheckbox(), InboundMessage, shortTitle() (+3 more)
 
 ### Community 42 - "escapeHtml"
 Cohesion: 0.17
@@ -504,20 +510,20 @@ Cohesion: 0.12
 Nodes (23): security-reviewer agent, APPX signing and thumbprint-pinning check, shell-ext IExplorerCommand path/argv check, Self-update staging and launcher.ps1 injection check, NULL IDE Architecture (product audit), Native updater (null-updater.exe + TS orchestration), null-cpp CMake/toolchain layer (needs manual clangd/cpptools), Workbench customised by injection, not source edits (+15 more)
 
 ### Community 45 - "settingsPanel.ts"
-Cohesion: 0.14
-Nodes (15): settingsPanel.ts (WebviewPanel), ButtonBackground, ButtonType, parseButtonConfigs(), ParseResult, VALID_BACKGROUNDS, VALID_TYPES, writeButtonConfigs() (+7 more)
+Cohesion: 0.13
+Nodes (15): ButtonBackground, ButtonType, parseButtonConfigs(), ParseResult, VALID_BACKGROUNDS, VALID_TYPES, readButtonConfigs(), writeButtonConfigs() (+7 more)
 
 ### Community 46 - "handleAction"
 Cohesion: 0.16
 Nodes (25): beginWrite(), candidatePicker(), filterPickerItems(), findPost(), handleAction(), headerMenu(), mountEditComposer(), openPicker() (+17 more)
 
 ### Community 47 - "handleManualEditActivity"
-Cohesion: 0.19
-Nodes (24): clearStoredManualApplyState(), fetchPendingCount(), handleManualEditActivity(), hidePendingApplyDock(), manualApplyLoadingText(), manualApplyStateKey(), manualEditEventForCurrentPage(), numberOrNull() (+16 more)
+Cohesion: 0.17
+Nodes (26): clearStoredManualApplyState(), fetchPendingCount(), handleManualEditActivity(), hidePendingApplyDock(), manualApplyLoadingText(), manualApplyStateKey(), manualEditEventForCurrentPage(), numberOrNull() (+18 more)
 
 ### Community 48 - "toolchainRegistry.ts"
 Cohesion: 0.19
-Nodes (20): cached, detectClang(), detectClangAt(), detectMsvc(), detectWsl(), detectWslDistro(), execFileAsync, findClangxx() (+12 more)
+Nodes (21): cached, detectClang(), detectClangAt(), detectMsvc(), detectWsl(), detectWslDistro(), execFileAsync, findClangxx() (+13 more)
 
 ### Community 49 - "createComposer"
 Cohesion: 0.12
@@ -528,20 +534,20 @@ Cohesion: 0.12
 Nodes (26): Add-ShellExtCertToStore(), Ensure-NullIDEContextMenuRegistry(), Expand-ZipFast(), Get-NullIdeExecutable(), Get-Release(), Install-ShellExtSigningCertificate(), Install-ShellExtSigningCertificateElevated(), Install-Zip() (+18 more)
 
 ### Community 51 - "DiscordPresenceManager"
-Cohesion: 0.23
-Nodes (5): DiscordPresenceManager, getConfig(), isValidClientId(), workspaceLabel(), registerDiscordPresenceFeature()
+Cohesion: 0.26
+Nodes (4): DiscordPresenceManager, log(), workspaceLabel(), registerDiscordPresenceFeature()
 
 ### Community 53 - "ref_node_assert"
-Cohesion: 0.06
-Nodes (23): writeClangdConfig(), toYamlPath(), updateClangdContent(), FOCUS_GROUP_COMMANDS, draftKey(), loadIssueTemplates(), parseIssueTemplate(), toggleTaskCheckbox() (+15 more)
+Cohesion: 0.07
+Nodes (23): computeMinimalEdits(), offsetToPosition(), TextEditLike, LANGUAGE_PARSER_MAP, FOCUS_GROUP_COMMANDS, loadIssueTemplates(), parseIssueTemplate(), IssueTemplate (+15 more)
 
 ### Community 54 - "gitBranch.test.ts"
-Cohesion: 0.22
-Nodes (7): branchIssueTracker, branchIssueTracker (module singleton), branchNameForIssue(), createIssueBranch(), getLocallyClosedIssueNumbers(), issueNumberFromBranch(), slugify()
+Cohesion: 0.13
+Nodes (12): Built-in vscode.git extension API (state.onDidChange), branchIssueTracker, branchIssueTracker (module singleton), branchNameForIssue(), createIssueBranch(), getLocallyClosedIssueNumbers(), issueNumberFromBranch(), slugify() (+4 more)
 
 ### Community 55 - "DiscordRpcClient"
-Cohesion: 0.19
-Nodes (3): closeWithTimeout(), DiscordRpcClient, encode()
+Cohesion: 0.18
+Nodes (4): closeWithTimeout(), DiscordRpcClient, encode(), parseCloseError()
 
 ### Community 56 - "renderCreateForm"
 Cohesion: 0.17
@@ -552,8 +558,8 @@ Cohesion: 0.10
 Nodes (19): activationEvents, categories, dependencies, prettier, description, displayName, engines, vscode (+11 more)
 
 ### Community 58 - "null-tools/package.json"
-Cohesion: 0.10
-Nodes (20): activationEvents, dependencies, ws, description, displayName, engines, vscode, @types/node (+12 more)
+Cohesion: 0.12
+Nodes (16): activationEvents, description, displayName, glob, mocha, @types/mocha, @types/node, @types/vscode (+8 more)
 
 ### Community 59 - "lib.rs"
 Cohesion: 0.17
@@ -573,7 +579,7 @@ Nodes (17): basename(), cacheVarString(), COMPILER_FAMILY_ALIASES, expandMacros(
 
 ### Community 64 - "extension.js"
 Cohesion: 0.10
-Nodes (13): activate(), openPreview(), openSlidesCmd(), ALERT_LABELS, createMd(), crypto, NullMarkdownPreview, NullMarkdownSlides (+5 more)
+Nodes (14): activate(), exportPdf(), openPreview(), openSlidesCmd(), ALERT_LABELS, createMd(), crypto, NullMarkdownPreview (+6 more)
 
 ### Community 65 - "main.cpp"
 Cohesion: 0.11
@@ -592,12 +598,12 @@ Cohesion: 0.21
 Nodes (15): createLiveBrowserSessionState(), clearHandled(), clearScrollY(), clearSession(), isHandled(), loadSession(), markHandled(), nextCheckpointRevision() (+7 more)
 
 ### Community 69 - "sync-local.ps1"
-Cohesion: 0.13
+Cohesion: 0.15
 Nodes (10): runTest.ts (@vscode/test-electron harness), verify-local Claude skill, Null Actions Extension Plan, Integration-spec harness (@vscode/test-electron + mocha), verify-local Claude skill, null-actions extension, clangd VS Code extension (vscode-clangd), null-cpp extension (+2 more)
 
-### Community 70 - "githubApi.ts"
-Cohesion: 0.17
-Nodes (17): ApiError, ApiErrorBody, createIssue(), createOrphanBranch(), failure(), fetchBytes(), fetchRepoFile(), formatApiError() (+9 more)
+### Community 70 - "projectDetectionScan.ts"
+Cohesion: 0.21
+Nodes (8): isStrongEvidence(), isWeakEvidence(), PRUNED_DIRS, scanDirectoryForCppProject(), STRONG_EXTENSIONS, STRONG_FILENAMES, WEAK_EXCLUDED_DIRS, WEAK_EXTENSIONS
 
 ### Community 71 - "properties"
 Cohesion: 0.11
@@ -607,13 +613,13 @@ Nodes (18): default, description, enum, type, default, description, type, proper
 Cohesion: 0.11
 Nodes (18): properties, title, contributes, commands, configuration, default, description, editPresentation (+10 more)
 
-### Community 73 - "ref_child_process"
-Cohesion: 0.11
-Nodes (17): ClangFormatFormattingEditProvider, ClangFormatConfigResolution, findConfigFileUpwards(), formatTomlToRustfmtConfigArg(), formatYamlToClangFormatStyleArg(), resolveClangFormatStyle(), resolveRustfmtConfig(), RustfmtConfigResolution (+9 more)
+### Community 73 - "null-format/src/extension.ts"
+Cohesion: 0.18
+Nodes (5): ClangFormatFormattingEditProvider, activate(), createConfigFile(), PrettierFormattingEditProvider, RustfmtFormattingEditProvider
 
-### Community 74 - "imageUpload.ts"
-Cohesion: 0.19
-Nodes (15): getRefSha(), ASSET_BRANCH, checkUpload(), githubUploadApi, imageMarkdown(), queue, ready, fakeApi() (+7 more)
+### Community 74 - "scheduleAcceptCleanup"
+Cohesion: 0.31
+Nodes (11): acceptedDomAlreadyClean(), clearHandledWrapperReloadStamp(), deferredRecoverySuperseded(), ensureAcceptedDomClean(), findAcceptedRuntimeWrappers(), handledWrapperReloadKey(), reloadAfterMissingAcceptedDom(), restoreAcceptedDomFromSnapshot() (+3 more)
 
 ### Community 75 - "onAnnotDown"
 Cohesion: 0.20
@@ -624,7 +630,7 @@ Cohesion: 0.20
 Nodes (17): dropDraft(), labelStyleVars(), pickLabels(), pickMany(), renderCreateForm(), onFormClick(), pickAssignees(), pickLabels() (+9 more)
 
 ### Community 77 - "discordRpcClient.ts"
-Cohesion: 0.20
+Cohesion: 0.18
 Nodes (14): errorText(), Frame, FrameDecoder, ipcPath(), IpcProbeResult, isErrorMessage(), isReadyMessage(), LogFn (+6 more)
 
 ### Community 78 - "UpdaterArgs"
@@ -632,24 +638,24 @@ Cohesion: 0.12
 Nodes (11): ParseArgs(), UpdaterArgs, force, includePrerelease, installDir, launch, repo, version (+3 more)
 
 ### Community 79 - "createLiveBrowserDomHelpers"
-Cohesion: 0.17
-Nodes (10): createLiveBrowserDomHelpers(), cssId(), liveUiRoot(), makeFrozenAnchor(), own(), pickable(), rectIsUsableAnchor(), uiAppend() (+2 more)
+Cohesion: 0.16
+Nodes (11): createLiveBrowserDomHelpers(), cssId(), liveUiRoot(), makeFrozenAnchor(), own(), pickable(), rectIsUsableAnchor(), uiAppend() (+3 more)
 
 ### Community 80 - "composer.ts (Write/Preview composer component)"
 Cohesion: 0.12
 Nodes (14): composer.ts (Write/Preview composer component), composerText.ts (pure composer text edits), createExtras.ts (runCreateExtras), IssuesStore additions (renderPreview, suggestIssues, applyCreateExtras), issueSuggest.ts (matchIssues for # popup), renderMarkdown (POST /markdown GFM preview), imageUpload.ts (orphan-branch upload via Contents API), null-issue-assets orphan branch (+6 more)
 
 ### Community 81 - "null-actions/package.json"
-Cohesion: 0.12
-Nodes (15): activationEvents, description, displayName, engines, vscode, @types/node, @types/vscode, typescript (+7 more)
+Cohesion: 0.11
+Nodes (17): activationEvents, description, displayName, engines, vscode, glob, mocha, @types/mocha (+9 more)
 
 ### Community 82 - "null-cpp/src/extension.ts"
-Cohesion: 0.15
-Nodes (28): fileExists(), findAncestorCMakeLists(), registerInitCMakeProject(), appendAddSubdirectory(), cmakeListsContent(), MAIN_CPP_CONTENT, nestedCMakeListsContent(), presetFor() (+20 more)
+Cohesion: 0.16
+Nodes (27): fileExists(), findAncestorCMakeLists(), registerInitCMakeProject(), appendAddSubdirectory(), cmakeListsContent(), MAIN_CPP_CONTENT, nestedCMakeListsContent(), presetFor() (+19 more)
 
 ### Community 83 - "contributes"
-Cohesion: 0.12
-Nodes (16): contributes, commands, customEditors, keybindings, menus, views, viewsContainers, commandPalette (+8 more)
+Cohesion: 0.22
+Nodes (9): contributes, commands, customEditors, keybindings, views, viewsContainers, null-issues, null-workspace (+1 more)
 
 ### Community 84 - "detailHtml.ts"
 Cohesion: 0.17
@@ -672,8 +678,8 @@ Cohesion: 0.16
 Nodes (13): extract command, Extract only patterns used 3+ times, Onboarding reference (onboard.md), Empty state design, Time to value (aha moment), Operate mode depth reference (operate.md), Quieter command reference (quieter.md), Command routing reference (routing.md) (+5 more)
 
 ### Community 89 - "worktrees.ts (vscode-free git data layer)"
-Cohesion: 0.15
-Nodes (14): Quick Notes feature (null.newNote), null-workspace activity bar container, Scratch Files feature (null.newScratchFile), .null/ workspace storage layout, null.canRunScratchFile context key, null.runScratchFile command, Scratch runner mapping and buildScratchRunCommand, branchNameForIssue (gitBranch.ts) (+6 more)
+Cohesion: 0.20
+Nodes (11): Quick Notes feature (null.newNote), null-workspace activity bar container, Scratch Files feature (null.newScratchFile), .null/ workspace storage layout, branchNameForIssue (gitBranch.ts), createWorktree (issue/branch/scratch kinds), worktreesIntegration.ts (commands, settings, copySetupFiles), mergeWorktreeBack (+3 more)
 
 ### Community 90 - "compilerOptions"
 Cohesion: 0.14
@@ -695,9 +701,9 @@ Nodes (14): null-tools extension, TS background download staging, Changelog moda
 Cohesion: 0.14
 Nodes (14): properties, args, background, color, command, cwd, focus, icon (+6 more)
 
-### Community 95 - "null-actions/src/extension.ts"
-Cohesion: 0.22
-Nodes (6): readButtonConfigs(), activate(), refresh(), detectSuggestedButtons(), ActionButtonsPanel, getNonce()
+### Community 95 - "projectDetector.ts"
+Cohesion: 0.20
+Nodes (7): settingsPanel.ts (WebviewPanel), null-cpp.projectDetection.override setting, projectDetection.ts detectCppProject, DETECTORS, detectSuggestedButtons(), ManifestDetector, SuggestedButton
 
 ### Community 96 - "null-cpp/package.json"
 Cohesion: 0.14
@@ -780,16 +786,16 @@ Cohesion: 0.20
 Nodes (11): Neutral gray palette for preview CSS, Server-side highlight.js code highlighting, Mermaid fence renderer override, null-markdown extension, NullMarkdownSlides view, Null Compact CSS styling (custom.css), Preview smoke-test fixture, GFM task lists, emoji, footnotes sample (+3 more)
 
 ### Community 116 - "pairedSplit.ts (auto-pair + scroll sync)"
-Cohesion: 0.25
-Nodes (10): pairedSplit.ts (auto-pair + scroll sync), scaffold.ts (null-cpp.newClass), symbolIndex.ts (DocumentSymbol cache), Symbol-aware switch (null-cpp.switchSourceHeader, Alt+O), null-cpp.isCppProject context key, null-cpp.projectDetection.override setting, projectDetection.ts detectCppProject, Alt+O targets existing split fix (+2 more)
+Cohesion: 0.23
+Nodes (11): pairedSplit.ts (auto-pair + scroll sync), scaffold.ts (null-cpp.newClass), symbolIndex.ts (DocumentSymbol cache), Symbol-aware switch (null-cpp.switchSourceHeader, Alt+O), null-cpp.isCppProject context key, Alt+O targets existing split fix, editorLookup.ts findVisibleEditor, Deterministic scaffold layout (.cpp left, .hpp right) (+3 more)
 
 ### Community 117 - "Null symbol (empty-set glyph: ring with diagonal slash, rounded caps)"
 Cohesion: 0.24
 Nodes (11): null-tools app icon (dark rounded square with white null symbol), GitHub Issues view icon (circle with center dot, monochrome 16px), null-tools activity-bar icon (null symbol, currentColor 16px), null-notes icon (pen over green-ringed null circle on dark rounded square), Workspace icon (rounded panel crossed by a diagonal slash, monochrome 16px), Null IDE app icon (1024x1024 PNG): white null symbol on dark rounded square, Near-black rounded-square (squircle) background with subtle lighter border, Null symbol (empty-set glyph: ring with diagonal slash, rounded caps) (+3 more)
 
-### Community 118 - "properties"
-Cohesion: 0.18
-Nodes (11): properties, title, configuration, default, description, type, default, description (+3 more)
+### Community 118 - "null.discord.clientId"
+Cohesion: 0.50
+Nodes (4): default, description, type, null.discord.clientId
 
 ### Community 119 - "null.gitignore.ignoredPatterns"
 Cohesion: 0.18
@@ -810,6 +816,14 @@ Nodes (9): Bounded-concurrency git status batch, New Project and Clone Repo acti
 ### Community 123 - "compilerOptions"
 Cohesion: 0.20
 Nodes (9): compilerOptions, lib, module, outFile, skipLibCheck, sourceMap, strict, target (+1 more)
+
+### Community 124 - "menus"
+Cohesion: 0.29
+Nodes (7): menus, commandPalette, editor/title, explorer/context, scm/title, view/item/context, view/title
+
+### Community 125 - "clangdCompileDb.ts"
+Cohesion: 0.60
+Nodes (3): writeClangdConfig(), toYamlPath(), updateClangdContent()
 
 ### Community 126 - ".prettierrc.json"
 Cohesion: 0.20
@@ -868,7 +882,7 @@ Cohesion: 0.25
 Nodes (8): devDependencies, glob, mocha, @types/mocha, @types/node, @types/vscode, typescript, @vscode/test-electron
 
 ### Community 140 - "issueSuggest.ts"
-Cohesion: 0.39
+Cohesion: 0.53
 Nodes (4): IssueSuggestion, matchIssues(), Suggestible, toSuggestion()
 
 ### Community 141 - "webview/dashboard.ts"
@@ -919,6 +933,14 @@ Nodes (7): contributes, commands, keybindings, menus, commandPalette, editor/con
 Cohesion: 0.33
 Nodes (7): applyState(), flushDraft(), mountComposer(), saveDraftSoon(), submitComment(), toast(), updateComposer()
 
+### Community 153 - "scripts"
+Cohesion: 0.40
+Nodes (5): scripts, compile, pretest:integration, test, test:integration
+
+### Community 155 - "null.discord.privacyMode"
+Cohesion: 0.50
+Nodes (4): default, description, type, null.discord.privacyMode
+
 ### Community 157 - "null-cpp.compile.clangArgs"
 Cohesion: 0.33
 Nodes (6): type, default, description, items, type, null-cpp.compile.clangArgs
@@ -935,9 +957,9 @@ Nodes (5): base, deepMerge(), fs, merged, overlay
 Cohesion: 0.40
 Nodes (4): impeccable-manual-edit-applier agent, Entry atomicity (all ops or none), bolder reference, Skeleton test (structure carries meaning without copy)
 
-### Community 165 - "enableInlineEdit"
-Cohesion: 0.40
-Nodes (5): collectEditableTextRows(), visit(), enableInlineEdit(), onInlineInput(), wrapMixedContentTextNodes()
+### Community 165 - "documentRefForElement"
+Cohesion: 0.07
+Nodes (36): addManualContextText(), canRestoreManualEditElement(), collectEditableTextRows(), visit(), collectManualContextPieces(), walk(), contextElementForManualEdit(), copyEditContainerContext() (+28 more)
 
 ### Community 167 - "scripts"
 Cohesion: 0.40
@@ -960,8 +982,8 @@ Cohesion: 0.40
 Nodes (5): trailingComma, default, description, enum, type
 
 ### Community 172 - "devDependencies"
-Cohesion: 0.40
-Nodes (5): devDependencies, @types/node, @types/vscode, @types/ws, typescript
+Cohesion: 0.22
+Nodes (9): devDependencies, glob, mocha, @types/mocha, @types/node, @types/vscode, @types/ws, typescript (+1 more)
 
 ### Community 173 - "null.discord.idleTimeoutSec"
 Cohesion: 0.40
@@ -990,10 +1012,6 @@ Nodes (3): require_vscode_src(), build.sh script, usage()
 ### Community 181 - "003-null-dashboard-startup.patch"
 Cohesion: 0.50
 Nodes (4): Native Project Dashboard Plan, 003-null-dashboard-startup.patch, Null Compact settings styling in custom.css, 006-settings-toc-split-extensions.patch
-
-### Community 182 - "index.ts"
-Cohesion: 0.50
-Nodes (3): run(), glob, mocha
 
 ### Community 183 - "devDependencies"
 Cohesion: 0.50
@@ -1091,9 +1109,9 @@ Nodes (4): default, description, type, null.discord.showWorkspace
 Cohesion: 0.50
 Nodes (4): default, description, type, null.gitignore.autoCommit
 
-### Community 208 - "null.gitignore.autoUpdate"
-Cohesion: 0.50
-Nodes (4): default, description, type, null.gitignore.autoUpdate
+### Community 208 - "properties"
+Cohesion: 0.29
+Nodes (7): properties, title, configuration, default, description, type, null.gitignore.autoUpdate
 
 ### Community 209 - "null.nullNotes.exePath"
 Cohesion: 0.50
@@ -1166,24 +1184,24 @@ Nodes (3): Null IDE 150x150 tile icon (white null symbol on dark rounded square)
   CLAUDE.md · relation: references
 
 ## Knowledge Gaps
-- **986 isolated node(s):** `block-compiled-output.sh script`, `{ execSync }`, `path`, `fs`, `test-on-src-edit.sh script` (+981 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 1272 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **61 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **999 isolated node(s):** `block-compiled-output.sh script`, `{ execSync }`, `path`, `fs`, `test-on-src-edit.sh script` (+994 more)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 1285 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **64 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
 - **What is the exact relationship between `Hero section with animated grid and pulsing null logo` and `Flat-By-Default Rule (1px dividers, no shadow)`?**
   _Edge tagged AMBIGUOUS (relation: conceptually_related_to) - confidence is low._
-- **Why does `ws` connect `null-tools/package.json` to `discordRpcClient.ts`?**
-  _High betweenness centrality (0.029) - this node is a cross-community bridge._
+- **Why does `ws` connect `discordRpcClient.ts` to `null-tools/package.json`?**
+  _High betweenness centrality (0.028) - this node is a cross-community bridge._
 - **What connects `block-compiled-output.sh script`, `{ execSync }`, `path` to the rest of the system?**
-  _986 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _999 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `live-browser.js` be split into smaller, more focused modules?**
-  _Cohesion score 0.02795638803466592 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.031621047369078864 - nodes in this community are weakly interconnected._
 - **What is the exact relationship between `Brand commitments (teal/indigo Null Dark palette)` and `One Accent Rule (Signal Blue only)`?**
   _Edge tagged AMBIGUOUS (relation: conceptually_related_to) - confidence is low._
-- **Why does `prettier` connect `ref_child_process` to `null-format/package.json`?**
-  _High betweenness centrality (0.029) - this node is a cross-community bridge._
+- **Why does `prettier` connect `ref_node_assert` to `null-format/package.json`?**
+  _High betweenness centrality (0.027) - this node is a cross-community bridge._
 - **Should `resumeSession` be split into smaller, more focused modules?**
-  _Cohesion score 0.058002735978112174 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.050042955326460484 - nodes in this community are weakly interconnected._
