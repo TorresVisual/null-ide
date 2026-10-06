@@ -31,6 +31,11 @@ export class ProjectBinding {
     return this.read()[folderKey(folderPath, this.platform)];
   }
 
+  /** Every binding as [folder key, account id]. Keys are in `folderKey` form (lower-cased on Windows). */
+  entries(): [string, string][] {
+    return Object.entries(this.read());
+  }
+
   async bind(folderPath: string, accountId: string): Promise<void> {
     const key = folderKey(folderPath, this.platform);
     const bindings = this.read();

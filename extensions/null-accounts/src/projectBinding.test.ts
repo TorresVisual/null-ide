@@ -78,3 +78,20 @@ test('corrupt stored data reads as no bindings and is overwritten by the next bi
   await binding.bind('C:\\a', 'a1');
   assert.strictEqual(binding.accountIdFor('C:\\a'), 'a1');
 });
+
+test('entries lists every binding as [folder key, account id]', async () => {
+  const b = new ProjectBinding(new FakeMeta(), 'linux');
+  assert.deepStrictEqual(b.entries(), []);
+  await b.bind('/work/a', 'acc1');
+  await b.bind('/work/b', 'acc2');
+  assert.deepStrictEqual(b.entries(), [['/work/a', 'acc1'], ['/work/b', 'acc2']]);
+});
+
+test('a folder key from entries() can be passed straight back to unbind, on Windows too', async () => {
+  const b = new ProjectBinding(new FakeMeta(), 'win32');
+  await b.bind('C:\\Work\\MyRepo\\', 'acc1');
+  const [[key]] = b.entries();
+  assert.strictEqual(key, 'c:/work/myrepo'); // lower-cased: Windows paths are case-insensitive
+  await b.unbind(key);
+  assert.deepStrictEqual(b.entries(), []);
+});
