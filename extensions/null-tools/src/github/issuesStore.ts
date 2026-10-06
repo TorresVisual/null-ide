@@ -90,7 +90,7 @@ export class IssuesStore {
     const session = await getGithubSession(interactive).then(s => s, () => undefined);
     if (!session) throw new SessionError('signed-out');
     this.setRepo(repo);
-    this.viewerLogin = session.account.label;
+    this.viewerLogin = session.login;
     return { repo, token: session.accessToken };
   }
 

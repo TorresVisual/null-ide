@@ -1,9 +1,13 @@
 'use strict';
 
 import * as vscode from 'vscode';
+import { AccountsApiLike, GithubSession, resolveGithubSession } from './githubSession';
 
-const SCOPES = ['repo'];
+/** null-accounts' exported API. null-tools lists it in `extensionDependencies`, so it is active by now. */
+export function getAccountsApi(): AccountsApiLike | undefined {
+  return vscode.extensions.getExtension<AccountsApiLike>('null.null-accounts')?.exports;
+}
 
-export function getGithubSession(createIfNone: boolean): Thenable<vscode.AuthenticationSession | undefined> {
-  return vscode.authentication.getSession('github', SCOPES, { createIfNone, silent: !createIfNone });
+export function getGithubSession(createIfNone: boolean): Promise<GithubSession | undefined> {
+  return resolveGithubSession(getAccountsApi(), vscode.workspace.workspaceFolders?.[0]?.uri, createIfNone);
 }

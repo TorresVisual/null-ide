@@ -5,7 +5,7 @@ import { IssuesStore } from './github/issuesStore';
 import { IssuesViewProvider } from './issuesPanel';
 import { IssueDetailPanel } from './issueDetailPanel';
 import { getWorkspaceGithubRepo } from './github/githubRemote';
-import { getGithubSession } from './github/githubAuth';
+import { getAccountsApi, getGithubSession } from './github/githubAuth';
 import { fetchIssues } from './github/githubApi';
 import { GithubIssue } from './github/types';
 import { branchIssueTracker } from './github/gitBranch';
@@ -81,6 +81,12 @@ export function registerIssuesPanelFeature(context: vscode.ExtensionContext): vo
     vscode.workspace.onDidChangeWorkspaceFolders(() => refreshIssueCountBar()),
     vscode.window.onDidChangeWindowState(state => { if (state.focused) void refreshIssueCountBar(); }),
   );
+  // Importing or binding an account must show up without a manual refresh.
+  const accountsChanged = getAccountsApi()?.onDidChange(() => {
+    void provider.refresh();
+    void refreshIssueCountBar();
+  });
+  if (accountsChanged) { context.subscriptions.push(accountsChanged); }
   void refreshIssueCountBar();
 }
 
