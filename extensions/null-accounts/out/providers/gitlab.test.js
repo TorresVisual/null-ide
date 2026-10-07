@@ -244,4 +244,12 @@ const pat = { ...tanuki, authMethod: 'https' };
     node_assert_1.default.deepStrictEqual(prompted, []);
     node_assert_1.default.strictEqual(provider.needsReauth('g1'), false);
 });
+(0, node_test_1.test)('a rejected token reports the HTTP status and the reason GitLab gave', async () => {
+    const scope = make({
+        gets: { '/version': versionOk, '/user': { status: 403, body: { error: 'insufficient_scope', error_description: 'requires read_user, api' } } },
+    });
+    await node_assert_1.default.rejects(scope.provider.signInWithToken('gitlab.com', 'x'), /HTTP 403: requires read_user, api/);
+    const bad = make({ gets: { '/version': versionOk, '/user': { status: 401, body: { message: '401 Unauthorized' } } } });
+    await node_assert_1.default.rejects(bad.provider.signInWithToken('gitlab.com', 'x'), /HTTP 401: 401 Unauthorized/);
+});
 //# sourceMappingURL=gitlab.test.js.map
