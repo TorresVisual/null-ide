@@ -2,11 +2,11 @@
 
 > **For agentic workers:** See Execution Options below — the checked Execution Mode box names the REQUIRED SUB-SKILL (superpowers:executing-plans or superpowers:subagent-driven-development).
 
-**Goal:** Make git itself use the account a folder is bound to: repo-local identity (`user.name` / `user.email`), the right credential for that account's host, and an SSH key when an account has one — applied on bind and rebind, undone on unbind, and kept fresh as GitLab tokens rotate.
+**Goal:** Make git itself use the account a folder is bound to: repo-local identity (`user.name` / `user.email`), the right credential for that account's host, and an SSH key for accounts that sign in with one (a university or company GitLab that only offers SSH) — applied on bind and rebind, undone on unbind, and kept fresh as GitLab tokens rotate.
 
-**Architecture:** Same split as Phases 1–5: logic with branches lives in modules that never import `vscode` at runtime and take every side effect as an injected dependency. `git.ts` gains `runGit` (the one place a `git` process is spawned; never rejects, never prompts). `gitPlan.ts` is the pure "account → config keys + credential target" function. `GitWiring` (repo-local config) and `CredentialSync` (OS credential store) each *reconcile* against the current bindings and accounts rather than reacting to individual events, so they are idempotent, restart-safe and cheap to call often; both run their work through `serial()` so a burst of changes can't interleave. Only `extension.ts` touches `vscode`: it triggers a reconcile on every change, on every refreshed token and every 5 minutes.
+**Architecture:** Same split as Phases 1–5: logic with branches lives in modules that never import `vscode` at runtime and take every side effect as an injected dependency. `git.ts` gains `runGit` (the one place a `git` process is spawned; never rejects, never prompts). `gitPlan.ts` is the pure "account → config keys + credential target" function. `GitWiring` (repo-local config) and `CredentialSync` (OS credential store) each *reconcile* against the current bindings and accounts rather than reacting to individual events, so they are idempotent, restart-safe and cheap to call often; both run their work through `serial()` so a burst of changes can't interleave. SSH-only accounts are added through `sshAccount.ts` (pure validation) and checked once with `sshCheck.ts` (`ssh -T`, never blocking the save). Only `extension.ts` and `ui/accountPicker.ts` touch `vscode`: `extension.ts` triggers a reconcile on every change, on every refreshed token and every 5 minutes.
 
-**Tech Stack:** TypeScript (strict), `node:child_process` `execFile`, `node --test` + `node:assert`, the real `git` binary in unit tests (as `git.test.ts` already does), `git config --local`, `git credential approve|reject`.
+**Tech Stack:** TypeScript (strict), `node:child_process` `execFile` (`git`, `ssh`), `node --test` + `node:assert`, the real `git` binary in unit tests (as `git.test.ts` already does), `git config --local`, `git credential approve|reject`, VS Code `showInputBox` / `showOpenDialog`.
 
 **Spec:** `docs/specs/null-accounts-design.md` (issue #102), sections "Git wiring", "Error handling", "Security" and "Delivery phases". This is plan 6 of 7: (1) Foundation, (2) GitHub + binding, (3) UI, (4) Accounts menu, (5) GitLab — all landed (`docs/plans/null-accounts-phase{1,2,3,4,5}-*.md`); (6) Git wiring ← this plan; (7) Integration.
 
@@ -16,12 +16,12 @@ Leave every box below unchecked. The executing skill resolves them with
 your human partner before Step 1 and checks the chosen boxes itself.
 
 **Execution Target:**
-- [ ] Current branch (no isolation)
+- [x] Current branch (no isolation)
 - [ ] New feature branch (no worktree)
 - [ ] Worktree (superpowers:using-git-worktrees)
 
 **Execution Mode:**
-- [ ] Inline execution (superpowers:executing-plans)
+- [x] Inline execution (superpowers:executing-plans)
 - [ ] Subagent-driven execution (superpowers:subagent-driven-development)
 
 ## Global Constraints
@@ -33,24 +33,30 @@ your human partner before Step 1 and checks the chosen boxes itself.
 - **A token only ever travels on stdin** to `git credential approve`. It is never an argument, never logged, never in an error message, and never persisted outside `SecretStorage` (the `CredentialSync` record holds host + username only).
 - The credential is looked up by (host, username). `Account.host` may carry a port (`git.example.org:8443`), which is exactly git's `host=` form.
 - GitHub tokens come from `api.getToken(account)` with no `interactive` flag — wiring must **never open a prompt**. No token ⇒ the identity is still written, the credential is skipped, and the next sync tries again.
-- **Deviations from the spec** (each one is applied to the spec in Task 6):
+- **Deviations from the spec** (each one is applied to the spec in Task 7):
   1. The username key is `credential.https://<host>.username` (the documented URL form; scoped to https remotes), not `credential.<host>.username`. Verified against git 2.56: both match, the URL form is the one the docs promise.
   2. Unbinding **restores the value that was there before** (`null` ⇒ unset), instead of only removing our keys, and leaves a value alone if the user changed it after we wrote it. The spec's "remove the keys this extension set" would delete a `user.email` the user had set by hand.
   3. `core.sshCommand` single-quotes the key path (no shell expansion), writes it with forward slashes, and expands a leading `~/`.
   4. The OS credential is withdrawn (`git credential reject`) when **no folder uses the account any more** — the spec only says the token exists in two places and doesn't say when the second copy goes away.
   5. A 5-minute poll keeps the OS-store token current while the IDE stays open: GitLab tokens last ~2 h and nothing else would refresh them for a session that only uses a terminal.
   6. Reasons for skipping are shown as a warning **only when actionable** (git missing, SSH key missing, git refusing a setting) and only for open workspace folders, once per session. "Not a repository" and "folder is gone" are silent: a plain folder bound to an account for the Issues panel is not an error.
-- Not in this phase: any UI to *create* an SSH account (the model, validation and `planFor` already handle `authMethod: 'ssh'`; nothing in the Add Account flow produces one yet), the dashboard showing each project's account and the end-to-end `verify-local` spec (Phase 7), `git config` for submodules, `includeIf`, or git worktrees (a worktree shares its repo's `.git/config`, so binding two worktrees of one repo to different accounts makes the last write win).
+  7. SSH account creation is part of this phase (the spec lists SSH under Git wiring, and a university GitLab often offers nothing else), including a one-off `ssh -T` test whose failure warns but never prevents saving.
+- **SSH accounts** (`authMethod: 'ssh'`) sign in with a private key and nothing else: no OAuth, no token, no credential-store entry. `NullAccountsApi.getToken` returns `undefined` for them *before* asking any provider (the GitLab provider would otherwise read the missing token as a dead sign-in and flag "needs re-auth"). Features that need a token — the Issues panel for a GitHub-over-SSH account — therefore do not work for them; git does.
+- An SSH account's `host` is a bare host name with no port (the port comes from the repository URL), its key is a **private** key file that exists (`.pub` is refused), and `provider` is `github` for `github.com` and `gitlab` for every other host. `sshKeyPath` is stored as chosen; `~/` and Windows separators are handled when it is used (`expandKeyPath`).
+- One account per (provider, host, username), as before: an SSH account cannot be added for an identity that already has a token account — remove that one first.
+- Not in this phase: the dashboard showing each project's account and the end-to-end `verify-local` spec (Phase 7), `git config` for submodules, `includeIf`, or git worktrees (a worktree shares its repo's `.git/config`, so binding two worktrees of one repo to different accounts makes the last write win).
 
 ## Review Focus
 
-Inputs the spec implies but doesn't spell out, most likely to bite first. Each has a test in the owning task.
+Inputs the spec implies but doesn't spell out, most likely to bite first (items 6–7 cover SSH accounts). Each has a test in the owning task, or for behaviour that lives in the editor UI a check in Task 8.
 
 1. **A repo that already has a hand-set `user.email`** — binding must not lose it: unbinding puts it back, and a value the user edits *after* we wrote ours is never overwritten or deleted. (Task 3)
 2. **Two folders on one account** — the OS credential belongs to the account, so unbinding one folder must not withdraw the token the other still uses. (Task 4)
 3. **A token containing a newline, or a username that does** — would add a forged `host=` / `password=` line to `git credential` input. Refused, nothing sent. (Task 4)
 4. **A bound folder that was deleted, is not a repo, or git is not installed** — three different outcomes. Git reports a missing folder exactly like a missing `git` (`ENOENT`), so the folder is checked first; only real "git missing" keeps a cleanup record for retry and warns. (Tasks 1, 3)
 5. **A burst of changes** (bind → rebind → edit email, or the 5-minute poll landing mid-change) — reconciles are serialised and a no-change reconcile spawns no git process. (Tasks 1, 3)
+6. **An SSH account asked for a token** — by the Issues panel, by `CredentialSync`, by anything: it gets `undefined` without any provider being consulted, and is never flagged "needs re-auth". (Task 6)
+7. **The wrong key, or a host that isn't trusted yet** — the account is still saved, and the warning says what to do (add the `.pub` on the server, or run `ssh git@host` once); a key that belongs to a different user than the one typed is called out. (Task 6)
 
 ---
 
@@ -1161,7 +1167,7 @@ function registerGitSync(
 - [ ] **Step 6: Compile and run the whole suite**
 
 Run: `npm --prefix extensions/null-accounts test`
-Expected: PASS — everything compiles (`extension.ts` is only type-checked here; its behaviour is Task 7).
+Expected: PASS — everything compiles (`extension.ts` is only type-checked here; its behaviour is Task 8).
 
 - [ ] **Step 7: Commit**
 
@@ -1172,7 +1178,397 @@ git commit -m "feat(null-accounts): wire bound accounts into git on every change
 
 ---
 
-### Task 6: Docs and compiled output
+### Task 6: SSH accounts (add, validate, test the key)
+
+**Files:**
+- Modify: `extensions/null-accounts/src/gitPlan.ts` (extract `expandKeyPath`)
+- Create: `extensions/null-accounts/src/sshAccount.ts`
+- Test: `extensions/null-accounts/src/sshAccount.test.ts`
+- Create: `extensions/null-accounts/src/sshCheck.ts`
+- Test: `extensions/null-accounts/src/sshCheck.test.ts`
+- Modify: `extensions/null-accounts/src/api.ts`, `extensions/null-accounts/src/api.test.ts`
+- Modify: `extensions/null-accounts/src/ui/pickItems.ts`, `extensions/null-accounts/src/ui/pickItems.test.ts`
+- Modify: `extensions/null-accounts/src/ui/accountPicker.ts`
+- Modify: `extensions/null-accounts/package.json` (`scripts.test`)
+
+**Interfaces:**
+- Consumes: `sshKeyFile` (Task 2), `normalizeHost` / `validateNewAccount` (`accountInput.ts`), `NewAccount`, `AccountStore.add`.
+- Produces:
+  - `expandKeyPath(raw: string, home: string): string` in `gitPlan.ts` (`sshKeyFile` now calls it)
+  - `normalizeSshHost(input: string): string`, `checkKeyPath(keyPath: string, home: string, exists: (file: string) => boolean): string | undefined`, `interface SshAccountInput { host: string; username: string; email: string; keyPath: string }`, `buildSshAccount(input: SshAccountInput, home: string, exists: (file: string) => boolean): NewAccount` in `sshAccount.ts` (throws an `Error` whose message is fit to show the user)
+  - `interface SshCheck { ok: boolean; user?: string; message: string }`, `type RunSsh = (args: string[]) => Promise<string>`, `runSsh: RunSsh`, `sshCheckArgs(host: string, keyFile: string): string[]`, `interpretSshReply(output: string, host: string): SshCheck`, `checkSsh(host: string, keyFile: string, run?: RunSsh): Promise<SshCheck>` in `sshCheck.ts`
+  - `ProviderChoice` gains `'ssh'`; `providerPickItems()` gains a last item, `SSH key…`
+
+The flow a user sees: *Add account… → SSH key…* → the server (`gitlab.uni.example`) → their username there → the commit email → a file dialog opened in `~/.ssh` for the **private** key. The account is saved straight away; a notification then reports `ssh -T git@<host>` run with only that key: connected as the right user, connected as a different user, key rejected, or host not trusted yet. Binding a project to the account then makes `GitWiring` (Task 3) write `core.sshCommand`.
+
+- [ ] **Step 1: Write the failing tests**
+
+Create `extensions/null-accounts/src/sshAccount.test.ts`:
+
+```ts
+'use strict';
+
+import assert from 'node:assert';
+import { test } from 'node:test';
+import { buildSshAccount, checkKeyPath, normalizeSshHost } from './sshAccount';
+
+const present = new Set(['/home/me/.ssh/id_uni', 'C:/Users/me/.ssh/id_uni']);
+const exists = (file: string): boolean => present.has(file);
+const input = { host: 'GitLab.Uni.example', username: ' ada ', email: 'ada@uni.example', keyPath: '~/.ssh/id_uni' };
+
+test('a university GitLab account: GitLab provider, bare host, ssh auth, key path kept as typed', () => {
+  assert.deepStrictEqual(buildSshAccount(input, '/home/me', exists), {
+    provider: 'gitlab', host: 'gitlab.uni.example', username: 'ada', email: 'ada@uni.example',
+    authMethod: 'ssh', sshKeyPath: '~/.ssh/id_uni',
+  });
+});
+
+test('github.com over SSH is a GitHub account', () => {
+  assert.strictEqual(buildSshAccount({ ...input, host: 'https://github.com/' }, '/home/me', exists).provider, 'github');
+});
+
+test('a Windows key path is found after expansion, whichever way the slashes lean', () => {
+  const win = { ...input, keyPath: 'C:\\Users\\me\\.ssh\\id_uni' };
+  assert.strictEqual(buildSshAccount(win, 'C:\\Users\\me', exists).sshKeyPath, 'C:\\Users\\me\\.ssh\\id_uni');
+});
+
+test('the key path is checked: empty, the .pub half of a pair, and a file that is not there', () => {
+  assert.match(checkKeyPath('  ', '/home/me', exists) ?? '', /Choose the private key/);
+  assert.match(checkKeyPath('~/.ssh/id_uni.pub', '/home/me', exists) ?? '', /public key/);
+  assert.match(checkKeyPath('~/.ssh/nope', '/home/me', exists) ?? '', /no file at ~\/\.ssh\/nope/);
+  assert.strictEqual(checkKeyPath('~/.ssh/id_uni', '/home/me', exists), undefined);
+});
+
+test('a host with a port, an http:// host, or a bad email is refused with a readable message', () => {
+  assert.throws(() => normalizeSshHost('git.uni.example:2222'), /without a port/);
+  assert.throws(() => buildSshAccount({ ...input, host: 'http://git.uni.example' }, '/home/me', exists), /http/);
+  assert.throws(() => buildSshAccount({ ...input, email: 'not-an-email' }, '/home/me', exists), /email/i);
+  assert.throws(() => buildSshAccount({ ...input, keyPath: '~/.ssh/nope' }, '/home/me', exists), /no file/);
+});
+```
+
+Create `extensions/null-accounts/src/sshCheck.test.ts`:
+
+```ts
+'use strict';
+
+import assert from 'node:assert';
+import { test } from 'node:test';
+import { checkSsh, interpretSshReply, sshCheckArgs } from './sshCheck';
+
+test('GitLab and GitHub greetings are a success that names the user the key belongs to', () => {
+  assert.deepStrictEqual(interpretSshReply('Welcome to GitLab, @ada!\n', 'gitlab.uni.example'), {
+    ok: true, user: 'ada', message: 'Connected to gitlab.uni.example as ada.',
+  });
+  const hub = interpretSshReply("Hi ada! You've successfully authenticated, but GitHub does not provide shell access.", 'github.com');
+  assert.deepStrictEqual([hub.ok, hub.user], [true, 'ada']);
+});
+
+test('the common failures each get a message that says what to do', () => {
+  assert.match(interpretSshReply('Host key verification failed.', 'g.example').message, /ssh git@g\.example/);
+  assert.match(interpretSshReply('git@g.example: Permission denied (publickey).', 'g.example').message, /did not accept this key/);
+  assert.match(interpretSshReply('spawn ssh ENOENT', 'g.example').message, /not found on your PATH/);
+  assert.strictEqual(interpretSshReply('ssh: connect to host g.example port 22: Connection timed out', 'g.example').message,
+    'ssh: connect to host g.example port 22: Connection timed out');
+  assert.strictEqual(interpretSshReply('  \n', 'g.example').message, 'Could not reach g.example over SSH.');
+  assert.strictEqual(interpretSshReply('Permission denied', 'g.example').ok, false);
+});
+
+test('checkSsh asks ssh to use only this key, never to prompt, and passes the key as one argument', async () => {
+  let seen: string[] = [];
+  const check = await checkSsh('g.example', 'C:/Users/me/.ssh/id uni', async args => { seen = args; return 'Welcome to GitLab, @ada!'; });
+  assert.strictEqual(check.ok, true);
+  assert.deepStrictEqual(seen, sshCheckArgs('g.example', 'C:/Users/me/.ssh/id uni'));
+  assert.ok(seen.includes('BatchMode=yes') && seen.includes('IdentitiesOnly=yes'));
+  assert.strictEqual(seen[seen.indexOf('-i') + 1], 'C:/Users/me/.ssh/id uni');
+  assert.strictEqual(seen.at(-1), 'git@g.example');
+});
+```
+
+In `extensions/null-accounts/src/api.test.ts`, directly above the `onDidChange is the supplied event` test, add:
+
+```ts
+test('getToken resolves undefined for an SSH account without asking any provider', async () => {
+  const ssh: Account = { id: 'a3', provider: 'gitlab', host: 'git.uni.example', username: 'ada', email: 'a@uni.example', authMethod: 'ssh', sshKeyPath: '~/.ssh/id' };
+  let asked = 0;
+  const gitlab: TokenProvider = { getToken: async () => { asked++; return 'x'; } };
+  const api = createApi(makeDeps({
+    accounts: { list: () => [ssh], get: id => (id === ssh.id ? ssh : undefined) },
+    tokenProviders: { gitlab },
+  }));
+  assert.strictEqual(await api.getToken(ssh, undefined, { interactive: true }), undefined);
+  assert.strictEqual(asked, 0);
+});
+```
+
+In `extensions/null-accounts/src/ui/pickItems.test.ts` replace the last test with:
+
+```ts
+test('the provider choices are GitHub, gitlab.com, self-hosted GitLab, an access token and an SSH key, in that order', () => {
+  assert.deepStrictEqual(providerPickItems().map(p => p.choice), ['github', 'gitlab', 'gitlab-self-hosted', 'gitlab-token', 'ssh']);
+  assert.strictEqual(ADD_ACCOUNT_LABEL, '$(add) Add account…');
+});
+```
+
+- [ ] **Step 2: Run the tests to verify they fail**
+
+Run: `cd extensions/null-accounts && npx tsc -p tsconfig.json`
+Expected: FAIL — `Cannot find module './sshAccount'`, `Cannot find module './sshCheck'`, and `'ssh'` is not assignable to `ProviderChoice`.
+
+- [ ] **Step 3: Implement the pure parts**
+
+In `extensions/null-accounts/src/gitPlan.ts` replace the whole `sshKeyFile` function (and its doc comment) with:
+
+```ts
+/** "~/.ssh/id" -> "<home>/.ssh/id"; backslashes become slashes (git runs `core.sshCommand` through a POSIX shell). */
+export function expandKeyPath(raw: string, home: string): string {
+  const trimmed = raw.trim();
+  const expanded = /^~[\\/]/.test(trimmed) ? `${home.replace(/[\\/]+$/, '')}/${trimmed.slice(2)}` : trimmed;
+  return expanded.replace(/\\/g, '/');
+}
+
+export const sshKeyFile = (account: Account, home: string): string => expandKeyPath(account.sshKeyPath ?? '', home);
+```
+
+Create `extensions/null-accounts/src/sshAccount.ts`:
+
+```ts
+'use strict';
+
+import { normalizeHost, validateNewAccount } from './accountInput';
+import { expandKeyPath } from './gitPlan';
+import { NewAccount } from './types';
+
+/** A bare lowercase host for an SSH account. No port: ssh takes it from the remote URL, and `suggest` matches on the bare host. */
+export function normalizeSshHost(input: string): string {
+  const host = normalizeHost(input);
+  if (host.includes(':')) {
+    throw new Error('Enter the host name without a port; SSH takes the port from the repository URL.');
+  }
+  return host;
+}
+
+/** Why this file can't be an account's key, or `undefined` if it can. */
+export function checkKeyPath(keyPath: string, home: string, exists: (file: string) => boolean): string | undefined {
+  const raw = keyPath.trim();
+  if (!raw) { return 'Choose the private key file.'; }
+  if (/\.pub$/i.test(raw)) {
+    return 'That is the public key (.pub). Choose the private key next to it, the file without .pub.';
+  }
+  return exists(expandKeyPath(raw, home)) ? undefined : `There is no file at ${raw}.`;
+}
+
+export interface SshAccountInput { host: string; username: string; email: string; keyPath: string }
+
+/** GitHub for github.com, GitLab for every other host. Throws an Error with a message fit to show the user. */
+export function buildSshAccount(input: SshAccountInput, home: string, exists: (file: string) => boolean): NewAccount {
+  const host = normalizeSshHost(input.host);
+  const problem = checkKeyPath(input.keyPath, home, exists);
+  if (problem) { throw new Error(problem); }
+  return validateNewAccount({
+    provider: host === 'github.com' ? 'github' : 'gitlab',
+    host,
+    username: input.username,
+    email: input.email,
+    authMethod: 'ssh',
+    sshKeyPath: input.keyPath,
+  });
+}
+```
+
+Create `extensions/null-accounts/src/sshCheck.ts`:
+
+```ts
+'use strict';
+
+import { execFile } from 'node:child_process';
+
+export interface SshCheck {
+  ok: boolean;
+  /** The user the server says the key belongs to (GitLab: "Welcome to GitLab, @ada!"). */
+  user?: string;
+  /** Why it failed, fit to show the user. */
+  message: string;
+}
+
+/** Everything ssh printed, or the reason it could not run. */
+export type RunSsh = (args: string[]) => Promise<string>;
+
+export const runSsh: RunSsh = args => new Promise(resolve => {
+  execFile('ssh', args, { timeout: 20_000, windowsHide: true }, (err, stdout, stderr) => {
+    resolve(`${stdout}\n${stderr}\n${err && !stdout && !stderr ? err.message : ''}`);
+  });
+});
+
+/** `-T git@host` with only this key; BatchMode so it fails fast instead of waiting on a prompt nobody can see. */
+export function sshCheckArgs(host: string, keyFile: string): string[] {
+  return ['-i', keyFile, '-o', 'IdentitiesOnly=yes', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', '-T', `git@${host}`];
+}
+
+// GitLab: "Welcome to GitLab, @ada!". GitHub: "Hi ada! You've successfully authenticated, but GitHub does not provide shell access."
+const WELCOME = /welcome to gitlab, @?([\w.-]+)!|hi ([\w.-]+)! you've successfully authenticated/i;
+
+export function interpretSshReply(output: string, host: string): SshCheck {
+  const welcome = WELCOME.exec(output);
+  if (welcome) {
+    const user = welcome[1] ?? welcome[2];
+    return { ok: true, user, message: `Connected to ${host} as ${user}.` };
+  }
+  const fail = (message: string): SshCheck => ({ ok: false, message });
+  if (/ENOENT/.test(output)) { return fail('ssh was not found on your PATH.'); }
+  if (/host key verification failed|authenticity of host/i.test(output)) {
+    return fail(`${host} is not in your known hosts yet. Run  ssh git@${host}  once in a terminal and accept its fingerprint, then try again.`);
+  }
+  if (/permission denied/i.test(output)) {
+    return fail(`${host} did not accept this key. Is its public key (.pub) added to your account there?`);
+  }
+  const firstLine = output.split(/\r?\n/).map(l => l.trim()).find(Boolean);
+  return fail(firstLine ?? `Could not reach ${host} over SSH.`);
+}
+
+export async function checkSsh(host: string, keyFile: string, run: RunSsh = runSsh): Promise<SshCheck> {
+  return interpretSshReply(await run(sshCheckArgs(host, keyFile)), host);
+}
+```
+
+In `extensions/null-accounts/src/api.ts`, in `getToken`, directly after `if (!stored) { return undefined; }` add:
+
+```ts
+      // An SSH account signs in with its key: there is no token to hand out, and a provider must not mistake that for a dead sign-in.
+      if (stored.authMethod === 'ssh') { return undefined; }
+```
+
+In `extensions/null-accounts/src/ui/pickItems.ts` change the type to
+
+```ts
+export type ProviderChoice = 'github' | 'gitlab' | 'gitlab-self-hosted' | 'gitlab-token' | 'ssh';
+```
+
+and add as the last element of the `providerPickItems` array:
+
+```ts
+  { label: 'SSH key…', description: 'GitLab or GitHub with just a key — no sign-in', choice: 'ssh' },
+```
+
+- [ ] **Step 4: Register the tests and run them**
+
+Append ` out/sshAccount.test.js out/sshCheck.test.js` to `scripts.test` in `extensions/null-accounts/package.json`.
+
+Run: `npm --prefix extensions/null-accounts test`
+Expected: PASS — 5 new `sshAccount` tests, 3 new `sshCheck` tests, the new `api` test and the updated `pickItems` test; the existing `gitPlan` tests still pass through `expandKeyPath`.
+
+- [ ] **Step 5: Add the flow to the picker**
+
+In `extensions/null-accounts/src/ui/accountPicker.ts`:
+
+(a) Replace the first imports
+
+```ts
+import path from 'node:path';
+import * as vscode from 'vscode';
+import { normalizeHost } from '../accountInput';
+```
+
+with
+
+```ts
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import path from 'node:path';
+import * as vscode from 'vscode';
+import { normalizeHost, validateNewAccount } from '../accountInput';
+```
+
+(b) After `import { originUrl } from '../git';` add `import { expandKeyPath } from '../gitPlan';`, and after `import { OAuthError } from '../providers/gitlabOAuth';` add:
+
+```ts
+import { buildSshAccount, normalizeSshHost } from '../sshAccount';
+import { checkSsh } from '../sshCheck';
+```
+
+(c) Directly above the `/** Asks which provider, then signs in…` comment add:
+
+```ts
+const problemOf = (check: (value: string) => unknown) => (value: string): string | undefined => {
+  try { check(value); return undefined; } catch (err) { return (err as Error).message; }
+};
+
+/** What the server says about the key, shown after the account is saved: a failed test never blocks saving. */
+async function reportSshTest(account: Account): Promise<void> {
+  const check = await checkSsh(account.host, expandKeyPath(account.sshKeyPath ?? '', os.homedir()));
+  const who = `${account.username}@${account.host}`;
+  if (!check.ok) {
+    void vscode.window.showWarningMessage(`Saved ${who}, but the SSH test failed: ${check.message}`);
+  } else if (check.user && check.user.toLowerCase() !== account.username.toLowerCase()) {
+    void vscode.window.showWarningMessage(`Saved ${who}, but ${account.host} says this key belongs to ${check.user}, not ${account.username}.`);
+  } else {
+    void vscode.window.showInformationMessage(`${check.message} Git in projects using ${who} will use this key.`);
+  }
+}
+
+/** An account that signs in with an SSH key only: no OAuth, no token. Asks for the server, who you are there, and the key file. */
+async function addSshAccount(deps: PickerDeps): Promise<Account | undefined> {
+  const host = await vscode.window.showInputBox({
+    title: 'SSH account: server',
+    prompt: 'Host name of the GitLab (or GitHub) server, e.g. gitlab.example.edu — no port',
+    validateInput: problemOf(normalizeSshHost),
+    ignoreFocusOut: true,
+  });
+  if (host === undefined) { return undefined; }
+  const username = await vscode.window.showInputBox({
+    title: `Your username on ${normalizeSshHost(host)}`,
+    prompt: 'The name shown on your profile there (it is also used as the git author name)',
+    validateInput: v => (v.trim() ? undefined : 'A username is required.'),
+    ignoreFocusOut: true,
+  });
+  if (username === undefined) { return undefined; }
+  const email = await vscode.window.showInputBox({
+    title: 'Email for commits',
+    prompt: 'Written to user.email in projects that use this account',
+    validateInput: problemOf(v => validateNewAccount({ provider: 'gitlab', host: 'x.example', username: 'x', email: v, authMethod: 'oauth' })),
+    ignoreFocusOut: true,
+  });
+  if (email === undefined) { return undefined; }
+  const keys = await vscode.window.showOpenDialog({
+    title: `Private SSH key for ${normalizeSshHost(host)}`,
+    openLabel: 'Use this key',
+    canSelectMany: false,
+    canSelectFolders: false,
+    defaultUri: vscode.Uri.file(path.join(os.homedir(), '.ssh')),
+  });
+  if (!keys?.length) { return undefined; }
+  try {
+    const account = await deps.accounts.add(buildSshAccount({ host, username, email, keyPath: keys[0].fsPath }, os.homedir(), fs.existsSync));
+    void reportSshTest(account).catch(() => { /* the test is a courtesy; the account is already saved */ });
+    return account;
+  } catch (err) {
+    reportFailure('add the SSH account', err);
+    return undefined;
+  }
+}
+```
+
+(d) In `addAccount`, directly after the `gitlab-token` line add:
+
+```ts
+  if (picked.choice === 'ssh') { return addSshAccount(deps); }
+```
+
+- [ ] **Step 6: Compile and run the whole suite**
+
+Run: `npm --prefix extensions/null-accounts test`
+Expected: PASS (the picker is only type-checked here; its behaviour is Task 8, step 8).
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add extensions/null-accounts/src extensions/null-accounts/package.json
+git commit -m "feat(null-accounts): add accounts that sign in with an SSH key" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+```
+
+---
+
+### Task 7: Docs and compiled output
 
 **Files:**
 - Modify: `CLAUDE.md` (the `null-accounts` section)
@@ -1184,7 +1580,7 @@ git commit -m "feat(null-accounts): wire bound accounts into git on every change
 In the `### null-accounts` paragraph replace `Git wiring lands in a later phase.` with:
 
 ```
-Binding a folder wires git (`gitPlan.ts` → `gitWiring.ts` for repo-local `user.name` / `user.email` / `credential.https://<host>.username` / `core.sshCommand`, `gitCredentials.ts` for the token in the OS credential store via `git credential approve|reject`): it reconciles against the bindings on every change, every refreshed token and every 5 minutes; unbinding restores the values it replaced; global git config is never touched. Nothing in the Add Account flow creates an SSH-key account yet.
+Binding a folder wires git (`gitPlan.ts` → `gitWiring.ts` for repo-local `user.name` / `user.email` / `credential.https://<host>.username` / `core.sshCommand`, `gitCredentials.ts` for the token in the OS credential store via `git credential approve|reject`): it reconciles against the bindings on every change, every refreshed token and every 5 minutes; unbinding restores the values it replaced; global git config is never touched. SSH-key accounts (Add Account → "SSH key…", for servers such as a university GitLab; `sshAccount.ts`) have no token — `api.getToken` returns `undefined` for them — and are tested once with `ssh -T` when added (`sshCheck.ts`); a failed test warns but still saves.
 ```
 
 - [ ] **Step 2: Update the spec**
@@ -1195,7 +1591,7 @@ In `docs/specs/null-accounts-design.md`:
 - After the paragraph that ends "GitHub built-in tokens do not expire.", add:
 
 ```
-Implementation notes (Phase 6): wiring is a reconcile against the current bindings, so it is idempotent and survives restarts (`globalState` records per folder what was written and the value it replaced; unbinding restores that value, and leaves a value the user changed since). The OS credential belongs to the account: it is approved while any folder is bound to the account and withdrawn (`git credential reject`) when none is. A 5-minute poll re-approves a rotated GitLab token for sessions that only use a terminal. Skips (git missing, SSH key missing, git refusing a setting) warn once per session for open folders; a folder that is not a repository is silent.
+Implementation notes (Phase 6): wiring is a reconcile against the current bindings, so it is idempotent and survives restarts (`globalState` records per folder what was written and the value it replaced; unbinding restores that value, and leaves a value the user changed since). The OS credential belongs to the account: it is approved while any folder is bound to the account and withdrawn (`git credential reject`) when none is. A 5-minute poll re-approves a rotated GitLab token for sessions that only use a terminal. Skips (git missing, SSH key missing, git refusing a setting) warn once per session for open folders; a folder that is not a repository is silent. SSH accounts (`authMethod: 'ssh'`) are added with the server, username, email and a private-key file; they have no token (`getToken` returns `undefined`), and a failed `ssh -T` test warns but still saves the account.
 ```
 
 - In "Delivery phases", append ` — landed (\`docs/plans/null-accounts-phase6-git-wiring.md\`)` to item 6.
@@ -1219,7 +1615,7 @@ Run: `graphify update .` (AST-only; `graphify-out/` is git-ignored, nothing to c
 
 ---
 
-### Task 7: Smoke-test against real git and the real credential store
+### Task 8: Smoke-test against real git and the real credential store
 
 Human steps — every unit test fakes the credential store and the editor, so this is the first time wiring meets Git Credential Manager and a real window. Use a **throw-away private repo** on each account you test with. Sync the build into the installed Null IDE with the `verify-local` skill (or F5 *Extension Development Host*). Commands are PowerShell.
 
@@ -1236,14 +1632,16 @@ Human steps — every unit test fakes the credential store and the editor, so th
 
 - [ ] **Step 6: Quiet and loud skips.** Bind a plain folder (no `.git`): no notification. Bind a folder, then `git init` it: within 5 minutes the keys appear. Start Null IDE from a terminal whose `$env:PATH` has Git's `cmd` directory removed and bind an open repo: exactly one "git was not found" warning for that folder, however many times it is rebound.
 
-- [ ] **Step 7: GitLab rotation.** Temporarily set `EXPIRY_MARGIN_MS` in `providers/gitlabOAuth.ts` to `7_200_000` (as in the Phase 5 refresh check) so every sync refreshes; bind a repo to a GitLab account; confirm the password returned by `git credential fill` (compare its length/prefix, don't print it) changes after a sync. Revert the temporary edit (`git diff` must show nothing).
+- [ ] **Step 7: SSH account (the university case).** *Add account… → SSH key…* with your real server (`gitlab.uni.example`, no port), your username there, your email, and the private key file (the one without `.pub`). Expect a notification `Connected to <host> as <you>.`. Then check each failure message by trying it once: a key the server doesn't know → "did not accept this key"; a host you have never connected to → "not in your known hosts yet" (run `ssh git@<host>` once in a terminal, accept the fingerprint, and the next test passes); a different user's key → "belongs to … not …". In every case the account is still listed in the panel, with `ssh` as its method, **no Re-authenticate button**, and no `Null Accounts` "sign-in expired" notification ever. Bind a clone whose remote is `git@<host>:group/repo.git`: `git config --local core.sshCommand` shows `ssh -i '<key>' -o IdentitiesOnly=yes`; with Null IDE closed, `git ls-remote origin` works; `cmdkey /list` has no entry for the host. If the key has a passphrase, `ssh-add <key>` first (git inside the IDE has no terminal to ask on). An `https://` remote in a repo bound to an SSH account is unaffected by the key — switch it with `git remote set-url origin git@<host>:group/repo.git`.
+
+- [ ] **Step 8: GitLab rotation.** Temporarily set `EXPIRY_MARGIN_MS` in `providers/gitlabOAuth.ts` to `7_200_000` (as in the Phase 5 refresh check) so every sync refreshes; bind a repo to a GitLab account; confirm the password returned by `git credential fill` (compare its length/prefix, don't print it) changes after a sync. Revert the temporary edit (`git diff` must show nothing).
 
 ---
 
 ## Self-Review
 
-**Spec coverage** (spec → task): `user.name` / `user.email` for any account → Tasks 2, 3; SSH `core.sshCommand` with the key → Tasks 2, 3 (`planFor`, `ssh-key-missing`; creation of SSH accounts is out of scope, stated under Global Constraints); HTTPS/OAuth `credential.<host>.username` + token in the OS store via `git credential approve` → Tasks 2, 4 (URL-form key, documented deviation 1); token passed on stdin, never as an argument → Task 4 (`credentialInput`, test asserts the args); refresh re-approves → Tasks 4, 5 (`onDidChangeSecret` + 5-minute poll); "unbinding removes the keys this extension set (tracked in globalState per folder)" → Task 3 (records, restore of previous values — deviation 2); "account removed while bound: bindings cleared, keys removed" → Task 3 (`reconcile` visits recorded folders whose account is gone; `extension.ts` already prunes bindings, and `changed` triggers a sync either way); "SSH key file missing: flagged, config not written" → Task 3 (`ssh-key-missing`, warning in Task 5); "`git` not on PATH, or folder is not a repo: skip git wiring, show the reason, binding still succeeds" → Tasks 3, 5 (binding is never touched by wiring; reason shown for the actionable cases — deviation 6); "global and system config never modified" → every write is `git config --local`. Deferred and stated: SSH account creation UI, dashboard, `verify-local` spec (Phase 7).
+**Spec coverage** (spec → task): `user.name` / `user.email` for any account → Tasks 2, 3; SSH `core.sshCommand` with the key → Tasks 2, 3 (`planFor`, `ssh-key-missing`; creation of SSH accounts is out of scope, stated under Global Constraints); HTTPS/OAuth `credential.<host>.username` + token in the OS store via `git credential approve` → Tasks 2, 4 (URL-form key, documented deviation 1); token passed on stdin, never as an argument → Task 4 (`credentialInput`, test asserts the args); refresh re-approves → Tasks 4, 5 (`onDidChangeSecret` + 5-minute poll); "unbinding removes the keys this extension set (tracked in globalState per folder)" → Task 3 (records, restore of previous values — deviation 2); "account removed while bound: bindings cleared, keys removed" → Task 3 (`reconcile` visits recorded folders whose account is gone; `extension.ts` already prunes bindings, and `changed` triggers a sync either way); "SSH key file missing: flagged, config not written" → Task 3 (`ssh-key-missing`, warning in Task 5); "`git` not on PATH, or folder is not a repo: skip git wiring, show the reason, binding still succeeds" → Tasks 3, 5 (binding is never touched by wiring; reason shown for the actionable cases — deviation 6); "global and system config never modified" → every write is `git config --local`. SSH accounts for servers that offer only a key (the university GitLab) → Task 6 (`sshAccount.ts`, `sshCheck.ts`, picker flow, API returns no token for them). Deferred and stated: dashboard, `verify-local` spec (Phase 7).
 
 **Placeholder scan:** none — no TBD/TODO; every code step carries the code. The only manual part is Task 7, which is a labelled human step.
 
-**Type consistency:** `GitRun` / `GitResult` / `GIT_UNAVAILABLE` (Task 1) are used by Tasks 3–5 under those names; `planFor`, `sshKeyFile`, `credentialFor`, `CredentialTarget` (Task 2) are imported by Tasks 3–4; `WiringDeps.bindings` and `CredentialDeps.bindings` both take `ProjectBinding.entries(): [string, string][]` and `accounts` takes `AccountStore.get`; `GitWiring.reconcile()` returns `WireOutcome[]` consumed by `describeSkip` in Task 5; `CredentialSync.sync()` takes its token from `api.getToken(account)`, whose signature is unchanged.
+**Type consistency:** `GitRun` / `GitResult` / `GIT_UNAVAILABLE` (Task 1) are used by Tasks 3–5 under those names; `planFor`, `sshKeyFile`, `credentialFor`, `CredentialTarget` (Task 2) are imported by Tasks 3–4; `WiringDeps.bindings` and `CredentialDeps.bindings` both take `ProjectBinding.entries(): [string, string][]` and `accounts` takes `AccountStore.get`; `GitWiring.reconcile()` returns `WireOutcome[]` consumed by `describeSkip` in Task 5; `CredentialSync.sync()` takes its token from `api.getToken(account)`, whose signature is unchanged (it now returns `undefined` for `authMethod: 'ssh'`); `expandKeyPath` (Task 6) is the single place a key path is expanded, used by `sshKeyFile` (Tasks 2–3), `checkKeyPath` and the picker's `reportSshTest`.
