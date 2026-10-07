@@ -14,7 +14,7 @@
       "properties": {
         "null-accounts.gitlab.clientId": {
           "type": "string",
-          "default": "",
+          "default": "3fe026263d854abb9e622c74f122afb48774da9266c6f335b159875df545a6b7",
           "scope": "application",
           "markdownDescription": "OAuth application ID (device flow, public client) used to sign in to **gitlab.com**."
         },
