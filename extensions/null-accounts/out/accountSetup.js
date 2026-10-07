@@ -31,7 +31,11 @@ async function addOrRefresh(accounts, candidate, secret) {
     if (!existing) {
         return accounts.add(candidate, secret);
     }
+    // The secret's format follows the sign-in method (OAuth tokens vs a raw access token), so the two change together.
+    const account = existing.authMethod === candidate.authMethod
+        ? existing
+        : await accounts.update(existing.id, { authMethod: candidate.authMethod });
     await accounts.setSecret(existing.id, secret);
-    return existing;
+    return account;
 }
 //# sourceMappingURL=accountSetup.js.map

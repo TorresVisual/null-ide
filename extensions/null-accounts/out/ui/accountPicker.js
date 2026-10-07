@@ -86,9 +86,9 @@ async function addGitlabAccount(deps, host) {
         return undefined;
     }
 }
-async function askSelfHostedHost() {
+async function askSelfHostedHost(title = 'Self-hosted GitLab') {
     const value = await vscode.window.showInputBox({
-        title: 'Self-hosted GitLab',
+        title,
         prompt: 'Host name of your GitLab server, e.g. git.example.org (https only)',
         validateInput: v => { try {
             (0, accountInput_1.normalizeHost)(v);
@@ -100,6 +100,30 @@ async function askSelfHostedHost() {
     });
     return value === undefined ? undefined : (0, accountInput_1.normalizeHost)(value);
 }
+/** A personal access token for a server where no OAuth app can be registered; adding the same account again replaces its token. */
+async function addGitlabTokenAccount(deps) {
+    const host = await askSelfHostedHost('GitLab host for the access token');
+    if (!host) {
+        return undefined;
+    }
+    const token = await vscode.window.showInputBox({
+        title: `Access token for ${host}`,
+        prompt: 'Create one under Edit profile → Access tokens with the api and write_repository scopes (read_api for read-only).',
+        password: true,
+        ignoreFocusOut: true,
+    });
+    if (!token) {
+        return undefined;
+    }
+    try {
+        const { account, secret } = await deps.gitlab.signInWithToken(host, token);
+        return await (0, accountSetup_1.addOrRefresh)(deps.accounts, account, secret);
+    }
+    catch (err) {
+        reportFailure('add the GitLab account', err);
+        return undefined;
+    }
+}
 /** Asks which provider, then signs in and stores the account. `undefined` if the user backs out or sign-in fails. */
 async function addAccount(deps) {
     const picked = await vscode.window.showQuickPick((0, pickItems_1.providerPickItems)(), { placeHolder: 'Add an account from…' });
@@ -109,13 +133,16 @@ async function addAccount(deps) {
     if (picked.choice === 'github') {
         return addGithubAccount(deps);
     }
+    if (picked.choice === 'gitlab-token') {
+        return addGitlabTokenAccount(deps);
+    }
     const host = picked.choice === 'gitlab' ? gitlab_1.GITLAB_COM : await askSelfHostedHost();
     return host ? addGitlabAccount(deps, host) : undefined;
 }
 /** Signs a GitLab account in again (expired or revoked tokens). Failures are shown, never thrown. */
 async function reauthenticate(deps, accountId) {
     const account = deps.accounts.get(accountId);
-    if (!account || account.provider !== 'gitlab') {
+    if (!account || account.provider !== 'gitlab' || account.authMethod !== 'oauth') {
         return;
     }
     try {

@@ -37,7 +37,23 @@ class GitlabProvider {
         const tokens = await (0, gitlabOAuth_1.pollForToken)(this.deps.post, host, clientId, code, {
             sleep: this.deps.sleep, now: this.deps.now, cancelled: () => ui.cancelled(),
         });
-        const res = await this.deps.get(host, '/user', tokens.accessToken);
+        return { account: await this.describeUser(host, tokens.accessToken, 'oauth'), secret: (0, gitlabOAuth_1.serializeTokens)(tokens) };
+    }
+    /** Personal access token sign-in (for hosts where no OAuth app can be registered). The token is validated, then stored raw. */
+    async signInWithToken(host, token) {
+        const secret = token.trim();
+        if (!secret) {
+            throw new Error('An access token is required.');
+        }
+        await this.checkHost(host);
+        return { account: await this.describeUser(host, secret, 'https'), secret };
+    }
+    /** Reads /user with the token and builds the account it describes. */
+    async describeUser(host, token, authMethod) {
+        const res = await this.deps.get(host, '/user', token);
+        if (authMethod === 'https' && (res.status === 401 || res.status === 403)) {
+            throw new Error(`${host} said the token was rejected. Create a personal access token with the api and write_repository scopes (read_api for read-only) and try again.`);
+        }
         const user = (0, gitlabOAuth_1.asRecord)(res.body);
         const username = (0, gitlabOAuth_1.str)(user.username);
         if (res.status !== 200 || !username) {
@@ -46,15 +62,12 @@ class GitlabProvider {
         const id = typeof user.id === 'number' ? String(user.id) : undefined;
         const bareHost = host.replace(/:\d+$/, '');
         return {
-            account: {
-                provider: 'gitlab',
-                host,
-                username,
-                email: (0, gitlabOAuth_1.str)(user.email) ?? `${id ? `${id}-` : ''}${username}@users.noreply.${bareHost}`,
-                authMethod: 'oauth',
-                externalId: id,
-            },
-            secret: (0, gitlabOAuth_1.serializeTokens)(tokens),
+            provider: 'gitlab',
+            host,
+            username,
+            email: (0, gitlabOAuth_1.str)(user.email) ?? `${id ? `${id}-` : ''}${username}@users.noreply.${bareHost}`,
+            authMethod,
+            externalId: id,
         };
     }
     /** Signs in again and replaces the stored tokens; refuses a different GitLab user than the account's. */
@@ -70,6 +83,11 @@ class GitlabProvider {
     async getToken(account, _scopes, options) {
         if (account.provider !== 'gitlab') {
             return undefined;
+        }
+        // ponytail: a revoked or expired token is only noticed when a feature using it fails; check /user from here if that proves too late.
+        // A personal access token is used as is: it can't be refreshed, and the OAuth re-auth prompt doesn't apply to it.
+        if (account.authMethod === 'https') {
+            return (await this.deps.secrets.get(account.id)) || undefined;
         }
         const token = await this.usableToken(account);
         if (token || !options?.interactive) {

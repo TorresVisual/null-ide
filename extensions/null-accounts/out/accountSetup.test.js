@@ -69,4 +69,13 @@ const tanuki = {
     node_assert_1.default.strictEqual(accounts.list().length, 1);
     node_assert_1.default.strictEqual(vault.data.get(`null-accounts/${first.id}`), 'tokens-2');
 });
+(0, node_test_1.test)('addOrRefresh switches a stored account to the new sign-in method along with its secret', async () => {
+    const { accounts, vault } = setupWithVault();
+    const first = await (0, accountSetup_1.addOrRefresh)(accounts, tanuki, 'oauth-tokens');
+    const again = await (0, accountSetup_1.addOrRefresh)(accounts, { ...tanuki, authMethod: 'https', externalId: '9' }, 'glpat-abc');
+    node_assert_1.default.strictEqual(again.id, first.id);
+    node_assert_1.default.strictEqual(again.authMethod, 'https');
+    node_assert_1.default.strictEqual(accounts.get(first.id)?.authMethod, 'https');
+    node_assert_1.default.strictEqual(vault.data.get(`null-accounts/${first.id}`), 'glpat-abc');
+});
 //# sourceMappingURL=accountSetup.test.js.map

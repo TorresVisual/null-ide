@@ -28,6 +28,7 @@ const providerPickItems = () => [
     { label: 'GitHub', description: 'github.com', choice: 'github' },
     { label: 'GitLab', description: 'gitlab.com', choice: 'gitlab' },
     { label: 'GitLab self-hosted…', description: 'your own server (https)', choice: 'gitlab-self-hosted' },
+    { label: 'GitLab with an access token…', description: 'for servers that don’t allow OAuth apps', choice: 'gitlab-token' },
 ];
 exports.providerPickItems = providerPickItems;
 //# sourceMappingURL=pickItems.js.map
