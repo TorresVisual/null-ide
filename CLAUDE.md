@@ -21,60 +21,25 @@ Key characteristics:
 ```
 ├── .github/workflows/
 │   └── build.yml              # Build, package, and release pipeline
-├── extensions/
-│   ├── null-icons/            # Built-in file icon theme (null-icons)
-│   ├── null-theme/            # Built-in color theme (Null Dark)
-│   ├── null-markdown/         # Enhanced markdown preview (GFM, Mermaid, KaTeX, GitHub Alerts)
-│   ├── null-format/           # Built-in code formatter (Prettier in-process, rustfmt, clang-format)
-│   ├── null-music/            # Built-in music & Spotify player (controls, library, search, status bar)
-│   │   ├── src/                # TypeScript source (extension.ts, types.ts, auth/, provider/, playback/, ui/)
-│   │   ├── out/                # Compiled JS output (built during CI)
-│   │   ├── media/              # Activity bar icon (music.svg)
-│   │   └── package.json        # Contributes commands, views, keybindings, settings
-│   ├── null-tools/             # Built-in productivity extension
-│   │   ├── src/                # TypeScript source (extension.ts, commitMessage.ts, dashboard.ts, ...)
-│   │   ├── out/                # Compiled JS output (extension.js — built during CI)
-│   │   ├── package.json        # Contributes commands, views, keybindings, settings
-│   │   └── lib/                # marked.js, dashboard.js, issues.js (webview assets)
-│   ├── null-cpp/               # Symbol-aware C++ header/source navigation, paired editors, scaffolding
-│   │   ├── src/                # TypeScript source (extension.ts, symbolSwitch.ts, pairedSplit.ts, scaffold.ts)
-│   │   └── out/                # Compiled JS output (built during CI)
-│   ├── null-actions/           # Status bar action buttons (shell/vscode commands)
-│   │   ├── src/                # TypeScript source (buttonConfig.ts, terminalRegistry.ts, statusBarController.ts, settingsPanel.ts...)
-│   │   └── out/                # Compiled JS output (built during CI)
-│   └── null-accounts/          # GitHub/GitLab account manager and token API
-│       ├── src/                # TypeScript source (accountStore.ts, accountInput.ts, api.ts, extension.ts, projectBinding.ts, suggest.ts, providers/github.ts, ui/)
-│       └── out/                # Compiled JS output (built during CI)
+├── extensions/                # One dir per built-in extension (see "Built-in Extensions"); each has src/ and a tracked out/
 ├── archive/
 │   └── wooting-analog/        # Archived, not built by CI — depth-sensitive key actions for Wooting keyboards
 ├── shell-ext/                 # Win11 native Explorer context menu extension
 │   ├── src/                   # C++ IExplorerCommand implementation
 │   ├── deps/wil/              # Microsoft WIL headers (fetched by CI)
 │   └── AppxManifest.xml       # Sparse APPX manifest (ExternalLocation install)
-├── icons/                     # Source icons used by the build
-│   ├── icon.svg               # Master vector (∅ symbol, dark rounded square)
-│   ├── icon.ico               # Windows multi-size ICO
-│   ├── icon.png               # 1024×1024 PNG
-│   ├── icon_150x150.png       # Win32 tile PNG
-│   ├── icon_70x70.png         # Win32 tile PNG (small)
-│   └── icon.icns              # macOS (not used in current CI, kept for future)
+├── icons/                     # Source icons used by the build (icon.svg is the master)
 ├── installer/
 │   ├── null-ide.iss           # Inno Setup script → NullIDESetup-<version>.exe
 │   └── Null.VisualElementsManifest.xml  # Win10 tile metadata
 ├── patches/                   # Git-format patches applied against the VS Code source tree
-├── scripts/
-│   ├── convert-icons.js       # SVG → PNG/ICO/ICNS via sharp, to-ico, png2icons
-│   ├── merge-json.js          # Deep-merges product.json overlay (our values win)
-│   ├── install-null-ide.ps1   # Downloads from GitHub Releases or installs a local ZIP
-│   ├── update-null-ide.ps1    # Checks latest release tag, delegates to installer
-│   └── build-local.ps1        # Mirrors build.yml's build-windows job for local iteration
+├── scripts/                   # install/update-null-ide.ps1, merge-json.js, convert-icons.js, build-local.ps1 (CI mirror), sync-local.ps1 + reload-local.ps1 (fast local iteration)
 ├── workbench/
 │   ├── custom.css             # Injected as null-custom.css into workbench.html
 │   ├── splash.js              # Runs in <head> before the workbench (no Node/AMD)
 │   ├── letterpress-dark.svg   # Empty-editor watermark — dark variant (∅ symbol)
 │   └── letterpress-light.svg  # Empty-editor watermark — light variant
-├── docs/
-│   └── index.html             # GitHub Pages homepage
+├── docs/                      # specs/, plans/, ROADMAP.md; index.html is the GitHub Pages homepage
 └── product.json               # Deep-merged into vscode/product.json before build
 ```
 
@@ -83,78 +48,45 @@ Key characteristics:
 The entire build runs in GitHub Actions on a `windows-2022` runner — do **not** try to run it locally.
 
 1. Clone VSCodium at `VSCODIUM_TAG` and VS Code at the matching `MS_TAG`.
-2. Apply VSCodium's own patches against the VS Code source tree.
-3. Apply any patches in `patches/` (currently none).
-4. Deep-merge `product.json` overlay into `vscode-src/product.json`.
-5. Install `null-markdown` npm dependencies (`npm ci --prefix extensions/null-markdown`).
-6. Compile `null-tools` TypeScript (`npm ci && npm run compile` in `extensions/null-tools/`).
-7. Compile `null-cpp` TypeScript (`npm ci && npm run compile` in `extensions/null-cpp/`).
-8. Compile `null-actions` TypeScript (`npm ci && npm run compile` in `extensions/null-actions/`).
-9. Compile `null-accounts` TypeScript (`npm ci && npm run compile` in `extensions/null-accounts/`).
-10. Compile `null-format` TypeScript (`npm ci && npm run compile` in `extensions/null-format/`).
-11. Compile `null-music` TypeScript (`npm ci && npm run compile` in `extensions/null-music/`).
-12. Copy all nine built-in extensions (`null-theme`, `null-icons`, `null-tools`, `null-markdown`, `null-cpp`, `null-actions`, `null-accounts`, `null-format`, `null-music`) into `vscode-src/extensions/`.
-13. Replace upstream icons with files from `icons/`.
-14. Copy `workbench/custom.css` → `null-custom.css` and `workbench/splash.js` → `null-splash.js` into the source tree.
-15. Inject `<link>` and `<script>` tags into `workbench.html` pointing at those files.
-16. `npm ci && npx gulp vscode-win32-x64` produces `VSCode-win32-x64/`.
-17. Build Win11 shell extension: fetch WIL headers, compile DLL with CMake + MSVC, pack and sign sparse APPX (`null-shell-ext.appx`).
-18. Stamp version, commit hash, and server URL into the build output's `product.json`.
-19. Replace letterpress SVGs in the build output with the null-symbol versions.
-20. Run `rcedit` to stamp the custom icon into `null.exe`.
-21. Bundle `install-null-ide.ps1` and `update-null-ide.ps1` into `resources/app/null-updater/`.
-22. `Compress-Archive` → `null-ide-win32-x64.zip`.
-23. Inno Setup → `NullIDESetup-<version>.exe`.
-24. Both artifacts are uploaded to the GitHub Release (tag builds) and as workflow artifacts.
+2. Apply VSCodium's own patches, then every `patches/*.patch` in name order (`git apply --ignore-whitespace`).
+3. Deep-merge `product.json` overlay into `vscode-src/product.json`.
+4. `npm ci --prefix extensions/null-markdown`; `npm ci && npm run compile` in each other TS extension (`null-tools`, `null-cpp`, `null-actions`, `null-accounts`, `null-format`, `null-music`).
+5. Copy all nine built-in extensions into `vscode-src/extensions/`; bundle Code Spell Checker from `CSPELL_TAG`.
+6. Replace upstream icons with files from `icons/`.
+7. Copy `workbench/custom.css` → `null-custom.css` and `workbench/splash.js` → `null-splash.js` into the source tree; inject `<link>` / `<script>` tags into `workbench.html`.
+8. `npm ci && npx gulp vscode-win32-x64` produces `VSCode-win32-x64/`.
+9. Build Win11 shell extension: fetch WIL headers, compile DLL with CMake + MSVC, pack and sign sparse APPX (`null-shell-ext.appx`).
+10. Stamp version, commit hash, and server URL into the build output's `product.json`; replace letterpress SVGs; `rcedit` the icon into `null.exe`.
+11. Bundle `install-null-ide.ps1` and `update-null-ide.ps1` into `resources/app/null-updater/`.
+12. `Compress-Archive` → `null-ide-win32-x64.zip`; Inno Setup → `NullIDESetup-<version>.exe`; both uploaded to the GitHub Release (tag builds) and as workflow artifacts.
 
 ## Built-in Extensions
+Conventions for every extension with a `src/`:
+- `out/` is tracked in git. After editing `src/`, run `npm run compile` in that extension and commit the refreshed `out/` (repo uses `chore: refresh <ext> compiled output` commits). Never hand-edit `out/`.
+- `npm test` runs an explicit list of `out/**/*.test.js` files in `package.json`'s `test` script; a new test file is silently skipped until added there.
 
 ### null-theme (`extensions/null-theme/`)
-Standard VS Code color theme extension. Set as the default via `product.json → defaultColorTheme`.
-
-Palette:
-- Background: `#0d0d1a` – `#1a1a2e`
-- Accent teal: `#00b4d8` / `#0077b6`
-- Accent indigo: `#4361ee` / `#3a0ca3`
-- Font: Geist Mono, JetBrains Mono (fallback: Cascadia Code)
+Default color theme (Null Dark) via `product.json → defaultColorTheme`. Fonts: Geist Mono, JetBrains Mono, Cascadia Code.
 
 ### null-icons (`extensions/null-icons/`)
 Built-in file icon theme. Set as the default via `product.json → defaultIconTheme`. Contains SVG icons for a wide range of file types and folder types.
 
 ### null-markdown (`extensions/null-markdown/`)
-Enhanced markdown preview activated on `onLanguage:markdown`. Provides:
-- GitHub Flavored Markdown (GFM), task lists, emoji, footnotes
-- Mermaid diagram rendering (flowcharts, sequence, Gantt, etc.)
-- KaTeX math rendering (inline `$...$` and block `$$...$$`)
-- GitHub-style alert blocks (`> [!NOTE]`, `> [!WARNING]`, etc.)
-
-Keybindings: `Ctrl+Shift+V` and `Ctrl+K V` open the preview (same as VS Code default).
+Enhanced markdown preview (GFM, Mermaid, KaTeX, GitHub alerts) on `onLanguage:markdown`. Its `node_modules` come from `npm ci --prefix` in CI and are not synced by `sync-local.ps1`.
 
 ### null-format (`extensions/null-format/`)
-In-box code formatting provider for JS/TS/web, Rust, and C/C++. Activated per language.
-- **Prettier (in-process)**: Formats JavaScript, TypeScript, JSX, TSX, JSON, JSONC, CSS, SCSS, Less, HTML, YAML, and Markdown.
-- **rustfmt**: Formats Rust source files (`rustfmt --emit stdout`).
-- **clang-format**: Formats C, C++, and CUDA source files.
-- **Editable Default Configs**: Exposes editable fallback configurations directly in settings (`null-format.prettier.defaultConfig`, `null-format.rustfmt.defaultConfig`, `null-format.clangFormat.defaultConfig`). If a project contains its own configuration file (`.prettierrc`, `rustfmt.toml`, `.clang-format`), project-level config takes precedence automatically.
+Prettier (in-process), rustfmt and clang-format formatting providers. Editable fallback configs are `null-format.{prettier,rustfmt,clangFormat}.defaultConfig`; a project's own `.prettierrc` / `rustfmt.toml` / `.clang-format` always wins.
 
 ### null-music (`extensions/null-music/`)
-Dedicated music player & Spotify integration (issue #112). Activated on `onStartupFinished` and `onView:null.musicView`.
-- **Playback Controls**: Play, pause, previous track, next track, seek, volume adjustment, shuffle, and repeat mode cycling.
-- **Now Playing Display**: Full artwork, track title, artist, album, live playback progress bar, and active device indicator.
-- **Spotify Integration**: Official OAuth 2.0 PKCE authentication flow with local loopback server callback, automatic token refresh, token storage in `SecretStorage` (`null-music/token/spotify`), and account disconnect. No credentials/passwords stored by Null IDE.
-- **IDE Integration**:
-  - **Activity Bar View**: Dedicated "Music" panel (`null.musicView`) with player card, playlist browser, live search, and Spotify Connect device switcher.
-  - **Status Bar**: Configurable now-playing item (`$(play) Title - Artist`) with rich Markdown tooltip with progress and quick links, plus optional dedicated status bar media buttons.
-  - **Command Palette & Keyboard Shortcuts**: Commands for all media actions, search, playlist browsing, device transfer, and keybindings (`Ctrl+Alt+Space`, `Ctrl+Alt+Right`, `Ctrl+Alt+Left`, `Ctrl+Alt+Up`, `Ctrl+Alt+Down`, `Ctrl+Alt+L`, `Ctrl+Alt+M`).
-- **Architecture**: Decoupled provider layer (`IMusicProvider` and `ProviderRegistry`) allowing future music services (Apple Music, YouTube Music, local audio) to be integrated without altering core playback or UI components.
+Music player + Spotify (issue #112): activity-bar view `null.musicView`, status bar item, `Ctrl+Alt+…` media keybindings. Spotify auth is OAuth PKCE with a loopback callback; tokens live in `SecretStorage` (`null-music/token/spotify`) — never store credentials. All service access goes through `IMusicProvider` / `ProviderRegistry`; add new services as providers, not in playback/UI code.
 
 ### null-tools (`extensions/null-tools/`)
-Written in TypeScript (`src/`), compiled to `out/` during CI. Activated on `onStartupFinished`. Provides:
+Written in TypeScript (`src/`). Activated on `onStartupFinished`. Provides:
 
 | Feature | Details |
 |---|---|
 | **Project dashboard** | Custom editor (`null.dashboard`, `viewType`); opened on startup and via Help > Welcome (see `patches/003-*` and `004-*`); recent-project cards with async git status, New Project, Clone Repo |
-| **GitHub Issues panel** | Own activity-bar view (`null-issues`) plus a full-width tab (`null.issues.openFullView`); GraphQL search with a github.com-style query box, Open/Closed counts, filter dropdowns, sort, presets, paging and keyboard navigation; github.com-style issue tab (server-rendered markdown timeline with events, reactions, sub-issues, linked PRs, a metadata sidebar with optimistic pickers, close reasons, one tab per issue); a Write/Preview composer (toolbar, shortcuts, @/# autocomplete, drafts kept per issue) for comments and edits, a New issue tab (template chooser, sidebar pickers, Create more, sub-issue creation), image attach (paste, drop or toolbar; committed to an orphan `null-issue-assets` branch) with thumbnails cached in `.null/issue-images/`, *Copy as prompt* with comments and local image paths, sign-in, mark-as-read, issue templates, link/insert issue references in commit messages, an "open this issue?" prompt when you switch to an `issue-<n>-…` branch; signs in through null-accounts (`githubAuth.ts` → `githubSession.ts`); `null-tools` declares `extensionDependencies: ["null.null-accounts"]` |
+| **GitHub Issues panel** | Activity-bar view (`null-issues`), a full-width tab (`null.issues.openFullView`) and one tab per issue; GraphQL search, composer with per-issue drafts, image attach (committed to an orphan `null-issue-assets` branch, thumbnails cached in `.null/issue-images/`), *Copy as prompt*, and an "open this issue?" prompt when you switch to an `issue-<n>-…` branch. Signs in through null-accounts (`githubAuth.ts` → `githubSession.ts`); `null-tools` declares `extensionDependencies: ["null.null-accounts"]`. Webview code in `src/webview/` is compiled by separate `tsconfig.webview-*.json` projects into `lib/` |
 | **Commit message generation** | `null.generateCommitMessage` (`Ctrl+Shift+Alt+G`) — runs `claude --print` with staged diff; sets SCM input box |
 | **In-app updater** | Checks GitHub Releases on startup; shows status bar button; self-updates via PowerShell |
 | **Discord Rich Presence** | `discordRpcClient.ts` (IPC pipe / WebSocket transport), `discordPresence.ts` (activity building), `presenceOwnership.ts` (one window publishes), `discordAppInfo.ts` (Developer Portal diagnostics). Configured via `null.discord.*`; `null.discord.testConnection` reports setup problems |
@@ -168,7 +100,7 @@ CMake/toolchain/build/debug orchestration on top of this (the "C++ development l
 Status-bar buttons that run shell commands (via a dedicated, deterministically-reused terminal per button — identity is keyed by button id, never by command text, so window reloads and folder reopens don't spawn duplicate terminals) or VS Code API commands. Configured through a settings panel opened via the `$(gear) Actions` status bar item or the `null-actions.openSettings` command (opens as a `WebviewPanel` in the main editor area, not a sidebar view), or directly via the `null-actions.buttons` setting. Supports variable substitution (`${workspaceFolder}`, `${file}`, `${selectedText}`, etc.), priority-ordered status bar placement, an Affinity-style canvas color picker for the button text color, and project-type-detection suggestions (`Cargo.toml`, `CMakeLists.txt`, `*.csproj`, or a one-click "Load npm scripts" button that writes each `package.json` script in as a real persisted button). See `docs/specs/null-actions-design.md`.
 
 ### null-accounts (`extensions/null-accounts/`)
-GitHub/GitLab account manager (issue #102). Activated on `onStartupFinished`; exports `NullAccountsApi` (`getAccounts`, `getAccountForFolder`, `ensureAccountForFolder`, `getToken`, `onDidChange`) via `extensions.getExtension('null.null-accounts')?.exports`. Account metadata lives in `globalState`, secrets in `SecretStorage` under `null-accounts/<id>`; `Account.host` is a bare lowercase hostname. `getToken(account, scopes?, { interactive? })` is silent unless `interactive` is true. **Status: GitHub + project binding + UI** — the GitHub provider wraps VS Code's built-in `github` session (`Account.externalId` is the session's account id; tokens stay with VS Code), folders bind to an account in `globalState` (`projectBinding.ts`) with an origin-based suggestion (`suggest.ts`), `ensureAccountForFolder` opens a pick/add quick-pick, and a one-time prompt imports the account VS Code was already signed in with. The Issues panel in null-tools resolves its token through the API. The Accounts panel (`null-accounts.open`: list, add, edit email, remove, per-account projects with unbind) and a status bar item (click → `null-accounts.switchAccount` quick-pick to switch or clear) are in; GitLab and git wiring land in later phases. The Accounts menu (avatar in the activity bar) is null-accounts' front door: the extension publishes it as the context key `null.accounts.menu` (`ui/accountsMenuController.ts`, model in `ui/accountsMenuModel.ts`) and patch 007 renders it; commands `null-accounts.bindFolderToAccount` and `null-accounts.addAccount`. Design: `docs/specs/null-accounts-menu-design.md`; plan: `docs/plans/null-accounts-phase4-accounts-menu.md`. Design: `docs/specs/null-accounts-design.md`; phase plans: `docs/plans/null-accounts-phase*.md`.
+GitHub/GitLab account manager (issue #102). Activated on `onStartupFinished`; exports `NullAccountsApi` (`getAccounts`, `getAccountForFolder`, `ensureAccountForFolder`, `getToken`, `onDidChange`) via `extensions.getExtension('null.null-accounts')?.exports`. Account metadata lives in `globalState`, secrets in `SecretStorage` under `null-accounts/<id>`; `Account.host` is a bare lowercase hostname. `getToken(account, scopes?, { interactive? })` is silent unless `interactive` is true. The GitHub provider wraps VS Code's built-in `github` session (`Account.externalId` is the session's account id; tokens stay with VS Code). Folder→account bindings live in `globalState` (`projectBinding.ts`). The Accounts menu (activity-bar avatar) is published as the context key `null.accounts.menu` (`ui/accountsMenuController.ts`) and rendered by patch 007. Designs: `docs/specs/null-accounts-design.md`, `docs/specs/null-accounts-menu-design.md`; phase plans: `docs/plans/null-accounts-phase*.md`.
 
 ## Workbench Assets
 
@@ -212,6 +144,7 @@ Workbench chrome customisations (CSS/JS injection, icon swaps) are handled by di
 - `002-fix-claude-copilotapi-types.patch` — restores Anthropic SDK typing in `copilotApiService.ts`
 - `003-null-dashboard-startup.patch` — opens the Null Dashboard on startup
 - `004-null-dashboard-help-welcome.patch` — wires the dashboard into Help > Welcome
+- `005-claude-code-command-center-button.patch` — restores the icon and chevron on the command-center Claude split button
 - `006-settings-toc-split-extensions.patch` — splits the Settings editor's Extensions node into Null / Installed Extensions / Built-in Extensions sections
 - `007-accounts-menu-null-accounts.patch` — the Accounts menu lists null-accounts' accounts (read from the `null.accounts.menu` context key) and drops VS Code's provider-session and Settings Sync / Copilot / Edit Sessions / tunnel rows
 
@@ -264,6 +197,7 @@ on:
 - Work only inside `D:\Coding\Apps\null-ide\` and its subdirectories.
 - Do not touch system PATH, registry, or any existing VS Code/VSCodium installation outside this repo's installer scripts.
 - Full builds normally run in GitHub Actions, not locally. `scripts/build-local.ps1` is the exception: it mirrors the `build-windows` job for iterating on `build.yml`, `shell-ext/`, `installer/`, or the VSCodium/VS Code patch/merge steps — things `scripts/sync-local.ps1` can't reach. Don't run it without being asked; it takes tens of minutes and needs Node, Rust, CMake, VS2022, and Inno Setup 6 installed (see the script's header for the full list).
+- Iterate locally with `scripts/sync-local.ps1` (pushes compiled extensions + workbench assets into an installed Null IDE), then `scripts/reload-local.ps1` — `Developer: Reload Window` still serves cached `null-custom.css` / `null-splash.js`. The `/verify-local` skill chains both with the integration specs.
 - Do not set the Microsoft extension gallery env var silently; document it in the README only.
 
 ## graphify
