@@ -77,3 +77,13 @@ test('addOrRefresh on a stored account replaces its tokens instead of failing as
   assert.strictEqual(accounts.list().length, 1);
   assert.strictEqual(vault.data.get(`null-accounts/${first.id}`), 'tokens-2');
 });
+
+test('addOrRefresh switches a stored account to the new sign-in method along with its secret', async () => {
+  const { accounts, vault } = setupWithVault();
+  const first = await addOrRefresh(accounts, tanuki, 'oauth-tokens');
+  const again = await addOrRefresh(accounts, { ...tanuki, authMethod: 'https', externalId: '9' }, 'glpat-abc');
+  assert.strictEqual(again.id, first.id);
+  assert.strictEqual(again.authMethod, 'https');
+  assert.strictEqual(accounts.get(first.id)?.authMethod, 'https');
+  assert.strictEqual(vault.data.get(`null-accounts/${first.id}`), 'glpat-abc');
+});

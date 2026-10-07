@@ -44,11 +44,12 @@ export function buildPickItems(accounts: readonly Account[], { suggestedId, curr
   return items;
 }
 
-export type ProviderChoice = 'github' | 'gitlab' | 'gitlab-self-hosted';
+export type ProviderChoice = 'github' | 'gitlab' | 'gitlab-self-hosted' | 'gitlab-token';
 
 /** The second quick-pick, shown after "Add account…". */
 export const providerPickItems = (): Array<{ label: string; description: string; choice: ProviderChoice }> => [
   { label: 'GitHub', description: 'github.com', choice: 'github' },
   { label: 'GitLab', description: 'gitlab.com', choice: 'gitlab' },
   { label: 'GitLab self-hosted…', description: 'your own server (https)', choice: 'gitlab-self-hosted' },
+  { label: 'GitLab with an access token…', description: 'for servers that don’t allow OAuth apps', choice: 'gitlab-token' },
 ];

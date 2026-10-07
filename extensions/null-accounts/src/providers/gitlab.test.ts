@@ -239,3 +239,45 @@ test('GitLab client IDs are application-scoped, so a workspace cannot swap in it
     assert.strictEqual(pkg.contributes.configuration.properties[key]?.scope, 'application', key);
   }
 });
+
+const pat: Account = { ...tanuki, authMethod: 'https' };
+
+test('signInWithToken validates the token against /user and describes the account', async () => {
+  const { provider, calls, getCalls } = make({ gets: signInGets });
+  const { account, secret } = await provider.signInWithToken('gitlab.com', ' glpat-abc ');
+  assert.deepStrictEqual(account, {
+    provider: 'gitlab', host: 'gitlab.com', username: 'tanuki', email: 'tanuki@example.com', authMethod: 'https', externalId: '7',
+  });
+  assert.strictEqual(secret, 'glpat-abc'); // stored raw, trimmed
+  assert.strictEqual(getCalls[getCalls.length - 1].token, 'glpat-abc');
+  assert.strictEqual(calls.length, 0); // no OAuth traffic, no client ID needed
+});
+
+test('signInWithToken works without any OAuth client ID configured', async () => {
+  const { provider } = make({ clientId: undefined, gets: signInGets });
+  await provider.signInWithToken('gitlab.com', 'glpat-abc');
+});
+
+test('signInWithToken explains a rejected token, an empty one, and a host that is not GitLab', async () => {
+  const rejected = make({ gets: { '/version': versionOk, '/user': { status: 401, body: {} } } });
+  await assert.rejects(rejected.provider.signInWithToken('gitlab.com', 'bad'), /token was rejected/);
+  const empty = make({ gets: signInGets });
+  await assert.rejects(empty.provider.signInWithToken('gitlab.com', '  '), /token/i);
+  assert.strictEqual(empty.getCalls.length, 0);
+  const notGitlab = make({ gets: { '/version': { status: 404, body: {} } } });
+  await assert.rejects(notGitlab.provider.signInWithToken('example.org', 'x'), /does not look like a GitLab server/);
+});
+
+test('getToken returns a stored access token as is: no network, no refresh, no re-auth flag', async () => {
+  const { provider, calls, getCalls, secrets } = make();
+  secrets.set('g1', 'glpat-abc');
+  assert.strictEqual(await provider.getToken(pat), 'glpat-abc');
+  assert.strictEqual(calls.length + getCalls.length, 0);
+});
+
+test('a missing access token is undefined and never starts the OAuth re-auth prompt', async () => {
+  const { provider, prompted } = make();
+  assert.strictEqual(await provider.getToken(pat, undefined, { interactive: true }), undefined);
+  assert.deepStrictEqual(prompted, []);
+  assert.strictEqual(provider.needsReauth('g1'), false);
+});
