@@ -77,7 +77,7 @@ Each unit has one purpose and talks to others through typed interfaces:
   `interval` / `slow_down`. Host is configurable per account (default
   `https://gitlab.com`). Requires a registered GitLab OAuth application (public
   client ID, no secret) shipped as a default in `null-accounts.gitlab.clientId`; the
-  setting can be overridden for self-hosted instances. Access tokens expire (~2 h),
+  setting can be overridden for self-hosted instances. An OAuth application is registered per instance, so self-hosted hosts get their own ID from `null-accounts.gitlab.hostClientIds` (`{ "<host>": "<id>" }`); `clientId` covers gitlab.com only. Both settings are application-scoped. Access tokens expire (~2 h),
   so `getToken` refreshes via the refresh token and persists the rotated pair.
 - **gitConfig** — applies repo-local config when a project is bound/rebound
   (see Git wiring).
@@ -194,6 +194,6 @@ import it as an account so existing users are not logged out.
 3. **UI** — accounts webview, status bar, quick-pick.
 4. **Accounts menu** — the Accounts menu lists null-accounts' accounts
    (`null-accounts-menu-design.md`).
-5. **GitLab** — device flow, refresh, self-hosted host.
+5. **GitLab** — device flow, refresh, self-hosted host. — landed (`docs/plans/null-accounts-phase5-gitlab.md`)
 6. **Git wiring** — identity, SSH, HTTPS/OAuth credential store, cleanup on unbind.
 7. **Integration** — dashboard shows each project's account; docs; verify-local spec.
