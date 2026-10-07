@@ -221,7 +221,7 @@
   },
   "scripts": {
     "compile": "tsc -p tsconfig.json",
-    "test": "tsc -p tsconfig.json && node --test out/test/playbackManager.test.js out/test/statusBarController.test.js out/test/musicHtml.test.js out/test/musicViewProvider.test.js out/test/commands.test.js out/test/localProvider.test.js out/test/m3uParser.test.js out/test/uri.test.js out/test/queue.test.js"
+    "test": "tsc -p tsconfig.json && node --test out/test/playbackManager.test.js out/test/statusBarController.test.js out/test/musicHtml.test.js out/test/musicViewProvider.test.js out/test/commands.test.js out/test/localProvider.test.js out/test/m3uParser.test.js out/test/uri.test.js out/test/queue.test.js out/test/tagReader.test.js"
   },
   "devDependencies": {
     "typescript": "^5.8.0",
