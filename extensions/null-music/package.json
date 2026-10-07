@@ -112,6 +112,10 @@
         "title": "Null Music: Disconnect Spotify Account"
       },
       {
+        "command": "null-music.configureSpotifyClientId",
+        "title": "Null Music: Configure Spotify Client ID"
+      },
+      {
         "command": "null-music.focus",
         "title": "Null Music: Open Music Player View",
         "icon": "media/music.svg"

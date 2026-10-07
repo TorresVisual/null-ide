@@ -6,11 +6,13 @@ class MusicViewController {
     authStore;
     messenger;
     host;
-    constructor(playbackManager, authStore, messenger, host) {
+    getClientId;
+    constructor(playbackManager, authStore, messenger, host, getClientId) {
         this.playbackManager = playbackManager;
         this.authStore = authStore;
         this.messenger = messenger;
         this.host = host;
+        this.getClientId = getClientId;
     }
     async handleMessage(data) {
         if (!data || !data.type) {
@@ -23,7 +25,10 @@ class MusicViewController {
                     this.sendPlaybackState(this.playbackManager.getCurrentState());
                     break;
                 case 'signIn':
-                    await this.host.executeCommand('null-music.signIn');
+                    await this.host.executeCommand('null-music.signIn', data.clientId);
+                    break;
+                case 'openDevDashboard':
+                    await this.host.executeCommand('vscode.open', 'https://developer.spotify.com/dashboard');
                     break;
                 case 'signOut':
                     await this.host.executeCommand('null-music.signOut');
@@ -100,14 +105,15 @@ class MusicViewController {
         }
     }
     async sendAuthState() {
+        const clientId = this.getClientId?.() || '';
         const provider = this.playbackManager.activeProvider;
         if (!provider) {
-            this.messenger.postMessage({ type: 'authUpdate', isAuthenticated: false, user: null });
+            this.messenger.postMessage({ type: 'authUpdate', isAuthenticated: false, user: null, clientId });
             return;
         }
         const isAuth = await provider.isAuthenticated();
         const user = isAuth ? await provider.getCurrentUser().catch(() => null) : null;
-        this.messenger.postMessage({ type: 'authUpdate', isAuthenticated: isAuth, user });
+        this.messenger.postMessage({ type: 'authUpdate', isAuthenticated: isAuth, user, clientId });
     }
     sendPlaybackState(state) {
         this.messenger.postMessage({ type: 'stateUpdate', state });

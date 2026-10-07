@@ -142,9 +142,13 @@ export class SpotifyAuth {
   }
 
   public async login(): Promise<boolean> {
+    const clientId = this.getEffectiveClientId();
+    if (!clientId) {
+      return false;
+    }
+
     const { verifier, challenge } = generatePkcePair();
     const state = generateRandomString(32);
-    const clientId = this.getEffectiveClientId();
 
     return new Promise<boolean>((resolve) => {
       let server: http.Server | null = null;

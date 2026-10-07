@@ -39,7 +39,8 @@ const commandHelpers_1 = require("../ui/commandHelpers");
     node_assert_1.default.ok(commandHelpers_1.NULL_MUSIC_COMMANDS.includes('null-music.selectDevice'));
     node_assert_1.default.ok(commandHelpers_1.NULL_MUSIC_COMMANDS.includes('null-music.signIn'));
     node_assert_1.default.ok(commandHelpers_1.NULL_MUSIC_COMMANDS.includes('null-music.signOut'));
+    node_assert_1.default.ok(commandHelpers_1.NULL_MUSIC_COMMANDS.includes('null-music.configureSpotifyClientId'));
     node_assert_1.default.ok(commandHelpers_1.NULL_MUSIC_COMMANDS.includes('null-music.focus'));
-    node_assert_1.default.strictEqual(commandHelpers_1.NULL_MUSIC_COMMANDS.length, 19);
+    node_assert_1.default.strictEqual(commandHelpers_1.NULL_MUSIC_COMMANDS.length, 20);
 });
 //# sourceMappingURL=commands.test.js.map

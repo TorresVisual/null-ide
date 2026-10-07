@@ -42,6 +42,7 @@ exports.NULL_MUSIC_COMMANDS = [
     'null-music.selectDevice',
     'null-music.signIn',
     'null-music.signOut',
+    'null-music.configureSpotifyClientId',
     'null-music.focus',
 ];
 //# sourceMappingURL=commandHelpers.js.map

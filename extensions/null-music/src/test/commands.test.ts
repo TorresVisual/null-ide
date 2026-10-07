@@ -39,6 +39,7 @@ test('NULL_MUSIC_COMMANDS includes all essential playback and library commands',
   assert.ok(NULL_MUSIC_COMMANDS.includes('null-music.selectDevice'));
   assert.ok(NULL_MUSIC_COMMANDS.includes('null-music.signIn'));
   assert.ok(NULL_MUSIC_COMMANDS.includes('null-music.signOut'));
+  assert.ok(NULL_MUSIC_COMMANDS.includes('null-music.configureSpotifyClientId'));
   assert.ok(NULL_MUSIC_COMMANDS.includes('null-music.focus'));
-  assert.strictEqual(NULL_MUSIC_COMMANDS.length, 19);
+  assert.strictEqual(NULL_MUSIC_COMMANDS.length, 20);
 });

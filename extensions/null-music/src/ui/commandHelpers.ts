@@ -41,5 +41,6 @@ export const NULL_MUSIC_COMMANDS = [
   'null-music.selectDevice',
   'null-music.signIn',
   'null-music.signOut',
+  'null-music.configureSpotifyClientId',
   'null-music.focus',
 ] as const;

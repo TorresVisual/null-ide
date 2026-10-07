@@ -17,7 +17,8 @@ export class MusicViewController {
     private readonly playbackManager: PlaybackManager,
     private readonly authStore: AuthStore,
     private readonly messenger: WebviewMessenger,
-    private readonly host: WebviewControllerHost
+    private readonly host: WebviewControllerHost,
+    private readonly getClientId?: () => string
   ) {}
 
   public async handleMessage(data: any): Promise<void> {
@@ -33,7 +34,11 @@ export class MusicViewController {
           break;
 
         case 'signIn':
-          await this.host.executeCommand('null-music.signIn');
+          await this.host.executeCommand('null-music.signIn', data.clientId);
+          break;
+
+        case 'openDevDashboard':
+          await this.host.executeCommand('vscode.open', 'https://developer.spotify.com/dashboard');
           break;
 
         case 'signOut':
@@ -127,15 +132,16 @@ export class MusicViewController {
   }
 
   public async sendAuthState(): Promise<void> {
+    const clientId = this.getClientId?.() || '';
     const provider = this.playbackManager.activeProvider;
     if (!provider) {
-      this.messenger.postMessage({ type: 'authUpdate', isAuthenticated: false, user: null });
+      this.messenger.postMessage({ type: 'authUpdate', isAuthenticated: false, user: null, clientId });
       return;
     }
 
     const isAuth = await provider.isAuthenticated();
     const user = isAuth ? await provider.getCurrentUser().catch(() => null) : null;
-    this.messenger.postMessage({ type: 'authUpdate', isAuthenticated: isAuth, user });
+    this.messenger.postMessage({ type: 'authUpdate', isAuthenticated: isAuth, user, clientId });
   }
 
   public sendPlaybackState(state: any): void {

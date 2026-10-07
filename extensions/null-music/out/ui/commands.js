@@ -300,11 +300,33 @@ function registerCommands(context, playbackManager, authStore) {
             vscode.window.showErrorMessage(`Null Music: ${err.message || err}`);
         }
     });
-    register('null-music.signIn', async () => {
+    register('null-music.signIn', async (providedClientId) => {
         const provider = playbackManager.activeProvider;
         if (!provider) {
             vscode.window.showErrorMessage('No active music provider.');
             return;
+        }
+        const config = vscode.workspace.getConfiguration('null-music.spotify');
+        let clientId = typeof providedClientId === 'string' ? providedClientId.trim() : config.get('clientId', '').trim();
+        if (typeof providedClientId === 'string' && providedClientId.trim()) {
+            await config.update('clientId', providedClientId.trim(), vscode.ConfigurationTarget.Global);
+            clientId = providedClientId.trim();
+        }
+        if (!clientId) {
+            const choice = await vscode.window.showInformationMessage('To connect Spotify, enter your Spotify Developer App Client ID. (Takes 30 seconds to create free).', 'Enter Client ID', 'Open Developer Dashboard');
+            if (choice === 'Open Developer Dashboard') {
+                await vscode.env.openExternal(vscode.Uri.parse('https://developer.spotify.com/dashboard'));
+            }
+            const input = await vscode.window.showInputBox({
+                prompt: 'Enter your Spotify Client ID (Set Redirect URI to http://127.0.0.1:8888/callback)',
+                placeHolder: 'e.g. 1a2b3c4d5e6f7g8h9i0j...',
+                ignoreFocusOut: true,
+            });
+            if (!input?.trim()) {
+                return;
+            }
+            clientId = input.trim();
+            await config.update('clientId', clientId, vscode.ConfigurationTarget.Global);
         }
         const success = await provider.authenticate();
         if (success) {
@@ -313,6 +335,20 @@ function registerCommands(context, playbackManager, authStore) {
         }
         else {
             vscode.window.showWarningMessage('Spotify authentication was cancelled or failed.');
+        }
+    });
+    register('null-music.configureSpotifyClientId', async () => {
+        const config = vscode.workspace.getConfiguration('null-music.spotify');
+        const current = config.get('clientId', '');
+        const input = await vscode.window.showInputBox({
+            prompt: 'Configure Spotify App Client ID (Redirect URI must be http://127.0.0.1:8888/callback)',
+            value: current,
+            placeHolder: 'Paste Client ID here...',
+            ignoreFocusOut: true,
+        });
+        if (input !== undefined) {
+            await config.update('clientId', input.trim(), vscode.ConfigurationTarget.Global);
+            vscode.window.showInformationMessage('Spotify Client ID updated.');
         }
     });
     register('null-music.signOut', async () => {

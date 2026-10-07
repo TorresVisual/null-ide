@@ -141,9 +141,12 @@ class SpotifyAuth {
         return this.refreshPromise;
     }
     async login() {
+        const clientId = this.getEffectiveClientId();
+        if (!clientId) {
+            return false;
+        }
         const { verifier, challenge } = (0, pkce_1.generatePkcePair)();
         const state = (0, pkce_1.generateRandomString)(32);
-        const clientId = this.getEffectiveClientId();
         return new Promise((resolve) => {
             let server = null;
             let timeoutId = null;

@@ -55,6 +55,10 @@ export class MusicViewProvider implements vscode.WebviewViewProvider {
           return await vscode.commands.executeCommand(cmd, ...args);
         },
         showErrorMessage: (msg) => vscode.window.showErrorMessage(msg),
+      },
+      () => {
+        const config = vscode.workspace.getConfiguration('null-music.spotify');
+        return config.get<string>('clientId', '');
       }
     );
 
