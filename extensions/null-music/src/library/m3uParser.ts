@@ -1,25 +1,8 @@
 'use strict';
 
 import * as path from 'path';
-import { Track } from '../../types';
-
-let vscodeModule: any;
-try {
-  vscodeModule = require('vscode');
-} catch {
-  vscodeModule = {
-    Uri: {
-      file: (fsPath: string) => ({
-        fsPath,
-        toString: () => `file:///${fsPath.replace(/\\/g, '/')}`,
-      }),
-      parse: (val: string) => ({
-        toString: () => val,
-        fsPath: val.replace(/^file:\/\/\/?/, '').replace(/\//g, path.sep),
-      }),
-    },
-  };
-}
+import { Track } from '../types';
+import { pathToUri, uriToPath } from '../uri';
 
 export interface ParsedPlaylist {
   name: string;
@@ -96,20 +79,14 @@ export function parseM3u(content: string, playlistFilePath: string): ParsedPlayl
       }
     } else if (trackPathOrUrl.startsWith('file://')) {
       uri = trackPathOrUrl;
-      const parsed = vscodeModule.Uri.parse(trackPathOrUrl);
-      trackFileName = path.basename(parsed.fsPath || trackPathOrUrl);
+      trackFileName = path.basename(uriToPath(trackPathOrUrl));
     } else {
       // Local filesystem path (either absolute or relative to playlist file)
       const isAbsolute = path.isAbsolute(trackPathOrUrl) || /^[A-Za-z]:[\\/]/.test(trackPathOrUrl);
       const resolvedFsPath = isAbsolute
         ? path.normalize(trackPathOrUrl)
         : path.normalize(path.resolve(playlistDir, trackPathOrUrl));
-
-      if (vscodeModule.Uri?.file) {
-        uri = vscodeModule.Uri.file(resolvedFsPath).toString();
-      } else {
-        uri = `file:///${resolvedFsPath.replace(/\\/g, '/')}`;
-      }
+      uri = pathToUri(resolvedFsPath);
       trackFileName = path.basename(resolvedFsPath);
     }
 
@@ -138,7 +115,7 @@ export function parseM3u(content: string, playlistFilePath: string): ParsedPlayl
       name: trackTitle,
       artist: trackArtist,
       artists: [trackArtist],
-      album: playlistName,
+      album: '',
       durationMs: pendingDurationMs,
       uri,
     });

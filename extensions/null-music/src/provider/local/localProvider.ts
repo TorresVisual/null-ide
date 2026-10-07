@@ -13,7 +13,7 @@ import {
   Track,
 } from '../../types';
 import { IMusicProvider } from '../musicProvider';
-import { parseM3u } from './m3uParser';
+import { parseM3u } from '../../library/m3uParser';
 
 let vscodeModule: any;
 try {

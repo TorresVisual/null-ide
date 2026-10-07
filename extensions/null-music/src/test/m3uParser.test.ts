@@ -3,7 +3,7 @@
 import assert from 'node:assert';
 import { test } from 'node:test';
 import * as path from 'path';
-import { parseM3u, serializeM3u } from '../provider/local/m3uParser';
+import { parseM3u, serializeM3u } from '../library/m3uParser';
 
 test('m3uParser parses standard M3U8 with EXTINF metadata and relative paths', () => {
   const content = `#EXTM3U
