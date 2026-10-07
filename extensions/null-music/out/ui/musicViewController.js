@@ -80,6 +80,16 @@ class MusicViewController {
                         await this.sendLocalLibrary();
                     }
                     break;
+                case 'localImportPlaylist':
+                    await this.host.executeCommand('null-music.importPlaylist');
+                    await this.sendLocalLibrary();
+                    break;
+                case 'localRemovePlaylist':
+                    if (data.playlistId) {
+                        await this.localProvider.removePlaylist(data.playlistId);
+                        await this.sendLocalLibrary();
+                    }
+                    break;
                 case 'localPlayTrack':
                     if (data.trackUri) {
                         const allTracks = this.localProvider.getAllTracks();
@@ -97,6 +107,13 @@ class MusicViewController {
                         });
                     }
                     break;
+                case 'localPlayPlaylist':
+                    if (data.playlistId) {
+                        await this.playbackManager.play({
+                            contextUri: `local:playlist:${encodeURIComponent(data.playlistId)}`,
+                        });
+                    }
+                    break;
                 case 'localGetLibrary':
                     await this.sendLocalLibrary();
                     break;
@@ -104,6 +121,25 @@ class MusicViewController {
                     if (typeof data.durationMs === 'number') {
                         this.localProvider.notifyDuration(data.durationMs, data.trackUri);
                         await this.playbackManager.refreshNow();
+                    }
+                    break;
+                case 'localAudioTimeUpdate':
+                    if (typeof data.positionMs === 'number') {
+                        this.localProvider.notifyTimeUpdate(data.positionMs);
+                    }
+                    break;
+                case 'localAudioPlayStarted':
+                    this.localProvider.notifyAudioPlayStarted();
+                    break;
+                case 'localAudioPaused':
+                    this.localProvider.notifyAudioPaused();
+                    break;
+                case 'localAudioPlayFailed':
+                case 'localAudioError':
+                    this.localProvider.notifyPlaybackFailed(data.error || 'Playback error');
+                    await this.playbackManager.refreshNow();
+                    if (data.error && !data.silent) {
+                        this.host.showErrorMessage(`Null Music: ${data.error}`);
                     }
                     break;
                 case 'localAudioEnded':
@@ -126,7 +162,8 @@ class MusicViewController {
             isLiked: await this.localProvider.isLiked(t.id),
         })));
         const folders = this.localProvider.getFolderUris();
-        this.messenger.postMessage({ type: 'localLibraryUpdate', tracks, folders });
+        const playlists = this.localProvider.getPlaylists();
+        this.messenger.postMessage({ type: 'localLibraryUpdate', tracks, folders, playlists });
     }
 }
 exports.MusicViewController = MusicViewController;

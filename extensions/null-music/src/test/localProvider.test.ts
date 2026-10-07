@@ -136,3 +136,61 @@ test('LocalMusicProvider scans directory and manages folders', async () => {
   assert.strictEqual(provider.getAllTracks().length, 0);
   assert.strictEqual(provider.getFolderUris().length, 0);
 });
+
+test('LocalMusicProvider imports and plays .m3u8 playlists', async () => {
+  const audioCalls: Array<{ method: string; args: any[] }> = [];
+  const adapter = {
+    playFile: (uri: string, trackId: string) => audioCalls.push({ method: 'playFile', args: [uri, trackId] }),
+    pauseAudio: () => audioCalls.push({ method: 'pauseAudio', args: [] }),
+    resumeAudio: () => audioCalls.push({ method: 'resumeAudio', args: [] }),
+    seekAudio: (ms: number) => audioCalls.push({ method: 'seekAudio', args: [ms] }),
+    setVolume: (vol: number) => audioCalls.push({ method: 'setVolume', args: [vol] }),
+  };
+
+  const provider = new LocalMusicProvider(adapter);
+
+  const m3uContent = `#EXTM3U
+#PLAYLIST:Coding Beats
+#EXTINF:200,Lofi Girl - Study Session
+study.mp3
+#EXTINF:250,Chillhop - Coffee Break
+coffee.mp3
+`;
+
+  const playlist = await provider.importPlaylist('D:\\Music\\coding.m3u8', m3uContent);
+  assert.strictEqual(playlist.name, 'Coding Beats');
+  assert.strictEqual(playlist.tracks.length, 2);
+
+  // Check playlists list
+  const playlists = await provider.getUserPlaylists();
+  assert.strictEqual(playlists.length, 1);
+  assert.strictEqual(playlists[0].name, 'Coding Beats');
+  assert.strictEqual(playlists[0].trackCount, 2);
+
+  // Play playlist via contextUri
+  await provider.play({ contextUri: `local:playlist:${encodeURIComponent(playlist.id)}` });
+  let state = await provider.getPlaybackState();
+  assert.strictEqual(state?.isPlaying, true);
+  assert.strictEqual(state?.track?.name, 'Study Session');
+  assert.strictEqual(audioCalls[0].method, 'playFile');
+
+  // Next track in playlist
+  await provider.next();
+  state = await provider.getPlaybackState();
+  assert.strictEqual(state?.track?.name, 'Coffee Break');
+
+  // Audio time synchronization
+  provider.notifyTimeUpdate(45000);
+  state = await provider.getPlaybackState();
+  assert.ok(state && state.progressMs >= 45000);
+
+  // Playback failure notification sets isPlaying to false
+  provider.notifyPlaybackFailed('Codec error');
+  state = await provider.getPlaybackState();
+  assert.strictEqual(state?.isPlaying, false);
+
+  // Remove playlist
+  await provider.removePlaylist(playlist.id);
+  const afterRemove = await provider.getUserPlaylists();
+  assert.strictEqual(afterRemove.length, 0);
+});

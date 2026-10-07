@@ -1,6 +1,8 @@
 'use strict';
 
 import * as vscode from 'vscode';
+import * as path from 'path';
+import * as fs from 'fs';
 import { LocalMusicProvider } from '../provider/local/localProvider';
 import { PlaybackManager } from '../playback/playbackManager';
 import { getMusicWebviewHtml } from './musicHtml';
@@ -28,14 +30,11 @@ export class MusicViewProvider implements vscode.WebviewViewProvider {
   ): void {
     this.view = webviewView;
 
-    const localRoots = this.getLocalFolderRoots();
-    webviewView.webview.options = {
-      enableScripts: true,
-      localResourceRoots: [this.extensionUri, ...localRoots],
-    };
+    this.refreshLocalResourceRoots(webviewView);
 
     const nonce = this.getNonce();
-    webviewView.webview.html = getMusicWebviewHtml(nonce);
+    const cspSource = webviewView.webview.cspSource;
+    webviewView.webview.html = getMusicWebviewHtml(nonce, cspSource);
 
     const postToWebview = (msg: any) => {
       try {
@@ -47,10 +46,17 @@ export class MusicViewProvider implements vscode.WebviewViewProvider {
     this.localProvider.setAudioAdapter({
       playFile: (uri: string, _trackId: string) => {
         let webviewUri = uri;
-        try {
-          const fileUri = vscode.Uri.parse(uri);
-          webviewUri = webviewView.webview.asWebviewUri(fileUri).toString();
-        } catch (_) {}
+        if (!uri.startsWith('http://') && !uri.startsWith('https://')) {
+          try {
+            let fileUri: vscode.Uri;
+            if (uri.startsWith('file://')) {
+              fileUri = vscode.Uri.parse(uri);
+            } else {
+              fileUri = vscode.Uri.file(uri);
+            }
+            webviewUri = webviewView.webview.asWebviewUri(fileUri).toString();
+          } catch (_) {}
+        }
         postToWebview({ type: 'localPlay', uri: webviewUri, trackUri: uri });
       },
       pauseAudio: () => postToWebview({ type: 'localPause' }),
@@ -76,33 +82,64 @@ export class MusicViewProvider implements vscode.WebviewViewProvider {
     );
 
     webviewView.webview.onDidReceiveMessage(async (data) => {
-      if (data?.type === 'localOpenFolder' || data?.type === 'localRemoveFolder') {
+      if (
+        data?.type === 'localOpenFolder' ||
+        data?.type === 'localRemoveFolder' ||
+        data?.type === 'localImportPlaylist' ||
+        data?.type === 'localRemovePlaylist'
+      ) {
         this.refreshLocalResourceRoots(webviewView);
       }
       await this.controller?.handleMessage(data);
     });
   }
 
-  private getLocalFolderRoots(): vscode.Uri[] {
-    const roots: vscode.Uri[] = [];
+  public getLocalFolderRoots(): vscode.Uri[] {
+    const roots: vscode.Uri[] = [this.extensionUri];
+
     if (vscode.workspace.workspaceFolders) {
       for (const wf of vscode.workspace.workspaceFolders) {
         roots.push(wf.uri);
       }
     }
+
     for (const u of this.localProvider.getFolderUris()) {
       try {
         roots.push(vscode.Uri.parse(u));
       } catch (_) {}
     }
+
+    for (const pl of this.localProvider.getPlaylists()) {
+      try {
+        roots.push(vscode.Uri.file(path.dirname(pl.filePath)));
+      } catch (_) {}
+    }
+
+    // Include drive roots on Windows or root on Unix so local audio files can be loaded
+    if (process.platform === 'win32') {
+      const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+      for (const letter of letters) {
+        try {
+          const driveRoot = `${letter}:\\`;
+          if (fs.existsSync(driveRoot)) {
+            roots.push(vscode.Uri.file(driveRoot));
+          }
+        } catch (_) {}
+      }
+    } else {
+      try {
+        roots.push(vscode.Uri.file('/'));
+      } catch (_) {}
+    }
+
     return roots;
   }
 
-  private refreshLocalResourceRoots(webviewView: vscode.WebviewView): void {
+  public refreshLocalResourceRoots(webviewView: vscode.WebviewView): void {
     const localRoots = this.getLocalFolderRoots();
     webviewView.webview.options = {
       enableScripts: true,
-      localResourceRoots: [this.extensionUri, ...localRoots],
+      localResourceRoots: localRoots,
     };
   }
 

@@ -37,7 +37,8 @@ const commandHelpers_1 = require("../ui/commandHelpers");
     node_assert_1.default.ok(commandHelpers_1.NULL_MUSIC_COMMANDS.includes('null-music.search'));
     node_assert_1.default.ok(commandHelpers_1.NULL_MUSIC_COMMANDS.includes('null-music.browsePlaylists'));
     node_assert_1.default.ok(commandHelpers_1.NULL_MUSIC_COMMANDS.includes('null-music.openLocalFolder'));
+    node_assert_1.default.ok(commandHelpers_1.NULL_MUSIC_COMMANDS.includes('null-music.importPlaylist'));
     node_assert_1.default.ok(commandHelpers_1.NULL_MUSIC_COMMANDS.includes('null-music.focus'));
-    node_assert_1.default.strictEqual(commandHelpers_1.NULL_MUSIC_COMMANDS.length, 17);
+    node_assert_1.default.strictEqual(commandHelpers_1.NULL_MUSIC_COMMANDS.length, 18);
 });
 //# sourceMappingURL=commands.test.js.map

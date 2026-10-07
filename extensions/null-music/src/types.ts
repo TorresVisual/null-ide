@@ -42,6 +42,7 @@ export interface Playlist {
   trackCount: number;
   uri: string;
   owner: string;
+  filePath?: string;
 }
 
 export interface Artist {

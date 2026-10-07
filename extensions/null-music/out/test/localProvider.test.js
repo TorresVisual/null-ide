@@ -118,4 +118,52 @@ const localProvider_1 = require("../provider/local/localProvider");
     node_assert_1.default.strictEqual(provider.getAllTracks().length, 0);
     node_assert_1.default.strictEqual(provider.getFolderUris().length, 0);
 });
+(0, node_test_1.test)('LocalMusicProvider imports and plays .m3u8 playlists', async () => {
+    const audioCalls = [];
+    const adapter = {
+        playFile: (uri, trackId) => audioCalls.push({ method: 'playFile', args: [uri, trackId] }),
+        pauseAudio: () => audioCalls.push({ method: 'pauseAudio', args: [] }),
+        resumeAudio: () => audioCalls.push({ method: 'resumeAudio', args: [] }),
+        seekAudio: (ms) => audioCalls.push({ method: 'seekAudio', args: [ms] }),
+        setVolume: (vol) => audioCalls.push({ method: 'setVolume', args: [vol] }),
+    };
+    const provider = new localProvider_1.LocalMusicProvider(adapter);
+    const m3uContent = `#EXTM3U
+#PLAYLIST:Coding Beats
+#EXTINF:200,Lofi Girl - Study Session
+study.mp3
+#EXTINF:250,Chillhop - Coffee Break
+coffee.mp3
+`;
+    const playlist = await provider.importPlaylist('D:\\Music\\coding.m3u8', m3uContent);
+    node_assert_1.default.strictEqual(playlist.name, 'Coding Beats');
+    node_assert_1.default.strictEqual(playlist.tracks.length, 2);
+    // Check playlists list
+    const playlists = await provider.getUserPlaylists();
+    node_assert_1.default.strictEqual(playlists.length, 1);
+    node_assert_1.default.strictEqual(playlists[0].name, 'Coding Beats');
+    node_assert_1.default.strictEqual(playlists[0].trackCount, 2);
+    // Play playlist via contextUri
+    await provider.play({ contextUri: `local:playlist:${encodeURIComponent(playlist.id)}` });
+    let state = await provider.getPlaybackState();
+    node_assert_1.default.strictEqual(state?.isPlaying, true);
+    node_assert_1.default.strictEqual(state?.track?.name, 'Study Session');
+    node_assert_1.default.strictEqual(audioCalls[0].method, 'playFile');
+    // Next track in playlist
+    await provider.next();
+    state = await provider.getPlaybackState();
+    node_assert_1.default.strictEqual(state?.track?.name, 'Coffee Break');
+    // Audio time synchronization
+    provider.notifyTimeUpdate(45000);
+    state = await provider.getPlaybackState();
+    node_assert_1.default.ok(state && state.progressMs >= 45000);
+    // Playback failure notification sets isPlaying to false
+    provider.notifyPlaybackFailed('Codec error');
+    state = await provider.getPlaybackState();
+    node_assert_1.default.strictEqual(state?.isPlaying, false);
+    // Remove playlist
+    await provider.removePlaylist(playlist.id);
+    const afterRemove = await provider.getUserPlaylists();
+    node_assert_1.default.strictEqual(afterRemove.length, 0);
+});
 //# sourceMappingURL=localProvider.test.js.map

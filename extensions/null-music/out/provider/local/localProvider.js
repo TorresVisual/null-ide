@@ -35,6 +35,8 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.LocalMusicProvider = void 0;
 const path = __importStar(require("path"));
+const fs = __importStar(require("fs"));
+const m3uParser_1 = require("./m3uParser");
 let vscodeModule;
 try {
     vscodeModule = require('vscode');
@@ -43,6 +45,10 @@ catch {
     vscodeModule = {
         FileType: { File: 1, Directory: 2 },
         Uri: {
+            file: (fsPath) => ({
+                fsPath,
+                toString: () => `file:///${fsPath.replace(/\\/g, '/')}`,
+            }),
             parse: (val) => ({
                 toString: () => val,
                 fsPath: val.replace(/^file:\/\/\/?/, '').replace(/\//g, path.sep),
@@ -74,6 +80,8 @@ class LocalMusicProvider {
     startTime = 0;
     likedTrackIds = new Set();
     folderUris = [];
+    playlistFilePaths = [];
+    playlists = new Map();
     audioAdapter;
     context;
     directoryReader;
@@ -92,7 +100,7 @@ class LocalMusicProvider {
             this.context = context;
         }
         this.loadPersistedState();
-        this.rescanAllFolders().catch(() => { });
+        this.rescanAll().catch(() => { });
     }
     setAudioAdapter(adapter) {
         this.audioAdapter = adapter;
@@ -101,10 +109,12 @@ class LocalMusicProvider {
         if (!this.context)
             return;
         try {
-            const saved = this.context.globalState.get('null-music.local.folders', []);
-            this.folderUris = saved;
+            const savedFolders = this.context.globalState.get('null-music.local.folders', []);
+            this.folderUris = savedFolders;
             const liked = this.context.globalState.get('null-music.local.liked', []);
             liked.forEach((id) => this.likedTrackIds.add(id));
+            const savedPlaylists = this.context.globalState.get('null-music.local.playlists', []);
+            this.playlistFilePaths = savedPlaylists;
         }
         catch (_) { }
     }
@@ -113,14 +123,33 @@ class LocalMusicProvider {
             return;
         await this.context.globalState.update('null-music.local.folders', this.folderUris);
     }
+    async persistPlaylists() {
+        if (!this.context)
+            return;
+        await this.context.globalState.update('null-music.local.playlists', this.playlistFilePaths);
+    }
     async persistLiked() {
         if (!this.context)
             return;
         await this.context.globalState.update('null-music.local.liked', Array.from(this.likedTrackIds));
     }
+    async rescanAll() {
+        await this.rescanAllFolders();
+        await this.rescanAllPlaylists();
+    }
     async rescanAllFolders() {
         for (const folderUri of this.folderUris) {
             await this.loadFolder(folderUri);
+        }
+    }
+    async rescanAllPlaylists() {
+        for (const filePath of this.playlistFilePaths) {
+            try {
+                await this.loadPlaylistFile(filePath);
+            }
+            catch (err) {
+                console.error('LocalMusicProvider: Failed to reload playlist', filePath, err);
+            }
         }
     }
     // ─── IMusicProvider ──────────────────────────────────────────────────────────
@@ -178,12 +207,30 @@ class LocalMusicProvider {
             if (idx >= 0) {
                 this.currentIndex = idx;
             }
+            else {
+                const all = this.getAllTracks();
+                const allIdx = all.findIndex((t) => t.id === trackId || t.uri === trackId);
+                if (allIdx >= 0) {
+                    this.queue = [...all];
+                    this.currentIndex = allIdx;
+                }
+            }
         }
         else if (options?.contextUri) {
-            const folderUri = decodeURIComponent(options.contextUri.replace('local:folder:', ''));
-            await this.loadFolder(folderUri);
-            this.queue = this.tracks.filter((t) => t.album === folderUri);
-            this.currentIndex = 0;
+            if (options.contextUri.startsWith('local:playlist:')) {
+                const playlistId = decodeURIComponent(options.contextUri.replace('local:playlist:', ''));
+                const pTracks = await this.getPlaylistTracks(playlistId);
+                if (pTracks.length > 0) {
+                    this.queue = [...pTracks];
+                    this.currentIndex = 0;
+                }
+            }
+            else {
+                const folderUri = decodeURIComponent(options.contextUri.replace('local:folder:', ''));
+                await this.loadFolder(folderUri);
+                this.queue = this.tracks.filter((t) => t.album === folderUri);
+                this.currentIndex = 0;
+            }
         }
         if (this.currentIndex < 0 && this.queue.length > 0) {
             this.currentIndex = 0;
@@ -254,9 +301,9 @@ class LocalMusicProvider {
         }
     }
     async seek(positionMs) {
-        this.progressMs = positionMs;
+        this.progressMs = Math.max(0, positionMs);
         this.startTime = this.isPlayingState ? Date.now() : 0;
-        this.audioAdapter?.seekAudio(positionMs);
+        this.audioAdapter?.seekAudio(this.progressMs);
     }
     async setVolume(volumePercent) {
         this.volume = Math.max(0, Math.min(100, volumePercent));
@@ -269,21 +316,10 @@ class LocalMusicProvider {
         this.repeatMode = mode;
     }
     async getUserPlaylists() {
-        const playlists = this.folderUris.map((uri, i) => {
-            const folderName = path.basename(decodeURIComponent(uri).replace(/[/\\]$/, '')) || uri;
-            const count = this.tracks.filter((t) => t.album === uri).length;
-            return {
-                id: `local-folder-${i}`,
-                name: folderName,
-                description: uri,
-                trackCount: count,
-                uri: `local:folder:${encodeURIComponent(uri)}`,
-                owner: 'Local Folder',
-            };
-        });
+        const list = [];
         const likedCount = this.likedTrackIds.size;
         if (likedCount > 0) {
-            playlists.unshift({
+            list.push({
                 id: 'local-favorites',
                 name: 'Liked Tracks',
                 description: `${likedCount} favorite track${likedCount !== 1 ? 's' : ''}`,
@@ -292,23 +328,53 @@ class LocalMusicProvider {
                 owner: 'Favorites',
             });
         }
-        return playlists;
+        // Imported .m3u8 Playlists
+        for (const [id, pl] of this.playlists.entries()) {
+            list.push({
+                id: `playlist-${id}`,
+                name: pl.name,
+                description: pl.filePath,
+                trackCount: pl.tracks.length,
+                uri: `local:playlist:${encodeURIComponent(id)}`,
+                owner: 'Imported Playlist',
+                filePath: pl.filePath,
+            });
+        }
+        // Local folder playlists
+        this.folderUris.forEach((uri, i) => {
+            const folderName = path.basename(decodeURIComponent(uri).replace(/[/\\]$/, '')) || uri;
+            const count = this.tracks.filter((t) => t.album === uri).length;
+            list.push({
+                id: `local-folder-${i}`,
+                name: folderName,
+                description: uri,
+                trackCount: count,
+                uri: `local:folder:${encodeURIComponent(uri)}`,
+                owner: 'Local Folder',
+            });
+        });
+        return list;
     }
     async getPlaylistTracks(playlistId) {
-        if (playlistId === 'local-favorites') {
-            return this.tracks.filter((t) => this.likedTrackIds.has(t.id));
+        if (playlistId === 'local-favorites' || playlistId === 'favorites') {
+            return this.getAllTracks().filter((t) => this.likedTrackIds.has(t.id));
+        }
+        const cleanId = playlistId.startsWith('playlist-') ? playlistId.replace('playlist-', '') : playlistId;
+        if (this.playlists.has(cleanId)) {
+            return this.playlists.get(cleanId).tracks;
         }
         const idx = parseInt(playlistId.replace('local-folder-', ''), 10);
-        if (isNaN(idx) || idx >= this.folderUris.length)
-            return [];
-        const folderUri = this.folderUris[idx];
-        return this.tracks.filter((t) => t.album === folderUri);
+        if (!isNaN(idx) && idx >= 0 && idx < this.folderUris.length) {
+            const folderUri = this.folderUris[idx];
+            return this.tracks.filter((t) => t.album === folderUri);
+        }
+        return [];
     }
     async search(query) {
         const q = query.toLowerCase().trim();
-        const source = this.tracks.length > 0 ? this.tracks : this.queue;
+        const source = this.getAllTracks();
         if (!q) {
-            return { tracks: source, playlists: [], artists: [], albums: [] };
+            return { tracks: source, playlists: await this.getUserPlaylists(), artists: [], albums: [] };
         }
         const matching = source.filter((t) => t.name.toLowerCase().includes(q) ||
             t.artist.toLowerCase().includes(q) ||
@@ -344,6 +410,71 @@ class LocalMusicProvider {
         this.queue = this.queue.filter((t) => t.album !== folderUri);
         await this.persistFolders();
     }
+    async importPlaylist(filePathOrUri, explicitContent) {
+        const playlist = await this.loadPlaylistFile(filePathOrUri, explicitContent);
+        if (!this.playlistFilePaths.includes(playlist.filePath)) {
+            this.playlistFilePaths.push(playlist.filePath);
+            await this.persistPlaylists();
+        }
+        return playlist;
+    }
+    async removePlaylist(playlistId) {
+        const cleanId = playlistId.startsWith('playlist-') ? playlistId.replace('playlist-', '') : playlistId;
+        const pl = this.playlists.get(cleanId);
+        if (pl) {
+            this.playlists.delete(cleanId);
+            this.playlistFilePaths = this.playlistFilePaths.filter((p) => p !== pl.filePath);
+            await this.persistPlaylists();
+        }
+    }
+    getPlaylists() {
+        return Array.from(this.playlists.values());
+    }
+    getPlaylistPaths() {
+        return this.playlistFilePaths;
+    }
+    async loadPlaylistFile(filePathOrUri, explicitContent) {
+        let fsPath = filePathOrUri;
+        if (filePathOrUri.startsWith('file://')) {
+            const parsed = vscodeModule.Uri.parse(filePathOrUri);
+            fsPath = parsed.fsPath || filePathOrUri.replace(/^file:\/\/\/?/, '');
+        }
+        let content = explicitContent;
+        if (content === undefined) {
+            try {
+                if (vscodeModule.workspace?.fs) {
+                    const uri = vscodeModule.Uri.file(fsPath);
+                    const bytes = await vscodeModule.workspace.fs.readFile(uri);
+                    content = new TextDecoder('utf-8').decode(bytes);
+                }
+                else {
+                    content = await fs.promises.readFile(fsPath, 'utf8');
+                }
+            }
+            catch (err) {
+                throw new Error(`Failed to read playlist file "${fsPath}": ${err.message}`);
+            }
+        }
+        const parsed = (0, m3uParser_1.parseM3u)(content, fsPath);
+        const id = Buffer.from(fsPath).toString('base64url').slice(0, 16);
+        const stored = {
+            id,
+            name: parsed.name,
+            filePath: fsPath,
+            tracks: parsed.tracks,
+        };
+        this.playlists.set(id, stored);
+        // Merge tracks into library without duplicates
+        for (const track of parsed.tracks) {
+            if (!this.tracks.some((t) => t.id === track.id || t.uri === track.uri)) {
+                this.tracks.push(track);
+            }
+        }
+        if (this.queue.length === 0) {
+            this.queue = [...this.tracks];
+        }
+        return stored;
+    }
     notifyDuration(durationMs, trackUri) {
         this.durationMs = durationMs;
         if (trackUri) {
@@ -357,6 +488,21 @@ class LocalMusicProvider {
         else if (this.currentTrack) {
             this.currentTrack.durationMs = durationMs;
         }
+    }
+    notifyTimeUpdate(positionMs) {
+        this.progressMs = positionMs;
+        this.startTime = this.isPlayingState ? Date.now() : 0;
+    }
+    notifyPlaybackFailed(_error) {
+        this.isPlayingState = false;
+        this.startTime = 0;
+    }
+    notifyAudioPlayStarted() {
+        this.isPlayingState = true;
+        this.startTime = Date.now();
+    }
+    notifyAudioPaused() {
+        this.pause().catch(() => { });
     }
     async notifyEnded() {
         if (this.repeatMode === 'track') {

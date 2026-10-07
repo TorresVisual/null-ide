@@ -230,17 +230,32 @@ function registerCommands(context, playbackManager, localProvider) {
         try {
             const playlists = await playbackManager.getUserPlaylists();
             if (playlists.length === 0) {
-                vscode.window.showInformationMessage('No folders or playlists found. Click "Add Music Folder" to scan a folder.');
+                const choice = await vscode.window.showInformationMessage('No folders or playlists found. What would you like to add?', 'Import Playlist (.m3u8)', 'Add Music Folder');
+                if (choice === 'Import Playlist (.m3u8)') {
+                    await vscode.commands.executeCommand('null-music.importPlaylist');
+                }
+                else if (choice === 'Add Music Folder') {
+                    await vscode.commands.executeCommand('null-music.openLocalFolder');
+                }
                 return;
             }
-            const items = playlists.map((p) => ({
-                label: `$(folder) ${p.name}`,
-                description: `${p.trackCount} tracks`,
-                detail: p.description || undefined,
-                uri: p.uri,
-            }));
+            const items = playlists.map((p) => {
+                let icon = '$(folder)';
+                if (p.id === 'local-favorites') {
+                    icon = '$(heart)';
+                }
+                else if (p.owner === 'Imported Playlist') {
+                    icon = '$(list-ordered)';
+                }
+                return {
+                    label: `${icon} ${p.name}`,
+                    description: `${p.trackCount} track${p.trackCount !== 1 ? 's' : ''} • ${p.owner}`,
+                    detail: p.description || undefined,
+                    uri: p.uri,
+                };
+            });
             const pick = await vscode.window.showQuickPick(items, {
-                placeHolder: 'Select a folder or playlist to play',
+                placeHolder: 'Select a playlist or folder to play',
             });
             if (pick) {
                 await playbackManager.play({ contextUri: pick.uri });
@@ -248,6 +263,37 @@ function registerCommands(context, playbackManager, localProvider) {
         }
         catch (err) {
             vscode.window.showErrorMessage(`Null Music: ${err.message || err}`);
+        }
+    });
+    register('null-music.importPlaylist', async () => {
+        const files = await vscode.window.showOpenDialog({
+            canSelectFolders: false,
+            canSelectFiles: true,
+            canSelectMany: false,
+            filters: {
+                'Playlists (*.m3u8, *.m3u)': ['m3u8', 'm3u'],
+            },
+            openLabel: 'Import Playlist',
+            title: 'Select a .m3u8 or .m3u playlist file',
+        });
+        if (!files || files.length === 0)
+            return;
+        try {
+            const playlist = await localProvider.importPlaylist(files[0].fsPath || files[0].toString());
+            if (playlist.tracks.length === 0) {
+                vscode.window.showWarningMessage(`Playlist "${playlist.name}" was imported, but contained no tracks.`);
+            }
+            else {
+                const action = await vscode.window.showInformationMessage(`Imported playlist "${playlist.name}" (${playlist.tracks.length} tracks)`, 'Play Now');
+                if (action === 'Play Now') {
+                    await playbackManager.play({
+                        contextUri: `local:playlist:${encodeURIComponent(playlist.id)}`,
+                    });
+                }
+            }
+        }
+        catch (err) {
+            vscode.window.showErrorMessage(`Failed to import playlist: ${err.message || err}`);
         }
     });
     register('null-music.openLocalFolder', async () => {

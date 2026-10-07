@@ -22,8 +22,13 @@ const musicHtml_1 = require("../ui/musicHtml");
     node_assert_1.default.ok(html.includes('id="btn-add-folder"'));
     node_assert_1.default.ok(html.includes('id="audio-player"'));
     node_assert_1.default.ok(html.includes('id="pane-tracks"'));
+    node_assert_1.default.ok(html.includes('id="pane-playlists"'));
     node_assert_1.default.ok(html.includes('id="pane-folders"'));
     node_assert_1.default.ok(html.includes('id="pane-favorites"'));
+    node_assert_1.default.ok(html.includes('id="btn-import-playlist"'));
+    node_assert_1.default.ok(html.includes('id="btn-rewind-10"'));
+    node_assert_1.default.ok(html.includes('id="btn-forward-10"'));
+    node_assert_1.default.ok(html.includes('id="error-banner"'));
     // Ensure slop is completely removed
     node_assert_1.default.ok(!html.includes('Spotify'));
     node_assert_1.default.ok(!html.includes('Lo-Fi Radio'));

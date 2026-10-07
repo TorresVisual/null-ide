@@ -39,5 +39,6 @@ export const NULL_MUSIC_COMMANDS = [
   'null-music.search',
   'null-music.browsePlaylists',
   'null-music.openLocalFolder',
+  'null-music.importPlaylist',
   'null-music.focus',
 ] as const;

@@ -21,8 +21,13 @@ test('getMusicWebviewHtml contains CSP nonce, controls, and clean local elements
   assert.ok(html.includes('id="btn-add-folder"'));
   assert.ok(html.includes('id="audio-player"'));
   assert.ok(html.includes('id="pane-tracks"'));
+  assert.ok(html.includes('id="pane-playlists"'));
   assert.ok(html.includes('id="pane-folders"'));
   assert.ok(html.includes('id="pane-favorites"'));
+  assert.ok(html.includes('id="btn-import-playlist"'));
+  assert.ok(html.includes('id="btn-rewind-10"'));
+  assert.ok(html.includes('id="btn-forward-10"'));
+  assert.ok(html.includes('id="error-banner"'));
 
   // Ensure slop is completely removed
   assert.ok(!html.includes('Spotify'));

@@ -84,5 +84,20 @@ test('MusicViewController handles UI messages and delegates to PlaybackManager a
   // Audio ended
   await controller.handleMessage({ type: 'localAudioEnded' });
 
+  // Import Playlist command delegate
+  await controller.handleMessage({ type: 'localImportPlaylist' });
+  assert.ok(executedCommands.includes('null-music.importPlaylist'));
+
+  // Audio time update
+  await controller.handleMessage({ type: 'localAudioTimeUpdate', positionMs: 50000 });
+  const pState = await localProvider.getPlaybackState();
+  assert.ok(pState && pState.progressMs >= 50000);
+
+  // Playback failed
+  await controller.handleMessage({ type: 'localAudioPlayFailed', error: 'Decode failure' });
+  assert.strictEqual(errorMessages.some((msg) => msg.includes('Decode failure')), true);
+  const failedState = await localProvider.getPlaybackState();
+  assert.strictEqual(failedState?.isPlaying, false);
+
   playbackManager.dispose();
 });

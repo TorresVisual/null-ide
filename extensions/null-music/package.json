@@ -105,6 +105,11 @@
         "icon": "$(folder-opened)"
       },
       {
+        "command": "null-music.importPlaylist",
+        "title": "Null Music: Import Playlist (.m3u8)",
+        "icon": "$(list-ordered)"
+      },
+      {
         "command": "null-music.focus",
         "title": "Null Music: Open Music Player View",
         "icon": "media/music.svg"
@@ -216,7 +221,7 @@
   },
   "scripts": {
     "compile": "tsc -p tsconfig.json",
-    "test": "tsc -p tsconfig.json && node --test out/test/playbackManager.test.js out/test/statusBarController.test.js out/test/musicHtml.test.js out/test/musicViewProvider.test.js out/test/commands.test.js out/test/localProvider.test.js"
+    "test": "tsc -p tsconfig.json && node --test out/test/playbackManager.test.js out/test/statusBarController.test.js out/test/musicHtml.test.js out/test/musicViewProvider.test.js out/test/commands.test.js out/test/localProvider.test.js out/test/m3uParser.test.js"
   },
   "devDependencies": {
     "typescript": "^5.8.0",

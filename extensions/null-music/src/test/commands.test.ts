@@ -37,6 +37,7 @@ test('NULL_MUSIC_COMMANDS includes all essential local playback and folder comma
   assert.ok(NULL_MUSIC_COMMANDS.includes('null-music.search'));
   assert.ok(NULL_MUSIC_COMMANDS.includes('null-music.browsePlaylists'));
   assert.ok(NULL_MUSIC_COMMANDS.includes('null-music.openLocalFolder'));
+  assert.ok(NULL_MUSIC_COMMANDS.includes('null-music.importPlaylist'));
   assert.ok(NULL_MUSIC_COMMANDS.includes('null-music.focus'));
-  assert.strictEqual(NULL_MUSIC_COMMANDS.length, 17);
+  assert.strictEqual(NULL_MUSIC_COMMANDS.length, 18);
 });

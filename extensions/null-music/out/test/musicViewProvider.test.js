@@ -70,6 +70,18 @@ const musicViewController_1 = require("../ui/musicViewController");
     node_assert_1.default.strictEqual(localProvider.getAllTracks()[0].durationMs, 125000);
     // Audio ended
     await controller.handleMessage({ type: 'localAudioEnded' });
+    // Import Playlist command delegate
+    await controller.handleMessage({ type: 'localImportPlaylist' });
+    node_assert_1.default.ok(executedCommands.includes('null-music.importPlaylist'));
+    // Audio time update
+    await controller.handleMessage({ type: 'localAudioTimeUpdate', positionMs: 50000 });
+    const pState = await localProvider.getPlaybackState();
+    node_assert_1.default.ok(pState && pState.progressMs >= 50000);
+    // Playback failed
+    await controller.handleMessage({ type: 'localAudioPlayFailed', error: 'Decode failure' });
+    node_assert_1.default.strictEqual(errorMessages.some((msg) => msg.includes('Decode failure')), true);
+    const failedState = await localProvider.getPlaybackState();
+    node_assert_1.default.strictEqual(failedState?.isPlaying, false);
     playbackManager.dispose();
 });
 //# sourceMappingURL=musicViewProvider.test.js.map

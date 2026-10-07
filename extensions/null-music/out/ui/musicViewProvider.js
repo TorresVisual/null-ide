@@ -35,6 +35,8 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MusicViewProvider = void 0;
 const vscode = __importStar(require("vscode"));
+const path = __importStar(require("path"));
+const fs = __importStar(require("fs"));
 const musicHtml_1 = require("./musicHtml");
 const musicViewController_1 = require("./musicViewController");
 class MusicViewProvider {
@@ -54,13 +56,10 @@ class MusicViewProvider {
     }
     resolveWebviewView(webviewView, _context, _token) {
         this.view = webviewView;
-        const localRoots = this.getLocalFolderRoots();
-        webviewView.webview.options = {
-            enableScripts: true,
-            localResourceRoots: [this.extensionUri, ...localRoots],
-        };
+        this.refreshLocalResourceRoots(webviewView);
         const nonce = this.getNonce();
-        webviewView.webview.html = (0, musicHtml_1.getMusicWebviewHtml)(nonce);
+        const cspSource = webviewView.webview.cspSource;
+        webviewView.webview.html = (0, musicHtml_1.getMusicWebviewHtml)(nonce, cspSource);
         const postToWebview = (msg) => {
             try {
                 webviewView.webview.postMessage(msg);
@@ -71,11 +70,19 @@ class MusicViewProvider {
         this.localProvider.setAudioAdapter({
             playFile: (uri, _trackId) => {
                 let webviewUri = uri;
-                try {
-                    const fileUri = vscode.Uri.parse(uri);
-                    webviewUri = webviewView.webview.asWebviewUri(fileUri).toString();
+                if (!uri.startsWith('http://') && !uri.startsWith('https://')) {
+                    try {
+                        let fileUri;
+                        if (uri.startsWith('file://')) {
+                            fileUri = vscode.Uri.parse(uri);
+                        }
+                        else {
+                            fileUri = vscode.Uri.file(uri);
+                        }
+                        webviewUri = webviewView.webview.asWebviewUri(fileUri).toString();
+                    }
+                    catch (_) { }
                 }
-                catch (_) { }
                 postToWebview({ type: 'localPlay', uri: webviewUri, trackUri: uri });
             },
             pauseAudio: () => postToWebview({ type: 'localPause' }),
@@ -94,14 +101,17 @@ class MusicViewProvider {
             showErrorMessage: (msg) => vscode.window.showErrorMessage(msg),
         });
         webviewView.webview.onDidReceiveMessage(async (data) => {
-            if (data?.type === 'localOpenFolder' || data?.type === 'localRemoveFolder') {
+            if (data?.type === 'localOpenFolder' ||
+                data?.type === 'localRemoveFolder' ||
+                data?.type === 'localImportPlaylist' ||
+                data?.type === 'localRemovePlaylist') {
                 this.refreshLocalResourceRoots(webviewView);
             }
             await this.controller?.handleMessage(data);
         });
     }
     getLocalFolderRoots() {
-        const roots = [];
+        const roots = [this.extensionUri];
         if (vscode.workspace.workspaceFolders) {
             for (const wf of vscode.workspace.workspaceFolders) {
                 roots.push(wf.uri);
@@ -113,13 +123,38 @@ class MusicViewProvider {
             }
             catch (_) { }
         }
+        for (const pl of this.localProvider.getPlaylists()) {
+            try {
+                roots.push(vscode.Uri.file(path.dirname(pl.filePath)));
+            }
+            catch (_) { }
+        }
+        // Include drive roots on Windows or root on Unix so local audio files can be loaded
+        if (process.platform === 'win32') {
+            const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+            for (const letter of letters) {
+                try {
+                    const driveRoot = `${letter}:\\`;
+                    if (fs.existsSync(driveRoot)) {
+                        roots.push(vscode.Uri.file(driveRoot));
+                    }
+                }
+                catch (_) { }
+            }
+        }
+        else {
+            try {
+                roots.push(vscode.Uri.file('/'));
+            }
+            catch (_) { }
+        }
         return roots;
     }
     refreshLocalResourceRoots(webviewView) {
         const localRoots = this.getLocalFolderRoots();
         webviewView.webview.options = {
             enableScripts: true,
-            localResourceRoots: [this.extensionUri, ...localRoots],
+            localResourceRoots: localRoots,
         };
     }
     getNonce() {

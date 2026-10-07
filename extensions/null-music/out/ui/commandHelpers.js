@@ -40,6 +40,7 @@ exports.NULL_MUSIC_COMMANDS = [
     'null-music.search',
     'null-music.browsePlaylists',
     'null-music.openLocalFolder',
+    'null-music.importPlaylist',
     'null-music.focus',
 ];
 //# sourceMappingURL=commandHelpers.js.map
