@@ -46,4 +46,22 @@ suite('null-accounts activation', () => {
       await vscode.commands.executeCommand('null-accounts.switchAccount');
     }
   });
+
+  test('Phase 4: menu commands are registered; a stale bind resolves without throwing', async () => {
+    await vscode.extensions.getExtension<NullAccountsApi>('null.null-accounts')!.activate();
+
+    const commands = await vscode.commands.getCommands(true);
+    assert.ok(commands.includes('null-accounts.bindFolderToAccount'), 'bindFolderToAccount not registered');
+    assert.ok(commands.includes('null-accounts.addAccount'), 'addAccount not registered');
+
+    // No such account: must be a no-op (an info message, not a throw, not a binding).
+    await vscode.commands.executeCommand('null-accounts.bindFolderToAccount', 'does-not-exist');
+    const folder = vscode.workspace.workspaceFolders?.[0];
+    if (folder) {
+      const api = vscode.extensions.getExtension<NullAccountsApi>('null.null-accounts')!.exports as NullAccountsApi;
+      assert.strictEqual(api.getAccountForFolder(folder.uri), undefined);
+    }
+    // The `null.accounts.menu` context key cannot be read from the extension host, so its content is
+    // covered by accountsMenuModel/accountsMenuActions unit tests and the manual check in Task 4.
+  });
 });

@@ -8,6 +8,9 @@ import { ChangeEmitter } from './changeEmitter';
 import { ProjectBinding } from './projectBinding';
 import { fetchGithub, GithubProvider } from './providers/github';
 import { addGithubAccount, chooseAccountForFolder, PickerDeps } from './ui/accountPicker';
+import { bindFolderToAccount } from './ui/accountsMenuActions';
+import { registerAccountsMenu } from './ui/accountsMenuController';
+import { ADD_ACCOUNT_COMMAND, BIND_COMMAND } from './ui/accountsMenuModel';
 import { AccountsPanel } from './ui/accountsPanel';
 import { registerStatusBar, SWITCH_COMMAND } from './ui/statusBarController';
 
@@ -57,7 +60,17 @@ export function activate(context: vscode.ExtensionContext): NullAccountsApi {
       }
       await chooseAccountForFolder(pickerDeps, folder.uri);
     }),
+    vscode.commands.registerCommand(BIND_COMMAND, async (accountId: unknown) => {
+      const result = await bindFolderToAccount(
+        { folderPath: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath, accounts: store, bindings },
+        accountId,
+      );
+      if (result === 'no-folder') { void vscode.window.showInformationMessage('Open a folder to choose its account.'); }
+      if (result === 'no-account') { void vscode.window.showInformationMessage('That account no longer exists.'); }
+    }),
+    vscode.commands.registerCommand(ADD_ACCOUNT_COMMAND, async () => { await addGithubAccount(pickerDeps); }),
     registerStatusBar(api),
+    registerAccountsMenu(api),
   );
 
   void offerImport(context, store, bindings, github).catch(() => { /* a failed offer must never break activation */ });

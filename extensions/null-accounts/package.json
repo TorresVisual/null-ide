@@ -11,8 +11,15 @@
   "contributes": {
     "commands": [
       { "command": "null-accounts.open", "title": "Null Accounts: Manage Accounts" },
-      { "command": "null-accounts.switchAccount", "title": "Null Accounts: Switch Account for This Project" }
-    ]
+      { "command": "null-accounts.switchAccount", "title": "Null Accounts: Switch Account for This Project" },
+      { "command": "null-accounts.addAccount", "title": "Null Accounts: Add Account" },
+      { "command": "null-accounts.bindFolderToAccount", "title": "Null Accounts: Use Account for This Project" }
+    ],
+    "menus": {
+      "commandPalette": [
+        { "command": "null-accounts.bindFolderToAccount", "when": "false" }
+      ]
+    }
   },
   "scripts": {
     "compile": "tsc -p tsconfig.json",
