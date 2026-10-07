@@ -78,7 +78,7 @@ Enhanced markdown preview (GFM, Mermaid, KaTeX, GitHub alerts) on `onLanguage:ma
 Prettier (in-process), rustfmt and clang-format formatting providers. Editable fallback configs are `null-format.{prettier,rustfmt,clangFormat}.defaultConfig`; a project's own `.prettierrc` / `rustfmt.toml` / `.clang-format` always wins.
 
 ### null-music (`extensions/null-music/`)
-Music player + Spotify (issue #112): activity-bar view `null.musicView`, status bar item, `Ctrl+Alt+…` media keybindings. Spotify auth is OAuth PKCE with a loopback callback; tokens live in `SecretStorage` (`null-music/token/spotify`) — never store credentials. All service access goes through `IMusicProvider` / `ProviderRegistry`; add new services as providers, not in playback/UI code.
+Local-file music player: activity-bar view `null.musicView`, status bar item, `Ctrl+Alt+…` media keybindings. The extension host owns all state — `Library` (folders + `.m3u8`, tags and cover art via the in-house `library/tagReader.ts`, JSON cache in `globalStorageUri`), `Queue` (history-aware shuffle, play next/add), `Player` (single position clock, paused session restore under `globalState` key `null-music.session`) and an `AudioOutput`. Sound comes from an `<audio>` element in the sidebar webview (`WebviewAudioOutput`): commands reveal the view and wait for its `ready`, and closing the view stops playback. `isPlaying` is true only after the output reports `play`. There is no provider abstraction; do not add one. Designs: `docs/specs/null-music-engine-design.md`, `docs/specs/null-music-player-ui-design.md`; plan: `docs/plans/null-music-engine.md`.
 
 ### null-tools (`extensions/null-tools/`)
 Written in TypeScript (`src/`). Activated on `onStartupFinished`. Provides:

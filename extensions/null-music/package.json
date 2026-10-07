@@ -198,12 +198,7 @@
         "null-music.statusBar.format": {
           "type": "string",
           "default": "${title} - ${artist}",
-          "description": "Format string for the status bar. Available variables: ${title}, ${artist}, ${album}, ${device}."
-        },
-        "null-music.playback.pollingIntervalMs": {
-          "type": "number",
-          "default": 2500,
-          "description": "Interval in milliseconds to poll playback status."
+          "description": "Format string for the status bar. Available variables: ${title}, ${artist}, ${album}."
         },
         "null-music.notifications.showOnSongChange": {
           "type": "boolean",
@@ -213,7 +208,7 @@
         "null-music.local.supportedExtensions": {
           "type": "array",
           "items": { "type": "string" },
-          "default": [".mp3", ".flac", ".ogg", ".wav", ".m4a", ".aac", ".opus", ".wma"],
+          "default": [".mp3", ".flac", ".ogg", ".wav", ".m4a", ".aac", ".opus"],
           "description": "List of audio file extensions to include when scanning local music folders."
         }
       }
