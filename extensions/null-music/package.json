@@ -1,0 +1,243 @@
+{
+  "name": "null-music",
+  "displayName": "Null Music",
+  "description": "Seamless music player and Spotify integration for Null IDE — controls, playlists, search, and status bar display",
+  "version": "1.0.0",
+  "publisher": "null",
+  "license": "MIT",
+  "engines": { "vscode": "^1.85.0" },
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onStartupFinished",
+    "onView:null.musicView"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "null-music",
+          "title": "Music",
+          "icon": "media/music.svg"
+        }
+      ]
+    },
+    "views": {
+      "null-music": [
+        {
+          "type": "webview",
+          "id": "null.musicView",
+          "name": "Music Player"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "null-music.playPause",
+        "title": "Null Music: Play / Pause",
+        "icon": "$(play)"
+      },
+      {
+        "command": "null-music.play",
+        "title": "Null Music: Play",
+        "icon": "$(play)"
+      },
+      {
+        "command": "null-music.pause",
+        "title": "Null Music: Pause",
+        "icon": "$(debug-pause)"
+      },
+      {
+        "command": "null-music.nextTrack",
+        "title": "Null Music: Next Track",
+        "icon": "$(chevron-right)"
+      },
+      {
+        "command": "null-music.previousTrack",
+        "title": "Null Music: Previous Track",
+        "icon": "$(chevron-left)"
+      },
+      {
+        "command": "null-music.seek",
+        "title": "Null Music: Seek Track Position"
+      },
+      {
+        "command": "null-music.setVolume",
+        "title": "Null Music: Set Volume"
+      },
+      {
+        "command": "null-music.volumeUp",
+        "title": "Null Music: Volume Up"
+      },
+      {
+        "command": "null-music.volumeDown",
+        "title": "Null Music: Volume Down"
+      },
+      {
+        "command": "null-music.toggleShuffle",
+        "title": "Null Music: Toggle Shuffle"
+      },
+      {
+        "command": "null-music.toggleRepeat",
+        "title": "Null Music: Toggle Repeat Mode"
+      },
+      {
+        "command": "null-music.likeCurrentTrack",
+        "title": "Null Music: Like / Save Current Track",
+        "icon": "$(heart)"
+      },
+      {
+        "command": "null-music.showCurrentTrack",
+        "title": "Null Music: Show Currently Playing Track"
+      },
+      {
+        "command": "null-music.search",
+        "title": "Null Music: Search Music",
+        "icon": "$(search)"
+      },
+      {
+        "command": "null-music.browsePlaylists",
+        "title": "Null Music: Browse Playlists",
+        "icon": "$(list-unordered)"
+      },
+      {
+        "command": "null-music.selectDevice",
+        "title": "Null Music: Select Playback Device"
+      },
+      {
+        "command": "null-music.signIn",
+        "title": "Null Music: Connect Spotify Account"
+      },
+      {
+        "command": "null-music.signOut",
+        "title": "Null Music: Disconnect Spotify Account"
+      },
+      {
+        "command": "null-music.focus",
+        "title": "Null Music: Open Music Player View",
+        "icon": "media/music.svg"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "null-music.search",
+          "when": "view == null.musicView",
+          "group": "navigation@1"
+        },
+        {
+          "command": "null-music.browsePlaylists",
+          "when": "view == null.musicView",
+          "group": "navigation@2"
+        },
+        {
+          "command": "null-music.previousTrack",
+          "when": "view == null.musicView",
+          "group": "navigation@3"
+        },
+        {
+          "command": "null-music.playPause",
+          "when": "view == null.musicView",
+          "group": "navigation@4"
+        },
+        {
+          "command": "null-music.nextTrack",
+          "when": "view == null.musicView",
+          "group": "navigation@5"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "null-music.playPause",
+        "key": "ctrl+alt+space",
+        "mac": "cmd+alt+space"
+      },
+      {
+        "command": "null-music.nextTrack",
+        "key": "ctrl+alt+right",
+        "mac": "cmd+alt+right"
+      },
+      {
+        "command": "null-music.previousTrack",
+        "key": "ctrl+alt+left",
+        "mac": "cmd+alt+left"
+      },
+      {
+        "command": "null-music.volumeUp",
+        "key": "ctrl+alt+up",
+        "mac": "cmd+alt+up"
+      },
+      {
+        "command": "null-music.volumeDown",
+        "key": "ctrl+alt+down",
+        "mac": "cmd+alt+down"
+      },
+      {
+        "command": "null-music.likeCurrentTrack",
+        "key": "ctrl+alt+l",
+        "mac": "cmd+alt+l"
+      },
+      {
+        "command": "null-music.focus",
+        "key": "ctrl+alt+m",
+        "mac": "cmd+alt+m"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "Null Music",
+      "properties": {
+        "null-music.provider": {
+          "type": "string",
+          "default": "spotify",
+          "enum": ["spotify"],
+          "description": "Primary music service provider."
+        },
+        "null-music.spotify.clientId": {
+          "type": "string",
+          "default": "",
+          "description": "Custom Spotify Developer Application Client ID. Leave blank to use standard default."
+        },
+        "null-music.spotify.clientSecret": {
+          "type": "string",
+          "default": "",
+          "description": "Custom Spotify Developer Application Client Secret (optional)."
+        },
+        "null-music.statusBar.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Display currently playing track in the status bar."
+        },
+        "null-music.statusBar.showControls": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show dedicated playback buttons (Previous, Play/Pause, Next) in the status bar."
+        },
+        "null-music.statusBar.format": {
+          "type": "string",
+          "default": "${title} - ${artist}",
+          "description": "Format string for the status bar. Available variables: ${title}, ${artist}, ${album}, ${device}."
+        },
+        "null-music.playback.pollingIntervalMs": {
+          "type": "number",
+          "default": 2500,
+          "description": "Interval in milliseconds to poll playback status from the active music provider."
+        },
+        "null-music.notifications.showOnSongChange": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show a toast notification when the playing song changes."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p tsconfig.json",
+    "test": "tsc -p tsconfig.json && node --test out/test/pkce.test.js out/test/authStore.test.js out/test/spotifyAuth.test.js out/test/spotifyApi.test.js out/test/spotifyProvider.test.js out/test/providerRegistry.test.js out/test/playbackManager.test.js out/test/statusBarController.test.js out/test/musicHtml.test.js out/test/musicViewProvider.test.js out/test/commands.test.js"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0",
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^22.0.0"
+  }
+}

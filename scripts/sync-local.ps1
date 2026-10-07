@@ -271,6 +271,16 @@ $Extensions = [ordered]@{
         )
     }
 
+    "null-music" = @{
+        Compile       = $true
+        CompileScript = "compile"
+        Copy          = @(
+            "package.json",
+            "out",
+            "media"
+        )
+    }
+
 }
 
 # ============================================================
