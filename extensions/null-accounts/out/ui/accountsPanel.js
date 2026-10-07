@@ -75,7 +75,7 @@ class AccountsPanel {
         });
     }
     postState() {
-        const rows = (0, accountsView_1.buildRows)(this.deps.accounts.list(), this.deps.bindings.entries(), resolveFolder);
+        const rows = (0, accountsView_1.buildRows)(this.deps.accounts.list(), this.deps.bindings.entries(), resolveFolder, id => this.deps.needsReauth(id));
         void this.panel.webview.postMessage({ type: 'state', rows });
     }
     async handle(raw) {
@@ -89,8 +89,11 @@ class AccountsPanel {
                     this.postState();
                     break;
                 case 'add':
-                    await this.deps.addGithub();
+                    await this.deps.add();
                     break; // the store's change event refreshes the list
+                case 'reauth':
+                    await this.deps.reauth(msg.id);
+                    break;
                 case 'unbind':
                     await this.deps.bindings.unbind(msg.key);
                     break;

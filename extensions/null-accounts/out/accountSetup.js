@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.findAccount = findAccount;
 exports.addOrReuse = addOrReuse;
 exports.importExisting = importExisting;
+exports.addOrRefresh = addOrRefresh;
 const accountStore_1 = require("./accountStore");
 function findAccount(accounts, candidate) {
     return accounts.find(a => (0, accountStore_1.sameIdentity)(a, candidate));
@@ -23,5 +24,14 @@ async function importExisting(found, folders, accounts, bindings) {
         }
     }
     return account;
+}
+/** GitLab sign-in: add the account with its tokens, or (already stored) replace the tokens — how an expired sign-in is repaired. */
+async function addOrRefresh(accounts, candidate, secret) {
+    const existing = findAccount(accounts.list(), candidate);
+    if (!existing) {
+        return accounts.add(candidate, secret);
+    }
+    await accounts.setSecret(existing.id, secret);
+    return existing;
 }
 //# sourceMappingURL=accountSetup.js.map

@@ -46,4 +46,27 @@ const octocat = {
     await (0, accountSetup_1.importExisting)(octocat, ['C:\\a'], accounts, bindings);
     node_assert_1.default.strictEqual(accounts.list().length, 1);
 });
+function setupWithVault() {
+    let n = 0;
+    const vault = new testFakes_1.FakeVault();
+    const accounts = new accountStore_1.AccountStore(new testFakes_1.FakeMeta(), vault, () => `id-${++n}`);
+    return { accounts, vault };
+}
+const tanuki = {
+    provider: 'gitlab', host: 'gitlab.com', username: 'tanuki', email: 't@e.com', authMethod: 'oauth', externalId: '7',
+};
+(0, node_test_1.test)('addOrRefresh adds a new account together with its tokens', async () => {
+    const { accounts, vault } = setupWithVault();
+    const account = await (0, accountSetup_1.addOrRefresh)(accounts, tanuki, 'tokens-1');
+    node_assert_1.default.strictEqual(accounts.list().length, 1);
+    node_assert_1.default.strictEqual(vault.data.get(`null-accounts/${account.id}`), 'tokens-1');
+});
+(0, node_test_1.test)('addOrRefresh on a stored account replaces its tokens instead of failing as a duplicate', async () => {
+    const { accounts, vault } = setupWithVault();
+    const first = await (0, accountSetup_1.addOrRefresh)(accounts, tanuki, 'tokens-1');
+    const again = await (0, accountSetup_1.addOrRefresh)(accounts, { ...tanuki, username: 'Tanuki' }, 'tokens-2');
+    node_assert_1.default.strictEqual(again.id, first.id);
+    node_assert_1.default.strictEqual(accounts.list().length, 1);
+    node_assert_1.default.strictEqual(vault.data.get(`null-accounts/${first.id}`), 'tokens-2');
+});
 //# sourceMappingURL=accountSetup.test.js.map

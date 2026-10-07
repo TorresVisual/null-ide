@@ -15,6 +15,7 @@ function parsePanelMessage(raw) {
             return { type };
         case 'remove':
         case 'editEmail':
+        case 'reauth':
             return nonEmpty(m.id) ? { type, id: m.id } : undefined;
         case 'unbind':
             return nonEmpty(m.key) ? { type, key: m.key } : undefined;

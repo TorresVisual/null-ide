@@ -28,6 +28,9 @@ function render(rows) {
     const head = el('div', 'head');
     head.append(el('span', 'name', row.username), el('span', 'meta', row.provider + ' · ' + row.host + ' · ' + row.authMethod));
     const actions = el('div', 'actions');
+    if (row.needsReauth) {
+      actions.append(button('Re-authenticate', () => vscode.postMessage({ type: 'reauth', id: row.id }), 'primary'));
+    }
     actions.append(
       button('Edit email', () => vscode.postMessage({ type: 'editEmail', id: row.id })),
       button('Remove', () => vscode.postMessage({ type: 'remove', id: row.id }), 'danger'),
@@ -44,7 +47,9 @@ function render(rows) {
       );
       projects.append(line);
     }
-    card.append(head, el('div', 'email', row.email), actions, projects);
+    const lines = [head, el('div', 'email', row.email)];
+    if (row.needsReauth) { lines.push(el('div', 'warn', 'Sign-in expired. Re-authenticate to use this account again.')); }
+    card.append(...lines, actions, projects);
     list.append(card);
   }
 }

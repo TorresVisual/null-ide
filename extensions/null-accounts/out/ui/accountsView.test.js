@@ -37,7 +37,12 @@ const exists = (key) => ({ path: key, exists: true });
 });
 (0, node_test_1.test)('rows carry only display fields — no secrets or provider internals', () => {
     const rows = (0, accountsView_1.buildRows)([{ ...acct('a1'), externalId: 'ext-1' }], [], exists);
-    node_assert_1.default.deepStrictEqual(Object.keys(rows[0]).sort(), ['authMethod', 'email', 'host', 'id', 'projects', 'provider', 'username']);
+    node_assert_1.default.deepStrictEqual(Object.keys(rows[0]).sort(), ['authMethod', 'email', 'host', 'id', 'needsReauth', 'projects', 'provider', 'username']);
+});
+(0, node_test_1.test)('needsReauth is taken from the callback per account and defaults to false', () => {
+    node_assert_1.default.strictEqual((0, accountsView_1.buildRows)([acct('a1')], [], exists)[0].needsReauth, false);
+    const rows = (0, accountsView_1.buildRows)([acct('a1'), acct('a2')], [], exists, id => id === 'a2');
+    node_assert_1.default.deepStrictEqual(rows.map(r => r.needsReauth), [false, true]);
 });
 (0, node_test_1.test)('removeConfirmation counts projects with correct plurals and never claims to sign out', () => {
     const none = (0, accountsView_1.removeConfirmation)({ username: 'octo', host: 'github.com' }, 0);

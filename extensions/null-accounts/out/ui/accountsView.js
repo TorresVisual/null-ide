@@ -7,7 +7,7 @@ exports.buildRows = buildRows;
 exports.removeConfirmation = removeConfirmation;
 const node_path_1 = __importDefault(require("node:path"));
 /** Everything the panel shows, as plain data. Deliberately copies display fields only. */
-function buildRows(accounts, entries, resolve) {
+function buildRows(accounts, entries, resolve, needsReauth = () => false) {
     return accounts.map(a => ({
         id: a.id,
         provider: a.provider,
@@ -15,6 +15,7 @@ function buildRows(accounts, entries, resolve) {
         username: a.username,
         email: a.email,
         authMethod: a.authMethod,
+        needsReauth: needsReauth(a.id),
         projects: entries
             .filter(([, accountId]) => accountId === a.id)
             .map(([key]) => {

@@ -26,4 +26,7 @@ const accountsHtml_1 = require("./accountsHtml");
     node_assert_1.default.doesNotMatch(accountsClient_1.CLIENT_SCRIPT, /innerHTML|outerHTML|insertAdjacentHTML|document\.write|eval\(/);
     node_assert_1.default.match(accountsClient_1.CLIENT_SCRIPT, /textContent/);
 });
+(0, node_test_1.test)('the client script can ask the host to re-authenticate an account', () => {
+    node_assert_1.default.match(accountsClient_1.CLIENT_SCRIPT, /type: 'reauth'/);
+});
 //# sourceMappingURL=accountsHtml.test.js.map

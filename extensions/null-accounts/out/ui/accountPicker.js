@@ -36,14 +36,24 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.addGithubAccount = addGithubAccount;
+exports.addAccount = addAccount;
+exports.reauthenticate = reauthenticate;
 exports.chooseAccountForFolder = chooseAccountForFolder;
 const node_path_1 = __importDefault(require("node:path"));
 const vscode = __importStar(require("vscode"));
+const accountInput_1 = require("../accountInput");
 const accountSetup_1 = require("../accountSetup");
 const git_1 = require("../git");
+const gitlab_1 = require("../providers/gitlab");
+const gitlabOAuth_1 = require("../providers/gitlabOAuth");
 const suggest_1 = require("../suggest");
 const pickItems_1 = require("./pickItems");
+function reportFailure(what, err) {
+    if (err instanceof gitlabOAuth_1.OAuthError && err.reason === 'cancelled') {
+        return;
+    }
+    void vscode.window.showErrorMessage(`Could not ${what}: ${err.message}`);
+}
 /** Signs in to another GitHub account and stores it; resolves the stored one if it was already added. */
 async function addGithubAccount(deps) {
     try {
@@ -51,8 +61,68 @@ async function addGithubAccount(deps) {
         return fresh ? await (0, accountSetup_1.addOrReuse)(deps.accounts, fresh) : undefined;
     }
     catch (err) {
-        void vscode.window.showErrorMessage(`Could not add the GitHub account: ${err.message}`);
+        reportFailure('add the GitHub account', err);
         return undefined;
+    }
+}
+/** A device-flow sign-in behind a cancellable notification: shows the code, copies it, opens the verification page. */
+function withDeviceFlow(title, run) {
+    return vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title, cancellable: true }, (progress, token) => run({
+        show: code => {
+            progress.report({ message: `Enter ${code.userCode} in your browser (copied to the clipboard)` });
+            void vscode.env.clipboard.writeText(code.userCode);
+            void vscode.env.openExternal(vscode.Uri.parse(code.verificationUriComplete ?? code.verificationUri));
+        },
+        cancelled: () => token.isCancellationRequested,
+    }));
+}
+async function addGitlabAccount(deps, host) {
+    try {
+        const { account, secret } = await withDeviceFlow(`Signing in to ${host}`, ui => deps.gitlab.signIn(host, ui));
+        return await (0, accountSetup_1.addOrRefresh)(deps.accounts, account, secret);
+    }
+    catch (err) {
+        reportFailure('add the GitLab account', err);
+        return undefined;
+    }
+}
+async function askSelfHostedHost() {
+    const value = await vscode.window.showInputBox({
+        title: 'Self-hosted GitLab',
+        prompt: 'Host name of your GitLab server, e.g. git.example.org (https only)',
+        validateInput: v => { try {
+            (0, accountInput_1.normalizeHost)(v);
+            return undefined;
+        }
+        catch (err) {
+            return err.message;
+        } },
+    });
+    return value === undefined ? undefined : (0, accountInput_1.normalizeHost)(value);
+}
+/** Asks which provider, then signs in and stores the account. `undefined` if the user backs out or sign-in fails. */
+async function addAccount(deps) {
+    const picked = await vscode.window.showQuickPick((0, pickItems_1.providerPickItems)(), { placeHolder: 'Add an account from…' });
+    if (!picked) {
+        return undefined;
+    }
+    if (picked.choice === 'github') {
+        return addGithubAccount(deps);
+    }
+    const host = picked.choice === 'gitlab' ? gitlab_1.GITLAB_COM : await askSelfHostedHost();
+    return host ? addGitlabAccount(deps, host) : undefined;
+}
+/** Signs a GitLab account in again (expired or revoked tokens). Failures are shown, never thrown. */
+async function reauthenticate(deps, accountId) {
+    const account = deps.accounts.get(accountId);
+    if (!account || account.provider !== 'gitlab') {
+        return;
+    }
+    try {
+        await withDeviceFlow(`Signing in to ${account.host}`, ui => deps.gitlab.reauthenticate(account, ui));
+    }
+    catch (err) {
+        reportFailure('re-authenticate', err);
     }
 }
 /** Quick-pick an account for the folder (suggesting one from its origin remote when unbound), then bind it. */
@@ -71,7 +141,7 @@ async function chooseAccountForFolder(deps, folder) {
         await deps.bindings.unbind(folder.fsPath);
         return undefined;
     }
-    const account = picked.action.kind === 'add' ? await addGithubAccount(deps) : picked.action.account;
+    const account = picked.action.kind === 'add' ? await addAccount(deps) : picked.action.account;
     if (!account) {
         return undefined;
     }

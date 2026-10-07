@@ -42,6 +42,7 @@ const api_1 = require("./api");
 const changeEmitter_1 = require("./changeEmitter");
 const projectBinding_1 = require("./projectBinding");
 const github_1 = require("./providers/github");
+const gitlab_1 = require("./providers/gitlab");
 const accountPicker_1 = require("./ui/accountPicker");
 const accountsMenuActions_1 = require("./ui/accountsMenuActions");
 const accountsMenuController_1 = require("./ui/accountsMenuController");
@@ -56,24 +57,45 @@ function activate(context) {
         getSession: (scopes, options) => vscode.authentication.getSession('github', scopes, options),
         api: github_1.fetchGithub,
     });
+    const gitlab = new gitlab_1.GitlabProvider({
+        post: gitlab_1.fetchPostForm,
+        get: gitlab_1.fetchGitlab,
+        secrets: { get: id => store.getSecret(id), set: (id, value) => store.setSecret(id, value) },
+        clientIdFor: host => {
+            const cfg = vscode.workspace.getConfiguration('null-accounts.gitlab');
+            return (0, gitlab_1.resolveClientId)(host, cfg.get('clientId'), cfg.get('hostClientIds'));
+        },
+        now: Date.now,
+        sleep: ms => new Promise(resolve => setTimeout(resolve, ms)),
+        onNeedsReauth: account => {
+            void vscode.window
+                .showWarningMessage(`Your GitLab sign-in for ${account.username}@${account.host} has expired.`, 'Re-authenticate')
+                .then(choice => { if (choice) {
+                return (0, accountPicker_1.reauthenticate)(pickerDeps, account.id);
+            } });
+        },
+        promptReauth: account => (0, accountPicker_1.reauthenticate)(pickerDeps, account.id),
+    });
     // One event for "something changed" (accounts or bindings); the API and, later, the UI listen to it.
     const changed = new changeEmitter_1.ChangeEmitter();
     context.subscriptions.push(store.onDidChange(() => {
         void bindings.prune(new Set(store.list().map(a => a.id)));
         changed.fire();
-    }), bindings.onDidChange(() => changed.fire()));
-    const pickerDeps = { accounts: store, bindings, github };
+    }), bindings.onDidChange(() => changed.fire()), gitlab.onDidChange(() => changed.fire()));
+    const pickerDeps = { accounts: store, bindings, github, gitlab };
     const api = (0, api_1.createApi)({
         accounts: store,
         accountIdForFolder: folder => bindings.accountIdFor(folder.fsPath),
         chooseAccountForFolder: folder => (0, accountPicker_1.chooseAccountForFolder)(pickerDeps, folder),
-        tokenProviders: { github }, // Phase 4 adds gitlab
+        tokenProviders: { github, gitlab },
         onDidChange: changed.event,
     });
     context.subscriptions.push(vscode.commands.registerCommand('null-accounts.open', () => accountsPanel_1.AccountsPanel.createOrShow({
         accounts: store,
         bindings,
-        addGithub: () => (0, accountPicker_1.addGithubAccount)(pickerDeps),
+        add: () => (0, accountPicker_1.addAccount)(pickerDeps),
+        reauth: id => (0, accountPicker_1.reauthenticate)(pickerDeps, id),
+        needsReauth: id => gitlab.needsReauth(id),
         onDidChange: changed.event,
     })), vscode.commands.registerCommand(statusBarController_1.SWITCH_COMMAND, async () => {
         const folder = vscode.workspace.workspaceFolders?.[0];
@@ -90,7 +112,7 @@ function activate(context) {
         if (result === 'no-account') {
             void vscode.window.showInformationMessage('That account no longer exists.');
         }
-    }), vscode.commands.registerCommand(accountsMenuModel_1.ADD_ACCOUNT_COMMAND, async () => { await (0, accountPicker_1.addGithubAccount)(pickerDeps); }), (0, statusBarController_1.registerStatusBar)(api), (0, accountsMenuController_1.registerAccountsMenu)(api));
+    }), vscode.commands.registerCommand(accountsMenuModel_1.ADD_ACCOUNT_COMMAND, async () => { await (0, accountPicker_1.addAccount)(pickerDeps); }), (0, statusBarController_1.registerStatusBar)(api), (0, accountsMenuController_1.registerAccountsMenu)(api));
     void offerImport(context, store, bindings, github).catch(() => { });
     return api;
 }
