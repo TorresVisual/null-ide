@@ -6,7 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const node_assert_1 = __importDefault(require("node:assert"));
 const node_test_1 = require("node:test");
 const musicHtml_1 = require("../ui/musicHtml");
-(0, node_test_1.test)('getMusicWebviewHtml contains CSP nonce, controls, and elements', () => {
+(0, node_test_1.test)('getMusicWebviewHtml contains CSP nonce, controls, and clean local elements', () => {
     const nonce = 'test-nonce-12345';
     const html = (0, musicHtml_1.getMusicWebviewHtml)(nonce);
     node_assert_1.default.ok(html.includes(`nonce-${nonce}`));
@@ -18,8 +18,17 @@ const musicHtml_1 = require("../ui/musicHtml");
     node_assert_1.default.ok(html.includes('id="btn-like"'));
     node_assert_1.default.ok(html.includes('id="volume-slider"'));
     node_assert_1.default.ok(html.includes('id="progress-bar-container"'));
-    node_assert_1.default.ok(html.includes('id="playlists-list"'));
     node_assert_1.default.ok(html.includes('id="search-input"'));
-    node_assert_1.default.ok(html.includes('id="devices-list"'));
+    node_assert_1.default.ok(html.includes('id="btn-add-folder"'));
+    node_assert_1.default.ok(html.includes('id="audio-player"'));
+    node_assert_1.default.ok(html.includes('id="pane-tracks"'));
+    node_assert_1.default.ok(html.includes('id="pane-folders"'));
+    node_assert_1.default.ok(html.includes('id="pane-favorites"'));
+    // Ensure slop is completely removed
+    node_assert_1.default.ok(!html.includes('Spotify'));
+    node_assert_1.default.ok(!html.includes('Lo-Fi Radio'));
+    node_assert_1.default.ok(!html.includes('input-client-id'));
+    node_assert_1.default.ok(!html.includes('link-dev-dash'));
+    node_assert_1.default.ok(!html.includes('select-provider'));
 });
 //# sourceMappingURL=musicHtml.test.js.map

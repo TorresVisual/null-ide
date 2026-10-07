@@ -23,7 +23,7 @@ test('parseTimeToMs parses seconds, mm:ss, and rejects invalid formats', () => {
   assert.strictEqual(parseTimeToMs('-10'), null);
 });
 
-test('NULL_MUSIC_COMMANDS includes all essential playback and library commands', () => {
+test('NULL_MUSIC_COMMANDS includes all essential local playback and folder commands', () => {
   assert.ok(NULL_MUSIC_COMMANDS.includes('null-music.playPause'));
   assert.ok(NULL_MUSIC_COMMANDS.includes('null-music.nextTrack'));
   assert.ok(NULL_MUSIC_COMMANDS.includes('null-music.previousTrack'));
@@ -36,10 +36,7 @@ test('NULL_MUSIC_COMMANDS includes all essential playback and library commands',
   assert.ok(NULL_MUSIC_COMMANDS.includes('null-music.likeCurrentTrack'));
   assert.ok(NULL_MUSIC_COMMANDS.includes('null-music.search'));
   assert.ok(NULL_MUSIC_COMMANDS.includes('null-music.browsePlaylists'));
-  assert.ok(NULL_MUSIC_COMMANDS.includes('null-music.selectDevice'));
-  assert.ok(NULL_MUSIC_COMMANDS.includes('null-music.signIn'));
-  assert.ok(NULL_MUSIC_COMMANDS.includes('null-music.signOut'));
-  assert.ok(NULL_MUSIC_COMMANDS.includes('null-music.configureSpotifyClientId'));
+  assert.ok(NULL_MUSIC_COMMANDS.includes('null-music.openLocalFolder'));
   assert.ok(NULL_MUSIC_COMMANDS.includes('null-music.focus'));
-  assert.strictEqual(NULL_MUSIC_COMMANDS.length, 20);
+  assert.strictEqual(NULL_MUSIC_COMMANDS.length, 17);
 });

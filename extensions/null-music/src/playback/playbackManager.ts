@@ -1,20 +1,19 @@
 'use strict';
 
 import { IMusicProvider } from '../provider/musicProvider';
-import { ProviderRegistry } from '../provider/providerRegistry';
 import { PlaybackDevice, PlaybackState, Playlist, PlayOptions, RepeatMode, SearchResults, Track } from '../types';
 
 export type PlaybackStateListener = (state: PlaybackState | null) => void;
 export type TrackChangeListener = (track: Track | null) => void;
 
 export interface PlaybackManagerOptions {
-  providerRegistry: ProviderRegistry;
+  provider: IMusicProvider;
   getPollingIntervalMs?: () => number;
   onNotification?: (message: string) => void;
 }
 
 export class PlaybackManager {
-  private readonly providerRegistry: ProviderRegistry;
+  private readonly provider: IMusicProvider;
   private readonly getPollingIntervalMs: () => number;
   private readonly onNotification?: (message: string) => void;
 
@@ -28,19 +27,15 @@ export class PlaybackManager {
   private readonly trackChangeListeners: Set<TrackChangeListener> = new Set();
 
   constructor(options: PlaybackManagerOptions) {
-    this.providerRegistry = options.providerRegistry;
+    this.provider = options.provider;
     this.getPollingIntervalMs = options.getPollingIntervalMs ?? (() => 2500);
     this.onNotification = options.onNotification;
-
-    this.providerRegistry.onDidChangeActiveProvider(() => {
-      this.refreshNow();
-    });
 
     this.startPolling();
   }
 
-  public get activeProvider(): IMusicProvider | null {
-    return this.providerRegistry.getActiveProvider();
+  public get activeProvider(): IMusicProvider {
+    return this.provider;
   }
 
   public getCurrentState(): PlaybackState | null {
@@ -48,7 +43,6 @@ export class PlaybackManager {
       return null;
     }
 
-    // Interpolate progress if currently playing
     if (this.currentState.isPlaying && this.currentState.timestamp > 0) {
       const elapsed = Date.now() - this.currentState.timestamp;
       const interpolatedProgress = Math.min(
@@ -79,24 +73,17 @@ export class PlaybackManager {
   }
 
   public async refreshNow(): Promise<PlaybackState | null> {
-    const provider = this.activeProvider;
-    if (!provider) {
-      this.updateState(null);
-      return null;
-    }
-
     try {
-      const isAuth = await provider.isAuthenticated();
+      const isAuth = await this.provider.isAuthenticated();
       if (!isAuth) {
         this.updateState(null);
         return null;
       }
 
-      const state = await provider.getPlaybackState();
+      const state = await this.provider.getPlaybackState();
       this.updateState(state);
       return state;
-    } catch (err: any) {
-      // Don't clear state on transient network blip
+    } catch {
       return this.currentState;
     }
   }
@@ -106,7 +93,6 @@ export class PlaybackManager {
     this.currentState = newState;
     const currentTrackId = newState?.track?.id ?? null;
 
-    // Fire state listeners
     for (const listener of this.stateListeners) {
       try {
         listener(this.currentState);
@@ -115,7 +101,6 @@ export class PlaybackManager {
       }
     }
 
-    // Fire track change listeners if song changed
     if (currentTrackId !== previousTrackId) {
       this.lastTrackId = currentTrackId;
       for (const listener of this.trackChangeListeners) {
@@ -161,42 +146,36 @@ export class PlaybackManager {
   }
 
   public async playPause(): Promise<void> {
-    const provider = this.ensureActiveProvider();
     if (this.currentState?.isPlaying) {
-      await provider.pause();
+      await this.provider.pause();
     } else {
-      await provider.play();
+      await this.provider.play();
     }
     await this.refreshNow();
   }
 
   public async play(options?: PlayOptions): Promise<void> {
-    const provider = this.ensureActiveProvider();
-    await provider.play(options);
+    await this.provider.play(options);
     await this.refreshNow();
   }
 
   public async pause(): Promise<void> {
-    const provider = this.ensureActiveProvider();
-    await provider.pause();
+    await this.provider.pause();
     await this.refreshNow();
   }
 
   public async next(): Promise<void> {
-    const provider = this.ensureActiveProvider();
-    await provider.next();
+    await this.provider.next();
     await this.refreshNow();
   }
 
   public async previous(): Promise<void> {
-    const provider = this.ensureActiveProvider();
-    await provider.previous();
+    await this.provider.previous();
     await this.refreshNow();
   }
 
   public async seek(positionMs: number): Promise<void> {
-    const provider = this.ensureActiveProvider();
-    await provider.seek(positionMs);
+    await this.provider.seek(positionMs);
     if (this.currentState) {
       this.currentState.progressMs = positionMs;
       this.currentState.timestamp = Date.now();
@@ -206,8 +185,7 @@ export class PlaybackManager {
   }
 
   public async setVolume(volumePercent: number): Promise<void> {
-    const provider = this.ensureActiveProvider();
-    await provider.setVolume(volumePercent);
+    await this.provider.setVolume(volumePercent);
     if (this.currentState) {
       this.currentState.volume = Math.max(0, Math.min(100, volumePercent));
       this.updateState(this.currentState);
@@ -228,9 +206,8 @@ export class PlaybackManager {
   }
 
   public async toggleShuffle(): Promise<void> {
-    const provider = this.ensureActiveProvider();
     const nextState = !this.currentState?.shuffle;
-    await provider.setShuffle(nextState);
+    await this.provider.setShuffle(nextState);
     if (this.currentState) {
       this.currentState.shuffle = nextState;
       this.updateState(this.currentState);
@@ -239,13 +216,12 @@ export class PlaybackManager {
   }
 
   public async toggleRepeat(): Promise<void> {
-    const provider = this.ensureActiveProvider();
     const modes: RepeatMode[] = ['off', 'context', 'track'];
     const currentMode = this.currentState?.repeat || 'off';
     const nextIndex = (modes.indexOf(currentMode) + 1) % modes.length;
     const nextMode = modes[nextIndex];
 
-    await provider.setRepeatMode(nextMode);
+    await this.provider.setRepeatMode(nextMode);
     if (this.currentState) {
       this.currentState.repeat = nextMode;
       this.updateState(this.currentState);
@@ -254,7 +230,6 @@ export class PlaybackManager {
   }
 
   public async toggleLike(): Promise<boolean> {
-    const provider = this.ensureActiveProvider();
     const track = this.currentState?.track;
     if (!track?.id) {
       return false;
@@ -262,10 +237,10 @@ export class PlaybackManager {
 
     const currentLiked = !!track.isLiked;
     if (currentLiked) {
-      await provider.removeTrack(track.id);
+      await this.provider.removeTrack(track.id);
       track.isLiked = false;
     } else {
-      await provider.saveTrack(track.id);
+      await this.provider.saveTrack(track.id);
       track.isLiked = true;
     }
 
@@ -274,32 +249,20 @@ export class PlaybackManager {
   }
 
   public async getUserPlaylists(): Promise<Playlist[]> {
-    const provider = this.ensureActiveProvider();
-    return provider.getUserPlaylists();
+    return this.provider.getUserPlaylists();
   }
 
   public async search(query: string): Promise<SearchResults> {
-    const provider = this.ensureActiveProvider();
-    return provider.search(query);
+    return this.provider.search(query);
   }
 
   public async getDevices(): Promise<PlaybackDevice[]> {
-    const provider = this.ensureActiveProvider();
-    return provider.getDevices();
+    return this.provider.getDevices();
   }
 
   public async transferPlayback(deviceId: string): Promise<void> {
-    const provider = this.ensureActiveProvider();
-    await provider.transferPlayback(deviceId);
+    await this.provider.transferPlayback(deviceId);
     await this.refreshNow();
-  }
-
-  private ensureActiveProvider(): IMusicProvider {
-    const provider = this.activeProvider;
-    if (!provider) {
-      throw new Error('No active music provider available');
-    }
-    return provider;
   }
 
   public dispose(): void {

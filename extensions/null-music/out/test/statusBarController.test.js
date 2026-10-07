@@ -26,20 +26,19 @@ const statusBarModel_1 = require("../ui/statusBarModel");
         durationMs: 200000,
     });
     const model = (0, statusBarModel_1.buildStatusBarModel)(state, '${title} by ${artist}');
-    node_assert_1.default.strictEqual(model.text, '$(play) Lo-Fi Coding Beats by Chill Coder');
+    node_assert_1.default.strictEqual(model.text, '$(play) Ambient Coding by Null Artist');
     node_assert_1.default.strictEqual(model.isPlaying, true);
-    node_assert_1.default.ok(model.tooltipText.includes('Lo-Fi Coding Beats'));
-    node_assert_1.default.ok(model.tooltipText.includes('Chill Coder'));
-    node_assert_1.default.ok(model.tooltipText.includes('Code Vibes Vol. 1'));
+    node_assert_1.default.ok(model.tooltipText.includes('Ambient Coding'));
+    node_assert_1.default.ok(model.tooltipText.includes('Null Artist'));
     node_assert_1.default.ok(model.tooltipText.includes('1:15 / 3:20'));
-    node_assert_1.default.ok(model.tooltipText.includes('MacBook Pro'));
+    node_assert_1.default.ok(model.tooltipText.includes('Null IDE Local Player'));
 });
 (0, node_test_1.test)('buildStatusBarModel shows paused icon when paused', () => {
     const state = (0, testFakes_1.makeSamplePlaybackState)({
         isPlaying: false,
     });
     const model = (0, statusBarModel_1.buildStatusBarModel)(state);
-    node_assert_1.default.strictEqual(model.text, '$(debug-pause) Lo-Fi Coding Beats - Chill Coder');
+    node_assert_1.default.strictEqual(model.text, '$(debug-pause) Ambient Coding - Null Artist');
     node_assert_1.default.strictEqual(model.isPlaying, false);
 });
 //# sourceMappingURL=statusBarController.test.js.map

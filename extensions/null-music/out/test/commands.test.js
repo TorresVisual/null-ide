@@ -23,7 +23,7 @@ const commandHelpers_1 = require("../ui/commandHelpers");
     node_assert_1.default.strictEqual((0, commandHelpers_1.parseTimeToMs)('1:99'), null);
     node_assert_1.default.strictEqual((0, commandHelpers_1.parseTimeToMs)('-10'), null);
 });
-(0, node_test_1.test)('NULL_MUSIC_COMMANDS includes all essential playback and library commands', () => {
+(0, node_test_1.test)('NULL_MUSIC_COMMANDS includes all essential local playback and folder commands', () => {
     node_assert_1.default.ok(commandHelpers_1.NULL_MUSIC_COMMANDS.includes('null-music.playPause'));
     node_assert_1.default.ok(commandHelpers_1.NULL_MUSIC_COMMANDS.includes('null-music.nextTrack'));
     node_assert_1.default.ok(commandHelpers_1.NULL_MUSIC_COMMANDS.includes('null-music.previousTrack'));
@@ -36,11 +36,8 @@ const commandHelpers_1 = require("../ui/commandHelpers");
     node_assert_1.default.ok(commandHelpers_1.NULL_MUSIC_COMMANDS.includes('null-music.likeCurrentTrack'));
     node_assert_1.default.ok(commandHelpers_1.NULL_MUSIC_COMMANDS.includes('null-music.search'));
     node_assert_1.default.ok(commandHelpers_1.NULL_MUSIC_COMMANDS.includes('null-music.browsePlaylists'));
-    node_assert_1.default.ok(commandHelpers_1.NULL_MUSIC_COMMANDS.includes('null-music.selectDevice'));
-    node_assert_1.default.ok(commandHelpers_1.NULL_MUSIC_COMMANDS.includes('null-music.signIn'));
-    node_assert_1.default.ok(commandHelpers_1.NULL_MUSIC_COMMANDS.includes('null-music.signOut'));
-    node_assert_1.default.ok(commandHelpers_1.NULL_MUSIC_COMMANDS.includes('null-music.configureSpotifyClientId'));
+    node_assert_1.default.ok(commandHelpers_1.NULL_MUSIC_COMMANDS.includes('null-music.openLocalFolder'));
     node_assert_1.default.ok(commandHelpers_1.NULL_MUSIC_COMMANDS.includes('null-music.focus'));
-    node_assert_1.default.strictEqual(commandHelpers_1.NULL_MUSIC_COMMANDS.length, 20);
+    node_assert_1.default.strictEqual(commandHelpers_1.NULL_MUSIC_COMMANDS.length, 17);
 });
 //# sourceMappingURL=commands.test.js.map

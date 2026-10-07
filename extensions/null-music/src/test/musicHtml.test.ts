@@ -4,7 +4,7 @@ import assert from 'node:assert';
 import { test } from 'node:test';
 import { getMusicWebviewHtml } from '../ui/musicHtml';
 
-test('getMusicWebviewHtml contains CSP nonce, controls, and elements', () => {
+test('getMusicWebviewHtml contains CSP nonce, controls, and clean local elements', () => {
   const nonce = 'test-nonce-12345';
   const html = getMusicWebviewHtml(nonce);
 
@@ -17,7 +17,17 @@ test('getMusicWebviewHtml contains CSP nonce, controls, and elements', () => {
   assert.ok(html.includes('id="btn-like"'));
   assert.ok(html.includes('id="volume-slider"'));
   assert.ok(html.includes('id="progress-bar-container"'));
-  assert.ok(html.includes('id="playlists-list"'));
   assert.ok(html.includes('id="search-input"'));
-  assert.ok(html.includes('id="devices-list"'));
+  assert.ok(html.includes('id="btn-add-folder"'));
+  assert.ok(html.includes('id="audio-player"'));
+  assert.ok(html.includes('id="pane-tracks"'));
+  assert.ok(html.includes('id="pane-folders"'));
+  assert.ok(html.includes('id="pane-favorites"'));
+
+  // Ensure slop is completely removed
+  assert.ok(!html.includes('Spotify'));
+  assert.ok(!html.includes('Lo-Fi Radio'));
+  assert.ok(!html.includes('input-client-id'));
+  assert.ok(!html.includes('link-dev-dash'));
+  assert.ok(!html.includes('select-provider'));
 });

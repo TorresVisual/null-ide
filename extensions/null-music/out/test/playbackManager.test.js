@@ -6,16 +6,13 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const node_assert_1 = __importDefault(require("node:assert"));
 const node_test_1 = require("node:test");
 const playbackManager_1 = require("../playback/playbackManager");
-const providerRegistry_1 = require("../provider/providerRegistry");
 const testFakes_1 = require("../testFakes");
 (0, node_test_1.test)('PlaybackManager refreshes state and fires change events', async () => {
-    const registry = new providerRegistry_1.ProviderRegistry();
-    const fakeProvider = new testFakes_1.FakeMusicProvider('spotify');
+    const fakeProvider = new testFakes_1.FakeMusicProvider('local');
     fakeProvider.state = (0, testFakes_1.makeSamplePlaybackState)({ progressMs: 10000 });
-    registry.register(fakeProvider);
     const notifications = [];
     const manager = new playbackManager_1.PlaybackManager({
-        providerRegistry: registry,
+        provider: fakeProvider,
         getPollingIntervalMs: () => 10000,
         onNotification: (msg) => notifications.push(msg),
     });
@@ -28,7 +25,7 @@ const testFakes_1 = require("../testFakes");
     node_assert_1.default.strictEqual(tracks.length, 1);
     node_assert_1.default.strictEqual(tracks[0]?.id, 'track-123');
     node_assert_1.default.strictEqual(notifications.length, 1);
-    node_assert_1.default.ok(notifications[0].includes('Lo-Fi Coding Beats'));
+    node_assert_1.default.ok(notifications[0].includes('Ambient Coding'));
     // Controls
     await manager.playPause();
     node_assert_1.default.strictEqual(fakeProvider.state.isPlaying, false);

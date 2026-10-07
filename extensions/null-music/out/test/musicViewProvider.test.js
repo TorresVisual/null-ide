@@ -5,24 +5,28 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const node_assert_1 = __importDefault(require("node:assert"));
 const node_test_1 = require("node:test");
-const authStore_1 = require("../auth/authStore");
 const playbackManager_1 = require("../playback/playbackManager");
-const providerRegistry_1 = require("../provider/providerRegistry");
+const localProvider_1 = require("../provider/local/localProvider");
 const testFakes_1 = require("../testFakes");
 const musicViewController_1 = require("../ui/musicViewController");
-(0, node_test_1.test)('MusicViewController handles UI messages and delegates to PlaybackManager', async () => {
-    const vault = new testFakes_1.FakeSecretVault();
-    const authStore = new authStore_1.AuthStore(vault);
-    const registry = new providerRegistry_1.ProviderRegistry();
-    const fakeProvider = new testFakes_1.FakeMusicProvider('spotify');
+(0, node_test_1.test)('MusicViewController handles UI messages and delegates to PlaybackManager and LocalProvider', async () => {
+    const fakeProvider = new testFakes_1.FakeMusicProvider('local');
     fakeProvider.state = (0, testFakes_1.makeSamplePlaybackState)();
-    fakeProvider.playlists = [
-        { id: 'p1', name: 'Work Focus', trackCount: 50, uri: 'spotify:playlist:p1', owner: 'Me' },
-    ];
-    registry.register(fakeProvider);
     const playbackManager = new playbackManager_1.PlaybackManager({
-        providerRegistry: registry,
+        provider: fakeProvider,
     });
+    const localProvider = new localProvider_1.LocalMusicProvider();
+    localProvider.queueAndPlay([
+        {
+            id: 'local:file:///music/t1.mp3',
+            name: 'Song 1',
+            artist: 'Band',
+            artists: ['Band'],
+            album: 'file:///music',
+            durationMs: 100000,
+            uri: 'file:///music/t1.mp3',
+        },
+    ]);
     const postedMessages = [];
     const executedCommands = [];
     const errorMessages = [];
@@ -39,23 +43,33 @@ const musicViewController_1 = require("../ui/musicViewController");
             errorMessages.push(msg);
         },
     };
-    const controller = new musicViewController_1.MusicViewController(playbackManager, authStore, messenger, host);
-    // Test message handling
+    const controller = new musicViewController_1.MusicViewController(playbackManager, localProvider, messenger, host);
+    // Ready message
     await controller.handleMessage({ type: 'ready' });
-    node_assert_1.default.ok(postedMessages.some((m) => m.type === 'authUpdate' && m.isAuthenticated === true));
     node_assert_1.default.ok(postedMessages.some((m) => m.type === 'stateUpdate'));
-    await controller.handleMessage({ type: 'signIn' });
-    node_assert_1.default.strictEqual(executedCommands[0], 'null-music.signIn');
-    await controller.handleMessage({ type: 'signOut' });
-    node_assert_1.default.strictEqual(executedCommands[1], 'null-music.signOut');
+    node_assert_1.default.ok(postedMessages.some((m) => m.type === 'localLibraryUpdate'));
+    // Play / Pause
     await controller.handleMessage({ type: 'playPause' });
     node_assert_1.default.strictEqual(fakeProvider.state.isPlaying, false);
+    // Seek
     await controller.handleMessage({ type: 'seek', positionMs: 30000 });
     node_assert_1.default.strictEqual(fakeProvider.state.progressMs, 30000);
+    // Volume
     await controller.handleMessage({ type: 'setVolume', volumePercent: 45 });
     node_assert_1.default.strictEqual(fakeProvider.state.volume, 45);
-    await controller.handleMessage({ type: 'getPlaylists' });
-    node_assert_1.default.ok(postedMessages.some((m) => m.type === 'playlistsUpdate' && m.playlists.length === 1));
+    // Add folder
+    await controller.handleMessage({ type: 'localOpenFolder' });
+    node_assert_1.default.strictEqual(executedCommands[0], 'null-music.openLocalFolder');
+    // Toggle track like
+    await controller.handleMessage({ type: 'toggleTrackLike', trackId: 'local:file:///music/t1.mp3' });
+    node_assert_1.default.strictEqual(await localProvider.isLiked('local:file:///music/t1.mp3'), true);
+    // Play track
+    await controller.handleMessage({ type: 'localPlayTrack', trackUri: 'file:///music/t1.mp3' });
+    // Audio duration update
+    await controller.handleMessage({ type: 'localAudioDuration', durationMs: 125000, trackUri: 'file:///music/t1.mp3' });
+    node_assert_1.default.strictEqual(localProvider.getAllTracks()[0].durationMs, 125000);
+    // Audio ended
+    await controller.handleMessage({ type: 'localAudioEnded' });
     playbackManager.dispose();
 });
 //# sourceMappingURL=musicViewProvider.test.js.map

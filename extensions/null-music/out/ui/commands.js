@@ -1,4 +1,4 @@
-"use strict";
+'use strict';
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     var desc = Object.getOwnPropertyDescriptor(m, k);
@@ -36,7 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.registerCommands = registerCommands;
 const vscode = __importStar(require("vscode"));
 const commandHelpers_1 = require("./commandHelpers");
-function registerCommands(context, playbackManager, authStore, localProvider, providerRegistry) {
+function registerCommands(context, playbackManager, localProvider) {
     const register = (command, callback) => {
         context.subscriptions.push(vscode.commands.registerCommand(command, callback));
     };
@@ -194,61 +194,35 @@ function registerCommands(context, playbackManager, authStore, localProvider, pr
             vscode.window.showInformationMessage('Null Music: No track is currently playing.');
             return;
         }
-        vscode.window.showInformationMessage(`Now Playing: ${state.track.name} by ${state.track.artist} (${state.track.album})`);
+        vscode.window.showInformationMessage(`Now Playing: ${state.track.name} by ${state.track.artist}`);
     });
     register('null-music.search', async () => {
         const query = await vscode.window.showInputBox({
-            prompt: 'Search Spotify for songs, artists, albums, or playlists',
-            placeHolder: 'e.g. Lofi coding, Hans Zimmer, Daft Punk...',
+            prompt: 'Search local music library by title, artist, or folder',
+            placeHolder: 'e.g. ambient, soundtrack, artist name…',
         });
-        if (!query?.trim())
+        if (query === undefined)
             return;
         const results = await playbackManager.search(query);
-        const items = [];
-        if (results.tracks.length > 0) {
-            items.push({ label: 'SONGS', kind: vscode.QuickPickItemKind.Separator });
-            for (const t of results.tracks) {
-                items.push({
-                    label: `$(play) ${t.name}`,
-                    description: t.artist,
-                    detail: `Album: ${t.album}`,
-                    uri: t.uri,
-                });
-            }
-        }
-        if (results.playlists.length > 0) {
-            items.push({ label: 'PLAYLISTS', kind: vscode.QuickPickItemKind.Separator });
-            for (const p of results.playlists) {
-                items.push({
-                    label: `$(list-unordered) ${p.name}`,
-                    description: `by ${p.owner} • ${p.trackCount} tracks`,
-                    contextUri: p.uri,
-                });
-            }
-        }
-        if (results.albums.length > 0) {
-            items.push({ label: 'ALBUMS', kind: vscode.QuickPickItemKind.Separator });
-            for (const a of results.albums) {
-                items.push({
-                    label: `$(folder) ${a.name}`,
-                    description: `${a.artist} • ${a.trackCount} tracks`,
-                    contextUri: a.uri,
-                });
-            }
-        }
-        if (items.length === 0) {
-            vscode.window.showInformationMessage(`No Spotify results found for "${query}"`);
+        if (results.tracks.length === 0) {
+            vscode.window.showInformationMessage(`No tracks found matching "${query}".`);
             return;
         }
+        const items = results.tracks.map((t) => ({
+            label: `$(play) ${t.name}`,
+            description: t.artist,
+            detail: t.album ? `Folder: ${t.album.split(/[/\\]/).pop()}` : undefined,
+            trackUri: t.uri,
+        }));
         const selected = await vscode.window.showQuickPick(items, {
             placeHolder: `Search results for "${query}" (select to play)`,
         });
         if (selected) {
-            if (selected.uri) {
-                await playbackManager.play({ uri: selected.uri });
-            }
-            else if (selected.contextUri) {
-                await playbackManager.play({ contextUri: selected.contextUri });
+            const allTracks = localProvider.getAllTracks();
+            const idx = allTracks.findIndex((t) => t.uri === selected.trackUri);
+            if (idx >= 0) {
+                localProvider.queueAndPlay(allTracks, idx);
+                await playbackManager.refreshNow();
             }
         }
     });
@@ -256,17 +230,17 @@ function registerCommands(context, playbackManager, authStore, localProvider, pr
         try {
             const playlists = await playbackManager.getUserPlaylists();
             if (playlists.length === 0) {
-                vscode.window.showInformationMessage('No playlists found in your library.');
+                vscode.window.showInformationMessage('No folders or playlists found. Click "Add Music Folder" to scan a folder.');
                 return;
             }
             const items = playlists.map((p) => ({
-                label: `$(list-unordered) ${p.name}`,
-                description: `${p.trackCount} tracks • by ${p.owner}`,
+                label: `$(folder) ${p.name}`,
+                description: `${p.trackCount} tracks`,
                 detail: p.description || undefined,
                 uri: p.uri,
             }));
             const pick = await vscode.window.showQuickPick(items, {
-                placeHolder: 'Select a playlist to play',
+                placeHolder: 'Select a folder or playlist to play',
             });
             if (pick) {
                 await playbackManager.play({ contextUri: pick.uri });
@@ -276,100 +250,7 @@ function registerCommands(context, playbackManager, authStore, localProvider, pr
             vscode.window.showErrorMessage(`Null Music: ${err.message || err}`);
         }
     });
-    register('null-music.selectDevice', async () => {
-        try {
-            const devices = await playbackManager.getDevices();
-            if (devices.length === 0) {
-                vscode.window.showInformationMessage('No active Spotify devices found. Open Spotify on any device.');
-                return;
-            }
-            const items = devices.map((d) => ({
-                label: `${d.isActive ? '$(check) ' : ''}${d.name}`,
-                description: `${d.type} • Volume: ${d.volumePercent}%`,
-                deviceId: d.id,
-            }));
-            const pick = await vscode.window.showQuickPick(items, {
-                placeHolder: 'Select playback device to transfer playback to',
-            });
-            if (pick) {
-                await playbackManager.transferPlayback(pick.deviceId);
-                vscode.window.showInformationMessage(`Transferred playback to ${pick.label.replace('$(check) ', '')}`);
-            }
-        }
-        catch (err) {
-            vscode.window.showErrorMessage(`Null Music: ${err.message || err}`);
-        }
-    });
-    register('null-music.signIn', async (providedClientId) => {
-        const provider = playbackManager.activeProvider;
-        if (!provider) {
-            vscode.window.showErrorMessage('No active music provider.');
-            return;
-        }
-        const config = vscode.workspace.getConfiguration('null-music.spotify');
-        let clientId = typeof providedClientId === 'string' ? providedClientId.trim() : config.get('clientId', '').trim();
-        if (typeof providedClientId === 'string' && providedClientId.trim()) {
-            await config.update('clientId', providedClientId.trim(), vscode.ConfigurationTarget.Global);
-            clientId = providedClientId.trim();
-        }
-        if (!clientId) {
-            const choice = await vscode.window.showInformationMessage('To connect Spotify, enter your Spotify Developer App Client ID. (Takes 30 seconds to create free).', 'Enter Client ID', 'Open Developer Dashboard');
-            if (choice === 'Open Developer Dashboard') {
-                await vscode.env.openExternal(vscode.Uri.parse('https://developer.spotify.com/dashboard'));
-            }
-            const input = await vscode.window.showInputBox({
-                prompt: 'Enter your Spotify Client ID (Set Redirect URI to http://127.0.0.1:8888/callback)',
-                placeHolder: 'e.g. 1a2b3c4d5e6f7g8h9i0j...',
-                ignoreFocusOut: true,
-            });
-            if (!input?.trim()) {
-                return;
-            }
-            clientId = input.trim();
-            await config.update('clientId', clientId, vscode.ConfigurationTarget.Global);
-        }
-        const success = await provider.authenticate();
-        if (success) {
-            vscode.window.showInformationMessage('Successfully connected to Spotify!');
-            await playbackManager.refreshNow();
-        }
-        else {
-            vscode.window.showWarningMessage('Spotify authentication was cancelled or failed.');
-        }
-    });
-    register('null-music.configureSpotifyClientId', async () => {
-        const config = vscode.workspace.getConfiguration('null-music.spotify');
-        const current = config.get('clientId', '');
-        const input = await vscode.window.showInputBox({
-            prompt: 'Configure Spotify App Client ID (Redirect URI must be http://127.0.0.1:8888/callback)',
-            value: current,
-            placeHolder: 'Paste Client ID here...',
-            ignoreFocusOut: true,
-        });
-        if (input !== undefined) {
-            await config.update('clientId', input.trim(), vscode.ConfigurationTarget.Global);
-            vscode.window.showInformationMessage('Spotify Client ID updated.');
-        }
-    });
-    register('null-music.signOut', async () => {
-        const choice = await vscode.window.showWarningMessage('Are you sure you want to disconnect your Spotify account from Null IDE?', 'Disconnect', 'Cancel');
-        if (choice === 'Disconnect') {
-            const provider = playbackManager.activeProvider;
-            if (provider) {
-                await provider.disconnect();
-            }
-            vscode.window.showInformationMessage('Disconnected Spotify account from Null IDE.');
-        }
-    });
-    register('null-music.focus', async () => {
-        await vscode.commands.executeCommand('null.musicView.focus');
-    });
-    // ── Local Music Commands ────────────────────────────────────────────────────
     register('null-music.openLocalFolder', async () => {
-        if (!localProvider) {
-            vscode.window.showErrorMessage('Local music provider not available.');
-            return;
-        }
         const folders = await vscode.window.showOpenDialog({
             canSelectFolders: true,
             canSelectFiles: false,
@@ -382,43 +263,14 @@ function registerCommands(context, playbackManager, authStore, localProvider, pr
         const folderUri = folders[0].toString();
         const tracks = await localProvider.addFolder(folderUri);
         if (tracks.length === 0) {
-            vscode.window.showWarningMessage(`No supported audio files found in that folder. Supported formats: MP3, FLAC, OGG, WAV, M4A, AAC, Opus, WMA.`);
+            vscode.window.showWarningMessage('No supported audio files found in that folder. Supported formats: MP3, FLAC, OGG, WAV, M4A, AAC, Opus, WMA.');
         }
         else {
             vscode.window.showInformationMessage(`Added ${tracks.length} track${tracks.length !== 1 ? 's' : ''} from "${folders[0].fsPath}"`);
-            // Switch to local provider
-            if (providerRegistry) {
-                providerRegistry.setActiveProviderId('local');
-            }
         }
     });
-    register('null-music.switchProvider', async (providedProviderId) => {
-        if (!providerRegistry) {
-            vscode.window.showErrorMessage('Provider registry not available.');
-            return;
-        }
-        // If called from webview or another command with a provider ID, use it directly
-        if (typeof providedProviderId === 'string' && providedProviderId.trim()) {
-            const provider = providerRegistry.get(providedProviderId.trim());
-            if (provider) {
-                providerRegistry.setActiveProviderId(provider.id);
-            }
-            return;
-        }
-        // Otherwise show a QuickPick
-        const providers = providerRegistry.getAll();
-        const items = providers.map((p) => ({
-            label: p.displayName,
-            description: p.id === providerRegistry.getActiveProvider()?.id ? '(active)' : '',
-            id: p.id,
-        }));
-        const pick = await vscode.window.showQuickPick(items, {
-            placeHolder: 'Switch music service',
-        });
-        if (pick) {
-            providerRegistry.setActiveProviderId(pick.id);
-            vscode.window.showInformationMessage(`Switched to ${pick.label}`);
-        }
+    register('null-music.focus', async () => {
+        await vscode.commands.executeCommand('null.musicView.focus');
     });
 }
 //# sourceMappingURL=commands.js.map
