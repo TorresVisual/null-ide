@@ -39,7 +39,7 @@ export interface ApiDeps {
   accountIdForFolder(folder: vscode.Uri): string | undefined;
   /** Quick-pick an account for the folder and bind it (ui/accountPicker). */
   chooseAccountForFolder(folder: vscode.Uri): Promise<Account | undefined>;
-  /** Filled in per provider as they land (github: Phase 2, gitlab: Phase 4). */
+  /** Filled in per provider as they land (github: Phase 2, gitlab: Phase 5). */
   tokenProviders: Partial<Record<Provider, TokenProvider>>;
   /** Fires when accounts or bindings change. */
   onDidChange: vscode.Event<void>;

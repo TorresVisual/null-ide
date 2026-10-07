@@ -9,6 +9,24 @@
   "main": "./out/extension.js",
   "activationEvents": ["onStartupFinished"],
   "contributes": {
+    "configuration": {
+      "title": "Null Accounts",
+      "properties": {
+        "null-accounts.gitlab.clientId": {
+          "type": "string",
+          "default": "",
+          "scope": "application",
+          "markdownDescription": "OAuth application ID (device flow, public client) used to sign in to **gitlab.com**."
+        },
+        "null-accounts.gitlab.hostClientIds": {
+          "type": "object",
+          "default": {},
+          "scope": "application",
+          "additionalProperties": { "type": "string" },
+          "markdownDescription": "OAuth application ID per self-hosted GitLab host, e.g. `{ \"git.example.org\": \"abc123\" }`. Register the application on that instance as a non-confidential app with the scopes `read_user api write_repository`."
+        }
+      }
+    },
     "commands": [
       { "command": "null-accounts.open", "title": "Null Accounts: Manage Accounts" },
       { "command": "null-accounts.switchAccount", "title": "Null Accounts: Switch Account for This Project" },

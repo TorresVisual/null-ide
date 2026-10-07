@@ -1,6 +1,8 @@
 'use strict';
 
 import assert from 'node:assert';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { test } from 'node:test';
 import { Account } from '../types';
 import { fakeClock, fakePost, Reply } from '../testFakes';
@@ -229,4 +231,11 @@ test('resolveClientId reads the gitlab.com setting for gitlab.com and the per-ho
   assert.strictEqual(resolveClientId('git.example.org', 'abc', {}), undefined); // gitlab.com's ID is not reused
   assert.strictEqual(resolveClientId('git.example.org', 'abc', 'junk'), undefined);
   assert.strictEqual(resolveClientId('git.example.org', 'abc', { 'git.example.org': 5 }), undefined);
+});
+
+test('GitLab client IDs are application-scoped, so a workspace cannot swap in its own OAuth app', () => {
+  const pkg = JSON.parse(readFileSync(path.join(__dirname, '..', '..', 'package.json'), 'utf8'));
+  for (const key of ['null-accounts.gitlab.clientId', 'null-accounts.gitlab.hostClientIds']) {
+    assert.strictEqual(pkg.contributes.configuration.properties[key]?.scope, 'application', key);
+  }
 });

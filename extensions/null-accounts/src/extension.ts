@@ -7,7 +7,8 @@ import { createApi, NullAccountsApi } from './api';
 import { ChangeEmitter } from './changeEmitter';
 import { ProjectBinding } from './projectBinding';
 import { fetchGithub, GithubProvider } from './providers/github';
-import { addGithubAccount, chooseAccountForFolder, PickerDeps } from './ui/accountPicker';
+import { fetchGitlab, fetchPostForm, GitlabProvider, resolveClientId } from './providers/gitlab';
+import { addAccount, chooseAccountForFolder, PickerDeps, reauthenticate } from './ui/accountPicker';
 import { bindFolderToAccount } from './ui/accountsMenuActions';
 import { registerAccountsMenu } from './ui/accountsMenuController';
 import { ADD_ACCOUNT_COMMAND, BIND_COMMAND } from './ui/accountsMenuModel';
@@ -23,6 +24,23 @@ export function activate(context: vscode.ExtensionContext): NullAccountsApi {
     getSession: (scopes, options) => vscode.authentication.getSession('github', scopes, options),
     api: fetchGithub,
   });
+  const gitlab = new GitlabProvider({
+    post: fetchPostForm,
+    get: fetchGitlab,
+    secrets: { get: id => store.getSecret(id), set: (id, value) => store.setSecret(id, value) },
+    clientIdFor: host => {
+      const cfg = vscode.workspace.getConfiguration('null-accounts.gitlab');
+      return resolveClientId(host, cfg.get('clientId'), cfg.get('hostClientIds'));
+    },
+    now: Date.now,
+    sleep: ms => new Promise(resolve => setTimeout(resolve, ms)),
+    onNeedsReauth: account => {
+      void vscode.window
+        .showWarningMessage(`Your GitLab sign-in for ${account.username}@${account.host} has expired.`, 'Re-authenticate')
+        .then(choice => { if (choice) { return reauthenticate(pickerDeps, account.id); } });
+    },
+    promptReauth: account => reauthenticate(pickerDeps, account.id),
+  });
 
   // One event for "something changed" (accounts or bindings); the API and, later, the UI listen to it.
   const changed = new ChangeEmitter();
@@ -32,15 +50,16 @@ export function activate(context: vscode.ExtensionContext): NullAccountsApi {
       changed.fire();
     }),
     bindings.onDidChange(() => changed.fire()),
+    gitlab.onDidChange(() => changed.fire()),
   );
 
-  const pickerDeps: PickerDeps = { accounts: store, bindings, github };
+  const pickerDeps: PickerDeps = { accounts: store, bindings, github, gitlab };
 
   const api = createApi({
     accounts: store,
     accountIdForFolder: folder => bindings.accountIdFor(folder.fsPath),
     chooseAccountForFolder: folder => chooseAccountForFolder(pickerDeps, folder),
-    tokenProviders: { github }, // Phase 4 adds gitlab
+    tokenProviders: { github, gitlab },
     onDidChange: changed.event,
   });
 
@@ -49,7 +68,9 @@ export function activate(context: vscode.ExtensionContext): NullAccountsApi {
       AccountsPanel.createOrShow({
         accounts: store,
         bindings,
-        addGithub: () => addGithubAccount(pickerDeps),
+        add: () => addAccount(pickerDeps),
+        reauth: id => reauthenticate(pickerDeps, id),
+        needsReauth: id => gitlab.needsReauth(id),
         onDidChange: changed.event,
       })),
     vscode.commands.registerCommand(SWITCH_COMMAND, async () => {
@@ -68,7 +89,7 @@ export function activate(context: vscode.ExtensionContext): NullAccountsApi {
       if (result === 'no-folder') { void vscode.window.showInformationMessage('Open a folder to choose its account.'); }
       if (result === 'no-account') { void vscode.window.showInformationMessage('That account no longer exists.'); }
     }),
-    vscode.commands.registerCommand(ADD_ACCOUNT_COMMAND, async () => { await addGithubAccount(pickerDeps); }),
+    vscode.commands.registerCommand(ADD_ACCOUNT_COMMAND, async () => { await addAccount(pickerDeps); }),
     registerStatusBar(api),
     registerAccountsMenu(api),
   );

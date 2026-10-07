@@ -14,9 +14,13 @@ import { parsePanelMessage } from './panelMessages';
 export interface PanelDeps {
   accounts: AccountStore;
   bindings: ProjectBinding;
-  /** Sign in to another GitHub account and store it (ui/accountPicker `addGithubAccount`). */
-  addGithub(): Promise<Account | undefined>;
-  /** Fires when accounts or bindings change. */
+  /** Pick a provider, sign in and store the account (ui/accountPicker `addAccount`). */
+  add(): Promise<Account | undefined>;
+  /** Sign a GitLab account in again (ui/accountPicker `reauthenticate`). */
+  reauth(id: string): Promise<void>;
+  /** The account's sign-in has expired (GitlabProvider.needsReauth). */
+  needsReauth(id: string): boolean;
+  /** Fires when accounts, bindings or re-auth state change. */
   onDidChange: vscode.Event<void>;
 }
 
@@ -54,7 +58,7 @@ export class AccountsPanel {
   }
 
   private postState(): void {
-    const rows = buildRows(this.deps.accounts.list(), this.deps.bindings.entries(), resolveFolder);
+    const rows = buildRows(this.deps.accounts.list(), this.deps.bindings.entries(), resolveFolder, id => this.deps.needsReauth(id));
     void this.panel.webview.postMessage({ type: 'state', rows });
   }
 
@@ -64,7 +68,8 @@ export class AccountsPanel {
     try {
       switch (msg.type) {
         case 'ready': this.postState(); break;
-        case 'add': await this.deps.addGithub(); break; // the store's change event refreshes the list
+        case 'add': await this.deps.add(); break; // the store's change event refreshes the list
+        case 'reauth': await this.deps.reauth(msg.id); break;
         case 'unbind': await this.deps.bindings.unbind(msg.key); break;
         case 'remove': await this.remove(msg.id); break;
         case 'editEmail': await this.editEmail(msg.id); break;
