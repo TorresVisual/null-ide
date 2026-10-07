@@ -47,7 +47,13 @@ test('the resolved (real-cased) path is shown; a missing or throwing folder fall
 test('rows carry only display fields — no secrets or provider internals', () => {
   const rows = buildRows([{ ...acct('a1'), externalId: 'ext-1' }], [], exists);
   assert.deepStrictEqual(Object.keys(rows[0]).sort(),
-    ['authMethod', 'email', 'host', 'id', 'projects', 'provider', 'username']);
+    ['authMethod', 'email', 'host', 'id', 'needsReauth', 'projects', 'provider', 'username']);
+});
+
+test('needsReauth is taken from the callback per account and defaults to false', () => {
+  assert.strictEqual(buildRows([acct('a1')], [], exists)[0].needsReauth, false);
+  const rows = buildRows([acct('a1'), acct('a2')], [], exists, id => id === 'a2');
+  assert.deepStrictEqual(rows.map(r => r.needsReauth), [false, true]);
 });
 
 test('removeConfirmation counts projects with correct plurals and never claims to sign out', () => {

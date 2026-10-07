@@ -26,3 +26,7 @@ test('account and folder text only ever reaches the DOM as text', () => {
   assert.doesNotMatch(CLIENT_SCRIPT, /innerHTML|outerHTML|insertAdjacentHTML|document\.write|eval\(/);
   assert.match(CLIENT_SCRIPT, /textContent/);
 });
+
+test('the client script can ask the host to re-authenticate an account', () => {
+  assert.match(CLIENT_SCRIPT, /type: 'reauth'/);
+});

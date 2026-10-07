@@ -19,6 +19,8 @@ export interface AccountRow {
   username: string;
   email: string;
   authMethod: Account['authMethod'];
+  /** The sign-in has expired and cannot be refreshed; the panel offers Re-authenticate. */
+  needsReauth: boolean;
   projects: ProjectRef[];
 }
 
@@ -29,6 +31,7 @@ export function buildRows(
   accounts: readonly Account[],
   entries: ReadonlyArray<readonly [string, string]>,
   resolve: ResolveFolder,
+  needsReauth: (id: string) => boolean = () => false,
 ): AccountRow[] {
   return accounts.map(a => ({
     id: a.id,
@@ -37,6 +40,7 @@ export function buildRows(
     username: a.username,
     email: a.email,
     authMethod: a.authMethod,
+    needsReauth: needsReauth(a.id),
     projects: entries
       .filter(([, accountId]) => accountId === a.id)
       .map(([key]): ProjectRef => {

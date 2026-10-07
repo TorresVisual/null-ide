@@ -19,6 +19,7 @@ button.danger{color:var(--vscode-errorForeground);}
 .head{display:flex;align-items:baseline;gap:10px;}
 .name{font-size:14px;font-weight:600;}
 .meta,.email,.ppath{color:var(--vscode-descriptionForeground);}
+.warn{color:var(--vscode-editorWarning-foreground);margin:2px 0 0;}
 .actions{display:flex;gap:6px;margin:8px 0 10px;}
 .projects h3{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--vscode-descriptionForeground);margin:0 0 4px;}
 .project{display:flex;align-items:center;gap:10px;padding:2px 0;}
@@ -41,8 +42,8 @@ export function buildHtml(nonce: string): string {
 <body>
 <div id="page">
   <h1>Null Accounts</h1>
-  <p class="subtitle">Each project uses one account for GitHub features.</p>
-  <div id="toolbar"><button id="add-btn" class="primary">Add GitHub account</button></div>
+  <p class="subtitle">Each project uses one account for GitHub and GitLab features.</p>
+  <div id="toolbar"><button id="add-btn" class="primary">Add account</button></div>
   <div id="list"></div>
   <div id="empty">No accounts yet — add one above.</div>
 </div>

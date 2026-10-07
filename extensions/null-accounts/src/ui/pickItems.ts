@@ -21,7 +21,7 @@ export interface PickOptions {
   currentId?: string;
 }
 
-export const ADD_GITHUB_LABEL = '$(add) Add GitHub account…';
+export const ADD_ACCOUNT_LABEL = '$(add) Add account…';
 export const UNBIND_LABEL = '$(circle-slash) Use no account for this project';
 
 /** Current account first, then the suggested one, then the rest in stored order; add; and "no account" when bound. */
@@ -37,9 +37,18 @@ export function buildPickItems(accounts: readonly Account[], { suggestedId, curr
         : account.id === suggestedId ? 'Suggested — matches this repository’s remote' : undefined,
       action: { kind: 'account', account },
     }));
-  items.push({ label: ADD_GITHUB_LABEL, action: { kind: 'add' } });
+  items.push({ label: ADD_ACCOUNT_LABEL, action: { kind: 'add' } });
   if (currentId !== undefined && accounts.some(a => a.id === currentId)) {
     items.push({ label: UNBIND_LABEL, action: { kind: 'unbind' } });
   }
   return items;
 }
+
+export type ProviderChoice = 'github' | 'gitlab' | 'gitlab-self-hosted';
+
+/** The second quick-pick, shown after "Add account…". */
+export const providerPickItems = (): Array<{ label: string; description: string; choice: ProviderChoice }> => [
+  { label: 'GitHub', description: 'github.com', choice: 'github' },
+  { label: 'GitLab', description: 'gitlab.com', choice: 'gitlab' },
+  { label: 'GitLab self-hosted…', description: 'your own server (https)', choice: 'gitlab-self-hosted' },
+];

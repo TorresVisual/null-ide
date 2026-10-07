@@ -3,7 +3,7 @@
 import assert from 'node:assert';
 import { test } from 'node:test';
 import { Account } from '../types';
-import { ADD_GITHUB_LABEL, buildPickItems, PickItem, UNBIND_LABEL } from './pickItems';
+import { ADD_ACCOUNT_LABEL, buildPickItems, PickItem, providerPickItems, UNBIND_LABEL } from './pickItems';
 
 const acct = (id: string): Account =>
   ({ id, provider: 'github', host: 'github.com', username: id, email: `${id}@e.com`, authMethod: 'oauth' });
@@ -16,7 +16,7 @@ test('the suggested account comes first and is marked; the add action is always 
   assert.deepStrictEqual(kinds(items), ['a2', 'a1', 'a3', 'add']);
   assert.match(items[0].detail ?? '', /suggested/i);
   assert.strictEqual(items[1].detail, undefined);
-  assert.strictEqual(items[3].label, ADD_GITHUB_LABEL);
+  assert.strictEqual(items[3].label, ADD_ACCOUNT_LABEL);
 });
 
 test('the current account comes first and is marked, followed by add and "no account"', () => {
@@ -34,4 +34,9 @@ test('"no account" is offered only when the current account still exists', () =>
 
 test('with no accounts only the add action remains', () => {
   assert.deepStrictEqual(kinds(buildPickItems([])), ['add']);
+});
+
+test('the provider choices are GitHub, gitlab.com and self-hosted GitLab, in that order', () => {
+  assert.deepStrictEqual(providerPickItems().map(p => p.choice), ['github', 'gitlab', 'gitlab-self-hosted']);
+  assert.strictEqual(ADD_ACCOUNT_LABEL, '$(add) Add account…');
 });

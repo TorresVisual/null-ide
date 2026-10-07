@@ -5,6 +5,7 @@ export type PanelMessage =
   | { type: 'add' }
   | { type: 'remove'; id: string }
   | { type: 'editEmail'; id: string }
+  | { type: 'reauth'; id: string }
   | { type: 'unbind'; key: string };
 
 const nonEmpty = (v: unknown): v is string => typeof v === 'string' && v.length > 0;
@@ -20,6 +21,7 @@ export function parsePanelMessage(raw: unknown): PanelMessage | undefined {
       return { type };
     case 'remove':
     case 'editEmail':
+    case 'reauth':
       return nonEmpty(m.id) ? { type, id: m.id } : undefined;
     case 'unbind':
       return nonEmpty(m.key) ? { type, key: m.key } : undefined;
