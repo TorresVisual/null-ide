@@ -32,7 +32,6 @@ test('buildStatusBarModel formats playing song and markdown tooltip', () => {
   assert.ok(model.tooltipText.includes('Ambient Coding'));
   assert.ok(model.tooltipText.includes('Null Artist'));
   assert.ok(model.tooltipText.includes('1:15 / 3:20'));
-  assert.ok(model.tooltipText.includes('Null IDE Local Player'));
 });
 
 test('buildStatusBarModel shows paused icon when paused', () => {

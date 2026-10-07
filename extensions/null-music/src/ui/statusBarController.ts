@@ -1,7 +1,7 @@
 'use strict';
 
 import * as vscode from 'vscode';
-import { PlaybackManager } from '../playback/playbackManager';
+import { Player } from '../playback/player';
 import { PlaybackState } from '../types';
 import { buildStatusBarModel } from './statusBarModel';
 
@@ -12,7 +12,7 @@ export class StatusBarController implements vscode.Disposable {
   private nextItem?: vscode.StatusBarItem;
   private disposables: vscode.Disposable[] = [];
 
-  constructor(private readonly playbackManager: PlaybackManager) {
+  constructor(private readonly player: Player) {
     this.mainItem = vscode.window.createStatusBarItem(
       vscode.StatusBarAlignment.Left,
       100
@@ -21,17 +21,17 @@ export class StatusBarController implements vscode.Disposable {
 
     this.disposables.push(
       this.mainItem,
-      this.playbackManager.onDidChangePlaybackState((state) => this.update(state)),
+      this.player.onDidChange(() => this.update(this.player.getState())),
       vscode.workspace.onDidChangeConfiguration((e) => {
         if (e.affectsConfiguration('null-music.statusBar')) {
           this.rebuildControls();
-          this.update(this.playbackManager.getCurrentState());
+          this.update(this.player.getState());
         }
       })
     );
 
     this.rebuildControls();
-    this.update(this.playbackManager.getCurrentState());
+    this.update(this.player.getState());
   }
 
   private rebuildControls(): void {

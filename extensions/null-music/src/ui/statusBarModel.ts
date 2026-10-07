@@ -30,8 +30,7 @@ export function buildStatusBarModel(
   const formatted = formatPattern
     .replace('${title}', track.name)
     .replace('${artist}', track.artist)
-    .replace('${album}', track.album)
-    .replace('${device}', state.device?.name || '');
+    .replace('${album}', track.album);
 
   const icon = state.isPlaying ? '$(play)' : '$(debug-pause)';
   const progressSec = Math.floor((state.progressMs || 0) / 1000);
@@ -42,7 +41,6 @@ export function buildStatusBarModel(
     `**Artist:** ${track.artist}`,
     `**Album:** ${track.album}`,
     `**Progress:** \`${formatTime(progressSec)} / ${formatTime(durationSec)}\``,
-    state.device ? `**Device:** ${state.device.name} (${state.device.volumePercent}% vol)` : '',
     '---',
     `[$(chevron-left) Prev](command:null-music.previousTrack) | [${state.isPlaying ? '$(debug-pause) Pause' : '$(play) Play'}](command:null-music.playPause) | [$(chevron-right) Next](command:null-music.nextTrack) | [${track.isLiked ? '$(heart) Liked' : '$(heart) Like'}](command:null-music.likeCurrentTrack)`,
     '*Click status bar to open Music panel*',
