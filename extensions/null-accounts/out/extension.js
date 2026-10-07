@@ -43,6 +43,9 @@ const changeEmitter_1 = require("./changeEmitter");
 const projectBinding_1 = require("./projectBinding");
 const github_1 = require("./providers/github");
 const accountPicker_1 = require("./ui/accountPicker");
+const accountsMenuActions_1 = require("./ui/accountsMenuActions");
+const accountsMenuController_1 = require("./ui/accountsMenuController");
+const accountsMenuModel_1 = require("./ui/accountsMenuModel");
 const accountsPanel_1 = require("./ui/accountsPanel");
 const statusBarController_1 = require("./ui/statusBarController");
 const IMPORT_OFFERED_KEY = 'null-accounts.importOffered';
@@ -79,7 +82,15 @@ function activate(context) {
             return;
         }
         await (0, accountPicker_1.chooseAccountForFolder)(pickerDeps, folder.uri);
-    }), (0, statusBarController_1.registerStatusBar)(api));
+    }), vscode.commands.registerCommand(accountsMenuModel_1.BIND_COMMAND, async (accountId) => {
+        const result = await (0, accountsMenuActions_1.bindFolderToAccount)({ folderPath: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath, accounts: store, bindings }, accountId);
+        if (result === 'no-folder') {
+            void vscode.window.showInformationMessage('Open a folder to choose its account.');
+        }
+        if (result === 'no-account') {
+            void vscode.window.showInformationMessage('That account no longer exists.');
+        }
+    }), vscode.commands.registerCommand(accountsMenuModel_1.ADD_ACCOUNT_COMMAND, async () => { await (0, accountPicker_1.addGithubAccount)(pickerDeps); }), (0, statusBarController_1.registerStatusBar)(api), (0, accountsMenuController_1.registerAccountsMenu)(api));
     void offerImport(context, store, bindings, github).catch(() => { });
     return api;
 }
