@@ -40,3 +40,15 @@ export async function importExisting(
   }
   return account;
 }
+
+/** GitLab sign-in: add the account with its tokens, or (already stored) replace the tokens — how an expired sign-in is repaired. */
+export async function addOrRefresh(
+  accounts: Accounts & { setSecret(id: string, value: string): Promise<void> },
+  candidate: NewAccount,
+  secret: string,
+): Promise<Account> {
+  const existing = findAccount(accounts.list(), candidate);
+  if (!existing) { return accounts.add(candidate, secret); }
+  await accounts.setSecret(existing.id, secret);
+  return existing;
+}
