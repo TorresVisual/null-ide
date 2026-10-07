@@ -119,6 +119,15 @@
         "command": "null-music.focus",
         "title": "Null Music: Open Music Player View",
         "icon": "media/music.svg"
+      },
+      {
+        "command": "null-music.openLocalFolder",
+        "title": "Null Music: Add Local Music Folder",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "null-music.switchProvider",
+        "title": "Null Music: Switch Music Service"
       }
     ],
     "menus": {
@@ -194,8 +203,8 @@
         "null-music.provider": {
           "type": "string",
           "default": "spotify",
-          "enum": ["spotify"],
-          "description": "Primary music service provider."
+          "enum": ["spotify", "lofi", "local"],
+          "description": "Primary music service provider (spotify, lofi, or local)."
         },
         "null-music.spotify.clientId": {
           "type": "string",
@@ -231,13 +240,19 @@
           "type": "boolean",
           "default": false,
           "description": "Show a toast notification when the playing song changes."
+        },
+        "null-music.local.supportedExtensions": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [".mp3", ".flac", ".ogg", ".wav", ".m4a", ".aac", ".opus", ".wma"],
+          "description": "List of audio file extensions to include when scanning local music folders."
         }
       }
     }
   },
   "scripts": {
     "compile": "tsc -p tsconfig.json",
-    "test": "tsc -p tsconfig.json && node --test out/test/pkce.test.js out/test/authStore.test.js out/test/spotifyAuth.test.js out/test/spotifyApi.test.js out/test/spotifyProvider.test.js out/test/providerRegistry.test.js out/test/playbackManager.test.js out/test/statusBarController.test.js out/test/musicHtml.test.js out/test/musicViewProvider.test.js out/test/commands.test.js"
+    "test": "tsc -p tsconfig.json && node --test out/test/pkce.test.js out/test/authStore.test.js out/test/spotifyAuth.test.js out/test/spotifyApi.test.js out/test/spotifyProvider.test.js out/test/lofiProvider.test.js out/test/providerRegistry.test.js out/test/playbackManager.test.js out/test/statusBarController.test.js out/test/musicHtml.test.js out/test/musicViewProvider.test.js out/test/commands.test.js"
   },
   "devDependencies": {
     "typescript": "^5.8.0",

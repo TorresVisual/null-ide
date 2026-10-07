@@ -36,7 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.registerCommands = registerCommands;
 const vscode = __importStar(require("vscode"));
 const commandHelpers_1 = require("./commandHelpers");
-function registerCommands(context, playbackManager, authStore) {
+function registerCommands(context, playbackManager, authStore, localProvider, providerRegistry) {
     const register = (command, callback) => {
         context.subscriptions.push(vscode.commands.registerCommand(command, callback));
     };
@@ -363,6 +363,62 @@ function registerCommands(context, playbackManager, authStore) {
     });
     register('null-music.focus', async () => {
         await vscode.commands.executeCommand('null.musicView.focus');
+    });
+    // ── Local Music Commands ────────────────────────────────────────────────────
+    register('null-music.openLocalFolder', async () => {
+        if (!localProvider) {
+            vscode.window.showErrorMessage('Local music provider not available.');
+            return;
+        }
+        const folders = await vscode.window.showOpenDialog({
+            canSelectFolders: true,
+            canSelectFiles: false,
+            canSelectMany: false,
+            openLabel: 'Add Music Folder',
+            title: 'Select a folder containing audio files',
+        });
+        if (!folders || folders.length === 0)
+            return;
+        const folderUri = folders[0].toString();
+        const tracks = await localProvider.addFolder(folderUri);
+        if (tracks.length === 0) {
+            vscode.window.showWarningMessage(`No supported audio files found in that folder. Supported formats: MP3, FLAC, OGG, WAV, M4A, AAC, Opus, WMA.`);
+        }
+        else {
+            vscode.window.showInformationMessage(`Added ${tracks.length} track${tracks.length !== 1 ? 's' : ''} from "${folders[0].fsPath}"`);
+            // Switch to local provider
+            if (providerRegistry) {
+                providerRegistry.setActiveProviderId('local');
+            }
+        }
+    });
+    register('null-music.switchProvider', async (providedProviderId) => {
+        if (!providerRegistry) {
+            vscode.window.showErrorMessage('Provider registry not available.');
+            return;
+        }
+        // If called from webview or another command with a provider ID, use it directly
+        if (typeof providedProviderId === 'string' && providedProviderId.trim()) {
+            const provider = providerRegistry.get(providedProviderId.trim());
+            if (provider) {
+                providerRegistry.setActiveProviderId(provider.id);
+            }
+            return;
+        }
+        // Otherwise show a QuickPick
+        const providers = providerRegistry.getAll();
+        const items = providers.map((p) => ({
+            label: p.displayName,
+            description: p.id === providerRegistry.getActiveProvider()?.id ? '(active)' : '',
+            id: p.id,
+        }));
+        const pick = await vscode.window.showQuickPick(items, {
+            placeHolder: 'Switch music service',
+        });
+        if (pick) {
+            providerRegistry.setActiveProviderId(pick.id);
+            vscode.window.showInformationMessage(`Switched to ${pick.label}`);
+        }
     });
 }
 //# sourceMappingURL=commands.js.map

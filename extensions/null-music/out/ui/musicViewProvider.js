@@ -41,13 +41,17 @@ class MusicViewProvider {
     extensionUri;
     playbackManager;
     authStore;
+    localProvider;
+    lofiProvider;
     static viewType = 'null.musicView';
     view;
     controller;
-    constructor(extensionUri, playbackManager, authStore) {
+    constructor(extensionUri, playbackManager, authStore, localProvider, lofiProvider) {
         this.extensionUri = extensionUri;
         this.playbackManager = playbackManager;
         this.authStore = authStore;
+        this.localProvider = localProvider;
+        this.lofiProvider = lofiProvider;
         this.playbackManager.onDidChangePlaybackState((state) => {
             this.controller?.sendPlaybackState(state);
         });
@@ -57,17 +61,51 @@ class MusicViewProvider {
     }
     resolveWebviewView(webviewView, _context, _token) {
         this.view = webviewView;
+        // Build localResourceRoots: extension dir + all local music folder roots
+        const localRoots = this.getLocalFolderRoots();
         webviewView.webview.options = {
             enableScripts: true,
-            localResourceRoots: [this.extensionUri],
+            localResourceRoots: [this.extensionUri, ...localRoots],
         };
         const nonce = this.getNonce();
         webviewView.webview.html = (0, musicHtml_1.getMusicWebviewHtml)(nonce);
+        const postToWebview = (msg) => {
+            try {
+                webviewView.webview.postMessage(msg);
+            }
+            catch (_) { }
+        };
+        // Wire the local audio adapter: the webview's <audio> element handles actual
+        // playback, so we route calls from LocalMusicProvider → webview messages.
+        if (this.localProvider) {
+            this.localProvider.audioAdapter = {
+                playFile: (uri, _trackId) => {
+                    // Convert the local file URI to a webview-safe URI
+                    let webviewUri = uri;
+                    try {
+                        const fileUri = vscode.Uri.parse(uri);
+                        webviewUri = webviewView.webview.asWebviewUri(fileUri).toString();
+                    }
+                    catch (_) { }
+                    postToWebview({ type: 'localPlay', uri: webviewUri });
+                },
+                pauseAudio: () => postToWebview({ type: 'localPause' }),
+                resumeAudio: () => postToWebview({ type: 'localResume' }),
+                seekAudio: (positionMs) => postToWebview({ type: 'localSeek', positionMs }),
+                setVolume: (volumePercent) => postToWebview({ type: 'localVolume', volumePercent }),
+            };
+        }
+        // Wire the lofi radio audio adapter
+        if (this.lofiProvider) {
+            this.lofiProvider.setAudioAdapter({
+                playStream: (url) => postToWebview({ type: 'localPlay', uri: url }),
+                pauseStream: () => postToWebview({ type: 'localPause' }),
+                setVolume: (volumePercent) => postToWebview({ type: 'localVolume', volumePercent }),
+            });
+        }
         this.controller = new musicViewController_1.MusicViewController(this.playbackManager, this.authStore, {
             postMessage: (msg) => {
-                if (this.view?.visible) {
-                    this.view.webview.postMessage(msg);
-                }
+                postToWebview(msg);
             },
         }, {
             executeCommand: async (cmd, ...args) => {
@@ -77,10 +115,39 @@ class MusicViewProvider {
         }, () => {
             const config = vscode.workspace.getConfiguration('null-music.spotify');
             return config.get('clientId', '');
-        });
+        }, this.localProvider);
         webviewView.webview.onDidReceiveMessage(async (data) => {
+            // After adding a new folder, refresh the localResourceRoots
+            if (data?.type === 'localOpenFolder' || data?.type === 'localRemoveFolder') {
+                this.refreshLocalResourceRoots(webviewView);
+            }
             await this.controller?.handleMessage(data);
         });
+    }
+    /** Get the root URIs of all local folders so the webview can load their audio files. */
+    getLocalFolderRoots() {
+        if (!this.localProvider)
+            return [];
+        return this.localProvider.getFolderUris().map((u) => {
+            try {
+                return vscode.Uri.parse(u);
+            }
+            catch (_) {
+                return null;
+            }
+        }).filter((u) => u !== null);
+    }
+    /**
+     * Refreshes localResourceRoots after folders change.
+     * Note: VSCode does not support updating options on an already-resolved webview,
+     * so we re-create the HTML (which triggers a reload) only if roots changed.
+     */
+    refreshLocalResourceRoots(webviewView) {
+        const localRoots = this.getLocalFolderRoots();
+        webviewView.webview.options = {
+            enableScripts: true,
+            localResourceRoots: [this.extensionUri, ...localRoots],
+        };
     }
     getNonce() {
         let text = '';

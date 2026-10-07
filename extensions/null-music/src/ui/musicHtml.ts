@@ -6,7 +6,7 @@ export function getMusicWebviewHtml(nonce: string): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src https: data: http:; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src https: data: http: vscode-resource: vscode-webview-resource:; style-src 'unsafe-inline'; script-src 'nonce-${nonce}'; media-src vscode-resource: vscode-webview-resource: https: blob:;">
   <title>Null Music</title>
   <style>
     :root {
@@ -555,6 +555,18 @@ export function getMusicWebviewHtml(nonce: string): string {
 </head>
 <body>
 
+  <!-- Top Service Switcher -->
+  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; padding: 2px 2px;">
+    <span style="font-size: 11px; font-weight: 700; color: var(--null-text-muted); letter-spacing: 0.5px;">SERVICE:</span>
+    <select id="select-provider" class="search-box" style="width: auto; padding: 3px 8px; font-size: 11px; height: 26px; border-radius: 6px; cursor: pointer;">
+      <option value="spotify">Spotify</option>
+      <option value="lofi">Null Lo-Fi Radio (Free)</option>
+      <option value="local">📁 Local Music</option>
+    </select>
+  </div>
+
+  <audio id="audio-player" preload="none" style="display: none;"></audio>
+
   <!-- Authenticated Header Navigation -->
   <div id="tabs-header" class="tabs-header" style="display: none;">
     <button class="tab-btn active" data-tab="now-playing">
@@ -563,7 +575,11 @@ export function getMusicWebviewHtml(nonce: string): string {
     </button>
     <button class="tab-btn" data-tab="playlists">
       <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><path d="M2 3h12v2H2zm0 4h12v2H2zm0 4h8v2H2z"/></svg>
-      Playlists
+      Stations / Playlists
+    </button>
+    <button class="tab-btn" data-tab="library" id="tab-library" style="display: none;">
+      <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><path d="M1 2.5A1.5 1.5 0 0 1 2.5 1h3A1.5 1.5 0 0 1 7 2.5v3A1.5 1.5 0 0 1 5.5 7h-3A1.5 1.5 0 0 1 1 5.5v-3zm8 0A1.5 1.5 0 0 1 10.5 1h3A1.5 1.5 0 0 1 15 2.5v3A1.5 1.5 0 0 1 13.5 7h-3A1.5 1.5 0 0 1 9 5.5v-3zm-8 8A1.5 1.5 0 0 1 2.5 9h3A1.5 1.5 0 0 1 7 10.5v3A1.5 1.5 0 0 1 5.5 15h-3A1.5 1.5 0 0 1 1 13.5v-3zm8 0A1.5 1.5 0 0 1 10.5 9h3A1.5 1.5 0 0 1 15 10.5v3A1.5 1.5 0 0 1 13.5 15h-3A1.5 1.5 0 0 1 9 13.5v-3z"/></svg>
+      Library
     </button>
     <button class="tab-btn" data-tab="search">
       <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/></svg>
@@ -581,7 +597,7 @@ export function getMusicWebviewHtml(nonce: string): string {
       <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.48.66.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
     </svg>
     <div class="auth-title">Spotify for Null IDE</div>
-    <div class="auth-desc">Listen and control your music seamlessly without leaving your editor.</div>
+    <div class="auth-desc">Listen and control your Spotify music seamlessly inside Null IDE.</div>
 
     <div style="width: 100%; display: flex; flex-direction: column; gap: 6px; text-align: left;">
       <label style="font-size: 11px; font-weight: 600; color: var(--null-text-muted);">Spotify App Client ID:</label>
@@ -595,13 +611,18 @@ export function getMusicWebviewHtml(nonce: string): string {
       Connect Spotify
     </button>
 
+    <button id="btn-switch-lofi" style="width: 100%; background: transparent; border: 1px solid var(--null-border); color: var(--null-accent); border-radius: 24px; padding: 8px 16px; font-weight: 600; font-size: 12px; cursor: pointer;">
+      🎵 Or Listen Free with Null Lo-Fi Radio
+    </button>
+
     <details style="width: 100%; text-align: left; background: var(--null-bg); border: 1px solid var(--null-border); border-radius: 8px; padding: 10px; font-size: 11px; color: var(--null-text-muted);">
-      <summary style="font-weight: 600; color: var(--null-accent); cursor: pointer; outline: none;">How to get a Client ID (Free • 30s)</summary>
+      <summary style="font-weight: 600; color: var(--null-accent); cursor: pointer; outline: none;">Spotify App Setup Guide</summary>
       <ol style="margin: 8px 0 0 16px; line-height: 1.6;">
         <li>Open the <a id="link-dev-dash" style="color: var(--null-accent); text-decoration: underline; cursor: pointer;">Spotify Developer Dashboard</a></li>
         <li>Click <b>Create App</b> (Name: <code>Null IDE</code>)</li>
         <li>Set Redirect URI: <code style="user-select: text; color: #fff; background: var(--null-card-bg); padding: 2px 4px; border-radius: 3px;">http://127.0.0.1:8888/callback</code></li>
         <li>Check <b>Web API</b>, click Save, and copy your <b>Client ID</b>.</li>
+        <li style="margin-top: 4px; color: #f59e0b;">Note: Spotify Developer apps require a Spotify Premium account. If you don't have Premium, use Null Lo-Fi Radio above!</li>
       </ol>
     </details>
   </div>
@@ -683,6 +704,21 @@ export function getMusicWebviewHtml(nonce: string): string {
     </div>
   </div>
 
+  <!-- Library Pane (Local Music) -->
+  <div id="pane-library" class="tab-pane">
+    <div style="display: flex; align-items: center; justify-content: space-between;">
+      <div class="section-title" style="margin: 0;">Local Library</div>
+      <button id="btn-add-folder" style="background: var(--null-accent-dark); border: none; color: #fff; border-radius: 6px; padding: 4px 10px; font-size: 11px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+        <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><path d="M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm8-3.5a.5.5 0 0 1 .5.5v2.5H11a.5.5 0 0 1 0 1H8.5V11a.5.5 0 0 1-1 0V8.5H5a.5.5 0 0 1 0-1h2.5V5a.5.5 0 0 1 .5-.5z"/></svg>
+        Add Folder
+      </button>
+    </div>
+    <div id="local-folders-list" class="list-container" style="gap: 4px;"></div>
+    <div class="section-title" id="local-tracks-header" style="display: none;">Tracks</div>
+    <div id="local-tracks-list" class="list-container"></div>
+    <div id="local-empty-msg" class="empty-msg">No folders added yet. Click "Add Folder" to scan your music library.</div>
+  </div>
+
   <!-- Search Pane -->
   <div id="pane-search" class="tab-pane">
     <input id="search-input" class="search-box" type="text" placeholder="Search songs, artists, albums, playlists…" />
@@ -722,8 +758,17 @@ export function getMusicWebviewHtml(nonce: string): string {
 
     const paneNowPlaying = document.getElementById('pane-now-playing');
     const panePlaylists = document.getElementById('pane-playlists');
+    const paneLibrary = document.getElementById('pane-library');
     const paneSearch = document.getElementById('pane-search');
     const paneDevices = document.getElementById('pane-devices');
+    const tabLibrary = document.getElementById('tab-library');
+
+    // Local library elements
+    const btnAddFolder = document.getElementById('btn-add-folder');
+    const localFoldersList = document.getElementById('local-folders-list');
+    const localTracksList = document.getElementById('local-tracks-list');
+    const localTracksHeader = document.getElementById('local-tracks-header');
+    const localEmptyMsg = document.getElementById('local-empty-msg');
 
     const btnSignIn = document.getElementById('btn-sign-in');
     const btnPlayPause = document.getElementById('btn-play-pause');
@@ -757,6 +802,10 @@ export function getMusicWebviewHtml(nonce: string): string {
     const inputClientId = document.getElementById('input-client-id');
     const linkDevDash = document.getElementById('link-dev-dash');
 
+    // Local audio element
+    const audioPlayer = document.getElementById('audio-player');
+    let currentProviderId = 'spotify';
+
     // Tab Switching
     document.querySelectorAll('.tab-btn').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -764,9 +813,8 @@ export function getMusicWebviewHtml(nonce: string): string {
         btn.classList.add('active');
 
         const tab = btn.dataset.tab;
-        [paneNowPlaying, panePlaylists, paneSearch, paneDevices].forEach(p => {
-          p.classList.remove('active');
-          p.style.display = 'none';
+        [paneNowPlaying, panePlaylists, paneLibrary, paneSearch, paneDevices].forEach(p => {
+          if (p) { p.classList.remove('active'); p.style.display = 'none'; }
         });
 
         if (tab === 'now-playing') {
@@ -776,6 +824,10 @@ export function getMusicWebviewHtml(nonce: string): string {
           panePlaylists.classList.add('active');
           panePlaylists.style.display = 'flex';
           vscode.postMessage({ type: 'getPlaylists' });
+        } else if (tab === 'library') {
+          paneLibrary.classList.add('active');
+          paneLibrary.style.display = 'flex';
+          vscode.postMessage({ type: 'localGetLibrary' });
         } else if (tab === 'search') {
           paneSearch.classList.add('active');
           paneSearch.style.display = 'flex';
@@ -798,18 +850,43 @@ export function getMusicWebviewHtml(nonce: string): string {
     }
 
     // UI Updates
-    function updateAuthState(isAuthenticated, user, clientId) {
+    function updateAuthState(isAuthenticated, user, clientId, providerId) {
+      currentProviderId = providerId || 'spotify';
+      const isLocal = currentProviderId === 'local';
+      const isLofi = currentProviderId === 'lofi';
+
+      // Sync the service dropdown to reflect the active provider
+      const providerSelect = document.getElementById('select-provider');
+      if (providerSelect) {
+        providerSelect.value = currentProviderId;
+      }
+
+      // Show/hide Library tab only for local provider
+      if (tabLibrary) {
+        tabLibrary.style.display = isLocal ? 'flex' : 'none';
+      }
+
       if (isAuthenticated) {
         authView.style.display = 'none';
         tabsHeader.style.display = 'flex';
         paneNowPlaying.style.display = 'flex';
-        footerAccount.style.display = 'flex';
-        accountName.textContent = user?.name ? 'Logged in as ' + user.name : 'Connected to Spotify';
+        footerAccount.style.display = isLocal ? 'none' : 'flex';
+        if (!isLocal && !isLofi) {
+          accountName.textContent = user?.name ? 'Logged in as ' + user.name : 'Connected to Spotify';
+        } else if (isLofi) {
+          accountName.textContent = 'Null Lo-Fi Radio — Free';
+        }
+
+        // If switching to local, auto-navigate to Library tab
+        if (isLocal && tabLibrary) {
+          tabLibrary.click();
+        }
       } else {
         authView.style.display = 'flex';
         tabsHeader.style.display = 'none';
         paneNowPlaying.style.display = 'none';
         panePlaylists.style.display = 'none';
+        if (paneLibrary) paneLibrary.style.display = 'none';
         paneSearch.style.display = 'none';
         paneDevices.style.display = 'none';
         footerAccount.style.display = 'none';
@@ -825,7 +902,13 @@ export function getMusicWebviewHtml(nonce: string): string {
         playerArt.style.display = 'none';
         playerPlaceholder.style.display = 'block';
         playerTitle.textContent = 'No Track Playing';
-        playerArtist.textContent = 'Start playback on Spotify to listen';
+        if (currentProviderId === 'local') {
+          playerArtist.textContent = 'Pick a track from your Library tab to listen';
+        } else if (currentProviderId === 'lofi') {
+          playerArtist.textContent = 'Press play to start Lo-Fi radio';
+        } else {
+          playerArtist.textContent = 'Start playback on Spotify to listen';
+        }
         playerAlbum.textContent = '';
         iconPlay.style.display = 'block';
         iconPause.style.display = 'none';
@@ -1085,6 +1168,113 @@ export function getMusicWebviewHtml(nonce: string): string {
       });
     }
 
+    // Render Local Library
+    function renderLocalLibrary(tracks, folders) {
+      if (!folders || folders.length === 0) {
+        localFoldersList.innerHTML = '';
+        localTracksList.innerHTML = '';
+        localTracksHeader.style.display = 'none';
+        localEmptyMsg.style.display = 'block';
+        return;
+      }
+
+      localEmptyMsg.style.display = 'none';
+
+      // Render folders
+      localFoldersList.innerHTML = folders.map(f => {
+        const folderName = f.split('/').pop() || f.split('\\\\').pop() || f;
+        return '<div class="item-card" data-folder-uri="' + f + '" style="gap: 8px;">' +
+          '<svg viewBox="0 0 16 16" width="20" height="20" fill="var(--null-accent)" style="flex-shrink:0;"><path d="M.54 3.87.5 3a2 2 0 0 1 2-2h3.19a2 2 0 0 1 1.45.63l.41.44H14a2 2 0 0 1 2 2v8.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-1.49l.54-7.13zM2 14h12V5H9.19l-.61-.65a.5.5 0 0 0-.36-.15H2.5a.5.5 0 0 0-.5.5L2 14z"/></svg>' +
+          '<div class="item-details"><div class="item-title">' + folderName + '</div>' +
+          '<div class="item-subtitle">' + (tracks.filter(t => t.album === f).length) + ' tracks</div></div>' +
+          '<button class="item-action-btn folder-play-btn" title="Play Folder" data-folder-uri="' + f + '" style="opacity:1;">' +
+            '<svg viewBox="0 0 16 16"><path d="M4 2.5v11l9-5.5z"/></svg>' +
+          '</button>' +
+          '<button class="item-action-btn folder-remove-btn" title="Remove Folder" data-folder-uri="' + f + '" style="opacity:1; color: var(--null-danger);">' +
+            '<svg viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg>' +
+          '</button>' +
+        '</div>';
+      }).join('');
+
+      // Folder play buttons
+      localFoldersList.querySelectorAll('.folder-play-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          vscode.postMessage({ type: 'localPlayFolder', folderUri: btn.dataset.folderUri });
+        });
+      });
+
+      // Folder remove buttons
+      localFoldersList.querySelectorAll('.folder-remove-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          vscode.postMessage({ type: 'localRemoveFolder', folderUri: btn.dataset.folderUri });
+        });
+      });
+
+      // Render tracks
+      if (tracks && tracks.length > 0) {
+        localTracksHeader.style.display = 'block';
+        localTracksList.innerHTML = tracks.map((t, idx) => {
+          return '<div class="item-card local-track-card" data-track-uri="' + t.uri + '">' +
+            '<svg viewBox="0 0 16 16" width="16" height="16" fill="var(--null-text-muted)" style="flex-shrink:0;"><path d="M12 1v8.55A3.5 3.5 0 1 0 13 12V3h2V1h-3zM5.5 14A2.5 2.5 0 1 1 8 11.5 2.5 2.5 0 0 1 5.5 14z"/></svg>' +
+            '<div class="item-details">' +
+              '<div class="item-title">' + t.name + '</div>' +
+              '<div class="item-subtitle">' + t.artist + '</div>' +
+            '</div>' +
+            '<button class="item-action-btn" title="Play" style="opacity:1;">' +
+              '<svg viewBox="0 0 16 16"><path d="M4 2.5v11l9-5.5z"/></svg>' +
+            '</button>' +
+          '</div>';
+        }).join('');
+
+        localTracksList.querySelectorAll('.local-track-card').forEach(card => {
+          card.addEventListener('click', () => {
+            vscode.postMessage({ type: 'localPlayTrack', trackUri: card.dataset.trackUri });
+          });
+        });
+      } else {
+        localTracksHeader.style.display = 'none';
+        localTracksList.innerHTML = '';
+      }
+    }
+
+    // ── Local Audio element handlers ─────────────────────────────────────────
+    if (audioPlayer) {
+      audioPlayer.addEventListener('loadedmetadata', () => {
+        const durationMs = Math.round(audioPlayer.duration * 1000);
+        vscode.postMessage({ type: 'localAudioDuration', durationMs });
+      });
+
+      audioPlayer.addEventListener('ended', () => {
+        vscode.postMessage({ type: 'localAudioEnded' });
+      });
+    }
+
+    // ── Add folder button ────────────────────────────────────────────────────
+    if (btnAddFolder) {
+      btnAddFolder.addEventListener('click', () => {
+        vscode.postMessage({ type: 'localOpenFolder' });
+      });
+    }
+
+    // ── Service switcher dropdown ─────────────────────────────────────────────
+    const selectProvider = document.getElementById('select-provider');
+    if (selectProvider) {
+      selectProvider.addEventListener('change', () => {
+        const providerId = selectProvider.value;
+        vscode.postMessage({ type: 'switchProvider', providerId });
+      });
+    }
+
+    const btnSwitchLofi = document.getElementById('btn-switch-lofi');
+    if (btnSwitchLofi) {
+      btnSwitchLofi.addEventListener('click', () => {
+        if (selectProvider) selectProvider.value = 'lofi';
+        vscode.postMessage({ type: 'switchProvider', providerId: 'lofi' });
+      });
+    }
+
     // Handle messages from Extension Host
     window.addEventListener('message', event => {
       const msg = event.data;
@@ -1092,7 +1282,7 @@ export function getMusicWebviewHtml(nonce: string): string {
 
       switch (msg.type) {
         case 'authUpdate':
-          updateAuthState(msg.isAuthenticated, msg.user, msg.clientId);
+          updateAuthState(msg.isAuthenticated, msg.user, msg.clientId, msg.providerId);
           break;
         case 'stateUpdate':
           renderPlaybackState(msg.state);
@@ -1105,6 +1295,34 @@ export function getMusicWebviewHtml(nonce: string): string {
           break;
         case 'devicesUpdate':
           renderDevices(msg.devices);
+          break;
+        case 'localLibraryUpdate':
+          renderLocalLibrary(msg.tracks, msg.folders);
+          break;
+
+        // ── Audio adapter commands from extension host → <audio> element ──
+        case 'localPlay':
+          if (audioPlayer && msg.uri) {
+            audioPlayer.src = msg.uri;
+            audioPlayer.load();
+            audioPlayer.play().catch(err => console.error('Audio play error:', err));
+          }
+          break;
+        case 'localPause':
+          if (audioPlayer) audioPlayer.pause();
+          break;
+        case 'localResume':
+          if (audioPlayer) audioPlayer.play().catch(() => {});
+          break;
+        case 'localSeek':
+          if (audioPlayer && typeof msg.positionMs === 'number') {
+            audioPlayer.currentTime = msg.positionMs / 1000;
+          }
+          break;
+        case 'localVolume':
+          if (audioPlayer && typeof msg.volumePercent === 'number') {
+            audioPlayer.volume = msg.volumePercent / 100;
+          }
           break;
       }
     });

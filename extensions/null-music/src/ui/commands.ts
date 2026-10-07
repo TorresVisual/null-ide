@@ -1,12 +1,16 @@
 import * as vscode from 'vscode';
 import { AuthStore } from '../auth/authStore';
 import { PlaybackManager } from '../playback/playbackManager';
+import { LocalMusicProvider } from '../provider/local/localProvider';
+import { ProviderRegistry } from '../provider/providerRegistry';
 import { formatSec, parseTimeToMs } from './commandHelpers';
 
 export function registerCommands(
   context: vscode.ExtensionContext,
   playbackManager: PlaybackManager,
-  authStore: AuthStore
+  authStore: AuthStore,
+  localProvider?: LocalMusicProvider,
+  providerRegistry?: ProviderRegistry
 ): void {
   const register = (command: string, callback: (...args: any[]) => any) => {
     context.subscriptions.push(vscode.commands.registerCommand(command, callback));
@@ -378,4 +382,74 @@ export function registerCommands(
   register('null-music.focus', async () => {
     await vscode.commands.executeCommand('null.musicView.focus');
   });
+
+  // ── Local Music Commands ────────────────────────────────────────────────────
+
+  register('null-music.openLocalFolder', async () => {
+    if (!localProvider) {
+      vscode.window.showErrorMessage('Local music provider not available.');
+      return;
+    }
+
+    const folders = await vscode.window.showOpenDialog({
+      canSelectFolders: true,
+      canSelectFiles: false,
+      canSelectMany: false,
+      openLabel: 'Add Music Folder',
+      title: 'Select a folder containing audio files',
+    });
+
+    if (!folders || folders.length === 0) return;
+
+    const folderUri = folders[0].toString();
+
+    const tracks = await localProvider.addFolder(folderUri);
+    if (tracks.length === 0) {
+      vscode.window.showWarningMessage(
+        `No supported audio files found in that folder. Supported formats: MP3, FLAC, OGG, WAV, M4A, AAC, Opus, WMA.`
+      );
+    } else {
+      vscode.window.showInformationMessage(
+        `Added ${tracks.length} track${tracks.length !== 1 ? 's' : ''} from "${folders[0].fsPath}"`
+      );
+      // Switch to local provider
+      if (providerRegistry) {
+        providerRegistry.setActiveProviderId('local');
+      }
+    }
+  });
+
+  register('null-music.switchProvider', async (providedProviderId?: unknown) => {
+    if (!providerRegistry) {
+      vscode.window.showErrorMessage('Provider registry not available.');
+      return;
+    }
+
+    // If called from webview or another command with a provider ID, use it directly
+    if (typeof providedProviderId === 'string' && providedProviderId.trim()) {
+      const provider = providerRegistry.get(providedProviderId.trim());
+      if (provider) {
+        providerRegistry.setActiveProviderId(provider.id);
+      }
+      return;
+    }
+
+    // Otherwise show a QuickPick
+    const providers = providerRegistry.getAll();
+    const items: Array<vscode.QuickPickItem & { id: string }> = providers.map((p) => ({
+      label: p.displayName,
+      description: p.id === providerRegistry.getActiveProvider()?.id ? '(active)' : '',
+      id: p.id,
+    }));
+
+    const pick = await vscode.window.showQuickPick(items, {
+      placeHolder: 'Switch music service',
+    });
+
+    if (pick) {
+      providerRegistry.setActiveProviderId(pick.id);
+      vscode.window.showInformationMessage(`Switched to ${pick.label}`);
+    }
+  });
 }
+

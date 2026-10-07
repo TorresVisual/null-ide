@@ -7,12 +7,14 @@ class MusicViewController {
     messenger;
     host;
     getClientId;
-    constructor(playbackManager, authStore, messenger, host, getClientId) {
+    localProvider;
+    constructor(playbackManager, authStore, messenger, host, getClientId, localProvider) {
         this.playbackManager = playbackManager;
         this.authStore = authStore;
         this.messenger = messenger;
         this.host = host;
         this.getClientId = getClientId;
+        this.localProvider = localProvider;
     }
     async handleMessage(data) {
         if (!data || !data.type) {
@@ -23,6 +25,10 @@ class MusicViewController {
                 case 'ready':
                     await this.sendAuthState();
                     this.sendPlaybackState(this.playbackManager.getCurrentState());
+                    // If local provider is active, send initial library
+                    if (this.localProvider) {
+                        await this.sendLocalLibrary();
+                    }
                     break;
                 case 'signIn':
                     await this.host.executeCommand('null-music.signIn', data.clientId);
@@ -98,6 +104,63 @@ class MusicViewController {
                         this.messenger.postMessage({ type: 'devicesUpdate', devices: updated });
                     }
                     break;
+                // ── Local Music messages ────────────────────────────────────────────
+                case 'localOpenFolder':
+                    // Triggered from webview "Add Folder" button
+                    await this.host.executeCommand('null-music.openLocalFolder');
+                    // Send updated library state to webview after folder is added
+                    if (this.localProvider) {
+                        await this.sendLocalLibrary();
+                    }
+                    break;
+                case 'localRemoveFolder':
+                    if (data.folderUri && this.localProvider) {
+                        await this.localProvider.removeFolder(data.folderUri);
+                        await this.sendLocalLibrary();
+                    }
+                    break;
+                case 'localPlayTrack':
+                    // Play a specific local track (with its full queue context)
+                    if (data.trackUri && this.localProvider) {
+                        const allTracks = this.localProvider.getAllTracks();
+                        const idx = allTracks.findIndex((t) => t.uri === data.trackUri);
+                        if (idx >= 0) {
+                            this.localProvider.queueAndPlay(allTracks, idx);
+                            await this.playbackManager.refreshNow();
+                        }
+                    }
+                    break;
+                case 'localPlayFolder':
+                    // Play all tracks from a specific folder
+                    if (data.folderUri && this.localProvider) {
+                        await this.playbackManager.play({
+                            contextUri: `local:folder:${encodeURIComponent(data.folderUri)}`,
+                        });
+                    }
+                    break;
+                case 'localGetLibrary':
+                    if (this.localProvider) {
+                        await this.sendLocalLibrary();
+                    }
+                    break;
+                case 'switchProvider':
+                    if (data.providerId) {
+                        await this.host.executeCommand('null-music.switchProvider', data.providerId);
+                    }
+                    break;
+                // Sync events from the webview <audio> element back to localProvider
+                case 'localAudioDuration':
+                    if (typeof data.durationMs === 'number' && this.localProvider) {
+                        this.localProvider.notifyDuration(data.durationMs);
+                        await this.playbackManager.refreshNow();
+                    }
+                    break;
+                case 'localAudioEnded':
+                    if (this.localProvider) {
+                        await this.localProvider.notifyEnded();
+                        await this.playbackManager.refreshNow();
+                    }
+                    break;
             }
         }
         catch (err) {
@@ -113,10 +176,23 @@ class MusicViewController {
         }
         const isAuth = await provider.isAuthenticated();
         const user = isAuth ? await provider.getCurrentUser().catch(() => null) : null;
-        this.messenger.postMessage({ type: 'authUpdate', isAuthenticated: isAuth, user, clientId });
+        this.messenger.postMessage({
+            type: 'authUpdate',
+            isAuthenticated: isAuth,
+            user,
+            clientId,
+            providerId: provider.id,
+        });
     }
     sendPlaybackState(state) {
         this.messenger.postMessage({ type: 'stateUpdate', state });
+    }
+    async sendLocalLibrary() {
+        if (!this.localProvider)
+            return;
+        const tracks = this.localProvider.getAllTracks();
+        const folders = this.localProvider.getFolderUris();
+        this.messenger.postMessage({ type: 'localLibraryUpdate', tracks, folders });
     }
 }
 exports.MusicViewController = MusicViewController;

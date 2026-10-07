@@ -1,6 +1,7 @@
 'use strict';
 
 import { AuthStore } from '../auth/authStore';
+import { LocalMusicProvider } from '../provider/local/localProvider';
 import { PlaybackManager } from '../playback/playbackManager';
 
 export interface WebviewMessenger {
@@ -18,7 +19,8 @@ export class MusicViewController {
     private readonly authStore: AuthStore,
     private readonly messenger: WebviewMessenger,
     private readonly host: WebviewControllerHost,
-    private readonly getClientId?: () => string
+    private readonly getClientId?: () => string,
+    private readonly localProvider?: LocalMusicProvider
   ) {}
 
   public async handleMessage(data: any): Promise<void> {
@@ -31,6 +33,10 @@ export class MusicViewController {
         case 'ready':
           await this.sendAuthState();
           this.sendPlaybackState(this.playbackManager.getCurrentState());
+          // If local provider is active, send initial library
+          if (this.localProvider) {
+            await this.sendLocalLibrary();
+          }
           break;
 
         case 'signIn':
@@ -125,6 +131,72 @@ export class MusicViewController {
             this.messenger.postMessage({ type: 'devicesUpdate', devices: updated });
           }
           break;
+
+        // ── Local Music messages ────────────────────────────────────────────
+
+        case 'localOpenFolder':
+          // Triggered from webview "Add Folder" button
+          await this.host.executeCommand('null-music.openLocalFolder');
+          // Send updated library state to webview after folder is added
+          if (this.localProvider) {
+            await this.sendLocalLibrary();
+          }
+          break;
+
+        case 'localRemoveFolder':
+          if (data.folderUri && this.localProvider) {
+            await this.localProvider.removeFolder(data.folderUri);
+            await this.sendLocalLibrary();
+          }
+          break;
+
+        case 'localPlayTrack':
+          // Play a specific local track (with its full queue context)
+          if (data.trackUri && this.localProvider) {
+            const allTracks = this.localProvider.getAllTracks();
+            const idx = allTracks.findIndex((t) => t.uri === data.trackUri);
+            if (idx >= 0) {
+              this.localProvider.queueAndPlay(allTracks, idx);
+              await this.playbackManager.refreshNow();
+            }
+          }
+          break;
+
+        case 'localPlayFolder':
+          // Play all tracks from a specific folder
+          if (data.folderUri && this.localProvider) {
+            await this.playbackManager.play({
+              contextUri: `local:folder:${encodeURIComponent(data.folderUri)}`,
+            });
+          }
+          break;
+
+        case 'localGetLibrary':
+          if (this.localProvider) {
+            await this.sendLocalLibrary();
+          }
+          break;
+
+        case 'switchProvider':
+          if (data.providerId) {
+            await this.host.executeCommand('null-music.switchProvider', data.providerId);
+          }
+          break;
+
+        // Sync events from the webview <audio> element back to localProvider
+        case 'localAudioDuration':
+          if (typeof data.durationMs === 'number' && this.localProvider) {
+            this.localProvider.notifyDuration(data.durationMs);
+            await this.playbackManager.refreshNow();
+          }
+          break;
+
+        case 'localAudioEnded':
+          if (this.localProvider) {
+            await this.localProvider.notifyEnded();
+            await this.playbackManager.refreshNow();
+          }
+          break;
       }
     } catch (err: any) {
       this.host.showErrorMessage(`Null Music: ${err.message || err}`);
@@ -141,10 +213,23 @@ export class MusicViewController {
 
     const isAuth = await provider.isAuthenticated();
     const user = isAuth ? await provider.getCurrentUser().catch(() => null) : null;
-    this.messenger.postMessage({ type: 'authUpdate', isAuthenticated: isAuth, user, clientId });
+    this.messenger.postMessage({
+      type: 'authUpdate',
+      isAuthenticated: isAuth,
+      user,
+      clientId,
+      providerId: provider.id,
+    });
   }
 
   public sendPlaybackState(state: any): void {
     this.messenger.postMessage({ type: 'stateUpdate', state });
+  }
+
+  private async sendLocalLibrary(): Promise<void> {
+    if (!this.localProvider) return;
+    const tracks = this.localProvider.getAllTracks();
+    const folders = this.localProvider.getFolderUris();
+    this.messenger.postMessage({ type: 'localLibraryUpdate', tracks, folders });
   }
 }
