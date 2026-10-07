@@ -82,7 +82,9 @@ export class GitlabProvider implements TokenProvider {
   private async describeUser(host: string, token: string, authMethod: NewAccount['authMethod']): Promise<NewAccount> {
     const res = await this.deps.get(host, '/user', token);
     if (authMethod === 'https' && (res.status === 401 || res.status === 403)) {
-      throw new Error(`${host} said the token was rejected. Create a personal access token with the api and write_repository scopes (read_api for read-only) and try again.`);
+      const b = asRecord(res.body);
+      const why = str(b.error_description) ?? str(b.error) ?? str(b.message);
+      throw new Error(`${host} said the token was rejected (HTTP ${res.status}${why ? `: ${why}` : ''}). Create a personal access token with the api and write_repository scopes (read_api for read-only) and try again.`);
     }
     const user = asRecord(res.body);
     const username = str(user.username);

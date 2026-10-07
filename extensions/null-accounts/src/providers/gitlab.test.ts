@@ -281,3 +281,12 @@ test('a missing access token is undefined and never starts the OAuth re-auth pro
   assert.deepStrictEqual(prompted, []);
   assert.strictEqual(provider.needsReauth('g1'), false);
 });
+
+test('a rejected token reports the HTTP status and the reason GitLab gave', async () => {
+  const scope = make({
+    gets: { '/version': versionOk, '/user': { status: 403, body: { error: 'insufficient_scope', error_description: 'requires read_user, api' } } },
+  });
+  await assert.rejects(scope.provider.signInWithToken('gitlab.com', 'x'), /HTTP 403: requires read_user, api/);
+  const bad = make({ gets: { '/version': versionOk, '/user': { status: 401, body: { message: '401 Unauthorized' } } } });
+  await assert.rejects(bad.provider.signInWithToken('gitlab.com', 'x'), /HTTP 401: 401 Unauthorized/);
+});
