@@ -94,6 +94,8 @@ sign out that session depends on `_signOutOfAccount` being callable from an exte
 public API. Until verified, Remove only drops the null-accounts record (current behavior). Trusted
 extensions remain manageable from the command palette.
 
+Finding (plan time): `_signOutOfAccount` is registered as a normal workbench command (src/vs/workbench/contrib/authentication/browser/actions/signOutOfAccountAction.ts) taking a serializable `{ providerId, accountLabel }`, so an extension can call it with `vscode.commands.executeCommand`. Not wired in this phase; making *Remove account* sign out the built-in `github` session is a follow-up that needs a product decision (it also logs VS Code's other GitHub consumers out).
+
 ## Testing
 
 - `git apply --check patches/007-*.patch` against the pinned VS Code source; build via `build-local.ps1`

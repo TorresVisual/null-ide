@@ -192,6 +192,8 @@ import it as an account so existing users are not logged out.
 2. **GitHub + binding** — github provider, projectBinding (+ suggest), Issues
    migration with import of the existing session.
 3. **UI** — accounts webview, status bar, quick-pick.
-4. **GitLab** — device flow, refresh, self-hosted host.
-5. **Git wiring** — identity, SSH, HTTPS/OAuth credential store, cleanup on unbind.
-6. **Integration** — dashboard shows each project's account; docs; verify-local spec.
+4. **Accounts menu** — the Accounts menu lists null-accounts' accounts
+   (`null-accounts-menu-design.md`).
+5. **GitLab** — device flow, refresh, self-hosted host.
+6. **Git wiring** — identity, SSH, HTTPS/OAuth credential store, cleanup on unbind.
+7. **Integration** — dashboard shows each project's account; docs; verify-local spec.
