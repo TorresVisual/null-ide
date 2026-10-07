@@ -1,14 +1,15 @@
 'use strict';
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MusicViewController = void 0;
+/** Translates webview messages into Player/Library calls. Audio events go to WebviewAudioOutput, not here. */
 class MusicViewController {
-    playbackManager;
-    localProvider;
+    player;
+    library;
     messenger;
     host;
-    constructor(playbackManager, localProvider, messenger, host) {
-        this.playbackManager = playbackManager;
-        this.localProvider = localProvider;
+    constructor(player, library, messenger, host) {
+        this.player = player;
+        this.library = library;
         this.messenger = messenger;
         this.host = host;
     }
@@ -19,132 +20,78 @@ class MusicViewController {
         try {
             switch (data.type) {
                 case 'ready':
-                    this.sendPlaybackState(this.playbackManager.getCurrentState());
-                    await this.sendLocalLibrary();
+                    this.sendPlaybackState();
+                    this.sendLocalLibrary();
                     break;
                 case 'playPause':
-                    await this.playbackManager.playPause();
+                    await this.player.playPause();
                     break;
                 case 'play':
-                    await this.playbackManager.play();
+                    await this.player.play();
                     break;
                 case 'pause':
-                    await this.playbackManager.pause();
+                    this.player.pause();
                     break;
                 case 'previous':
-                    await this.playbackManager.previous();
+                    await this.player.previous();
                     break;
                 case 'next':
-                    await this.playbackManager.next();
+                    await this.player.next();
                     break;
                 case 'seek':
-                    if (typeof data.positionMs === 'number') {
-                        await this.playbackManager.seek(data.positionMs);
-                    }
+                    if (typeof data.positionMs === 'number')
+                        this.player.seek(data.positionMs);
                     break;
                 case 'setVolume':
-                    if (typeof data.volumePercent === 'number') {
-                        await this.playbackManager.setVolume(data.volumePercent);
-                    }
+                    if (typeof data.volumePercent === 'number')
+                        this.player.setVolume(data.volumePercent);
                     break;
                 case 'toggleShuffle':
-                    await this.playbackManager.toggleShuffle();
+                    this.player.toggleShuffle();
                     break;
                 case 'toggleRepeat':
-                    await this.playbackManager.toggleRepeat();
+                    this.player.toggleRepeat();
                     break;
-                case 'toggleLike':
-                    await this.playbackManager.toggleLike();
-                    await this.sendLocalLibrary();
+                case 'toggleLike': {
+                    const track = this.player.getState().track;
+                    if (track)
+                        await this.toggleLike(track.id);
                     break;
+                }
                 case 'toggleTrackLike':
-                    if (data.trackId) {
-                        const isLiked = await this.localProvider.isLiked(data.trackId);
-                        if (isLiked) {
-                            await this.localProvider.removeTrack(data.trackId);
-                        }
-                        else {
-                            await this.localProvider.saveTrack(data.trackId);
-                        }
-                        await this.sendLocalLibrary();
-                        await this.playbackManager.refreshNow();
-                    }
+                    if (data.trackId)
+                        await this.toggleLike(data.trackId);
                     break;
                 case 'localOpenFolder':
                     await this.host.executeCommand('null-music.openLocalFolder');
-                    await this.sendLocalLibrary();
                     break;
                 case 'localRemoveFolder':
-                    if (data.folderUri) {
-                        await this.localProvider.removeFolder(data.folderUri);
-                        await this.sendLocalLibrary();
-                    }
+                    if (data.folderUri)
+                        await this.library.removeFolder(data.folderUri);
                     break;
                 case 'localImportPlaylist':
                     await this.host.executeCommand('null-music.importPlaylist');
-                    await this.sendLocalLibrary();
                     break;
                 case 'localRemovePlaylist':
-                    if (data.playlistId) {
-                        await this.localProvider.removePlaylist(data.playlistId);
-                        await this.sendLocalLibrary();
-                    }
+                    if (data.playlistId)
+                        await this.library.removePlaylist(data.playlistId);
                     break;
-                case 'localPlayTrack':
-                    if (data.trackUri) {
-                        const allTracks = this.localProvider.getAllTracks();
-                        const idx = allTracks.findIndex((t) => t.uri === data.trackUri);
-                        if (idx >= 0) {
-                            this.localProvider.queueAndPlay(allTracks, idx);
-                            await this.playbackManager.refreshNow();
-                        }
-                    }
+                case 'localPlayTrack': {
+                    const context = data.trackUri ? this.library.contextFor(data.trackUri) : undefined;
+                    if (context)
+                        await this.player.playTracks(context.tracks, context.index);
                     break;
+                }
                 case 'localPlayFolder':
-                    if (data.folderUri) {
-                        await this.playbackManager.play({
-                            contextUri: `local:folder:${encodeURIComponent(data.folderUri)}`,
-                        });
-                    }
+                    if (data.folderUri)
+                        await this.playAll(this.library.tracksInFolder(data.folderUri));
                     break;
                 case 'localPlayPlaylist':
-                    if (data.playlistId) {
-                        await this.playbackManager.play({
-                            contextUri: `local:playlist:${encodeURIComponent(data.playlistId)}`,
-                        });
-                    }
+                    if (data.playlistId)
+                        await this.playAll(this.library.playlistTracks(data.playlistId));
                     break;
                 case 'localGetLibrary':
-                    await this.sendLocalLibrary();
-                    break;
-                case 'localAudioDuration':
-                    if (typeof data.durationMs === 'number') {
-                        this.localProvider.notifyDuration(data.durationMs, data.trackUri);
-                        await this.playbackManager.refreshNow();
-                    }
-                    break;
-                case 'localAudioTimeUpdate':
-                    if (typeof data.positionMs === 'number') {
-                        this.localProvider.notifyTimeUpdate(data.positionMs);
-                    }
-                    break;
-                case 'localAudioPlayStarted':
-                    this.localProvider.notifyAudioPlayStarted();
-                    break;
-                case 'localAudioPaused':
-                    this.localProvider.notifyAudioPaused();
-                    break;
-                case 'localAudioPlayFailed':
-                case 'localAudioError':
-                    this.localProvider.notifyPlaybackFailed(data.error || 'Playback error');
-                    await this.playbackManager.refreshNow();
-                    if (data.error && !data.silent) {
-                        this.host.showErrorMessage(`Null Music: ${data.error}`);
-                    }
-                    break;
-                case 'localAudioEnded':
-                    await this.localProvider.notifyEnded();
-                    await this.playbackManager.refreshNow();
+                    this.sendLocalLibrary();
                     break;
             }
         }
@@ -152,18 +99,31 @@ class MusicViewController {
             this.host.showErrorMessage(`Null Music: ${err.message || err}`);
         }
     }
-    sendPlaybackState(state) {
-        this.messenger.postMessage({ type: 'stateUpdate', state });
+    sendPlaybackState() {
+        this.messenger.postMessage({ type: 'stateUpdate', state: this.player.getState() });
     }
-    async sendLocalLibrary() {
-        const rawTracks = this.localProvider.getAllTracks();
-        const tracks = await Promise.all(rawTracks.map(async (t) => ({
+    sendLocalLibrary() {
+        const tracks = this.library.tracks.map((t) => ({
             ...t,
-            isLiked: await this.localProvider.isLiked(t.id),
-        })));
-        const folders = this.localProvider.getFolderUris();
-        const playlists = this.localProvider.getPlaylists();
-        this.messenger.postMessage({ type: 'localLibraryUpdate', tracks, folders, playlists });
+            isLiked: this.library.isLiked(t.id),
+            albumArtUrl: t.artKey ? this.host.artUrl(t.artKey) : undefined,
+        }));
+        this.messenger.postMessage({
+            type: 'localLibraryUpdate',
+            tracks,
+            folders: this.library.folders,
+            playlists: this.library.playlists,
+            progress: this.library.progress,
+        });
+    }
+    async toggleLike(trackId) {
+        await this.library.toggleLike(trackId);
+        this.player.refresh();
+        this.sendLocalLibrary();
+    }
+    async playAll(tracks) {
+        if (tracks.length > 0)
+            await this.player.playTracks(tracks, 0);
     }
 }
 exports.MusicViewController = MusicViewController;

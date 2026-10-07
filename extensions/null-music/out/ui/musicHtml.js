@@ -1168,6 +1168,7 @@ function getMusicWebviewHtml(nonce, cspSource) {
     let isDraggingScrubber = false;
     let previousVolume = 80;
     let currentPlayingTrackUri = null;
+    let pendingSeekMs = 0;
     let timeUpdateThrottle = 0;
 
     // Elements
@@ -1466,7 +1467,11 @@ function getMusicWebviewHtml(nonce, cspSource) {
 
     audioPlayer.addEventListener('pause', () => {
       playerCard.classList.remove('playing');
-      vscode.postMessage({ type: 'localAudioPaused' });
+      vscode.postMessage({
+        type: 'localAudioPaused',
+        positionMs: Math.round(audioPlayer.currentTime * 1000),
+        trackUri: currentPlayingTrackUri
+      });
     });
 
     audioPlayer.addEventListener('timeupdate', () => {
@@ -1485,11 +1490,15 @@ function getMusicWebviewHtml(nonce, cspSource) {
       const now = Date.now();
       if (now - timeUpdateThrottle > 1500) {
         timeUpdateThrottle = now;
-        vscode.postMessage({ type: 'localAudioTimeUpdate', positionMs: curMs });
+        vscode.postMessage({ type: 'localAudioTimeUpdate', positionMs: curMs, trackUri: currentPlayingTrackUri });
       }
     });
 
     audioPlayer.addEventListener('loadedmetadata', () => {
+      if (pendingSeekMs > 0) {
+        audioPlayer.currentTime = pendingSeekMs / 1000;
+        pendingSeekMs = 0;
+      }
       const durationMs = Math.round(audioPlayer.duration * 1000);
       timeDuration.textContent = formatTime(durationMs);
       if (currentState) {
@@ -1504,7 +1513,7 @@ function getMusicWebviewHtml(nonce, cspSource) {
 
     audioPlayer.addEventListener('ended', () => {
       playerCard.classList.remove('playing');
-      vscode.postMessage({ type: 'localAudioEnded' });
+      vscode.postMessage({ type: 'localAudioEnded', trackUri: currentPlayingTrackUri });
     });
 
     audioPlayer.addEventListener('error', () => {
@@ -1524,6 +1533,27 @@ function getMusicWebviewHtml(nonce, cspSource) {
         trackUri: currentPlayingTrackUri
       });
     });
+
+    // Start playback; report real failures, but not a play() that a pause() or a new load interrupted.
+    function startPlayback(trackUri) {
+      const playPromise = audioPlayer.play();
+      if (playPromise === undefined) return;
+      playPromise.catch(err => {
+        if (err.name === 'AbortError') return;
+        if (err.name === 'NotAllowedError') {
+          autoplayPrompt.style.display = 'flex';
+          playerCard.classList.remove('playing');
+        } else {
+          showError('Audio play failed: ' + err.message);
+        }
+        vscode.postMessage({
+          type: 'localAudioPlayFailed',
+          error: err.name + ': ' + err.message,
+          trackUri: trackUri,
+          silent: err.name === 'NotAllowedError'
+        });
+      });
+    }
 
     // Autoplay unlock
     autoplayPrompt.addEventListener('click', () => {
@@ -1811,7 +1841,7 @@ function getMusicWebviewHtml(nonce, cspSource) {
         emptyFolders.style.display = 'none';
         foldersList.innerHTML = allFolders.map(f => {
           const fName = f.split('/').pop() || f.split('\\\\').pop() || f;
-          const count = allTracks.filter(t => t.album === f).length;
+          const count = allTracks.filter(t => t.folder === f).length;
           return '<div class="item-card" data-folder-uri="' + f + '">' +
             '<svg class="item-card-icon" viewBox="0 0 16 16"><path d="M.54 3.87.5 3a2 2 0 0 1 2-2h3.19a2 2 0 0 1 1.45.63l.41.44H14a2 2 0 0 1 2 2v8.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-1.49l.54-7.13zM2 14h12V5H9.19l-.61-.65a.5.5 0 0 0-.36-.15H2.5a.5.5 0 0 0-.5.5L2 14z"/></svg>' +
             '<div class="item-card-info">' +
@@ -1897,29 +1927,19 @@ function getMusicWebviewHtml(nonce, cspSource) {
           break;
 
         // Audio controls
-        case 'localPlay':
+        case 'localLoad':
           currentPlayingTrackUri = msg.trackUri;
+          pendingSeekMs = msg.startMs > 0 ? msg.startMs : 0;
           hideError();
           if (audioPlayer && msg.uri) {
             if (audioPlayer.src !== msg.uri) {
               audioPlayer.src = msg.uri;
+            } else {
+              audioPlayer.currentTime = pendingSeekMs / 1000;
+              pendingSeekMs = 0;
             }
-            const playPromise = audioPlayer.play();
-            if (playPromise !== undefined) {
-              playPromise.catch(err => {
-                if (err.name === 'NotAllowedError') {
-                  autoplayPrompt.style.display = 'flex';
-                  playerCard.classList.remove('playing');
-                } else {
-                  showError('Audio play failed: ' + err.message);
-                }
-                vscode.postMessage({
-                  type: 'localAudioPlayFailed',
-                  error: err.name + ': ' + err.message,
-                  trackUri: msg.trackUri,
-                  silent: err.name === 'NotAllowedError'
-                });
-              });
+            if (msg.autoplay) {
+              startPlayback(msg.trackUri);
             }
           }
           break;
@@ -1933,14 +1953,7 @@ function getMusicWebviewHtml(nonce, cspSource) {
 
         case 'localResume':
           if (audioPlayer) {
-            const playPromise = audioPlayer.play();
-            if (playPromise !== undefined) {
-              playPromise.catch(err => {
-                if (err.name === 'NotAllowedError') {
-                  autoplayPrompt.style.display = 'flex';
-                }
-              });
-            }
+            startPlayback(currentPlayingTrackUri);
           }
           break;
 

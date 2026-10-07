@@ -31,7 +31,6 @@ const statusBarModel_1 = require("../ui/statusBarModel");
     node_assert_1.default.ok(model.tooltipText.includes('Ambient Coding'));
     node_assert_1.default.ok(model.tooltipText.includes('Null Artist'));
     node_assert_1.default.ok(model.tooltipText.includes('1:15 / 3:20'));
-    node_assert_1.default.ok(model.tooltipText.includes('Null IDE Local Player'));
 });
 (0, node_test_1.test)('buildStatusBarModel shows paused icon when paused', () => {
     const state = (0, testFakes_1.makeSamplePlaybackState)({

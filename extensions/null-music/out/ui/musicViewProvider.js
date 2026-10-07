@@ -34,132 +34,86 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MusicViewProvider = void 0;
-const vscode = __importStar(require("vscode"));
 const path = __importStar(require("path"));
-const fs = __importStar(require("fs"));
+const vscode = __importStar(require("vscode"));
 const musicHtml_1 = require("./musicHtml");
 const musicViewController_1 = require("./musicViewController");
 class MusicViewProvider {
     extensionUri;
-    playbackManager;
-    localProvider;
+    player;
+    library;
+    output;
+    artDir;
     static viewType = 'null.musicView';
     view;
     controller;
-    constructor(extensionUri, playbackManager, localProvider) {
+    subscriptions = [];
+    constructor(extensionUri, player, library, output, artDir) {
         this.extensionUri = extensionUri;
-        this.playbackManager = playbackManager;
-        this.localProvider = localProvider;
-        this.playbackManager.onDidChangePlaybackState((state) => {
-            this.controller?.sendPlaybackState(state);
-        });
+        this.player = player;
+        this.library = library;
+        this.output = output;
+        this.artDir = artDir;
+        this.subscriptions.push(this.player.onDidChange(() => this.controller?.sendPlaybackState()), this.library.onDidChange(() => this.controller?.sendLocalLibrary()), this.library.onDidChangeSources(() => {
+            if (this.view)
+                this.refreshLocalResourceRoots(this.view);
+        }));
     }
     resolveWebviewView(webviewView, _context, _token) {
         this.view = webviewView;
+        const webview = webviewView.webview;
         this.refreshLocalResourceRoots(webviewView);
-        const nonce = this.getNonce();
-        const cspSource = webviewView.webview.cspSource;
-        webviewView.webview.html = (0, musicHtml_1.getMusicWebviewHtml)(nonce, cspSource);
-        const postToWebview = (msg) => {
-            try {
-                webviewView.webview.postMessage(msg);
-            }
-            catch (_) { }
-        };
-        // Wire audio adapter from LocalMusicProvider -> Webview HTML5 <audio> element
-        this.localProvider.setAudioAdapter({
-            playFile: (uri, _trackId) => {
-                let webviewUri = uri;
-                if (!uri.startsWith('http://') && !uri.startsWith('https://')) {
-                    try {
-                        let fileUri;
-                        if (uri.startsWith('file://')) {
-                            fileUri = vscode.Uri.parse(uri);
-                        }
-                        else {
-                            fileUri = vscode.Uri.file(uri);
-                        }
-                        webviewUri = webviewView.webview.asWebviewUri(fileUri).toString();
-                    }
-                    catch (_) { }
-                }
-                postToWebview({ type: 'localPlay', uri: webviewUri, trackUri: uri });
-            },
-            pauseAudio: () => postToWebview({ type: 'localPause' }),
-            resumeAudio: () => postToWebview({ type: 'localResume' }),
-            seekAudio: (positionMs) => postToWebview({ type: 'localSeek', positionMs }),
-            setVolume: (volumePercent) => postToWebview({ type: 'localVolume', volumePercent }),
+        // Attach before the html loads so the script's `ready` message is never missed.
+        this.output.attach({
+            postMessage: (message) => webview.postMessage(message),
+            resolveUri: (uri) => webview.asWebviewUri(vscode.Uri.parse(uri)).toString(),
         });
-        this.controller = new musicViewController_1.MusicViewController(this.playbackManager, this.localProvider, {
-            postMessage: (msg) => {
-                postToWebview(msg);
-            },
-        }, {
-            executeCommand: async (cmd, ...args) => {
-                return await vscode.commands.executeCommand(cmd, ...args);
-            },
-            showErrorMessage: (msg) => vscode.window.showErrorMessage(msg),
+        webview.html = (0, musicHtml_1.getMusicWebviewHtml)(this.getNonce(), webview.cspSource);
+        this.controller = new musicViewController_1.MusicViewController(this.player, this.library, { postMessage: (msg) => void webview.postMessage(msg) }, {
+            executeCommand: async (cmd, ...args) => await vscode.commands.executeCommand(cmd, ...args),
+            showErrorMessage: (msg) => void vscode.window.showErrorMessage(msg),
+            artUrl: (artKey) => webview.asWebviewUri(vscode.Uri.file(path.join(this.artDir, artKey))).toString(),
         });
-        webviewView.webview.onDidReceiveMessage(async (data) => {
-            if (data?.type === 'localOpenFolder' ||
-                data?.type === 'localRemoveFolder' ||
-                data?.type === 'localImportPlaylist' ||
-                data?.type === 'localRemovePlaylist') {
-                this.refreshLocalResourceRoots(webviewView);
-            }
+        webview.onDidReceiveMessage(async (data) => {
+            this.output.handleMessage(data);
             await this.controller?.handleMessage(data);
         });
+        webviewView.onDidDispose(() => {
+            this.output.detach();
+            this.controller = undefined;
+            this.view = undefined;
+        });
     }
+    /** Extension, art cache, library folders and playlist directories — nothing else is readable. */
     getLocalFolderRoots() {
-        const roots = [this.extensionUri];
-        if (vscode.workspace.workspaceFolders) {
-            for (const wf of vscode.workspace.workspaceFolders) {
-                roots.push(wf.uri);
-            }
-        }
-        for (const u of this.localProvider.getFolderUris()) {
+        const roots = [this.extensionUri, vscode.Uri.file(this.artDir)];
+        for (const folder of this.library.folders) {
             try {
-                roots.push(vscode.Uri.parse(u));
+                roots.push(vscode.Uri.parse(folder));
             }
-            catch (_) { }
-        }
-        for (const pl of this.localProvider.getPlaylists()) {
-            try {
-                roots.push(vscode.Uri.file(path.dirname(pl.filePath)));
-            }
-            catch (_) { }
-        }
-        // Include drive roots on Windows or root on Unix so local audio files can be loaded
-        if (process.platform === 'win32') {
-            const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-            for (const letter of letters) {
-                try {
-                    const driveRoot = `${letter}:\\`;
-                    if (fs.existsSync(driveRoot)) {
-                        roots.push(vscode.Uri.file(driveRoot));
-                    }
-                }
-                catch (_) { }
+            catch {
+                // skip a malformed stored folder
             }
         }
-        else {
-            try {
-                roots.push(vscode.Uri.file('/'));
-            }
-            catch (_) { }
+        for (const file of this.library.playlistPaths) {
+            roots.push(vscode.Uri.file(path.dirname(file)));
         }
         return roots;
     }
     refreshLocalResourceRoots(webviewView) {
-        const localRoots = this.getLocalFolderRoots();
         webviewView.webview.options = {
             enableScripts: true,
-            localResourceRoots: localRoots,
+            localResourceRoots: this.getLocalFolderRoots(),
         };
     }
+    dispose() {
+        for (const s of this.subscriptions)
+            s.dispose();
+        this.subscriptions.length = 0;
+    }
     getNonce() {
-        let text = '';
         const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        let text = '';
         for (let i = 0; i < 32; i++) {
             text += possible.charAt(Math.floor(Math.random() * possible.length));
         }

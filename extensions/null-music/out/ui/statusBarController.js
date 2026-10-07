@@ -37,24 +37,24 @@ exports.StatusBarController = void 0;
 const vscode = __importStar(require("vscode"));
 const statusBarModel_1 = require("./statusBarModel");
 class StatusBarController {
-    playbackManager;
+    player;
     mainItem;
     prevItem;
     playPauseItem;
     nextItem;
     disposables = [];
-    constructor(playbackManager) {
-        this.playbackManager = playbackManager;
+    constructor(player) {
+        this.player = player;
         this.mainItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
         this.mainItem.command = 'null-music.focus';
-        this.disposables.push(this.mainItem, this.playbackManager.onDidChangePlaybackState((state) => this.update(state)), vscode.workspace.onDidChangeConfiguration((e) => {
+        this.disposables.push(this.mainItem, this.player.onDidChange(() => this.update(this.player.getState())), vscode.workspace.onDidChangeConfiguration((e) => {
             if (e.affectsConfiguration('null-music.statusBar')) {
                 this.rebuildControls();
-                this.update(this.playbackManager.getCurrentState());
+                this.update(this.player.getState());
             }
         }));
         this.rebuildControls();
-        this.update(this.playbackManager.getCurrentState());
+        this.update(this.player.getState());
     }
     rebuildControls() {
         const config = vscode.workspace.getConfiguration('null-music.statusBar');

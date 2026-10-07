@@ -36,24 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.parseM3u = parseM3u;
 exports.serializeM3u = serializeM3u;
 const path = __importStar(require("path"));
-let vscodeModule;
-try {
-    vscodeModule = require('vscode');
-}
-catch {
-    vscodeModule = {
-        Uri: {
-            file: (fsPath) => ({
-                fsPath,
-                toString: () => `file:///${fsPath.replace(/\\/g, '/')}`,
-            }),
-            parse: (val) => ({
-                toString: () => val,
-                fsPath: val.replace(/^file:\/\/\/?/, '').replace(/\//g, path.sep),
-            }),
-        },
-    };
-}
+const uri_1 = require("../uri");
 function parseM3u(content, playlistFilePath) {
     // Strip UTF-8 BOM if present
     let cleanContent = content;
@@ -122,8 +105,7 @@ function parseM3u(content, playlistFilePath) {
         }
         else if (trackPathOrUrl.startsWith('file://')) {
             uri = trackPathOrUrl;
-            const parsed = vscodeModule.Uri.parse(trackPathOrUrl);
-            trackFileName = path.basename(parsed.fsPath || trackPathOrUrl);
+            trackFileName = path.basename((0, uri_1.uriToPath)(trackPathOrUrl));
         }
         else {
             // Local filesystem path (either absolute or relative to playlist file)
@@ -131,12 +113,7 @@ function parseM3u(content, playlistFilePath) {
             const resolvedFsPath = isAbsolute
                 ? path.normalize(trackPathOrUrl)
                 : path.normalize(path.resolve(playlistDir, trackPathOrUrl));
-            if (vscodeModule.Uri?.file) {
-                uri = vscodeModule.Uri.file(resolvedFsPath).toString();
-            }
-            else {
-                uri = `file:///${resolvedFsPath.replace(/\\/g, '/')}`;
-            }
+            uri = (0, uri_1.pathToUri)(resolvedFsPath);
             trackFileName = path.basename(resolvedFsPath);
         }
         let trackTitle = pendingTitle;
@@ -162,7 +139,7 @@ function parseM3u(content, playlistFilePath) {
             name: trackTitle,
             artist: trackArtist,
             artists: [trackArtist],
-            album: playlistName,
+            album: '',
             durationMs: pendingDurationMs,
             uri,
         });

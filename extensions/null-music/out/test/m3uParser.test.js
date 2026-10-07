@@ -5,7 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const node_assert_1 = __importDefault(require("node:assert"));
 const node_test_1 = require("node:test");
-const m3uParser_1 = require("../provider/local/m3uParser");
+const m3uParser_1 = require("../library/m3uParser");
 (0, node_test_1.test)('m3uParser parses standard M3U8 with EXTINF metadata and relative paths', () => {
     const content = `#EXTM3U
 #PLAYLIST:Synthwave Beats

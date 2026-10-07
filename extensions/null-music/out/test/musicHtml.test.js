@@ -35,5 +35,10 @@ const musicHtml_1 = require("../ui/musicHtml");
     node_assert_1.default.ok(!html.includes('input-client-id'));
     node_assert_1.default.ok(!html.includes('link-dev-dash'));
     node_assert_1.default.ok(!html.includes('select-provider'));
+    // Engine protocol: loads carry autoplay + start offset, interrupted play() is not a failure.
+    node_assert_1.default.ok(html.includes("case 'localLoad':"));
+    node_assert_1.default.ok(!html.includes("case 'localPlay':"));
+    node_assert_1.default.ok(html.includes("err.name === 'AbortError'"));
+    node_assert_1.default.ok(html.includes('t.folder === f'));
 });
 //# sourceMappingURL=musicHtml.test.js.map
