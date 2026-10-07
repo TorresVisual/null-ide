@@ -80,7 +80,7 @@ test('signIn runs the device flow and describes the account from /user', async (
 
 test('signIn on a self-hosted host with a port uses it in every URL and falls back to a noreply email', async () => {
   const { provider, calls, getCalls } = make({
-    replies: [device, granted],
+    replies: [{ body: { ...device.body as object, verification_uri: 'https://git.example.org:8443/oauth/device' } }, granted],
     gets: { '/version': versionOk, '/user': { status: 200, body: { id: 7, username: 'tanuki' } } },
   });
   const { account } = await provider.signIn('git.example.org:8443', ui());

@@ -39,9 +39,11 @@ export const asRecord = (v: unknown): Record<string, unknown> =>
 /** A non-empty string, else undefined. */
 export const str = (v: unknown): string | undefined => (typeof v === 'string' && v !== '' ? v : undefined);
 
-const httpsOnly = (v: unknown): string | undefined => {
+/** An https URL on the GitLab host itself: the user is sent there with a code, so a server must not be able to point them elsewhere. */
+const sameHostHttps = (v: unknown, host: string): string | undefined => {
   const s = str(v);
-  return s?.startsWith('https://') ? s : undefined;
+  if (!s?.startsWith('https://')) { return undefined; }
+  try { return new URL(s).host === host ? s : undefined; } catch { return undefined; }
 };
 
 function describe(res: FormResponse): string {
@@ -65,8 +67,8 @@ export async function startDeviceFlow(post: PostForm, host: string, clientId: st
   const b = asRecord(res.body);
   const deviceCode = str(b.device_code);
   const userCode = str(b.user_code);
-  // The URL is opened in the user's browser, so a server-supplied one must be https.
-  const verificationUri = httpsOnly(b.verification_uri);
+  // The URL is opened in the user's browser, so a server-supplied one must be https on this host.
+  const verificationUri = sameHostHttps(b.verification_uri, host);
   if (res.status !== 200 || !deviceCode || !userCode || !verificationUri) {
     throw new OAuthError('failed', `GitLab did not start the sign-in: ${describe(res)}`);
   }
@@ -74,7 +76,7 @@ export async function startDeviceFlow(post: PostForm, host: string, clientId: st
     deviceCode,
     userCode,
     verificationUri,
-    verificationUriComplete: httpsOnly(b.verification_uri_complete),
+    verificationUriComplete: sameHostHttps(b.verification_uri_complete, host),
     expiresIn: typeof b.expires_in === 'number' ? b.expires_in : 300,
     interval: typeof b.interval === 'number' ? b.interval : 5,
   };

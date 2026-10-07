@@ -134,3 +134,20 @@ test('tokens survive a serialise/parse round trip; junk parses to undefined', ()
     assert.strictEqual(parseTokens(bad), undefined, String(bad));
   }
 });
+
+test('startDeviceFlow refuses verification URLs that point away from the GitLab host', async () => {
+  const ok = { device_code: 'dc', user_code: 'UC', verification_uri: 'https://gitlab.com/oauth/device' };
+  await assert.rejects(
+    startDeviceFlow(fakePost({ body: { ...ok, verification_uri: 'https://gitlab.com.evil.example/oauth/device' } }).post, 'gitlab.com', 'cid'),
+    failsWith('failed'),
+  );
+  await assert.rejects(
+    startDeviceFlow(fakePost({ body: { ...ok, verification_uri: 'https://evil.example/' } }).post, 'git.example.org', 'cid'),
+    failsWith('failed'),
+  );
+  // a mismatching verification_uri_complete is dropped; the (matching) plain one still works
+  const got = await startDeviceFlow(
+    fakePost({ body: { ...ok, verification_uri_complete: 'https://evil.example/?user_code=UC' } }).post, 'gitlab.com', 'cid',
+  );
+  assert.strictEqual(got.verificationUriComplete, undefined);
+});
