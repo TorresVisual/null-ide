@@ -9,8 +9,6 @@ on:
         default: ''
   push:
     tags: ['v*']
-  schedule:
-    - cron: '0 6 * * 1'  # Monday 06:00 UTC — upstream check only
 
 concurrency:
   group: null-ide-${{ github.workflow }}-${{ github.ref }}
@@ -22,70 +20,9 @@ env:
   CSPELL_TAG: 'code-spell-checker-v4.5.6'   # Pinned release tag — update this to upgrade the spell checker
 
 jobs:
-  # ── Scheduled: open a PR when VSCodium releases a new version ──────────────
-  upstream-check:
-    name: Check for new VSCodium release
-    if: github.event_name == 'schedule'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Compare latest VSCodium tag to pinned tag
-        run: |
-          LATEST=$(gh api repos/VSCodium/vscodium/releases/latest --jq .tag_name)
-          PINNED=$(cat VSCODIUM_TAG)
-          echo "Latest upstream: $LATEST   Pinned: $PINNED"
-          if [ "$LATEST" = "$PINNED" ]; then
-            echo "Already up to date."
-            exit 0
-          fi
-          BRANCH="update/vscodium-${LATEST}"
-          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null; then
-            echo "$BRANCH already exists — bump PR is already open."
-            exit 0
-          fi
-
-          # Dry-run the patch stack (VSCodium's, then ours) against the new upstream,
-          # in the same order build-windows applies them.
-          W="$RUNNER_TEMP/patchcheck"
-          git clone -q --depth=1 --branch "$LATEST" https://github.com/VSCodium/vscodium "$W/vscodium"
-          MS_TAG=$(jq -r .tag "$W/vscodium/upstream/stable.json")
-          git clone -q --depth=1 --branch "$MS_TAG" https://github.com/microsoft/vscode "$W/vscode"
-          FAILED=""
-          for p in "$W"/vscodium/patches/*.patch "$W"/vscodium/patches/windows/*.patch "$GITHUB_WORKSPACE"/patches/*.patch; do
-            [ -e "$p" ] || continue
-            git -C "$W/vscode" apply --ignore-whitespace "$p" 2>/dev/null || FAILED="$FAILED $(basename "$p")"
-          done
-          if [ -n "$FAILED" ]; then
-            RESULT="⚠️ Patches that fail to apply against VS Code ${MS_TAG}:${FAILED}. A failure in a VSCodium patch can cascade into later ones; fix the earliest first."
-            DRAFT="--draft"
-          else
-            RESULT="✅ All VSCodium and overlay patches apply cleanly against VS Code ${MS_TAG}."
-            DRAFT=""
-          fi
-
-          echo "$LATEST" > VSCODIUM_TAG
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout -b "$BRANCH"
-          git add VSCODIUM_TAG
-          git commit -m "chore: bump VSCodium upstream to ${LATEST}"
-          git push origin "$BRANCH"
-          gh pr create $DRAFT \
-            --title "Update VSCodium upstream to ${LATEST}" \
-            --body "Automated upstream version bump (${PINNED} → ${LATEST}). ${RESULT}" \
-            --head "$BRANCH" \
-            --base main
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
   # ── Build: patch → merge → build → package → upload ───────────────────────
   build-windows:
     name: Build Windows x64
-    if: github.event_name != 'schedule'
     runs-on: windows-2022
     permissions:
       contents: write
