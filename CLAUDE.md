@@ -213,7 +213,7 @@ Patches apply **after** VSCodium's own patches, against the VS Code commit at `M
 
 ## Updating the Upstream Version
 
-1. The scheduled CI job (Mondays 06:00 UTC) opens a PR automatically if VSCodium has a new release.
+1. The scheduled CI job (Mondays 06:00 UTC) opens a PR automatically if VSCodium has a new release (needs repo setting Actions → "Allow GitHub Actions to create and approve pull requests"). The PR body says whether all patches apply against the new MS tag; a failing check opens it as a draft.
 2. To bump manually: edit `VSCODIUM_TAG` in `.github/workflows/build.yml`.
 3. Verify any patches in `patches/` still apply cleanly against the new MS tag.
 
