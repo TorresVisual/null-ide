@@ -1,0 +1,147 @@
+'use strict';
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.AccountsPanel = void 0;
+const node_crypto_1 = require("node:crypto");
+const fs = __importStar(require("node:fs"));
+const vscode = __importStar(require("vscode"));
+const accountInput_1 = require("../accountInput");
+const accountsHtml_1 = require("./accountsHtml");
+const accountsView_1 = require("./accountsView");
+const panelMessages_1 = require("./panelMessages");
+/** Real-cased path when the folder exists (binding keys are lower-cased on Windows). */
+const resolveFolder = key => {
+    try {
+        return { path: fs.realpathSync.native(key), exists: true };
+    }
+    catch {
+        return { path: key, exists: false };
+    }
+};
+/** The Accounts tab in the main editor area. One at a time; state is re-posted on every change. */
+class AccountsPanel {
+    panel;
+    deps;
+    static current;
+    static createOrShow(deps) {
+        if (AccountsPanel.current) {
+            AccountsPanel.current.panel.reveal();
+            return;
+        }
+        const panel = vscode.window.createWebviewPanel('null-accounts.panel', 'Null Accounts', vscode.ViewColumn.One, { enableScripts: true, localResourceRoots: [] });
+        AccountsPanel.current = new AccountsPanel(panel, deps);
+    }
+    constructor(panel, deps) {
+        this.panel = panel;
+        this.deps = deps;
+        panel.webview.html = (0, accountsHtml_1.buildHtml)((0, node_crypto_1.randomBytes)(16).toString('hex'));
+        const changes = deps.onDidChange(() => this.postState());
+        panel.webview.onDidReceiveMessage(raw => void this.handle(raw));
+        panel.onDidDispose(() => {
+            changes.dispose();
+            AccountsPanel.current = undefined;
+        });
+    }
+    postState() {
+        const rows = (0, accountsView_1.buildRows)(this.deps.accounts.list(), this.deps.bindings.entries(), resolveFolder);
+        void this.panel.webview.postMessage({ type: 'state', rows });
+    }
+    async handle(raw) {
+        const msg = (0, panelMessages_1.parsePanelMessage)(raw);
+        if (!msg) {
+            return;
+        }
+        try {
+            switch (msg.type) {
+                case 'ready':
+                    this.postState();
+                    break;
+                case 'add':
+                    await this.deps.addGithub();
+                    break; // the store's change event refreshes the list
+                case 'unbind':
+                    await this.deps.bindings.unbind(msg.key);
+                    break;
+                case 'remove':
+                    await this.remove(msg.id);
+                    break;
+                case 'editEmail':
+                    await this.editEmail(msg.id);
+                    break;
+            }
+        }
+        catch (err) {
+            void vscode.window.showErrorMessage(`Null Accounts: ${err.message}`);
+        }
+    }
+    async remove(id) {
+        const account = this.deps.accounts.get(id);
+        if (!account) {
+            return;
+        }
+        const used = this.deps.bindings.entries().filter(([, accountId]) => accountId === id).length;
+        const { message, detail } = (0, accountsView_1.removeConfirmation)(account, used);
+        if (await vscode.window.showWarningMessage(message, { modal: true, detail }, 'Remove') !== 'Remove') {
+            return;
+        }
+        await this.deps.accounts.remove(id); // extension.ts prunes the now-dangling bindings
+    }
+    async editEmail(id) {
+        const account = this.deps.accounts.get(id);
+        if (!account) {
+            return;
+        }
+        const email = await vscode.window.showInputBox({
+            title: `Email for ${account.username}`,
+            prompt: 'Email address for this account',
+            value: account.email,
+            validateInput: value => {
+                try {
+                    (0, accountInput_1.validateNewAccount)({ ...account, email: value });
+                    return undefined;
+                }
+                catch (err) {
+                    return err.message;
+                }
+            },
+        });
+        if (email === undefined || email.trim() === account.email) {
+            return;
+        }
+        await this.deps.accounts.update(id, { email });
+    }
+}
+exports.AccountsPanel = AccountsPanel;
+//# sourceMappingURL=accountsPanel.js.map

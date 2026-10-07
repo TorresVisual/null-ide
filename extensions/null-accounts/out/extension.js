@@ -43,6 +43,8 @@ const changeEmitter_1 = require("./changeEmitter");
 const projectBinding_1 = require("./projectBinding");
 const github_1 = require("./providers/github");
 const accountPicker_1 = require("./ui/accountPicker");
+const accountsPanel_1 = require("./ui/accountsPanel");
+const statusBarController_1 = require("./ui/statusBarController");
 const IMPORT_OFFERED_KEY = 'null-accounts.importOffered';
 function activate(context) {
     const store = new accountStore_1.AccountStore(context.globalState, context.secrets);
@@ -57,13 +59,27 @@ function activate(context) {
         void bindings.prune(new Set(store.list().map(a => a.id)));
         changed.fire();
     }), bindings.onDidChange(() => changed.fire()));
+    const pickerDeps = { accounts: store, bindings, github };
     const api = (0, api_1.createApi)({
         accounts: store,
         accountIdForFolder: folder => bindings.accountIdFor(folder.fsPath),
-        chooseAccountForFolder: folder => (0, accountPicker_1.chooseAccountForFolder)({ accounts: store, bindings, github }, folder),
+        chooseAccountForFolder: folder => (0, accountPicker_1.chooseAccountForFolder)(pickerDeps, folder),
         tokenProviders: { github }, // Phase 4 adds gitlab
         onDidChange: changed.event,
     });
+    context.subscriptions.push(vscode.commands.registerCommand('null-accounts.open', () => accountsPanel_1.AccountsPanel.createOrShow({
+        accounts: store,
+        bindings,
+        addGithub: () => (0, accountPicker_1.addGithubAccount)(pickerDeps),
+        onDidChange: changed.event,
+    })), vscode.commands.registerCommand(statusBarController_1.SWITCH_COMMAND, async () => {
+        const folder = vscode.workspace.workspaceFolders?.[0];
+        if (!folder) {
+            void vscode.window.showInformationMessage('Open a folder to choose its account.');
+            return;
+        }
+        await (0, accountPicker_1.chooseAccountForFolder)(pickerDeps, folder.uri);
+    }), (0, statusBarController_1.registerStatusBar)(api));
     void offerImport(context, store, bindings, github).catch(() => { });
     return api;
 }

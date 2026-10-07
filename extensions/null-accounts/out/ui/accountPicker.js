@@ -55,17 +55,23 @@ async function addGithubAccount(deps) {
         return undefined;
     }
 }
-/** Quick-pick an account for the folder (suggesting one from its origin remote), then bind it. */
+/** Quick-pick an account for the folder (suggesting one from its origin remote when unbound), then bind it. */
 async function chooseAccountForFolder(deps, folder) {
-    const origin = await (0, git_1.originUrl)(folder.fsPath);
-    const suggested = origin ? (0, suggest_1.suggestAccount)(origin, deps.accounts.list()) : undefined;
-    const picked = await vscode.window.showQuickPick((0, pickItems_1.buildPickItems)(deps.accounts.list(), suggested?.id), {
-        placeHolder: `Which account should "${node_path_1.default.basename(folder.fsPath)}" use?`,
-    });
+    const currentId = deps.bindings.accountIdFor(folder.fsPath);
+    let suggestedId;
+    if (currentId === undefined) {
+        const origin = await (0, git_1.originUrl)(folder.fsPath);
+        suggestedId = origin ? (0, suggest_1.suggestAccount)(origin, deps.accounts.list())?.id : undefined;
+    }
+    const picked = await vscode.window.showQuickPick((0, pickItems_1.buildPickItems)(deps.accounts.list(), { suggestedId, currentId }), { placeHolder: `Which account should "${node_path_1.default.basename(folder.fsPath)}" use?` });
     if (!picked) {
         return undefined;
     }
-    const account = picked.account ?? await addGithubAccount(deps);
+    if (picked.action.kind === 'unbind') {
+        await deps.bindings.unbind(folder.fsPath);
+        return undefined;
+    }
+    const account = picked.action.kind === 'add' ? await addGithubAccount(deps) : picked.action.account;
     if (!account) {
         return undefined;
     }

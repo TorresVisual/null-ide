@@ -66,4 +66,19 @@ function makeBinding() {
     await binding.bind('C:\\a', 'a1');
     node_assert_1.default.strictEqual(binding.accountIdFor('C:\\a'), 'a1');
 });
+(0, node_test_1.test)('entries lists every binding as [folder key, account id]', async () => {
+    const b = new projectBinding_1.ProjectBinding(new testFakes_1.FakeMeta(), 'linux');
+    node_assert_1.default.deepStrictEqual(b.entries(), []);
+    await b.bind('/work/a', 'acc1');
+    await b.bind('/work/b', 'acc2');
+    node_assert_1.default.deepStrictEqual(b.entries(), [['/work/a', 'acc1'], ['/work/b', 'acc2']]);
+});
+(0, node_test_1.test)('a folder key from entries() can be passed straight back to unbind, on Windows too', async () => {
+    const b = new projectBinding_1.ProjectBinding(new testFakes_1.FakeMeta(), 'win32');
+    await b.bind('C:\\Work\\MyRepo\\', 'acc1');
+    const [[key]] = b.entries();
+    node_assert_1.default.strictEqual(key, 'c:/work/myrepo'); // lower-cased: Windows paths are case-insensitive
+    await b.unbind(key);
+    node_assert_1.default.deepStrictEqual(b.entries(), []);
+});
 //# sourceMappingURL=projectBinding.test.js.map
