@@ -289,4 +289,6 @@ test('a rejected token reports the HTTP status and the reason GitLab gave', asyn
   await assert.rejects(scope.provider.signInWithToken('gitlab.com', 'x'), /HTTP 403: requires read_user, api/);
   const bad = make({ gets: { '/version': versionOk, '/user': { status: 401, body: { message: '401 Unauthorized' } } } });
   await assert.rejects(bad.provider.signInWithToken('gitlab.com', 'x'), /HTTP 401: 401 Unauthorized/);
+  const fine = make({ gets: { '/version': versionOk, '/user': { status: 403, body: { message: 'Access denied: requires a fine-grained personal access token with [User: Read]' } } } });
+  await assert.rejects(fine.provider.signInWithToken('gitlab.com', 'x'), /fine-grained personal access token that includes the User: Read/);
 });

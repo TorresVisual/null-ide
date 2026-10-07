@@ -108,7 +108,7 @@ async function addGitlabTokenAccount(deps) {
     }
     const token = await vscode.window.showInputBox({
         title: `Access token for ${host}`,
-        prompt: 'Create one under Edit profile → Access tokens with the api and write_repository scopes (read_api for read-only).',
+        prompt: 'Create one under Edit profile → Access tokens with the api and write_repository scopes (read_api for read-only). If the server requires fine-grained tokens, include the User: Read permission.',
         password: true,
         ignoreFocusOut: true,
     });

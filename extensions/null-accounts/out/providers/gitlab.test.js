@@ -251,5 +251,7 @@ const pat = { ...tanuki, authMethod: 'https' };
     await node_assert_1.default.rejects(scope.provider.signInWithToken('gitlab.com', 'x'), /HTTP 403: requires read_user, api/);
     const bad = make({ gets: { '/version': versionOk, '/user': { status: 401, body: { message: '401 Unauthorized' } } } });
     await node_assert_1.default.rejects(bad.provider.signInWithToken('gitlab.com', 'x'), /HTTP 401: 401 Unauthorized/);
+    const fine = make({ gets: { '/version': versionOk, '/user': { status: 403, body: { message: 'Access denied: requires a fine-grained personal access token with [User: Read]' } } } });
+    await node_assert_1.default.rejects(fine.provider.signInWithToken('gitlab.com', 'x'), /fine-grained personal access token that includes the User: Read/);
 });
 //# sourceMappingURL=gitlab.test.js.map
