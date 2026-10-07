@@ -28,8 +28,10 @@ jobs:
             exit 0
           fi
           BRANCH="update/vscodium-${LATEST}"
-          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null; then
-            echo "$BRANCH already exists — bump PR is already open."
+          # Any PR for this bump (open, merged, or closed on purpose) means: leave it alone.
+          # A bare branch with no PR is a leftover from a failed run — reuse it.
+          if [ "$(gh pr list --head "$BRANCH" --state all --json number --jq length)" != "0" ]; then
+            echo "A PR for $BRANCH already exists."
             exit 0
           fi
 
@@ -58,7 +60,7 @@ jobs:
           git checkout -b "$BRANCH"
           git add VSCODIUM_TAG
           git commit -m "chore: bump VSCodium upstream to ${LATEST}"
-          git push origin "$BRANCH"
+          git push --force origin "$BRANCH"  # bot-owned branch; overwrites a leftover from a failed run
           gh pr create $DRAFT \
             --title "Update VSCodium upstream to ${LATEST}" \
             --body "Automated upstream version bump (${PINNED} → ${LATEST}). ${RESULT}" \
