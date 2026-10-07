@@ -1,7 +1,7 @@
 {
   "name": "null-music",
   "displayName": "Null Music",
-  "description": "Seamless music player and Spotify integration for Null IDE — controls, playlists, search, and status bar display",
+  "description": "Clean, distraction-free local music player for Null IDE — controls, folders, playlists, search, and status bar display",
   "version": "1.0.0",
   "publisher": "null",
   "license": "MIT",
@@ -82,7 +82,7 @@
       },
       {
         "command": "null-music.likeCurrentTrack",
-        "title": "Null Music: Like / Save Current Track",
+        "title": "Null Music: Like / Favorite Current Track",
         "icon": "$(heart)"
       },
       {
@@ -91,43 +91,23 @@
       },
       {
         "command": "null-music.search",
-        "title": "Null Music: Search Music",
+        "title": "Null Music: Search Local Music",
         "icon": "$(search)"
       },
       {
         "command": "null-music.browsePlaylists",
-        "title": "Null Music: Browse Playlists",
+        "title": "Null Music: Browse Music Folders",
         "icon": "$(list-unordered)"
       },
       {
-        "command": "null-music.selectDevice",
-        "title": "Null Music: Select Playback Device"
-      },
-      {
-        "command": "null-music.signIn",
-        "title": "Null Music: Connect Spotify Account"
-      },
-      {
-        "command": "null-music.signOut",
-        "title": "Null Music: Disconnect Spotify Account"
-      },
-      {
-        "command": "null-music.configureSpotifyClientId",
-        "title": "Null Music: Configure Spotify Client ID"
+        "command": "null-music.openLocalFolder",
+        "title": "Null Music: Add Music Folder",
+        "icon": "$(folder-opened)"
       },
       {
         "command": "null-music.focus",
         "title": "Null Music: Open Music Player View",
         "icon": "media/music.svg"
-      },
-      {
-        "command": "null-music.openLocalFolder",
-        "title": "Null Music: Add Local Music Folder",
-        "icon": "$(folder-opened)"
-      },
-      {
-        "command": "null-music.switchProvider",
-        "title": "Null Music: Switch Music Service"
       }
     ],
     "menus": {
@@ -138,7 +118,7 @@
           "group": "navigation@1"
         },
         {
-          "command": "null-music.browsePlaylists",
+          "command": "null-music.openLocalFolder",
           "when": "view == null.musicView",
           "group": "navigation@2"
         },
@@ -200,22 +180,6 @@
       "type": "object",
       "title": "Null Music",
       "properties": {
-        "null-music.provider": {
-          "type": "string",
-          "default": "spotify",
-          "enum": ["spotify", "lofi", "local"],
-          "description": "Primary music service provider (spotify, lofi, or local)."
-        },
-        "null-music.spotify.clientId": {
-          "type": "string",
-          "default": "",
-          "description": "Custom Spotify Developer Application Client ID. Leave blank to use standard default."
-        },
-        "null-music.spotify.clientSecret": {
-          "type": "string",
-          "default": "",
-          "description": "Custom Spotify Developer Application Client Secret (optional)."
-        },
         "null-music.statusBar.enabled": {
           "type": "boolean",
           "default": true,
@@ -234,7 +198,7 @@
         "null-music.playback.pollingIntervalMs": {
           "type": "number",
           "default": 2500,
-          "description": "Interval in milliseconds to poll playback status from the active music provider."
+          "description": "Interval in milliseconds to poll playback status."
         },
         "null-music.notifications.showOnSongChange": {
           "type": "boolean",
@@ -252,7 +216,7 @@
   },
   "scripts": {
     "compile": "tsc -p tsconfig.json",
-    "test": "tsc -p tsconfig.json && node --test out/test/pkce.test.js out/test/authStore.test.js out/test/spotifyAuth.test.js out/test/spotifyApi.test.js out/test/spotifyProvider.test.js out/test/lofiProvider.test.js out/test/providerRegistry.test.js out/test/playbackManager.test.js out/test/statusBarController.test.js out/test/musicHtml.test.js out/test/musicViewProvider.test.js out/test/commands.test.js"
+    "test": "tsc -p tsconfig.json && node --test out/test/playbackManager.test.js out/test/statusBarController.test.js out/test/musicHtml.test.js out/test/musicViewProvider.test.js out/test/commands.test.js out/test/localProvider.test.js"
   },
   "devDependencies": {
     "typescript": "^5.8.0",

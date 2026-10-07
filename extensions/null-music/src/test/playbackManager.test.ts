@@ -3,18 +3,15 @@
 import assert from 'node:assert';
 import { test } from 'node:test';
 import { PlaybackManager } from '../playback/playbackManager';
-import { ProviderRegistry } from '../provider/providerRegistry';
-import { FakeMusicProvider, makeSamplePlaybackState, makeSampleTrack } from '../testFakes';
+import { FakeMusicProvider, makeSamplePlaybackState } from '../testFakes';
 
 test('PlaybackManager refreshes state and fires change events', async () => {
-  const registry = new ProviderRegistry();
-  const fakeProvider = new FakeMusicProvider('spotify');
+  const fakeProvider = new FakeMusicProvider('local');
   fakeProvider.state = makeSamplePlaybackState({ progressMs: 10000 });
-  registry.register(fakeProvider);
 
   const notifications: string[] = [];
   const manager = new PlaybackManager({
-    providerRegistry: registry,
+    provider: fakeProvider,
     getPollingIntervalMs: () => 10000,
     onNotification: (msg) => notifications.push(msg),
   });
@@ -31,7 +28,7 @@ test('PlaybackManager refreshes state and fires change events', async () => {
   assert.strictEqual(tracks.length, 1);
   assert.strictEqual(tracks[0]?.id, 'track-123');
   assert.strictEqual(notifications.length, 1);
-  assert.ok(notifications[0].includes('Lo-Fi Coding Beats'));
+  assert.ok(notifications[0].includes('Ambient Coding'));
 
   // Controls
   await manager.playPause();

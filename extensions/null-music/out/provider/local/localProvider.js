@@ -34,12 +34,32 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.LocalMusicProvider = void 0;
-const vscode = __importStar(require("vscode"));
 const path = __importStar(require("path"));
+let vscodeModule;
+try {
+    vscodeModule = require('vscode');
+}
+catch {
+    vscodeModule = {
+        FileType: { File: 1, Directory: 2 },
+        Uri: {
+            parse: (val) => ({
+                toString: () => val,
+                fsPath: val.replace(/^file:\/\/\/?/, '').replace(/\//g, path.sep),
+            }),
+            joinPath: (base, ...parts) => {
+                const baseStr = typeof base === 'string' ? base : base.toString();
+                const joined = [baseStr.replace(/[/\\]$/, ''), ...parts].join('/');
+                return {
+                    toString: () => joined,
+                    fsPath: joined.replace(/^file:\/\/\/?/, '').replace(/\//g, path.sep),
+                };
+            },
+        },
+    };
+}
 const SUPPORTED_EXTENSIONS = ['.mp3', '.flac', '.ogg', '.wav', '.m4a', '.aac', '.opus', '.wma'];
 class LocalMusicProvider {
-    audioAdapter;
-    context;
     id = 'local';
     displayName = 'Local Music';
     tracks = [];
@@ -54,10 +74,28 @@ class LocalMusicProvider {
     startTime = 0;
     likedTrackIds = new Set();
     folderUris = [];
-    constructor(audioAdapter, context) {
-        this.audioAdapter = audioAdapter;
-        this.context = context;
+    audioAdapter;
+    context;
+    directoryReader;
+    constructor(options, context) {
+        if (options && typeof options.playFile === 'function') {
+            this.audioAdapter = options;
+            this.context = context;
+        }
+        else if (options) {
+            const opts = options;
+            this.audioAdapter = opts.audioAdapter;
+            this.context = opts.context ?? context;
+            this.directoryReader = opts.directoryReader;
+        }
+        else {
+            this.context = context;
+        }
         this.loadPersistedState();
+        this.rescanAllFolders().catch(() => { });
+    }
+    setAudioAdapter(adapter) {
+        this.audioAdapter = adapter;
     }
     loadPersistedState() {
         if (!this.context)
@@ -79,6 +117,11 @@ class LocalMusicProvider {
         if (!this.context)
             return;
         await this.context.globalState.update('null-music.local.liked', Array.from(this.likedTrackIds));
+    }
+    async rescanAllFolders() {
+        for (const folderUri of this.folderUris) {
+            await this.loadFolder(folderUri);
+        }
     }
     // ─── IMusicProvider ──────────────────────────────────────────────────────────
     async isAuthenticated() {
@@ -128,17 +171,18 @@ class LocalMusicProvider {
     }
     async play(options) {
         if (options?.uri) {
-            // Play a specific track by URI (local:track:<id>)
-            const trackId = options.uri.replace('local:track:', '');
-            const idx = this.queue.findIndex((t) => t.id === trackId);
+            const trackId = options.uri.startsWith('local:track:')
+                ? options.uri.replace('local:track:', '')
+                : options.uri;
+            const idx = this.queue.findIndex((t) => t.id === trackId || t.uri === trackId);
             if (idx >= 0) {
                 this.currentIndex = idx;
             }
         }
         else if (options?.contextUri) {
-            // Play a "playlist" (folder) by URI (local:folder:<folderUri>)
             const folderUri = decodeURIComponent(options.contextUri.replace('local:folder:', ''));
             await this.loadFolder(folderUri);
+            this.queue = this.tracks.filter((t) => t.album === folderUri);
             this.currentIndex = 0;
         }
         if (this.currentIndex < 0 && this.queue.length > 0) {
@@ -147,6 +191,12 @@ class LocalMusicProvider {
         const track = this.currentTrack;
         if (!track)
             return;
+        if (!options?.uri && !options?.contextUri && !this.isPlayingState) {
+            this.isPlayingState = true;
+            this.startTime = Date.now();
+            this.audioAdapter?.resumeAudio();
+            return;
+        }
         this.isPlayingState = true;
         this.progressMs = 0;
         this.startTime = Date.now();
@@ -180,7 +230,6 @@ class LocalMusicProvider {
     async previous() {
         if (this.queue.length === 0)
             return;
-        // If past 3 seconds, restart; otherwise go back
         const elapsed = this.isPlayingState && this.startTime > 0 ? Date.now() - this.startTime : 0;
         if (this.progressMs + elapsed > 3000) {
             this.progressMs = 0;
@@ -220,16 +269,35 @@ class LocalMusicProvider {
         this.repeatMode = mode;
     }
     async getUserPlaylists() {
-        return this.folderUris.map((uri, i) => ({
-            id: `local-folder-${i}`,
-            name: path.basename(uri),
-            description: uri,
-            trackCount: this.tracks.filter((t) => t.album === uri).length,
-            uri: `local:folder:${encodeURIComponent(uri)}`,
-            owner: 'Local Library',
-        }));
+        const playlists = this.folderUris.map((uri, i) => {
+            const folderName = path.basename(decodeURIComponent(uri).replace(/[/\\]$/, '')) || uri;
+            const count = this.tracks.filter((t) => t.album === uri).length;
+            return {
+                id: `local-folder-${i}`,
+                name: folderName,
+                description: uri,
+                trackCount: count,
+                uri: `local:folder:${encodeURIComponent(uri)}`,
+                owner: 'Local Folder',
+            };
+        });
+        const likedCount = this.likedTrackIds.size;
+        if (likedCount > 0) {
+            playlists.unshift({
+                id: 'local-favorites',
+                name: 'Liked Tracks',
+                description: `${likedCount} favorite track${likedCount !== 1 ? 's' : ''}`,
+                trackCount: likedCount,
+                uri: 'local:playlist:favorites',
+                owner: 'Favorites',
+            });
+        }
+        return playlists;
     }
     async getPlaylistTracks(playlistId) {
+        if (playlistId === 'local-favorites') {
+            return this.tracks.filter((t) => this.likedTrackIds.has(t.id));
+        }
         const idx = parseInt(playlistId.replace('local-folder-', ''), 10);
         if (isNaN(idx) || idx >= this.folderUris.length)
             return [];
@@ -238,7 +306,11 @@ class LocalMusicProvider {
     }
     async search(query) {
         const q = query.toLowerCase().trim();
-        const matching = this.tracks.filter((t) => t.name.toLowerCase().includes(q) ||
+        const source = this.tracks.length > 0 ? this.tracks : this.queue;
+        if (!q) {
+            return { tracks: source, playlists: [], artists: [], albums: [] };
+        }
+        const matching = source.filter((t) => t.name.toLowerCase().includes(q) ||
             t.artist.toLowerCase().includes(q) ||
             t.album.toLowerCase().includes(q));
         return { tracks: matching, playlists: [], artists: [], albums: [] };
@@ -259,7 +331,6 @@ class LocalMusicProvider {
     }
     async transferPlayback(_deviceId) { }
     // ─── Local-specific public API ────────────────────────────────────────────
-    /** Called by the extension host after a folder is picked via the file picker. */
     async addFolder(folderUri) {
         if (!this.folderUris.includes(folderUri)) {
             this.folderUris.push(folderUri);
@@ -267,18 +338,26 @@ class LocalMusicProvider {
         }
         return this.loadFolder(folderUri);
     }
-    /** Remove a previously added folder. */
     async removeFolder(folderUri) {
         this.folderUris = this.folderUris.filter((u) => u !== folderUri);
         this.tracks = this.tracks.filter((t) => t.album !== folderUri);
         this.queue = this.queue.filter((t) => t.album !== folderUri);
         await this.persistFolders();
     }
-    /** Called by webview audio events to keep state in sync. */
-    notifyDuration(durationMs) {
+    notifyDuration(durationMs, trackUri) {
         this.durationMs = durationMs;
+        if (trackUri) {
+            const track = this.tracks.find((t) => t.uri === trackUri);
+            if (track)
+                track.durationMs = durationMs;
+            const qTrack = this.queue.find((t) => t.uri === trackUri);
+            if (qTrack)
+                qTrack.durationMs = durationMs;
+        }
+        else if (this.currentTrack) {
+            this.currentTrack.durationMs = durationMs;
+        }
     }
-    /** Called when audio ends naturally. */
     async notifyEnded() {
         if (this.repeatMode === 'track') {
             this.progressMs = 0;
@@ -291,22 +370,27 @@ class LocalMusicProvider {
             await this.next();
         }
         else {
-            // End of queue, stop
             this.isPlayingState = false;
             this.progressMs = 0;
             this.startTime = 0;
         }
     }
     getAllTracks() {
-        return this.tracks;
+        return this.tracks.length > 0 ? this.tracks : this.queue;
+    }
+    getLikedTracks() {
+        const source = this.getAllTracks();
+        return source.filter((t) => this.likedTrackIds.has(t.id));
     }
     getFolderUris() {
         return this.folderUris;
     }
-    /** Queue a specific set of tracks starting at the given index. */
     queueAndPlay(tracks, startIndex = 0) {
+        if (this.tracks.length === 0) {
+            this.tracks = [...tracks];
+        }
         this.queue = tracks;
-        this.currentIndex = startIndex;
+        this.currentIndex = Math.max(0, Math.min(startIndex, tracks.length - 1));
         this.progressMs = 0;
         this.durationMs = 0;
         this.isPlayingState = true;
@@ -328,39 +412,83 @@ class LocalMusicProvider {
             volumePercent: this.volume,
         };
     }
+    async scanDirectoryRecursive(uri, depth = 0, maxDepth = 4) {
+        if (depth > maxDepth)
+            return [];
+        try {
+            let entries;
+            if (this.directoryReader) {
+                entries = await this.directoryReader(uri);
+            }
+            else if (vscodeModule.workspace?.fs) {
+                entries = await vscodeModule.workspace.fs.readDirectory(uri);
+            }
+            if (!entries)
+                return [];
+            const audioUris = [];
+            const fileTypeFile = vscodeModule.FileType?.File ?? 1;
+            const fileTypeDir = vscodeModule.FileType?.Directory ?? 2;
+            for (const [name, type] of entries) {
+                if (type === fileTypeFile) {
+                    const ext = path.extname(name).toLowerCase();
+                    if (SUPPORTED_EXTENSIONS.includes(ext)) {
+                        audioUris.push(vscodeModule.Uri.joinPath(uri, name));
+                    }
+                }
+                else if (type === fileTypeDir) {
+                    if (!name.startsWith('.')) {
+                        const subUris = await this.scanDirectoryRecursive(vscodeModule.Uri.joinPath(uri, name), depth + 1, maxDepth);
+                        audioUris.push(...subUris);
+                    }
+                }
+            }
+            return audioUris;
+        }
+        catch {
+            return [];
+        }
+    }
+    parseTrackMetadata(fileName, folderName) {
+        let base = path.basename(fileName, path.extname(fileName)).trim();
+        base = base.replace(/^\d+[\s.\-_]+/, '');
+        if (base.includes(' - ')) {
+            const parts = base.split(' - ');
+            if (parts.length >= 2) {
+                return {
+                    artist: parts[0].trim(),
+                    name: parts.slice(1).join(' - ').trim(),
+                };
+            }
+        }
+        return {
+            artist: folderName,
+            name: base,
+        };
+    }
     async loadFolder(folderUri) {
         try {
-            const uri = vscode.Uri.parse(folderUri);
-            const entries = await vscode.workspace.fs.readDirectory(uri);
-            const audioEntries = entries.filter(([name, type]) => {
-                if (type !== vscode.FileType.File)
-                    return false;
-                const ext = path.extname(name).toLowerCase();
-                return SUPPORTED_EXTENSIONS.includes(ext);
-            });
-            const folderTracks = audioEntries.map(([name]) => {
-                const fileUri = vscode.Uri.joinPath(uri, name).toString();
-                const trackName = path.basename(name, path.extname(name));
-                const id = `local:${fileUri}`;
+            const uri = vscodeModule.Uri.parse(folderUri);
+            const audioUris = await this.scanDirectoryRecursive(uri);
+            const folderName = path.basename(uri.fsPath || decodeURIComponent(folderUri).replace(/[/\\]$/, ''));
+            const folderTracks = audioUris.map((fileUri) => {
+                const fileUriStr = fileUri.toString();
+                const fileName = path.basename(fileUri.fsPath || fileUriStr);
+                const { name, artist } = this.parseTrackMetadata(fileName, folderName);
+                const id = `local:${fileUriStr}`;
+                const existingTrack = this.tracks.find((t) => t.id === id);
                 return {
                     id,
-                    name: trackName,
-                    artist: path.basename(folderUri),
-                    artists: [path.basename(folderUri)],
+                    name,
+                    artist,
+                    artists: [artist],
                     album: folderUri,
-                    durationMs: 0,
-                    uri: fileUri,
+                    durationMs: existingTrack?.durationMs || 0,
+                    uri: fileUriStr,
                 };
             });
-            // Merge: remove old tracks from this folder and add new ones
             this.tracks = this.tracks.filter((t) => t.album !== folderUri);
             this.tracks.push(...folderTracks);
-            // Also update queue if it was from this folder
-            if (this.queue.length > 0 && this.queue[0]?.album === folderUri) {
-                this.queue = folderTracks;
-                this.currentIndex = 0;
-            }
-            else if (this.queue.length === 0) {
+            if (this.queue.length === 0) {
                 this.queue = [...this.tracks];
             }
             return folderTracks;

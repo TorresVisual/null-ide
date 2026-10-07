@@ -1,21 +1,8 @@
 'use strict';
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.FakeMusicProvider = exports.FakeSecretVault = void 0;
+exports.FakeMusicProvider = void 0;
 exports.makeSampleTrack = makeSampleTrack;
 exports.makeSamplePlaybackState = makeSamplePlaybackState;
-class FakeSecretVault {
-    data = new Map();
-    async get(key) {
-        return this.data.get(key);
-    }
-    async store(key, value) {
-        this.data.set(key, value);
-    }
-    async delete(key) {
-        this.data.delete(key);
-    }
-}
-exports.FakeSecretVault = FakeSecretVault;
 class FakeMusicProvider {
     id;
     displayName;
@@ -25,9 +12,8 @@ class FakeMusicProvider {
     devices = [];
     searchResults = { tracks: [], playlists: [], artists: [], albums: [] };
     likedTracks = new Set();
-    user = { id: 'u1', name: 'Test User', email: 'test@example.com', product: 'premium' };
     calls = [];
-    constructor(id = 'spotify', displayName = 'Spotify') {
+    constructor(id = 'local', displayName = 'Local Music') {
         this.id = id;
         this.displayName = displayName;
     }
@@ -47,7 +33,7 @@ class FakeMusicProvider {
     }
     async getCurrentUser() {
         this.calls.push({ method: 'getCurrentUser', args: [] });
-        return this.user;
+        return { id: 'local-user', name: 'Local User' };
     }
     async getPlaybackState() {
         this.calls.push({ method: 'getPlaybackState', args: [] });
@@ -131,13 +117,12 @@ exports.FakeMusicProvider = FakeMusicProvider;
 function makeSampleTrack(overrides) {
     return {
         id: 'track-123',
-        name: 'Lo-Fi Coding Beats',
-        artist: 'Chill Coder',
-        artists: ['Chill Coder'],
-        album: 'Code Vibes Vol. 1',
-        albumArtUrl: 'https://example.com/art.jpg',
+        name: 'Ambient Coding',
+        artist: 'Null Artist',
+        artists: ['Null Artist'],
+        album: 'd:/Music/Code',
         durationMs: 180000,
-        uri: 'spotify:track:track-123',
+        uri: 'file:///d:/Music/Code/AmbientCoding.mp3',
         isLiked: false,
         ...overrides,
     };
@@ -152,9 +137,9 @@ function makeSamplePlaybackState(overrides) {
         shuffle: false,
         repeat: 'off',
         device: {
-            id: 'dev-1',
-            name: 'MacBook Pro',
-            type: 'Computer',
+            id: 'null-local-player',
+            name: 'Null IDE Local Player',
+            type: 'Local',
             isActive: true,
             volumePercent: 80,
         },

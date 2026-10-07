@@ -1,11 +1,7 @@
 'use strict';
 
-import { SecretVault } from './auth/authStore';
 import { IMusicProvider } from './provider/musicProvider';
 import {
-  Album,
-  Artist,
-  MusicAuthAccount,
   PlaybackDevice,
   PlaybackState,
   Playlist,
@@ -14,22 +10,6 @@ import {
   SearchResults,
   Track,
 } from './types';
-
-export class FakeSecretVault implements SecretVault {
-  public readonly data = new Map<string, string>();
-
-  public async get(key: string): Promise<string | undefined> {
-    return this.data.get(key);
-  }
-
-  public async store(key: string, value: string): Promise<void> {
-    this.data.set(key, value);
-  }
-
-  public async delete(key: string): Promise<void> {
-    this.data.delete(key);
-  }
-}
 
 export class FakeMusicProvider implements IMusicProvider {
   public id: string;
@@ -40,11 +20,10 @@ export class FakeMusicProvider implements IMusicProvider {
   public devices: PlaybackDevice[] = [];
   public searchResults: SearchResults = { tracks: [], playlists: [], artists: [], albums: [] };
   public likedTracks = new Set<string>();
-  public user: MusicAuthAccount | null = { id: 'u1', name: 'Test User', email: 'test@example.com', product: 'premium' };
 
   public calls: Array<{ method: string; args: any[] }> = [];
 
-  constructor(id: string = 'spotify', displayName: string = 'Spotify') {
+  constructor(id: string = 'local', displayName: string = 'Local Music') {
     this.id = id;
     this.displayName = displayName;
   }
@@ -66,9 +45,9 @@ export class FakeMusicProvider implements IMusicProvider {
     this.state = null;
   }
 
-  public async getCurrentUser(): Promise<MusicAuthAccount | null> {
+  public async getCurrentUser(): Promise<any> {
     this.calls.push({ method: 'getCurrentUser', args: [] });
-    return this.user;
+    return { id: 'local-user', name: 'Local User' };
   }
 
   public async getPlaybackState(): Promise<PlaybackState | null> {
@@ -169,13 +148,12 @@ export class FakeMusicProvider implements IMusicProvider {
 export function makeSampleTrack(overrides?: Partial<Track>): Track {
   return {
     id: 'track-123',
-    name: 'Lo-Fi Coding Beats',
-    artist: 'Chill Coder',
-    artists: ['Chill Coder'],
-    album: 'Code Vibes Vol. 1',
-    albumArtUrl: 'https://example.com/art.jpg',
+    name: 'Ambient Coding',
+    artist: 'Null Artist',
+    artists: ['Null Artist'],
+    album: 'd:/Music/Code',
     durationMs: 180000,
-    uri: 'spotify:track:track-123',
+    uri: 'file:///d:/Music/Code/AmbientCoding.mp3',
     isLiked: false,
     ...overrides,
   };
@@ -191,9 +169,9 @@ export function makeSamplePlaybackState(overrides?: Partial<PlaybackState>): Pla
     shuffle: false,
     repeat: 'off',
     device: {
-      id: 'dev-1',
-      name: 'MacBook Pro',
-      type: 'Computer',
+      id: 'null-local-player',
+      name: 'Null IDE Local Player',
+      type: 'Local',
       isActive: true,
       volumePercent: 80,
     },

@@ -27,13 +27,12 @@ test('buildStatusBarModel formats playing song and markdown tooltip', () => {
   });
 
   const model = buildStatusBarModel(state, '${title} by ${artist}');
-  assert.strictEqual(model.text, '$(play) Lo-Fi Coding Beats by Chill Coder');
+  assert.strictEqual(model.text, '$(play) Ambient Coding by Null Artist');
   assert.strictEqual(model.isPlaying, true);
-  assert.ok(model.tooltipText.includes('Lo-Fi Coding Beats'));
-  assert.ok(model.tooltipText.includes('Chill Coder'));
-  assert.ok(model.tooltipText.includes('Code Vibes Vol. 1'));
+  assert.ok(model.tooltipText.includes('Ambient Coding'));
+  assert.ok(model.tooltipText.includes('Null Artist'));
   assert.ok(model.tooltipText.includes('1:15 / 3:20'));
-  assert.ok(model.tooltipText.includes('MacBook Pro'));
+  assert.ok(model.tooltipText.includes('Null IDE Local Player'));
 });
 
 test('buildStatusBarModel shows paused icon when paused', () => {
@@ -42,6 +41,6 @@ test('buildStatusBarModel shows paused icon when paused', () => {
   });
 
   const model = buildStatusBarModel(state);
-  assert.strictEqual(model.text, '$(debug-pause) Lo-Fi Coding Beats - Chill Coder');
+  assert.strictEqual(model.text, '$(debug-pause) Ambient Coding - Null Artist');
   assert.strictEqual(model.isPlaying, false);
 });
