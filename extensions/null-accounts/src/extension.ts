@@ -7,7 +7,9 @@ import { createApi, NullAccountsApi } from './api';
 import { ChangeEmitter } from './changeEmitter';
 import { ProjectBinding } from './projectBinding';
 import { fetchGithub, GithubProvider } from './providers/github';
-import { chooseAccountForFolder } from './ui/accountPicker';
+import { addGithubAccount, chooseAccountForFolder, PickerDeps } from './ui/accountPicker';
+import { AccountsPanel } from './ui/accountsPanel';
+import { registerStatusBar, SWITCH_COMMAND } from './ui/statusBarController';
 
 const IMPORT_OFFERED_KEY = 'null-accounts.importOffered';
 
@@ -29,13 +31,34 @@ export function activate(context: vscode.ExtensionContext): NullAccountsApi {
     bindings.onDidChange(() => changed.fire()),
   );
 
+  const pickerDeps: PickerDeps = { accounts: store, bindings, github };
+
   const api = createApi({
     accounts: store,
     accountIdForFolder: folder => bindings.accountIdFor(folder.fsPath),
-    chooseAccountForFolder: folder => chooseAccountForFolder({ accounts: store, bindings, github }, folder),
+    chooseAccountForFolder: folder => chooseAccountForFolder(pickerDeps, folder),
     tokenProviders: { github }, // Phase 4 adds gitlab
     onDidChange: changed.event,
   });
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('null-accounts.open', () =>
+      AccountsPanel.createOrShow({
+        accounts: store,
+        bindings,
+        addGithub: () => addGithubAccount(pickerDeps),
+        onDidChange: changed.event,
+      })),
+    vscode.commands.registerCommand(SWITCH_COMMAND, async () => {
+      const folder = vscode.workspace.workspaceFolders?.[0];
+      if (!folder) {
+        void vscode.window.showInformationMessage('Open a folder to choose its account.');
+        return;
+      }
+      await chooseAccountForFolder(pickerDeps, folder.uri);
+    }),
+    registerStatusBar(api),
+  );
 
   void offerImport(context, store, bindings, github).catch(() => { /* a failed offer must never break activation */ });
   return api;
