@@ -35,4 +35,10 @@ test('getMusicWebviewHtml contains CSP nonce, controls, and clean local elements
   assert.ok(!html.includes('input-client-id'));
   assert.ok(!html.includes('link-dev-dash'));
   assert.ok(!html.includes('select-provider'));
+
+  // Engine protocol: loads carry autoplay + start offset, interrupted play() is not a failure.
+  assert.ok(html.includes("case 'localLoad':"));
+  assert.ok(!html.includes("case 'localPlay':"));
+  assert.ok(html.includes("err.name === 'AbortError'"));
+  assert.ok(html.includes('t.folder === f'));
 });
