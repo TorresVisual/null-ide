@@ -69,7 +69,7 @@ const signInGets = { '/version': versionOk, '/user': profile };
 });
 (0, node_test_1.test)('signIn on a self-hosted host with a port uses it in every URL and falls back to a noreply email', async () => {
     const { provider, calls, getCalls } = make({
-        replies: [device, granted],
+        replies: [{ body: { ...device.body, verification_uri: 'https://git.example.org:8443/oauth/device' } }, granted],
         gets: { '/version': versionOk, '/user': { status: 200, body: { id: 7, username: 'tanuki' } } },
     });
     const { account } = await provider.signIn('git.example.org:8443', ui());

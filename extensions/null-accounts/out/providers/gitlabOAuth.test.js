@@ -111,4 +111,12 @@ const failsWith = (reason) => (e) => e instanceof gitlabOAuth_1.OAuthError && e.
         node_assert_1.default.strictEqual((0, gitlabOAuth_1.parseTokens)(bad), undefined, String(bad));
     }
 });
+(0, node_test_1.test)('startDeviceFlow refuses verification URLs that point away from the GitLab host', async () => {
+    const ok = { device_code: 'dc', user_code: 'UC', verification_uri: 'https://gitlab.com/oauth/device' };
+    await node_assert_1.default.rejects((0, gitlabOAuth_1.startDeviceFlow)((0, testFakes_1.fakePost)({ body: { ...ok, verification_uri: 'https://gitlab.com.evil.example/oauth/device' } }).post, 'gitlab.com', 'cid'), failsWith('failed'));
+    await node_assert_1.default.rejects((0, gitlabOAuth_1.startDeviceFlow)((0, testFakes_1.fakePost)({ body: { ...ok, verification_uri: 'https://evil.example/' } }).post, 'git.example.org', 'cid'), failsWith('failed'));
+    // a mismatching verification_uri_complete is dropped; the (matching) plain one still works
+    const got = await (0, gitlabOAuth_1.startDeviceFlow)((0, testFakes_1.fakePost)({ body: { ...ok, verification_uri_complete: 'https://evil.example/?user_code=UC' } }).post, 'gitlab.com', 'cid');
+    node_assert_1.default.strictEqual(got.verificationUriComplete, undefined);
+});
 //# sourceMappingURL=gitlabOAuth.test.js.map
