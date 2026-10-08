@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "module": "none",
+    "lib": ["ES2017", "DOM"],
+    "outFile": "./out/webview-music-shared.js",
+    "strict": true,
+    "sourceMap": false,
+    "skipLibCheck": true
+  },
+  "include": [
+    "src/webview/music/protocol.ts",
+    "src/webview/music/dom.ts"
+  ]
+}
