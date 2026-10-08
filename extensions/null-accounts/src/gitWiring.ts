@@ -70,7 +70,13 @@ export class GitWiring {
         : { folder, status: 'skipped', reason: 'git-missing' };
     }
 
-    const plan = planFor(account, this.deps.home);
+    const keyFile = sshKeyFile(account, this.deps.home);
+    const keyMissing = keyFile !== '' && !this.deps.exists(keyFile);
+    // A token account's key is optional: without the file it keeps its identity and credential, minus the SSH settings.
+    const plan = planFor(
+      keyMissing && account.authMethod !== 'ssh' ? { ...account, sshKeyPath: undefined, signCommits: undefined } : account,
+      this.deps.home,
+    );
     if (old && old.accountId === account.id && sameConfig(old.entries, plan)) { return { folder, status: 'unchanged' }; }
 
     // A skipped folder must not keep the previous account's identity.
@@ -80,10 +86,7 @@ export class GitWiring {
     };
     // Checked first: git reports a folder that doesn't exist exactly like git not being installed.
     if (!this.deps.exists(folder)) { return skip('folder-missing'); }
-    if (account.authMethod === 'ssh') {
-      const keyFile = sshKeyFile(account, this.deps.home);
-      if (!this.deps.exists(keyFile)) { return skip('ssh-key-missing', keyFile); }
-    }
+    if (keyMissing && account.authMethod === 'ssh') { return skip('ssh-key-missing', keyFile); }
     const probe = await this.deps.git(folder, INSIDE_REPO);
     if (probe.code === GIT_UNAVAILABLE) { return skip('git-missing'); }
     if (probe.code !== 0) { return skip('not-a-repo', probe.stderr.trim().split(/\r?\n/)[0]); }

@@ -49,14 +49,20 @@ test('validateNewAccount rejects unknown provider and auth method', () => {
   assert.throws(() => validateNewAccount({ ...base, authMethod: 'magic' as never }), /auth/i);
 });
 
-test('validateNewAccount requires an SSH key path for ssh accounts only', () => {
+test('validateNewAccount requires an SSH key path for ssh accounts, and keeps one on any other account', () => {
   assert.throws(() => validateNewAccount({ ...base, authMethod: 'ssh' }), /ssh key/i);
   assert.throws(() => validateNewAccount({ ...base, authMethod: 'ssh', sshKeyPath: '  ' }), /ssh key/i);
-  const ssh = validateNewAccount({ ...base, authMethod: 'ssh', sshKeyPath: ' C:\keys\id_ed25519 ' });
-  assert.strictEqual(ssh.sshKeyPath, 'C:\keys\id_ed25519');
-  // A stray key path on a non-ssh account is dropped, not stored.
-  const oauth = validateNewAccount({ ...base, sshKeyPath: 'C:\keys\id_ed25519' });
-  assert.strictEqual('sshKeyPath' in oauth, false);
+  assert.strictEqual(validateNewAccount({ ...base, authMethod: 'ssh', sshKeyPath: ' C:/keys/id_ed25519 ' }).sshKeyPath, 'C:/keys/id_ed25519');
+  // A token account may carry a key too: git pushes over SSH with it while the token serves the API.
+  assert.strictEqual(validateNewAccount({ ...base, sshKeyPath: ' C:/keys/id_ed25519 ' }).sshKeyPath, 'C:/keys/id_ed25519');
+  assert.strictEqual('sshKeyPath' in validateNewAccount({ ...base, sshKeyPath: '  ' }), false);
+  assert.strictEqual('sshKeyPath' in validateNewAccount(base), false);
+});
+
+test('signCommits needs a key, and is stored only when true', () => {
+  assert.throws(() => validateNewAccount({ ...base, signCommits: true }), /signing needs an ssh key/i);
+  assert.strictEqual(validateNewAccount({ ...base, sshKeyPath: '/k/id', signCommits: true }).signCommits, true);
+  assert.strictEqual('signCommits' in validateNewAccount({ ...base, sshKeyPath: '/k/id', signCommits: false }), false);
 });
 
 test('validateNewAccount keeps a trimmed externalId and drops a blank one', () => {

@@ -46,3 +46,25 @@ test('~ in an SSH key path expands to the home directory, and a quote in the pat
 test('an SSH account without a key path plans an empty key, which the caller reports as a missing file', () => {
   assert.strictEqual(sshKeyFile({ ...github, authMethod: 'ssh' }, '/home/me'), '');
 });
+
+test('a token account with a key gets core.sshCommand as well as its credential entry', () => {
+  const both: Account = { ...github, sshKeyPath: '/k/id' };
+  const plan = planFor(both, '/home/me');
+  assert.deepStrictEqual(plan.config.map(e => e.key),
+    ['user.name', 'user.email', 'core.sshCommand', 'credential.https://github.com.username']);
+  assert.deepStrictEqual(plan.credential, { host: 'github.com', username: 'octocat' });
+});
+
+test('signCommits adds git SSH-signing settings that point at the private key, with plain separators and no quoting', () => {
+  const signer: Account = { ...github, authMethod: 'ssh', sshKeyPath: 'C:\\Users\\me\\.ssh\\id work', signCommits: true };
+  assert.deepStrictEqual(planFor(signer, 'C:\\Users\\me').config.slice(3), [
+    { key: 'gpg.format', value: 'ssh' },
+    { key: 'user.signingkey', value: 'C:/Users/me/.ssh/id work' },
+    { key: 'commit.gpgsign', value: 'true' },
+  ]);
+});
+
+test('signCommits without a key plans no signing', () => {
+  const stale: Account = { ...github, signCommits: true };
+  assert.ok(!planFor(stale, '/home/me').config.some(e => e.key === 'commit.gpgsign'));
+});

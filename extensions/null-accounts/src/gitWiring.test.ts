@@ -193,3 +193,53 @@ test('overlapping reconciles are serialised: two rapid calls leave one consisten
   assert.strictEqual(second[0].status, 'unchanged');
   assert.strictEqual(config(dir, 'user.email'), 'alice@example.com');
 });
+
+test('a signing account writes git SSH-signing settings; unbinding restores a hand-set commit.gpgsign', async () => {
+  const dir = makeRepo();
+  execFileSync('git', ['config', '--local', 'commit.gpgsign', 'false'], { cwd: dir });
+  const key = path.join(scratch, 'id_sign');
+  writeFileSync(key, 'not a real key');
+  const signer: Account = { ...alice, id: 'a4', authMethod: 'ssh', sshKeyPath: key, signCommits: true };
+  const { wiring, bound } = setup([[dir, signer]]);
+  await wiring.reconcile();
+  assert.strictEqual(config(dir, 'gpg.format'), 'ssh');
+  assert.strictEqual(config(dir, 'user.signingkey'), key.replace(/\\/g, '/'));
+  assert.strictEqual(config(dir, 'commit.gpgsign'), 'true');
+
+  bound.delete(dir);
+  await wiring.reconcile();
+  assert.strictEqual(config(dir, 'commit.gpgsign'), 'false');
+  assert.strictEqual(config(dir, 'gpg.format'), undefined);
+  assert.strictEqual(config(dir, 'user.signingkey'), undefined);
+});
+
+test('switching signing off rewrites the repo and puts the hand-set value back', async () => {
+  const dir = makeRepo();
+  execFileSync('git', ['config', '--local', 'commit.gpgsign', 'false'], { cwd: dir });
+  const key = path.join(scratch, 'id_sign2');
+  writeFileSync(key, 'not a real key');
+  const signer: Account = { ...alice, id: 'a5', authMethod: 'ssh', sshKeyPath: key, signCommits: true };
+  const { wiring, accounts } = setup([[dir, signer]]);
+  await wiring.reconcile();
+  accounts.set(signer.id, { ...signer, signCommits: undefined });
+  assert.deepStrictEqual(await wiring.reconcile(), [{ folder: dir, status: 'wired' }]);
+  assert.strictEqual(config(dir, 'commit.gpgsign'), 'false');
+  assert.strictEqual(config(dir, 'gpg.format'), undefined);
+  assert.strictEqual(config(dir, 'core.sshCommand'), `ssh -i '${key.replace(/\\/g, '/')}' -o IdentitiesOnly=yes`);
+});
+
+test('a token account whose key file is gone keeps its identity and credential, and loses only the SSH settings', async () => {
+  const dir = makeRepo();
+  const key = path.join(scratch, 'id_vanished');
+  const withKey: Account = { ...alice, id: 'a6', sshKeyPath: key, signCommits: true };
+  const { wiring } = setup([[dir, withKey]]);
+  assert.deepStrictEqual(await wiring.reconcile(), [{ folder: dir, status: 'wired' }]);
+  assert.strictEqual(config(dir, 'user.email'), 'alice@example.com');
+  assert.strictEqual(config(dir, CRED_ALICE), 'alice');
+  assert.strictEqual(config(dir, 'core.sshCommand'), undefined);
+  assert.strictEqual(config(dir, 'commit.gpgsign'), undefined);
+
+  writeFileSync(key, 'not a real key'); // the key comes back: the next reconcile adds the SSH settings
+  assert.deepStrictEqual(await wiring.reconcile(), [{ folder: dir, status: 'wired' }]);
+  assert.strictEqual(config(dir, 'commit.gpgsign'), 'true');
+});

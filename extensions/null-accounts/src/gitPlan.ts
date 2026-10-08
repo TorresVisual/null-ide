@@ -36,10 +36,20 @@ export function planFor(account: Account, home: string): WiringPlan {
     { key: 'user.name', value: account.username },
     { key: 'user.email', value: account.email },
   ];
-  if (account.authMethod === 'ssh') {
-    config.push({ key: 'core.sshCommand', value: `ssh -i ${shellQuote(sshKeyFile(account, home))} -o IdentitiesOnly=yes` });
-    return { config };
+  const keyFile = sshKeyFile(account, home);
+  if (keyFile) {
+    config.push({ key: 'core.sshCommand', value: `ssh -i ${shellQuote(keyFile)} -o IdentitiesOnly=yes` });
+    if (account.signCommits) {
+      // The private key's path: ssh-keygen signs with it directly, so no agent has to be running.
+      // Git reads this value itself (no shell), so it is not quoted.
+      config.push(
+        { key: 'gpg.format', value: 'ssh' },
+        { key: 'user.signingkey', value: keyFile },
+        { key: 'commit.gpgsign', value: 'true' },
+      );
+    }
   }
+  if (account.authMethod === 'ssh') { return { config }; }
   // The URL form of the key is the documented one and scopes the username to https remotes on this host.
   config.push({ key: `credential.https://${account.host}.username`, value: account.username });
   return { config, credential: credentialFor(account) };

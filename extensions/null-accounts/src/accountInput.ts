@@ -44,12 +44,18 @@ export function validateNewAccount(input: NewAccount): NewAccount {
     email,
     authMethod: input.authMethod,
   };
-  if (input.authMethod === 'ssh') {
-    const key = input.sshKeyPath?.trim();
-    if (!key) {
-      throw new Error('An SSH key path is required for SSH accounts.');
-    }
+  const key = input.sshKeyPath?.trim();
+  if (input.authMethod === 'ssh' && !key) {
+    throw new Error('An SSH key path is required for SSH accounts.');
+  }
+  if (key) {
     out.sshKeyPath = key;
+  }
+  if (input.signCommits) {
+    if (!key) {
+      throw new Error('Commit signing needs an SSH key.');
+    }
+    out.signCommits = true;
   }
   const externalId = input.externalId?.trim();
   if (externalId) {

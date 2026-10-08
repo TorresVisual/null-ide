@@ -11,8 +11,10 @@ export interface Account {
   username: string;
   email: string;
   authMethod: AuthMethod;
-  /** Required when authMethod is "ssh"; absent otherwise. */
+  /** Private key git uses over SSH for this account. Required for "ssh" accounts; any other account may have one too. */
   sshKeyPath?: string;
+  /** Sign commits in bound repos with `sshKeyPath` (gpg.format=ssh). Only meaningful with a key. */
+  signCommits?: boolean;
   /** Provider-side account id (GitHub: the session's `account.id`); used to pick the matching session. */
   externalId?: string;
 }
