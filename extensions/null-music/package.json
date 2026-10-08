@@ -113,9 +113,25 @@
         "command": "null-music.focus",
         "title": "Null Music: Open Music Player View",
         "icon": "media/music.svg"
-      }
+      },
+      { "command": "null-music.track.playNext", "title": "Null Music: Play Next" },
+      { "command": "null-music.track.addToQueue", "title": "Null Music: Add to Queue" },
+      { "command": "null-music.track.favorite", "title": "Null Music: Like / Unlike" },
+      { "command": "null-music.track.reveal", "title": "Null Music: Reveal in File Explorer" }
     ],
     "menus": {
+      "webview/context": [
+        { "command": "null-music.track.playNext", "when": "webviewId == 'null.musicView' && webviewSection == 'track'", "group": "1_queue@1" },
+        { "command": "null-music.track.addToQueue", "when": "webviewId == 'null.musicView' && webviewSection == 'track'", "group": "1_queue@2" },
+        { "command": "null-music.track.favorite", "when": "webviewId == 'null.musicView' && webviewSection == 'track'", "group": "2_library@1" },
+        { "command": "null-music.track.reveal", "when": "webviewId == 'null.musicView' && webviewSection == 'track'", "group": "3_file@1" }
+      ],
+      "commandPalette": [
+        { "command": "null-music.track.playNext", "when": "false" },
+        { "command": "null-music.track.addToQueue", "when": "false" },
+        { "command": "null-music.track.favorite", "when": "false" },
+        { "command": "null-music.track.reveal", "when": "false" }
+      ],
       "view/title": [
         {
           "command": "null-music.search",

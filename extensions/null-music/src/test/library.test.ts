@@ -194,3 +194,14 @@ test('externalDirs lists the folders of playlist-only files so the view may load
   assert.deepStrictEqual(lib.externalDirs, [path.dirname(outside)]);
   lib.dispose();
 });
+
+test('toggleLike fires onDidChangeLikes', async () => {
+  const dir = fs.mkdtempSync(path.join(root, 'likes-'));
+  const lib = new Library({ state: new MemState(), cacheFile: path.join(dir, 'c.json'), artDir: path.join(dir, 'art'), extensions: () => ['.mp3'] });
+  let fired = 0;
+  lib.onDidChangeLikes(() => fired++);
+  assert.strictEqual(await lib.toggleLike('local:x'), true);
+  assert.strictEqual(await lib.toggleLike('local:x'), false);
+  assert.strictEqual(fired, 2);
+  lib.dispose();
+});

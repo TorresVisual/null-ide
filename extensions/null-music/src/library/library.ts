@@ -96,11 +96,14 @@ export class Library {
   private saveTimer: NodeJS.Timeout | undefined;
   private readonly changeEmitter = new Emitter<void>();
   private readonly sourcesEmitter = new Emitter<void>();
+  private readonly likesEmitter = new Emitter<void>();
 
   /** Tracks, scan progress or likes-affecting data changed (throttled while scanning). */
   readonly onDidChange = this.changeEmitter.event;
   /** Folders or playlists were added/removed/reloaded. */
   readonly onDidChangeSources = this.sourcesEmitter.event;
+  /** A like was added or removed (cheap: carries no data, the UI re-reads `likedTracks()`). */
+  readonly onDidChangeLikes = this.likesEmitter.event;
 
   constructor(private readonly options: LibraryOptions) {
     this.cache = new LibraryCache(options.cacheFile);
@@ -134,6 +137,11 @@ export class Library {
       if (t.uri.startsWith('file://') && !t.folder) dirs.add(path.dirname(uriToPath(t.uri)));
     }
     return [...dirs];
+  }
+
+  /** Audio extensions the scanner accepts, as configured (e.g. `.mp3`). */
+  get supportedExtensions(): string[] {
+    return this.options.extensions();
   }
 
   get progress(): { scanned: number; total: number } {
@@ -199,6 +207,7 @@ export class Library {
   async toggleLike(id: string): Promise<boolean> {
     if (!this.liked.delete(id)) this.liked.add(id);
     await this.options.state.update(KEY_LIKED, [...this.liked]);
+    this.likesEmitter.fire();
     return this.liked.has(id);
   }
 
@@ -220,6 +229,7 @@ export class Library {
     void this.cache.save();
     this.changeEmitter.dispose();
     this.sourcesEmitter.dispose();
+    this.likesEmitter.dispose();
   }
 
   private lookup(): Map<string, Track> {

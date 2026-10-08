@@ -1,11 +1,13 @@
+/// <reference path="../webview/music/protocol.ts" />
 'use strict';
 
 import { Library } from '../library/library';
 import { Player } from '../playback/player';
 import { Track } from '../types';
+import { toWireLibrary, toWirePlayerState, toWireQueue } from './wire';
 
 export interface WebviewMessenger {
-  postMessage(message: any): void | Promise<boolean | void>;
+  postMessage(message: HostToWebview): void | Promise<boolean | void>;
 }
 
 export interface WebviewControllerHost {
@@ -15,8 +17,10 @@ export interface WebviewControllerHost {
   artUrl(artKey: string): string | undefined;
 }
 
-/** Translates webview messages into Player/Library calls. Audio events go to WebviewAudioOutput, not here. */
+/** Translates webview intents into Player/Library calls and publishes snapshots. Audio events go to WebviewAudioOutput, not here. */
 export class MusicViewController {
+  private lastQueue = '';
+
   constructor(
     private readonly player: Player,
     private readonly library: Library,
@@ -25,25 +29,17 @@ export class MusicViewController {
   ) {}
 
   public async handleMessage(data: any): Promise<void> {
-    if (!data || !data.type) {
-      return;
-    }
+    if (!data || typeof data.type !== 'string') return;
+    const msg = data as WebviewToHost;
 
     try {
-      switch (data.type) {
+      switch (msg.type) {
         case 'ready':
-          this.sendPlaybackState();
-          this.sendLocalLibrary();
+          this.sendAll();
           break;
 
         case 'playPause':
           await this.player.playPause();
-          break;
-        case 'play':
-          await this.player.play();
-          break;
-        case 'pause':
-          this.player.pause();
           break;
         case 'previous':
           await this.player.previous();
@@ -52,10 +48,10 @@ export class MusicViewController {
           await this.player.next();
           break;
         case 'seek':
-          if (typeof data.positionMs === 'number') this.player.seek(data.positionMs);
+          if (typeof msg.positionMs === 'number') this.player.seek(msg.positionMs);
           break;
         case 'setVolume':
-          if (typeof data.volumePercent === 'number') this.player.setVolume(data.volumePercent);
+          if (typeof msg.volumePercent === 'number') this.player.setVolume(msg.volumePercent);
           break;
         case 'toggleShuffle':
           this.player.toggleShuffle();
@@ -64,42 +60,56 @@ export class MusicViewController {
           this.player.toggleRepeat();
           break;
 
+        case 'playTracks':
+          await this.playTracks(msg);
+          break;
         case 'toggleLike': {
-          const track = this.player.getState().track;
-          if (track) await this.toggleLike(track.id);
+          const id = msg.trackId ?? this.player.getState().track?.id;
+          if (id) {
+            await this.library.toggleLike(id);
+            this.player.refresh();
+          }
           break;
         }
-        case 'toggleTrackLike':
-          if (data.trackId) await this.toggleLike(data.trackId);
+
+        case 'queuePlayNext': {
+          const t = this.library.trackById(msg.trackId);
+          if (t) this.player.playNext(t);
+          break;
+        }
+        case 'queueAdd': {
+          const t = this.library.trackById(msg.trackId);
+          if (t) this.player.addToQueue(t);
+          break;
+        }
+        case 'queueRemove':
+          await this.player.removeFromQueue(msg.key);
+          break;
+        case 'queueMove':
+          // Upcoming order is random while shuffling, so a manual order would mean nothing.
+          if (!this.player.queue.shuffle) this.player.moveInQueue(msg.key, msg.beforeKey);
+          break;
+        case 'queueClear':
+          this.player.clearQueue();
+          break;
+        case 'queueJump':
+          await this.player.jump(msg.key);
           break;
 
-        case 'localOpenFolder':
+        case 'addFolder':
           await this.host.executeCommand('null-music.openLocalFolder');
           break;
-        case 'localRemoveFolder':
-          if (data.folderUri) await this.library.removeFolder(data.folderUri);
-          break;
-        case 'localImportPlaylist':
+        case 'importPlaylist':
           await this.host.executeCommand('null-music.importPlaylist');
           break;
-        case 'localRemovePlaylist':
-          if (data.playlistId) await this.library.removePlaylist(data.playlistId);
+        case 'removeFolder':
+          if (msg.uri) await this.library.removeFolder(msg.uri);
           break;
-
-        case 'localPlayTrack': {
-          const context = data.trackUri ? this.library.contextFor(data.trackUri) : undefined;
-          if (context) await this.player.playTracks(context.tracks, context.index);
+        case 'removePlaylist':
+          if (msg.id) await this.library.removePlaylist(msg.id);
           break;
-        }
-        case 'localPlayFolder':
-          if (data.folderUri) await this.playAll(this.library.tracksInFolder(data.folderUri));
-          break;
-        case 'localPlayPlaylist':
-          if (data.playlistId) await this.playAll(this.library.playlistTracks(data.playlistId));
-          break;
-
-        case 'localGetLibrary':
-          this.sendLocalLibrary();
+        case 'rescan':
+          await this.library.rescan();
           break;
       }
     } catch (err: any) {
@@ -107,32 +117,54 @@ export class MusicViewController {
     }
   }
 
-  public sendPlaybackState(): void {
-    this.messenger.postMessage({ type: 'stateUpdate', state: this.player.getState() });
+  /** A (re)loaded webview starts empty: give it everything, including a fresh copy of the queue. */
+  public sendAll(): void {
+    this.lastQueue = '';
+    this.sendPlayer();
+    this.sendQueue();
+    this.sendLibrary();
+    this.sendLiked();
   }
 
-  public sendLocalLibrary(): void {
-    const tracks = this.library.tracks.map((t) => ({
-      ...t,
-      isLiked: this.library.isLiked(t.id),
-      albumArtUrl: t.artKey ? this.host.artUrl(t.artKey) : undefined,
-    }));
+  public sendPlayer(): void {
     this.messenger.postMessage({
-      type: 'localLibraryUpdate',
-      tracks,
-      folders: this.library.folders,
-      playlists: this.library.playlists,
-      progress: this.library.progress,
+      type: 'player',
+      state: toWirePlayerState(this.player.getState(), this.host.artUrl),
+      unavailable: [...this.player.unavailable],
     });
   }
 
-  private async toggleLike(trackId: string): Promise<void> {
-    await this.library.toggleLike(trackId);
-    this.player.refresh();
-    this.sendLocalLibrary();
+  /** Skips the post when nothing the Queue tab shows has changed (position ticks fire constantly). */
+  public sendQueue(): void {
+    const snapshot = this.player.queue.snapshot();
+    const signature = [
+      snapshot.history.map((e) => e.key).join(','),
+      snapshot.current?.key ?? '',
+      snapshot.upcoming.map((e) => e.key).join(','),
+      this.player.queue.shuffle,
+    ].join('|');
+    if (signature === this.lastQueue) return;
+    this.lastQueue = signature;
+    this.messenger.postMessage(toWireQueue(snapshot, this.player.queue.shuffle, this.host.artUrl));
   }
 
-  private async playAll(tracks: Track[]): Promise<void> {
-    if (tracks.length > 0) await this.player.playTracks(tracks, 0);
+  public sendLibrary(): void {
+    this.messenger.postMessage(toWireLibrary(this.library, this.host.artUrl));
+  }
+
+  public sendLiked(): void {
+    this.messenger.postMessage({ type: 'liked', ids: this.library.likedTracks().map((t) => t.id) });
+  }
+
+  private async playTracks(msg: Extract<WebviewToHost, { type: 'playTracks' }>): Promise<void> {
+    if (!Array.isArray(msg.ids)) return;
+    const tracks = msg.ids.map((id) => this.library.trackById(id)).filter((t): t is Track => !!t);
+    if (tracks.length === 0) return;
+    let start = Math.max(0, tracks.findIndex((t) => t.id === msg.startId));
+    if (msg.shuffle) {
+      if (!this.player.queue.shuffle) this.player.toggleShuffle();
+      start = Math.floor(Math.random() * tracks.length);
+    }
+    await this.player.playTracks(tracks, start);
   }
 }

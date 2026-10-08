@@ -123,6 +123,26 @@ export function registerCommands(context: vscode.ExtensionContext, player: Playe
     );
   });
 
+  // Row context-menu commands: the webview row's data-vscode-context payload arrives as the argument.
+  const trackFrom = (ctx: { trackId?: string } | undefined) => (ctx?.trackId ? library.trackById(ctx.trackId) : undefined);
+  register('null-music.track.playNext', (ctx) => {
+    const t = trackFrom(ctx);
+    if (t) player.playNext(t);
+  });
+  register('null-music.track.addToQueue', (ctx) => {
+    const t = trackFrom(ctx);
+    if (t) player.addToQueue(t);
+  });
+  register('null-music.track.favorite', async (ctx) => {
+    if (!ctx?.trackId) return;
+    await library.toggleLike(ctx.trackId);
+    player.refresh();
+  });
+  register('null-music.track.reveal', async (ctx) => {
+    const t = trackFrom(ctx);
+    if (t && t.uri.startsWith('file:')) await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.parse(t.uri));
+  });
+
   register('null-music.showCurrentTrack', () => {
     const track = player.getState().track;
     if (!track) {

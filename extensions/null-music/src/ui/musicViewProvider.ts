@@ -22,8 +22,12 @@ export class MusicViewProvider implements vscode.WebviewViewProvider, vscode.Dis
     private readonly artDir: string
   ) {
     this.subscriptions.push(
-      this.player.onDidChange(() => this.controller?.sendPlaybackState()),
-      this.library.onDidChange(() => this.controller?.sendLocalLibrary()),
+      this.player.onDidChange(() => {
+        this.controller?.sendPlayer();
+        this.controller?.sendQueue();
+      }),
+      this.library.onDidChange(() => this.controller?.sendLibrary()),
+      this.library.onDidChangeLikes(() => this.controller?.sendLiked()),
       this.library.onDidChangeSources(() => {
         if (this.view) this.refreshLocalResourceRoots(this.view);
       })
