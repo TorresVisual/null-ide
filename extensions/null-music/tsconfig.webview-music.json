@@ -19,6 +19,7 @@
     "src/webview/music/audio.ts",
     "src/webview/music/player.ts",
     "src/webview/music/queueView.ts",
+    "src/webview/music/libraryView.ts",
     "src/webview/music/header.ts",
     "src/webview/music/main.ts"
   ]
