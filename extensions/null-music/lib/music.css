@@ -42,7 +42,6 @@ mark { background: var(--vscode-editor-findMatchHighlightBackground); color: inh
 /* header */
 .np-header { display: flex; align-items: center; gap: 6px; padding: 6px 8px; min-height: 34px; flex: none; }
 .np-brand { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; font-weight: 600; }
-.np-brand-mark { font-size: 16px; line-height: 1; }
 
 /* player */
 .np-player { display: flex; flex-direction: column; gap: 6px; padding: 4px 12px 8px; flex: none; }
