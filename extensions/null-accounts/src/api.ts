@@ -66,6 +66,8 @@ export function createApi(deps: ApiDeps): NullAccountsApi {
       // Callers pass an Account they got from this API; trust only the stored copy, never its fields.
       const stored = deps.accounts.get(account.id);
       if (!stored) { return undefined; }
+      // An SSH account signs in with its key: there is no token to hand out, and a provider must not mistake that for a dead sign-in.
+      if (stored.authMethod === 'ssh') { return undefined; }
       try {
         return await deps.tokenProviders[stored.provider]?.getToken(stored, scopes, options);
       } catch {

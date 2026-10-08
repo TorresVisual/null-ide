@@ -44,7 +44,7 @@ export function buildPickItems(accounts: readonly Account[], { suggestedId, curr
   return items;
 }
 
-export type ProviderChoice = 'github' | 'gitlab' | 'gitlab-self-hosted' | 'gitlab-token';
+export type ProviderChoice = 'github' | 'gitlab' | 'gitlab-self-hosted' | 'gitlab-token' | 'ssh';
 
 /** The second quick-pick, shown after "Add account…". */
 export const providerPickItems = (): Array<{ label: string; description: string; choice: ProviderChoice }> => [
@@ -52,4 +52,5 @@ export const providerPickItems = (): Array<{ label: string; description: string;
   { label: 'GitLab', description: 'gitlab.com', choice: 'gitlab' },
   { label: 'GitLab self-hosted…', description: 'your own server (https)', choice: 'gitlab-self-hosted' },
   { label: 'GitLab with an access token…', description: 'for servers that don’t allow OAuth apps', choice: 'gitlab-token' },
+  { label: 'SSH key…', description: 'GitLab or GitHub with just a key — no sign-in', choice: 'ssh' },
 ];

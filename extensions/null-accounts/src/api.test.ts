@@ -80,6 +80,18 @@ test('getToken resolves undefined, never rejects, when the provider throws', asy
   assert.strictEqual(await api.getToken(gh), undefined);
 });
 
+test('getToken resolves undefined for an SSH account without asking any provider', async () => {
+  const ssh: Account = { id: 'a3', provider: 'gitlab', host: 'git.uni.example', username: 'ada', email: 'a@uni.example', authMethod: 'ssh', sshKeyPath: '~/.ssh/id' };
+  let asked = 0;
+  const gitlab: TokenProvider = { getToken: async () => { asked++; return 'x'; } };
+  const api = createApi(makeDeps({
+    accounts: { list: () => [ssh], get: id => (id === ssh.id ? ssh : undefined) },
+    tokenProviders: { gitlab },
+  }));
+  assert.strictEqual(await api.getToken(ssh, undefined, { interactive: true }), undefined);
+  assert.strictEqual(asked, 0);
+});
+
 test('onDidChange is the supplied event, not a wrapper', () => {
   assert.strictEqual(createApi(makeDeps()).onDidChange, noopEvent);
 });

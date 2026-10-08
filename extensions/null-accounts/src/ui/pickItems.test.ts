@@ -36,7 +36,7 @@ test('with no accounts only the add action remains', () => {
   assert.deepStrictEqual(kinds(buildPickItems([])), ['add']);
 });
 
-test('the provider choices are GitHub, gitlab.com, self-hosted GitLab and GitLab with an access token, in that order', () => {
-  assert.deepStrictEqual(providerPickItems().map(p => p.choice), ['github', 'gitlab', 'gitlab-self-hosted', 'gitlab-token']);
+test('the provider choices are GitHub, gitlab.com, self-hosted GitLab, an access token and an SSH key, in that order', () => {
+  assert.deepStrictEqual(providerPickItems().map(p => p.choice), ['github', 'gitlab', 'gitlab-self-hosted', 'gitlab-token', 'ssh']);
   assert.strictEqual(ADD_ACCOUNT_LABEL, '$(add) Add account…');
 });

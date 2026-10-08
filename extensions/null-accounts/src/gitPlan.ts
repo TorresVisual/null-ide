@@ -15,11 +15,13 @@ export interface WiringPlan {
 }
 
 /** "~/.ssh/id" -> "<home>/.ssh/id"; backslashes become slashes (git runs `core.sshCommand` through a POSIX shell). */
-export function sshKeyFile(account: Account, home: string): string {
-  const raw = account.sshKeyPath?.trim() ?? '';
-  const expanded = /^~[\\/]/.test(raw) ? `${home.replace(/[\\/]+$/, '')}/${raw.slice(2)}` : raw;
+export function expandKeyPath(raw: string, home: string): string {
+  const trimmed = raw.trim();
+  const expanded = /^~[\\/]/.test(trimmed) ? `${home.replace(/[\\/]+$/, '')}/${trimmed.slice(2)}` : trimmed;
   return expanded.replace(/\\/g, '/');
 }
+
+export const sshKeyFile = (account: Account, home: string): string => expandKeyPath(account.sshKeyPath ?? '', home);
 
 /** The credential entry for a token account (GitHub OAuth, GitLab OAuth or access token); SSH accounts have none. */
 export function credentialFor(account: Account): CredentialTarget | undefined {

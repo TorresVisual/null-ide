@@ -1,0 +1,50 @@
+'use strict';
+
+import { execFile } from 'node:child_process';
+
+export interface SshCheck {
+  ok: boolean;
+  /** The user the server says the key belongs to (GitLab: "Welcome to GitLab, @ada!"). */
+  user?: string;
+  /** Why it failed, fit to show the user. */
+  message: string;
+}
+
+/** Everything ssh printed, or the reason it could not run. */
+export type RunSsh = (args: string[]) => Promise<string>;
+
+export const runSsh: RunSsh = args => new Promise(resolve => {
+  execFile('ssh', args, { timeout: 20_000, windowsHide: true }, (err, stdout, stderr) => {
+    resolve(`${stdout}\n${stderr}\n${err && !stdout && !stderr ? err.message : ''}`);
+  });
+});
+
+/** `-T git@host` with only this key; BatchMode so it fails fast instead of waiting on a prompt nobody can see. */
+export function sshCheckArgs(host: string, keyFile: string): string[] {
+  return ['-i', keyFile, '-o', 'IdentitiesOnly=yes', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', '-T', `git@${host}`];
+}
+
+// GitLab: "Welcome to GitLab, @ada!". GitHub: "Hi ada! You've successfully authenticated, but GitHub does not provide shell access."
+const WELCOME = /welcome to gitlab, @?([\w.-]+)!|hi ([\w.-]+)! you've successfully authenticated/i;
+
+export function interpretSshReply(output: string, host: string): SshCheck {
+  const welcome = WELCOME.exec(output);
+  if (welcome) {
+    const user = welcome[1] ?? welcome[2];
+    return { ok: true, user, message: `Connected to ${host} as ${user}.` };
+  }
+  const fail = (message: string): SshCheck => ({ ok: false, message });
+  if (/ENOENT/.test(output)) { return fail('ssh was not found on your PATH.'); }
+  if (/host key verification failed|authenticity of host/i.test(output)) {
+    return fail(`${host} is not in your known hosts yet. Run  ssh git@${host}  once in a terminal and accept its fingerprint, then try again.`);
+  }
+  if (/permission denied/i.test(output)) {
+    return fail(`${host} did not accept this key. Is its public key (.pub) added to your account there?`);
+  }
+  const firstLine = output.split(/\r?\n/).map(l => l.trim()).find(Boolean);
+  return fail(firstLine ?? `Could not reach ${host} over SSH.`);
+}
+
+export async function checkSsh(host: string, keyFile: string, run: RunSsh = runSsh): Promise<SshCheck> {
+  return interpretSshReply(await run(sshCheckArgs(host, keyFile)), host);
+}
