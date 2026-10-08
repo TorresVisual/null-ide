@@ -110,8 +110,8 @@ system config are never modified. Unbinding removes the keys this extension set
 | Account auth | Config written |
 |---|---|
 | any | `user.name` = username, `user.email` = account email |
-| SSH | `core.sshCommand` = `ssh -i "<sshKeyPath>" -o IdentitiesOnly=yes` |
-| HTTPS / OAuth | `credential.<host>.username` = username; token stored in the OS credential store via `git credential approve` for (host, username) |
+| SSH | `core.sshCommand` = `ssh -i '<sshKeyPath>' -o IdentitiesOnly=yes` (single-quoted, `/` separators, leading `~/` expanded) |
+| HTTPS / OAuth | `credential.https://<host>.username` = username; token stored in the OS credential store via `git credential approve` for (host, username) |
 
 Rationale for the HTTPS/OAuth row: Git then selects the right credential for that
 repo even when invoked from a plain terminal outside the IDE. The alternative, a
@@ -121,6 +121,8 @@ places (SecretStorage and the OS store). GitLab refreshes re-run `credential
 approve` with the new token while the IDE is running; if the IDE is closed past
 token expiry, the next IDE start refreshes and re-approves. GitHub built-in
 tokens do not expire.
+
+Implementation notes (Phase 6): wiring is a reconcile against the current bindings, so it is idempotent and survives restarts (`globalState` records per folder what was written and the value it replaced; unbinding restores that value, and leaves a value the user changed since). The OS credential belongs to the account: it is approved while any folder is bound to the account and withdrawn (`git credential reject`) when none is. A 5-minute poll re-approves a rotated GitLab token for sessions that only use a terminal. Skips (git missing, SSH key missing, git refusing a setting) warn once per session for open folders; a folder that is not a repository is silent. SSH accounts (`authMethod: 'ssh'`) are added with the server, username, email and a private-key file; they have no token (`getToken` returns `undefined`), and a failed `ssh -T` test warns but still saves the account.
 
 ## Data flow
 
@@ -195,5 +197,5 @@ import it as an account so existing users are not logged out.
 4. **Accounts menu** — the Accounts menu lists null-accounts' accounts
    (`null-accounts-menu-design.md`).
 5. **GitLab** — device flow, refresh, self-hosted host. — landed (`docs/plans/null-accounts-phase5-gitlab.md`)
-6. **Git wiring** — identity, SSH, HTTPS/OAuth credential store, cleanup on unbind.
+6. **Git wiring** — identity, SSH, HTTPS/OAuth credential store, cleanup on unbind. — landed (`docs/plans/null-accounts-phase6-git-wiring.md`)
 7. **Integration** — dashboard shows each project's account; docs; verify-local spec.
