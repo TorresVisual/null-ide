@@ -14,6 +14,7 @@ import { registerAccountsMenu } from './ui/accountsMenuController';
 import { ADD_ACCOUNT_COMMAND, BIND_COMMAND } from './ui/accountsMenuModel';
 import { AccountsPanel } from './ui/accountsPanel';
 import { registerStatusBar, SWITCH_COMMAND } from './ui/statusBarController';
+import { NewAccount } from './types';
 
 const IMPORT_OFFERED_KEY = 'null-accounts.importOffered';
 
@@ -93,6 +94,16 @@ export function activate(context: vscode.ExtensionContext): NullAccountsApi {
     registerStatusBar(api),
     registerAccountsMenu(api),
   );
+
+  if (context.extensionMode === vscode.ExtensionMode.Test) {
+    // Integration specs cannot sign in to a provider, so they add and remove accounts through these two commands.
+    // Not contributed in package.json and registered only when an extensionTestsPath run hosts the extension:
+    // they would otherwise be a prompt-free way to add or delete accounts.
+    context.subscriptions.push(
+      vscode.commands.registerCommand('null-accounts.test.addAccount', (account: NewAccount, secret?: string) => store.add(account, secret)),
+      vscode.commands.registerCommand('null-accounts.test.removeAccount', (id: string) => store.remove(id)),
+    );
+  }
 
   void offerImport(context, store, bindings, github).catch(() => { /* a failed offer must never break activation */ });
   return api;

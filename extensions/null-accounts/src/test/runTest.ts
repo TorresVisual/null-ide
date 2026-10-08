@@ -33,6 +33,13 @@ async function main(): Promise<void> {
   const workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), 'null-accounts-spec-workspace-'));
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'null-accounts-spec-userdata-'));
   const extensionsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'null-accounts-spec-extensions-'));
+  // The git-wiring spec approves a fake token through `git credential`. Give git a throw-away global config
+  // whose only credential helper is a plain file (the empty `helper =` first resets the list, which drops the
+  // system config's Git Credential Manager), so the run can never touch the real credential store or ~/.gitconfig.
+  const gitDir = fs.mkdtempSync(path.join(os.tmpdir(), 'null-accounts-spec-git-'));
+  const credentialsFile = path.join(gitDir, 'credentials').split(path.sep).join('/');
+  const gitConfigFile = path.join(gitDir, 'gitconfig');
+  fs.writeFileSync(gitConfigFile, `[credential]\n\thelper =\n\thelper = store --file='${credentialsFile}'\n`);
 
   // If set, this forces any Electron binary to run as plain Node instead of
   // launching the app - breaks the actual GUI launch this harness needs.
@@ -51,11 +58,13 @@ async function main(): Promise<void> {
         '--user-data-dir', userDataDir,
         '--extensions-dir', extensionsDir,
       ],
+      extensionTestsEnv: { GIT_CONFIG_GLOBAL: gitConfigFile, NULL_ACCOUNTS_SPEC_CREDENTIALS: credentialsFile },
     });
   } finally {
     fs.rmSync(workspaceDir, { recursive: true, force: true });
     fs.rmSync(userDataDir, { recursive: true, force: true });
     fs.rmSync(extensionsDir, { recursive: true, force: true });
+    fs.rmSync(gitDir, { recursive: true, force: true });
   }
 }
 
