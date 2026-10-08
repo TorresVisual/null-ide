@@ -1,0 +1,54 @@
+{
+  "name": "null-activity",
+  "displayName": "Null Activity",
+  "description": "Private, local-only coding activity tracking for Null IDE — active time, projects, languages and sessions",
+  "version": "1.0.0",
+  "publisher": "null",
+  "license": "MIT",
+  "engines": { "vscode": "^1.93.0" },
+  "main": "./out/extension.js",
+  "activationEvents": ["onStartupFinished"],
+  "contributes": {
+    "commands": [
+      { "command": "null-activity.showTrackedData", "title": "Null Activity: Show Tracked Data" },
+      { "command": "null-activity.deleteRange", "title": "Null Activity: Delete Tracked Data for a Range…" },
+      { "command": "null-activity.deleteAll", "title": "Null Activity: Delete All Tracked Data…" }
+    ],
+    "configuration": {
+      "title": "Null Activity",
+      "properties": {
+        "null-activity.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Track coding activity locally. Turning this off stops collection immediately; existing data stays until you delete it."
+        },
+        "null-activity.idleTimeout": {
+          "type": "number",
+          "default": 120,
+          "minimum": 10,
+          "maximum": 3600,
+          "description": "Seconds without interaction before time stops counting."
+        },
+        "null-activity.sessionGap": {
+          "type": "number",
+          "default": 15,
+          "minimum": 1,
+          "maximum": 1440,
+          "description": "Minutes of inactivity that end a session."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0",
+    "@types/vscode": "^1.93.0",
+    "@types/node": "^22.0.0",
+    "@vscode/test-electron": "^3.1.0",
+    "mocha": "^11.8.0",
+    "@types/mocha": "^10.0.10",
+    "glob": "^13.0.6"
+  }
+}

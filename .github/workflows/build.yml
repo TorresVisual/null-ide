@@ -162,6 +162,13 @@ jobs:
           npm ci --ignore-scripts
           npm run compile
 
+      - name: Compile null-activity TypeScript
+        shell: pwsh
+        run: |
+          Set-Location ide-overlay/extensions/null-activity
+          npm ci --ignore-scripts
+          npm run compile
+
       - name: Copy built-in extensions
         shell: pwsh
         run: |
@@ -174,6 +181,7 @@ jobs:
           Copy-Item -Recurse -Force ide-overlay/extensions/null-accounts   vscode-src/extensions/
           Copy-Item -Recurse -Force ide-overlay/extensions/null-format     vscode-src/extensions/
           Copy-Item -Recurse -Force ide-overlay/extensions/null-music      vscode-src/extensions/
+          Copy-Item -Recurse -Force ide-overlay/extensions/null-activity   vscode-src/extensions/
 
       - name: Bundle Code Spell Checker as built-in extension
         shell: pwsh

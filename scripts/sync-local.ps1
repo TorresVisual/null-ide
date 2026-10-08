@@ -282,6 +282,15 @@ $Extensions = [ordered]@{
         )
     }
 
+    "null-activity" = @{
+        Compile       = $true
+        CompileScript = "compile"
+        Copy          = @(
+            "package.json",
+            "out"
+        )
+    }
+
 }
 
 # ============================================================
