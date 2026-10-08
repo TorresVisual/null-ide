@@ -35,45 +35,68 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 const node_test_1 = require("node:test");
 const assert = __importStar(require("node:assert/strict"));
-const fs = __importStar(require("fs"));
-const os = __importStar(require("os"));
-const path = __importStar(require("path"));
+const fs = __importStar(require("node:fs"));
+const os = __importStar(require("node:os"));
+const path = __importStar(require("node:path"));
 const recentProjects_1 = require("./recentProjects");
-(0, node_test_1.test)('readRecentProjects returns [] for a missing file', () => {
-    const missing = path.join(os.tmpdir(), `null-recent-projects-missing-${process.pid}.json`);
-    assert.deepEqual((0, recentProjects_1.readRecentProjects)(missing), []);
-});
-(0, node_test_1.test)('readRecentProjects returns [] for corrupt JSON', () => {
-    const filePath = path.join(os.tmpdir(), `null-recent-projects-corrupt-${process.pid}.json`);
-    fs.writeFileSync(filePath, '{not valid json');
+function withStore(run) {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'null-recent-projects-'));
     try {
-        assert.deepEqual((0, recentProjects_1.readRecentProjects)(filePath), []);
+        run(path.join(dir, 'recent.json'), dir);
     }
     finally {
-        fs.unlinkSync(filePath);
+        fs.rmSync(dir, { recursive: true, force: true });
     }
-});
-(0, node_test_1.test)('readRecentProjects returns [] for non-array JSON', () => {
-    const filePath = path.join(os.tmpdir(), `null-recent-projects-nonarray-${process.pid}.json`);
-    fs.writeFileSync(filePath, '{"not": "an array"}');
-    try {
-        assert.deepEqual((0, recentProjects_1.readRecentProjects)(filePath), []);
-    }
-    finally {
-        fs.unlinkSync(filePath);
-    }
-});
-(0, node_test_1.test)('readRecentProjects parses a valid entries array', () => {
-    const filePath = path.join(os.tmpdir(), `null-recent-projects-valid-${process.pid}.json`);
-    const entries = [
-        { path: 'C:\\Projects\\Foo', label: 'Foo', isWorkspaceFile: false, timestamp: 123 },
-    ];
-    fs.writeFileSync(filePath, JSON.stringify(entries));
-    try {
-        assert.deepEqual((0, recentProjects_1.readRecentProjects)(filePath), entries);
-    }
-    finally {
-        fs.unlinkSync(filePath);
-    }
-});
+}
+(0, node_test_1.test)('legacy entries receive defaults and unknown members are ignored', () => withStore(file => {
+    fs.writeFileSync(file, JSON.stringify([
+        { path: 'C:\\Code\\App', label: 'App', isWorkspaceFile: false, timestamp: 7 },
+        { path: 42 },
+    ]));
+    assert.deepEqual((0, recentProjects_1.readRecentProjects)(file), [{
+            path: 'C:\\Code\\App', label: 'App', isWorkspaceFile: false, timestamp: 7, pinned: false,
+        }]);
+}));
+(0, node_test_1.test)('readRecentProjects treats missing and malformed data as empty', () => withStore(file => {
+    assert.deepEqual((0, recentProjects_1.readRecentProjects)(file), []);
+    fs.writeFileSync(file, '{not valid json');
+    assert.deepEqual((0, recentProjects_1.readRecentProjects)(file), []);
+    fs.writeFileSync(file, JSON.stringify({ not: 'an array' }));
+    assert.deepEqual((0, recentProjects_1.readRecentProjects)(file), []);
+}));
+(0, node_test_1.test)('retention drops only oldest unpinned entries', () => withStore(file => {
+    (0, recentProjects_1.writeRecentProjects)(file, [
+        { path: 'C:\\pinned', label: 'Pinned', isWorkspaceFile: false, timestamp: 1, pinned: true },
+        { path: 'C:\\middle', label: 'Middle', isWorkspaceFile: false, timestamp: 2, pinned: false },
+        { path: 'C:\\newest', label: 'Newest', isWorkspaceFile: false, timestamp: 3, pinned: false },
+        { path: 'C:\\oldest', label: 'Oldest', isWorkspaceFile: false, timestamp: 0, pinned: false },
+    ]);
+    assert.equal((0, recentProjects_1.updateRecentProjects)(file, entries => entries, 2), true);
+    assert.deepEqual((0, recentProjects_1.readRecentProjects)(file).map(({ label }) => label), ['Newest', 'Middle', 'Pinned']);
+}));
+(0, node_test_1.test)('touch preserves enhanced fields and deduplicates case variants', () => withStore(file => {
+    (0, recentProjects_1.writeRecentProjects)(file, [{
+            path: 'C:\\Code\\App', label: 'Old', isWorkspaceFile: false, timestamp: 1, pinned: true,
+            gitBranch: 'main', projectType: 'Node', icon: 'node',
+        }]);
+    assert.equal((0, recentProjects_1.touchRecentProject)(file, {
+        path: 'c:\\code\\app', label: 'App', isWorkspaceFile: false, pinned: false,
+    }, 20), true);
+    const [entry] = (0, recentProjects_1.readRecentProjects)(file);
+    assert.equal((0, recentProjects_1.readRecentProjects)(file).length, 1);
+    assert.deepEqual({ path: entry.path, label: entry.label, pinned: entry.pinned, gitBranch: entry.gitBranch, projectType: entry.projectType, icon: entry.icon }, { path: 'c:\\code\\app', label: 'App', pinned: true, gitBranch: 'main', projectType: 'Node', icon: 'node' });
+}));
+(0, node_test_1.test)('pin and removal affect only the selected normalized identity', () => withStore(file => {
+    (0, recentProjects_1.writeRecentProjects)(file, [
+        { path: 'C:\\one', label: 'One', isWorkspaceFile: false, timestamp: 2, pinned: false },
+        { path: 'C:\\two', label: 'Two', isWorkspaceFile: false, timestamp: 1, pinned: false },
+    ]);
+    assert.equal((0, recentProjects_1.setRecentProjectPinned)(file, 'c:\\one', true, 20), true);
+    assert.equal((0, recentProjects_1.removeRecentProject)(file, 'C:\\two', 20), true);
+    assert.deepEqual((0, recentProjects_1.readRecentProjects)(file).map(entry => [entry.label, entry.pinned]), [['One', true]]);
+}));
+(0, node_test_1.test)('writes atomically without leaving a temporary file', () => withStore((file, dir) => {
+    assert.equal((0, recentProjects_1.writeRecentProjects)(file, [{ path: 'C:\\App', label: 'App', isWorkspaceFile: false, timestamp: 1, pinned: false }]), true);
+    assert.deepEqual(fs.readdirSync(dir).filter(name => name.endsWith('.tmp')), []);
+}));
 //# sourceMappingURL=recentProjects.test.js.map
