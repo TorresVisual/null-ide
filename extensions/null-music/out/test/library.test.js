@@ -197,4 +197,15 @@ function make(fx, state = new fixtures_1.MemState()) {
     await new Promise((r) => setTimeout(r, 50));
     node_assert_1.default.strictEqual(JSON.parse(fs.readFileSync(fx.cache, 'utf8')).entries[fx.files.alpha].tags.durationMs, 200000);
 });
+(0, node_test_1.test)('externalDirs lists the folders of playlist-only files so the view may load them', async () => {
+    const fx = fixture();
+    const outside = path.join(fx.base, 'elsewhere', 'solo.mp3');
+    fs.mkdirSync(path.dirname(outside), { recursive: true });
+    fs.writeFileSync(outside, 'x');
+    const { lib } = make(fx);
+    await lib.addFolder(fx.folderUri);
+    await lib.importPlaylist(path.join(fx.base, 'mix.m3u8'), `${fx.files.alpha}\n${outside}\nhttps://x.test/s.mp3\n`);
+    node_assert_1.default.deepStrictEqual(lib.externalDirs, [path.dirname(outside)]);
+    lib.dispose();
+});
 //# sourceMappingURL=library.test.js.map

@@ -84,7 +84,7 @@ class MusicViewProvider {
             this.view = undefined;
         });
     }
-    /** Extension, art cache, library folders and playlist directories — nothing else is readable. */
+    /** Extension, art cache, library folders, playlist directories and the folders of playlist-only files — nothing else is readable. */
     getLocalFolderRoots() {
         const roots = [this.extensionUri, vscode.Uri.file(this.artDir)];
         for (const folder of this.library.folders) {
@@ -97,6 +97,9 @@ class MusicViewProvider {
         }
         for (const file of this.library.playlistPaths) {
             roots.push(vscode.Uri.file(path.dirname(file)));
+        }
+        for (const dir of this.library.externalDirs) {
+            roots.push(vscode.Uri.file(dir));
         }
         return roots;
     }

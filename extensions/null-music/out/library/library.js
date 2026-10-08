@@ -133,6 +133,15 @@ class Library {
     get playlistPaths() {
         return [...this.playlistFiles];
     }
+    /** Folders of playlist-only local files (outside every library folder), so the view may load them. */
+    get externalDirs() {
+        const dirs = new Set();
+        for (const t of this.external.values()) {
+            if (t.uri.startsWith('file://') && !t.folder)
+                dirs.add(path.dirname((0, uri_1.uriToPath)(t.uri)));
+        }
+        return [...dirs];
+    }
     get progress() {
         return { scanned: this.scanned, total: this.total };
     }

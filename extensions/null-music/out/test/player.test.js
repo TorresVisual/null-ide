@@ -226,4 +226,24 @@ function setup(extra = {}) {
     node_assert_1.default.deepStrictEqual(learned, [[t[0].id, 201000]]);
     node_assert_1.default.strictEqual(player.getState().durationMs, 201000);
 });
+(0, node_test_1.test)('an unplayable file during a paused or restored load advances paused, never autoplaying', async () => {
+    const t = tracks(3);
+    const { out, player } = setup();
+    player.restore({ trackIds: t.map((x) => x.id), index: 1, positionMs: 5000, volume: 50, shuffle: false, repeat: 'off' }, (id) => t.find((x) => x.id === id));
+    out.becomeReady();
+    out.emit({ type: 'error', message: 'gone', silent: false, trackUri: t[1].uri });
+    await (0, fixtures_1.tick)();
+    node_assert_1.default.strictEqual(player.getState().track?.id, t[2].id);
+    node_assert_1.default.ok(out.calls.every((c) => !c.endsWith(' play') && c !== 'play'), out.calls.join(' | '));
+});
+(0, node_test_1.test)('a pause pressed while the view is still being revealed cancels the pending play', async () => {
+    const { out, player } = setup();
+    const started = player.playTracks(tracks(2), 0);
+    await (0, fixtures_1.tick)();
+    player.pause(); // output not ready: nothing to send, but the intent changed
+    out.becomeReady();
+    await started;
+    node_assert_1.default.ok(out.calls.every((c) => !c.endsWith(' play') && c !== 'play'), out.calls.join(' | '));
+    node_assert_1.default.strictEqual(player.getState().isPlaying, false);
+});
 //# sourceMappingURL=player.test.js.map
