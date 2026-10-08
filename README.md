@@ -42,7 +42,7 @@ Or download `NullIDESetup-<version>.exe` from the [latest release](https://githu
 
 ### Highlights
 
-- **Project dashboard** opens on startup: recent projects with live git status, New Project, Clone Repo.
+- **Project dashboard** opens on startup as a recent-project launcher: search, sort, pin and manage projects, with best-effort Git/type details alongside New Project, Clone Repo, and Open Folder.
 - **GitHub Issues** in its own activity-bar view and a full-width tab, with github.com-style search, filters, an issue detail tab, and issue creation and commenting. Sign in from the view.
 - **Commit messages** from your staged diff with `Ctrl+Shift+Alt+G` (uses the [`claude`](https://claude.com/claude-code) CLI, which must be installed separately).
 - **Git worktrees** view: create (including one per issue), open in a new window, merge back, prune.
