@@ -1,6 +1,6 @@
 # Null Music — Player UI (Sub-project B) — Design
 
-Status: approved in brainstorming; awaiting spec review.
+Status: implemented per [the plan](../plans/null-music-player-ui.md). Open items resolved by adopting the author's proposals (art cap `min(100% width, 35vh)`; ±10 s buttons dropped). The plan lists the few deliberate deviations from this spec.
 Part 2 of 3: [A](null-music-engine-design.md) engine & library → **B** player UI → C IDE integration.
 **Depends on A.** B ships after A: it consumes A's track tags, cover art, queue and scan progress.
 
