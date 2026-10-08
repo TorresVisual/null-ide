@@ -69,7 +69,7 @@ export class MusicViewProvider implements vscode.WebviewViewProvider, vscode.Dis
     });
   }
 
-  /** Extension, art cache, library folders and playlist directories — nothing else is readable. */
+  /** Extension, art cache, library folders, playlist directories and the folders of playlist-only files — nothing else is readable. */
   public getLocalFolderRoots(): vscode.Uri[] {
     const roots: vscode.Uri[] = [this.extensionUri, vscode.Uri.file(this.artDir)];
     for (const folder of this.library.folders) {
@@ -81,6 +81,9 @@ export class MusicViewProvider implements vscode.WebviewViewProvider, vscode.Dis
     }
     for (const file of this.library.playlistPaths) {
       roots.push(vscode.Uri.file(path.dirname(file)));
+    }
+    for (const dir of this.library.externalDirs) {
+      roots.push(vscode.Uri.file(dir));
     }
     return roots;
   }

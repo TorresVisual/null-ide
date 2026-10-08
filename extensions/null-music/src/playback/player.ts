@@ -231,6 +231,7 @@ export class Player {
       return;
     }
     if (this.queue.current !== track) return; // superseded while waiting
+    autoplay = this.pending; // a pause() while the view was revealing cancels the play
     if (this.loadedId === track.id) {
       if (autoplay) this.output.play();
     } else {
@@ -297,6 +298,7 @@ export class Player {
   }
 
   private async onOutputError(e: Extract<AudioEvent, { type: 'error' }>): Promise<void> {
+    const wasActive = this.playing || this.pending; // a paused or restored load must stay paused
     this.playing = false;
     if (e.silent) {
       // Autoplay blocked: stay pending until the user clicks the prompt.
@@ -313,19 +315,19 @@ export class Player {
       return;
     }
     this.deps.onSkipped?.(this.skipStreak);
-    if (!(await this.advance())) {
+    if (!(await this.advance(wasActive))) {
       this.skipStreak = 0;
       this.deps.onError?.(`Could not play "${failed?.name ?? 'track'}" (${e.message}).`);
     }
   }
 
   /** Move to the next item and start it; at the end of the queue, stop on the current one. */
-  private async advance(): Promise<boolean> {
+  private async advance(autoplay = true): Promise<boolean> {
     if (!this.queue.next()) {
       this.stopAtEnd();
       return false;
     }
-    await this.startCurrent(true, 0, true);
+    await this.startCurrent(autoplay, 0, true);
     return true;
   }
 

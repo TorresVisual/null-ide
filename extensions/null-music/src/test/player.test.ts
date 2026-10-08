@@ -247,3 +247,25 @@ test('learned durations are reported once the output measures them', async () =>
   assert.deepStrictEqual(learned, [[t[0].id, 201000]]);
   assert.strictEqual(player.getState().durationMs, 201000);
 });
+
+test('an unplayable file during a paused or restored load advances paused, never autoplaying', async () => {
+  const t = tracks(3);
+  const { out, player } = setup();
+  player.restore({ trackIds: t.map((x) => x.id), index: 1, positionMs: 5000, volume: 50, shuffle: false, repeat: 'off' }, (id) => t.find((x) => x.id === id));
+  out.becomeReady();
+  out.emit({ type: 'error', message: 'gone', silent: false, trackUri: t[1].uri });
+  await tick();
+  assert.strictEqual(player.getState().track?.id, t[2].id);
+  assert.ok(out.calls.every((c) => !c.endsWith(' play') && c !== 'play'), out.calls.join(' | '));
+});
+
+test('a pause pressed while the view is still being revealed cancels the pending play', async () => {
+  const { out, player } = setup();
+  const started = player.playTracks(tracks(2), 0);
+  await tick();
+  player.pause(); // output not ready: nothing to send, but the intent changed
+  out.becomeReady();
+  await started;
+  assert.ok(out.calls.every((c) => !c.endsWith(' play') && c !== 'play'), out.calls.join(' | '));
+  assert.strictEqual(player.getState().isPlaying, false);
+});
