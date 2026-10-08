@@ -54,7 +54,7 @@ document.addEventListener('click', (e) => {
 const headerEl = h(
   'header',
   { class: 'np-header' },
-  h('div', { class: 'np-header-row' }, h('div', { class: 'np-brand' }, h('span', { class: 'np-brand-mark', 'aria-hidden': 'true' }, '∅'), 'Music'), scanPill, menuBtn),
+  h('div', { class: 'np-header-row' }, h('div', { class: 'np-brand' }, 'Null Music'), scanPill, menuBtn),
   h('div', { class: 'np-search-row' }, searchInput),
   menuEl
 );
