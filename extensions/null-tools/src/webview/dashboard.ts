@@ -2,7 +2,7 @@
 
 interface RecentProjectEntry { path: string; label: string; isWorkspaceFile: boolean; timestamp: number; pinned: boolean; }
 interface GitStatus { branch: string; dirty: boolean; }
-interface LauncherProject extends RecentProjectEntry { available: boolean; projectType?: string; gitStatus: GitStatus | null; }
+interface LauncherProject extends RecentProjectEntry { available: boolean; projectType?: string; account?: string; gitStatus: GitStatus | null; }
 type OutboundMessage = { type: 'projects'; projects: LauncherProject[] } | { type: 'gitStatus'; path: string; status: GitStatus | null };
 declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
 declare function projectSections(projects: LauncherProject[], query: string, sort: 'lastOpened' | 'name' | 'location'): Array<{ title: string; projects: LauncherProject[] }>;
@@ -32,6 +32,7 @@ declare function relativeProjectTime(timestamp: number): string;
         const projectPath = document.createElement('div'); projectPath.className = 'path'; projectPath.textContent = project.path;
         const meta = document.createElement('div'); meta.className = 'meta'; meta.textContent = `${project.available ? '' : 'Missing · '}${relativeProjectTime(project.timestamp)}`;
         if (project.projectType) meta.textContent += ` · ${project.projectType}`;
+        if (project.account) meta.textContent += ` · ${project.account}`;
         if (project.gitStatus) meta.textContent += ` · ${project.gitStatus.branch}${project.gitStatus.dirty ? ' ●' : ''}`;
         const actions = document.createElement('div'); actions.className = 'meta';
         if (project.available) { actions.append(action('Open New', 'openProject', project, { forceNewWindow: true }), action(project.pinned ? 'Unpin' : 'Pin', 'setPinned', project, { pinned: !project.pinned }), action('Reveal', 'revealProject', project), action('Copy', 'copyProjectPath', project)); }
