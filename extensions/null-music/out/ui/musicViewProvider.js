@@ -48,6 +48,7 @@ class MusicViewProvider {
     view;
     controller;
     subscriptions = [];
+    scanTail;
     constructor(extensionUri, player, library, output, artDir) {
         this.extensionUri = extensionUri;
         this.player = player;
@@ -60,8 +61,10 @@ class MusicViewProvider {
         }), this.library.onDidChange(() => {
             this.controller?.sendLibrary();
             // `isScanning` flips just after the last change event; one more snapshot clears the "Scanning" pill.
-            if (this.library.isScanning)
-                setTimeout(() => this.controller?.sendLibrary(), 400);
+            if (this.library.isScanning) {
+                clearTimeout(this.scanTail);
+                this.scanTail = setTimeout(() => this.controller?.sendLibrary(), 400);
+            }
         }), this.library.onDidChangeLikes(() => this.controller?.sendLiked()), this.library.onDidChangeSources(() => {
             if (this.view)
                 this.refreshLocalResourceRoots(this.view);
@@ -119,6 +122,7 @@ class MusicViewProvider {
         };
     }
     dispose() {
+        clearTimeout(this.scanTail);
         for (const s of this.subscriptions)
             s.dispose();
         this.subscriptions.length = 0;

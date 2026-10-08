@@ -173,4 +173,25 @@ const names = (q) => q.tracks.map((t) => t.name);
     node_assert_1.default.strictEqual(q.jumpTo(999), undefined);
     node_assert_1.default.strictEqual(q.current?.name, 't0');
 });
+(0, node_test_1.test)('removing the current last entry leaves no current instead of replaying history', () => {
+    const q = new queue_1.Queue();
+    q.replace(tracks(3), 0);
+    q.next();
+    q.next(); // t2 playing, t0 and t1 in history
+    q.removeKey(q.snapshot().current.key);
+    node_assert_1.default.strictEqual(q.current, undefined);
+    node_assert_1.default.deepStrictEqual(names(q), ['t0', 't1']);
+});
+(0, node_test_1.test)('removing the current entry while shuffling advances to the next upcoming entry, not history', () => {
+    const q = new queue_1.Queue(seeded(3));
+    q.replace(tracks(4), 0);
+    q.setShuffle(true);
+    q.next();
+    q.next(); // two tracks in history, one still upcoming
+    const snap = q.snapshot();
+    node_assert_1.default.strictEqual(snap.upcoming.length, 1);
+    q.removeKey(snap.current.key);
+    node_assert_1.default.strictEqual(q.current?.name, snap.upcoming[0].track.name);
+    node_assert_1.default.strictEqual(q.snapshot().upcoming.length, 0);
+});
 //# sourceMappingURL=queue.test.js.map

@@ -304,4 +304,16 @@ const upcomingKeys = (p) => p.queue.snapshot().upcoming.map((e) => e.key);
     out.emit({ type: 'play' });
     node_assert_1.default.strictEqual(player.unavailable.size, 0);
 });
+(0, node_test_1.test)('removing the playing last entry stops instead of replaying an earlier track', async () => {
+    const { out, player } = readyPlayer();
+    await player.playTracks([(0, fixtures_1.track)(0), (0, fixtures_1.track)(1), (0, fixtures_1.track)(2)], 0);
+    out.emit({ type: 'play' });
+    await player.next();
+    out.emit({ type: 'play' });
+    await player.next();
+    out.emit({ type: 'play' });
+    await player.removeFromQueue(player.queue.snapshot().current.key);
+    node_assert_1.default.strictEqual(player.getState().track, null);
+    node_assert_1.default.strictEqual(player.getState().isPlaying, false);
+});
 //# sourceMappingURL=player.test.js.map

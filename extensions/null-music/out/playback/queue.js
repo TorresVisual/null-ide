@@ -69,9 +69,10 @@ class Queue {
         this.history = this.history.filter((k) => k !== e.key);
         this.upcoming = this.upcoming.filter((k) => k !== e.key);
         if (e.key === this.currentKey) {
-            const successor = this.entries[i] ?? this.entries[i - 1];
-            this.currentKey = successor ? successor.key : -1;
+            // The successor is what would play next: never a track from history (that would replay it).
+            this.currentKey = (this.shuffleOn ? this.upcoming.shift() : this.entries[i]?.key) ?? -1;
             this.upcoming = this.upcoming.filter((k) => k !== this.currentKey);
+            this.history = this.history.filter((k) => k !== this.currentKey);
         }
     }
     move(from, to) {
