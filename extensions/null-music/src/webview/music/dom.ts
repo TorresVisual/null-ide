@@ -23,3 +23,21 @@ function h(tag: string, attrs?: Attrs, ...children: Child[]): HTMLElement {
   }
   return el;
 }
+
+/** `text` as strings and <mark> elements around every case-insensitive occurrence of `query`. */
+function markText(text: string, query: string): Child[] {
+  const out: Child[] = [];
+  let at = 0;
+  for (const range of highlightRanges(text, query)) {
+    if (range[0] > at) out.push(text.slice(at, range[0]));
+    out.push(h('mark', null, text.slice(range[0], range[1])));
+    at = range[1];
+  }
+  if (at < text.length || out.length === 0) out.push(text.slice(at));
+  return out;
+}
+
+/** Value for `data-vscode-context`: makes the `webview/context` menu contribution fire for this track. */
+function trackContext(trackId: string): string {
+  return JSON.stringify({ webviewSection: 'track', trackId, preventDefaultContextMenuItems: true });
+}
