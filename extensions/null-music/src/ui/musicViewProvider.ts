@@ -48,7 +48,8 @@ export class MusicViewProvider implements vscode.WebviewViewProvider, vscode.Dis
       postMessage: (message) => webview.postMessage(message),
       resolveUri: (uri) => webview.asWebviewUri(vscode.Uri.parse(uri)).toString(),
     });
-    webview.html = getMusicWebviewHtml(this.getNonce(), webview.cspSource);
+    const asset = (file: string) => webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'lib', file)).toString();
+    webview.html = getMusicWebviewHtml(this.getNonce(), webview.cspSource, asset('music.js'), asset('music.css'));
 
     this.controller = new MusicViewController(
       this.player,

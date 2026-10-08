@@ -277,6 +277,7 @@ $Extensions = [ordered]@{
         Copy          = @(
             "package.json",
             "out",
+            "lib",
             "media"
         )
     }

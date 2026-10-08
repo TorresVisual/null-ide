@@ -231,8 +231,8 @@
     }
   },
   "scripts": {
-    "compile": "tsc -p tsconfig.json && tsc -p tsconfig.webview-music-shared.json",
-    "test": "tsc -p tsconfig.json && tsc -p tsconfig.webview-music-shared.json && node --test out/test/queue.test.js out/test/tagReader.test.js out/test/libraryCache.test.js out/test/library.test.js out/test/player.test.js out/test/webviewAudioOutput.test.js out/test/statusBarController.test.js out/test/musicHtml.test.js out/test/musicViewProvider.test.js out/test/commands.test.js out/test/m3uParser.test.js out/test/uri.test.js out/test/webviewDom.test.js out/test/webviewModel.test.js"
+    "compile": "tsc -p tsconfig.json && tsc -p tsconfig.webview-music-shared.json && tsc -p tsconfig.webview-music.json",
+    "test": "tsc -p tsconfig.json && tsc -p tsconfig.webview-music-shared.json && tsc -p tsconfig.webview-music.json && node --test out/test/queue.test.js out/test/tagReader.test.js out/test/libraryCache.test.js out/test/library.test.js out/test/player.test.js out/test/webviewAudioOutput.test.js out/test/statusBarController.test.js out/test/musicHtml.test.js out/test/musicViewProvider.test.js out/test/commands.test.js out/test/m3uParser.test.js out/test/uri.test.js out/test/webviewDom.test.js out/test/webviewModel.test.js"
   },
   "devDependencies": {
     "typescript": "^5.8.0",
