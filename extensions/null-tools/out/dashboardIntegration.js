@@ -33,9 +33,13 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.openDashboard = openDashboard;
 exports.registerDashboardFeature = registerDashboardFeature;
 const vscode = __importStar(require("vscode"));
 const dashboard_1 = require("./dashboard");
+function openDashboard() {
+    return vscode.commands.executeCommand('vscode.openWith', vscode.Uri.from({ scheme: 'null-dashboard', path: '/Dashboard' }), 'null.dashboard');
+}
 function registerDashboardFeature(context) {
     const provider = new dashboard_1.DashboardEditorProvider(context.extensionUri, context);
     context.subscriptions.push(vscode.window.registerCustomEditorProvider('null.dashboard', provider, {

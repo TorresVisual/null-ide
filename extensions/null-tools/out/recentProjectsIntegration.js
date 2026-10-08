@@ -35,29 +35,14 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.registerRecentProjectsUriHandler = registerRecentProjectsUriHandler;
 const vscode = __importStar(require("vscode"));
-const recentProjects_1 = require("./recentProjects");
+const dashboardIntegration_1 = require("./dashboardIntegration");
 function registerRecentProjectsUriHandler(context) {
     context.subscriptions.push(vscode.window.registerUriHandler({
         async handleUri(uri) {
             if (uri.path !== '/recent-projects') {
                 return;
             }
-            let entries;
-            try {
-                entries = (0, recentProjects_1.readRecentProjects)((0, recentProjects_1.getRecentProjectsFilePath)());
-            }
-            catch {
-                entries = [];
-            }
-            if (!entries.length) {
-                vscode.window.showInformationMessage('No recent projects tracked yet.');
-                return;
-            }
-            const picked = await vscode.window.showQuickPick(entries.map(e => ({ label: e.label, description: e.path, entry: e })), { placeHolder: 'Select a recent project to open' });
-            if (!picked) {
-                return;
-            }
-            await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(picked.entry.path), { forceNewWindow: true });
+            await (0, dashboardIntegration_1.openDashboard)();
         },
     }));
 }

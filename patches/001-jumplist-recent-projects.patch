@@ -5,11 +5,11 @@ Subject: [PATCH] feat(jumplist): source Windows jump list Recent category from
  null-tools
 
 ---
- .../workspacesHistoryMainService.ts           | 164 +++++++++++-------
- 1 file changed, 101 insertions(+), 63 deletions(-)
+ .../workspacesHistoryMainService.ts           | 190 ++++++++++++------
+ 1 file changed, 126 insertions(+), 64 deletions(-)
 
 diff --git a/src/vs/platform/workspaces/electron-main/workspacesHistoryMainService.ts b/src/vs/platform/workspaces/electron-main/workspacesHistoryMainService.ts
-index 70356b90..7a9de8e5 100644
+index 70356b9..c4dee2a 100644
 --- a/src/vs/platform/workspaces/electron-main/workspacesHistoryMainService.ts
 +++ b/src/vs/platform/workspaces/electron-main/workspacesHistoryMainService.ts
 @@ -7,7 +7,7 @@ import { app, JumpListCategory, JumpListItem } from 'electron';
@@ -21,7 +21,7 @@ index 70356b90..7a9de8e5 100644
  import { Disposable } from '../../../base/common/lifecycle.js';
  import { Schemas } from '../../../base/common/network.js';
  import { isMacintosh, isWindows } from '../../../base/common/platform.js';
-@@ -21,12 +21,14 @@ import { ILogService } from '../../log/common/log.js';
+@@ -21,12 +21,15 @@ import { ILogService } from '../../log/common/log.js';
  import { StorageScope, StorageTarget } from '../../storage/common/storage.js';
  import { IApplicationStorageMainService } from '../../storage/electron-main/storageMainService.js';
  import { IRecent, IRecentFile, IRecentFolder, IRecentlyOpened, IRecentWorkspace, isRecentFile, isRecentFolder, isRecentWorkspace, restoreRecentlyOpened, toStoreData } from '../common/workspaces.js';
@@ -32,20 +32,50 @@ index 70356b90..7a9de8e5 100644
  import { ResourceMap } from '../../../base/common/map.js';
  import { IDialogMainService } from '../../dialogs/electron-main/dialogMainService.js';
  import { IEnvironmentMainService } from '../../environment/electron-main/environmentMainService.js';
++import { IConfigurationService } from '../../configuration/common/configuration.js';
 +import { join } from '../../../base/common/path.js';
 +import { promises as fsPromises } from 'fs';
  
  export const IWorkspacesHistoryMainService = createDecorator<IWorkspacesHistoryMainService>('workspacesHistoryMainService');
  
-@@ -79,6 +81,50 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
+@@ -59,7 +62,8 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
+ 		@ILifecycleMainService private readonly lifecycleMainService: ILifecycleMainService,
+ 		@IApplicationStorageMainService private readonly applicationStorageMainService: IApplicationStorageMainService,
+ 		@IDialogMainService private readonly dialogMainService: IDialogMainService,
+-		@IEnvironmentMainService private readonly environmentMainService: IEnvironmentMainService
++		@IEnvironmentMainService private readonly environmentMainService: IEnvironmentMainService,
++		@IConfigurationService private readonly configurationService: IConfigurationService
+ 	) {
+ 		super();
+ 
+@@ -78,7 +82,72 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
+ 
  	//#region Workspaces History
  
++	// Null IDE: retention for null-recent-projects.json (pinned entries are always kept).
++	private nullRecentProjectsMaxItems(): number {
++		const value = this.configurationService.getValue<number>('null.recentProjects.maxItems');
++		return typeof value === 'number' && Number.isFinite(value) ? Math.max(1, Math.floor(value)) : 20;
++	}
++
++	// Null IDE: write a sibling temp file, then rename over the store so readers never see a partial file.
++	private async writeNullRecentProjects(filePath: string, entries: unknown[]): Promise<void> {
++		const tempPath = `${filePath}.${process.pid}.tmp`;
++		try {
++			await fsPromises.writeFile(tempPath, JSON.stringify(entries, undefined, '\t'));
++			await fsPromises.rename(tempPath, filePath);
++		} catch (error) {
++			await fsPromises.rm(tempPath, { force: true }).catch(() => undefined);
++			throw error;
++		}
++	}
++
  	async addRecentlyOpened(recentToAdd: IRecent[]): Promise<void> {
 +
 +		// Null IDE: update null-tools' own recent-projects list (see the
 +		// "Recent Projects" jump list category built in updateWindowsJumpList).
 +		{
-+			interface NullRecentProjectEntry { path: string; label: string; isWorkspaceFile: boolean; timestamp: number }
++			interface NullRecentProjectEntry { path: string; label: string; isWorkspaceFile: boolean; timestamp: number; pinned?: boolean; gitBranch?: string; projectType?: string; icon?: string }
 +
 +			const nullNewEntries: Omit<NullRecentProjectEntry, 'timestamp'>[] = [];
 +			for (const recent of recentToAdd) {
@@ -66,7 +96,8 @@ index 70356b90..7a9de8e5 100644
 +					let nullRecentProjects: NullRecentProjectEntry[] = [];
 +					try {
 +						const raw = await fsPromises.readFile(nullRecentProjectsPath, 'utf8');
-+						nullRecentProjects = JSON.parse(raw);
++						const parsed: unknown = JSON.parse(raw);
++						nullRecentProjects = Array.isArray(parsed) ? parsed : [];
 +					} catch {
 +						nullRecentProjects = [];
 +					}
@@ -76,9 +107,11 @@ index 70356b90..7a9de8e5 100644
 +						nullRecentProjects = nullRecentProjects.filter(existing => existing.path.toLowerCase() !== normalized);
 +						nullRecentProjects.unshift({ ...entry, timestamp: Date.now() });
 +					}
-+					nullRecentProjects = nullRecentProjects.slice(0, 50);
++					const pinned = nullRecentProjects.filter(entry => entry.pinned);
++					const unpinned = nullRecentProjects.filter(entry => !entry.pinned).slice(0, this.nullRecentProjectsMaxItems());
++					nullRecentProjects = [...pinned, ...unpinned];
 +
-+					await fsPromises.writeFile(nullRecentProjectsPath, JSON.stringify(nullRecentProjects, undefined, '\t'));
++					await this.writeNullRecentProjects(nullRecentProjectsPath, nullRecentProjects);
 +				} catch (error) {
 +					this.logService.warn('addRecentlyOpened#null-recent-projects', error);
 +				}
@@ -88,7 +121,7 @@ index 70356b90..7a9de8e5 100644
  		let workspaces: Array<IRecentFolder | IRecentWorkspace> = [];
  		let files: IRecentFile[] = [];
  
-@@ -385,59 +431,77 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
+@@ -385,59 +454,78 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
  					args: '-n', // force new window
  					iconPath: process.execPath,
  					iconIndex: 0
@@ -119,7 +152,8 @@ index 70356b90..7a9de8e5 100644
 +			let nullRecentProjects: NullRecentProjectEntry[] = [];
 +			try {
 +				const raw = await fsPromises.readFile(nullRecentProjectsPath, 'utf8');
-+				nullRecentProjects = JSON.parse(raw);
++				const parsed: unknown = JSON.parse(raw);
++				nullRecentProjects = Array.isArray(parsed) ? parsed : [];
 +			} catch {
 +				nullRecentProjects = [];
 +			}
@@ -146,7 +180,7 @@ index 70356b90..7a9de8e5 100644
 +				if (filtered.length !== nullRecentProjects.length) {
 +					nullRecentProjects = filtered;
 +					try {
-+						await fsPromises.writeFile(nullRecentProjectsPath, JSON.stringify(nullRecentProjects, undefined, '\t'));
++						await this.writeNullRecentProjects(nullRecentProjectsPath, nullRecentProjects);
 +					} catch (error) {
 +						this.logService.warn('updateWindowsJumpList#writeFile (null-recent-projects)', error);
  					}
@@ -201,7 +235,7 @@ index 70356b90..7a9de8e5 100644
  					items
  				});
  			}
-@@ -458,32 +522,6 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
+@@ -458,32 +546,6 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
  		}
  	}
  
@@ -235,5 +269,5 @@ index 70356b90..7a9de8e5 100644
  		return uri.scheme === 'file' ? normalizeDriveLetter(uri.fsPath) : uri.toString();
  	}
 -- 
-2.55.0.windows.5
+2.56.0.windows.1
 

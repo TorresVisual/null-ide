@@ -63,10 +63,10 @@ export function activate(context: vscode.ExtensionContext): void {
   bar.command = 'null.generateCommitMessage'; bar.show();
   context.subscriptions.push(bar);
 
+  registerDashboardFeature(context);
   registerRecentProjectsUriHandler(context);
   registerScratchAndNotesFeature(context);
   registerAutoGitignoreFeature(context);
-  registerDashboardFeature(context);
 
   registerUpdaterFeature(context);
 

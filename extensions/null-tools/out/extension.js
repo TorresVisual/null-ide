@@ -96,10 +96,10 @@ function activate(context) {
     bar.command = 'null.generateCommitMessage';
     bar.show();
     context.subscriptions.push(bar);
+    (0, dashboardIntegration_1.registerDashboardFeature)(context);
     (0, recentProjectsIntegration_1.registerRecentProjectsUriHandler)(context);
     (0, scratchNotesIntegration_1.registerScratchAndNotesFeature)(context);
     (0, autoGitignore_1.registerAutoGitignoreFeature)(context);
-    (0, dashboardIntegration_1.registerDashboardFeature)(context);
     (0, updaterIntegration_1.registerUpdaterFeature)(context);
     context.subscriptions.push(vscode.commands.registerCommand('null.generateCommitMessage', async () => {
         const folders = vscode.workspace.workspaceFolders;
