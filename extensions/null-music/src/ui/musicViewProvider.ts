@@ -13,6 +13,7 @@ export class MusicViewProvider implements vscode.WebviewViewProvider, vscode.Dis
   private view?: vscode.WebviewView;
   private controller?: MusicViewController;
   private readonly subscriptions: Array<{ dispose(): void }> = [];
+  private scanTail: ReturnType<typeof setTimeout> | undefined;
 
   constructor(
     private readonly extensionUri: vscode.Uri,
@@ -29,7 +30,10 @@ export class MusicViewProvider implements vscode.WebviewViewProvider, vscode.Dis
       this.library.onDidChange(() => {
         this.controller?.sendLibrary();
         // `isScanning` flips just after the last change event; one more snapshot clears the "Scanning" pill.
-        if (this.library.isScanning) setTimeout(() => this.controller?.sendLibrary(), 400);
+        if (this.library.isScanning) {
+          clearTimeout(this.scanTail);
+          this.scanTail = setTimeout(() => this.controller?.sendLibrary(), 400);
+        }
       }),
       this.library.onDidChangeLikes(() => this.controller?.sendLiked()),
       this.library.onDidChangeSources(() => {
@@ -105,6 +109,7 @@ export class MusicViewProvider implements vscode.WebviewViewProvider, vscode.Dis
   }
 
   public dispose(): void {
+    clearTimeout(this.scanTail);
     for (const s of this.subscriptions) s.dispose();
     this.subscriptions.length = 0;
   }

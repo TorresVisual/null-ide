@@ -333,3 +333,16 @@ test('a track the output fails on is marked unavailable until it plays', async (
   out.emit({ type: 'play' });
   assert.strictEqual(player.unavailable.size, 0);
 });
+
+test('removing the playing last entry stops instead of replaying an earlier track', async () => {
+  const { out, player } = readyPlayer();
+  await player.playTracks([track(0), track(1), track(2)], 0);
+  out.emit({ type: 'play' });
+  await player.next();
+  out.emit({ type: 'play' });
+  await player.next();
+  out.emit({ type: 'play' });
+  await player.removeFromQueue(player.queue.snapshot().current!.key);
+  assert.strictEqual(player.getState().track, null);
+  assert.strictEqual(player.getState().isPlaying, false);
+});

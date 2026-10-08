@@ -183,3 +183,26 @@ test('jumpTo makes an upcoming or history entry current and records history', ()
   assert.strictEqual(q.jumpTo(999), undefined);
   assert.strictEqual(q.current?.name, 't0');
 });
+
+test('removing the current last entry leaves no current instead of replaying history', () => {
+  const q = new Queue();
+  q.replace(tracks(3), 0);
+  q.next();
+  q.next(); // t2 playing, t0 and t1 in history
+  q.removeKey(q.snapshot().current!.key);
+  assert.strictEqual(q.current, undefined);
+  assert.deepStrictEqual(names(q), ['t0', 't1']);
+});
+
+test('removing the current entry while shuffling advances to the next upcoming entry, not history', () => {
+  const q = new Queue(seeded(3));
+  q.replace(tracks(4), 0);
+  q.setShuffle(true);
+  q.next();
+  q.next(); // two tracks in history, one still upcoming
+  const snap = q.snapshot();
+  assert.strictEqual(snap.upcoming.length, 1);
+  q.removeKey(snap.current!.key);
+  assert.strictEqual(q.current?.name, snap.upcoming[0].track.name);
+  assert.strictEqual(q.snapshot().upcoming.length, 0);
+});

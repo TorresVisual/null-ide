@@ -87,7 +87,8 @@ window.addEventListener('message', (event: MessageEvent) => {
       app.libraryLoaded = true;
       invalidate('player');
       invalidate('header');
-      invalidate('content');
+      // The Queue view only reads the library for its empty state; don't rebuild it (and lose clicks/drags) on every scan tick.
+      if (app.tab !== 'queue' || !app.queue.current) invalidate('content');
       break;
     case 'liked':
       app.liked = new Set(msg.ids);
