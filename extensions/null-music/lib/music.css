@@ -151,3 +151,20 @@ body.vscode-high-contrast .np-cover, body.vscode-high-contrast-light .np-cover {
 .np-chip[aria-pressed='true'] .np-icon { color: var(--vscode-charts-red); }
 .np-select { min-height: 24px; margin-left: auto; color: var(--vscode-dropdown-foreground); background: var(--vscode-dropdown-background); border: 1px solid var(--vscode-dropdown-border); border-radius: 3px; font: inherit; }
 .np-more { grid-column: 1 / -1; height: 1px; }
+
+/* albums, artists, detail */
+.np-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 8px 12px; }
+.np-card { display: flex; flex-direction: column; gap: 3px; padding: 6px; border-radius: 6px; text-align: left; }
+.np-card:hover { background: var(--np-hover); }
+.np-card-cover { width: 100%; aspect-ratio: 1; }
+.np-card-cover .np-ph-mark, .np-detail-cover .np-ph-mark { font-size: 32px; }
+.np-card-title, .np-card-sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.np-card-sub { color: var(--np-muted); font-size: 0.92em; }
+.np-artist-row { width: 100%; text-align: left; }
+.np-avatar { width: 32px; height: 32px; flex: none; border-radius: 50%; }
+.np-detail-head { display: flex; align-items: center; gap: 10px; padding: 8px 8px 4px; }
+.np-detail-cover { width: 72px; height: 72px; flex: none; }
+.np-detail-text { flex: 1; min-width: 0; }
+.np-detail-title { font-weight: 600; font-size: 1.1em; overflow-wrap: anywhere; }
+.np-detail-sub { color: var(--np-muted); }
+.np-detail-actions { display: flex; gap: 6px; padding: 4px 8px 8px; }

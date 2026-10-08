@@ -1,6 +1,10 @@
 'use strict';
 
-const SEGMENTS: Array<[Segment, string]> = [['tracks', 'Tracks']]; // Task 8 adds Albums and Artists
+const SEGMENTS: Array<[Segment, string]> = [
+  ['tracks', 'Tracks'],
+  ['albums', 'Albums'],
+  ['artists', 'Artists'],
+];
 const SORTS: Array<[SortKey, string]> = [
   ['title', 'Title'],
   ['artist', 'Artist'],
@@ -66,7 +70,11 @@ function renderLibraryView(el: HTMLElement): void {
     el.replaceChildren(noLibraryState());
     return;
   }
-  el.replaceChildren(libraryToolbar(), tracksBody(libraryBase()));
+  if (app.libraryDetail && renderLibraryDetail(el)) return;
+  app.libraryDetail = null; // the open album/artist is gone
+  const base = libraryBase();
+  const body = app.segment === 'albums' ? albumsBody(base) : app.segment === 'artists' ? artistsBody(base) : tracksBody(base);
+  el.replaceChildren(libraryToolbar(), body);
 }
 
 tabRenderers.library = renderLibraryView;
