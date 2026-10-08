@@ -2,9 +2,16 @@
 
 import { RepeatMode, Track } from '../types';
 
-interface Entry {
+export interface Entry {
   key: number;
   track: Track;
+}
+
+export interface QueueSnapshot {
+  history: Entry[];
+  current: Entry | null;
+  /** Shuffle order while shuffling, list order otherwise. */
+  upcoming: Entry[];
 }
 
 const HISTORY_LIMIT = 500;
@@ -128,6 +135,44 @@ export class Queue {
     if (this.shuffleOn && this.currentKey !== -1) this.upcoming.unshift(this.currentKey);
     this.currentKey = key;
     return this.current;
+  }
+
+  snapshot(): QueueSnapshot {
+    const byKey = new Map(this.entries.map((e) => [e.key, e]));
+    const pick = (keys: number[]) => keys.map((k) => byKey.get(k)).filter((e): e is Entry => !!e);
+    const at = this.index;
+    return {
+      history: pick(this.history),
+      current: at >= 0 ? this.entries[at] : null,
+      upcoming: this.shuffleOn ? pick(this.upcoming) : at >= 0 ? this.entries.slice(at + 1) : [],
+    };
+  }
+
+  removeKey(key: number): void {
+    const i = this.entries.findIndex((e) => e.key === key);
+    if (i >= 0) this.remove(i);
+  }
+
+  /** Move the entry with `key` to just before `beforeKey` (`null` = the end). Unknown keys are ignored. */
+  moveBefore(key: number, beforeKey: number | null): void {
+    const from = this.entries.findIndex((e) => e.key === key);
+    if (from < 0 || key === beforeKey) return;
+    let to = beforeKey === null ? this.entries.length - 1 : this.entries.findIndex((e) => e.key === beforeKey);
+    if (to < 0) return;
+    if (beforeKey !== null && from < to) to--;
+    this.move(from, to);
+  }
+
+  /** Make `key` current (from history or upcoming); the old current goes to history. */
+  jumpTo(key: number): Track | undefined {
+    const e = this.entries.find((x) => x.key === key);
+    if (!e || key === this.currentKey) return e?.track;
+    this.history = this.history.filter((k) => k !== key);
+    if (this.currentKey !== -1) this.history.push(this.currentKey);
+    if (this.history.length > HISTORY_LIMIT) this.history.shift();
+    this.upcoming = this.upcoming.filter((k) => k !== key);
+    this.currentKey = key;
+    return e.track;
   }
 
   private rebuild(): void {

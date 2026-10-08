@@ -269,3 +269,67 @@ test('a pause pressed while the view is still being revealed cancels the pending
   assert.ok(out.calls.every((c) => !c.endsWith(' play') && c !== 'play'), out.calls.join(' | '));
   assert.strictEqual(player.getState().isPlaying, false);
 });
+
+function readyPlayer() {
+  const out = new FakeOutput();
+  out.becomeReady();
+  return { out, player: new Player({ output: out }) };
+}
+const upcomingKeys = (p: Player) => p.queue.snapshot().upcoming.map((e) => e.key);
+
+test('jump starts the chosen entry and removeFromQueue of a non-current entry keeps playing', async () => {
+  const { out, player } = readyPlayer();
+  await player.playTracks([track(0), track(1), track(2)], 0);
+  out.emit({ type: 'play' });
+  const [k1, k2] = upcomingKeys(player);
+  await player.jump(k2);
+  assert.strictEqual(player.getState().track?.name, 't2');
+  assert.ok(out.calls.at(-1)?.startsWith('load file:///t2.mp3 @0 play'));
+  await player.removeFromQueue(k1);
+  assert.strictEqual(player.getState().track?.name, 't2');
+  assert.strictEqual(player.queue.length, 2);
+});
+
+test('removing the playing entry starts its successor; removing the last one stops cleanly', async () => {
+  const { out, player } = readyPlayer();
+  await player.playTracks([track(0), track(1)], 0);
+  out.emit({ type: 'play' });
+  await player.removeFromQueue(player.queue.snapshot().current!.key);
+  assert.strictEqual(player.getState().track?.name, 't1');
+  assert.ok(out.calls.at(-1)?.startsWith('load file:///t1.mp3 @0 play'));
+  out.emit({ type: 'play' });
+  await player.removeFromQueue(player.queue.snapshot().current!.key);
+  assert.strictEqual(player.getState().track, null);
+  assert.strictEqual(player.getState().isPlaying, false);
+  assert.ok(out.calls.includes('pause'));
+});
+
+test('clearQueue empties the queue and stops', async () => {
+  const { out, player } = readyPlayer();
+  await player.playTracks([track(0), track(1)], 0);
+  out.emit({ type: 'play' });
+  player.clearQueue();
+  assert.strictEqual(player.queue.length, 0);
+  assert.strictEqual(player.getState().isPlaying, false);
+  assert.strictEqual(player.getState().track, null);
+});
+
+test('moveInQueue reorders upcoming entries', async () => {
+  const { player } = readyPlayer();
+  await player.playTracks([track(0), track(1), track(2)], 0);
+  const [k1, k2] = upcomingKeys(player);
+  player.moveInQueue(k2, k1);
+  assert.deepStrictEqual(player.queue.tracks.map((t) => t.name), ['t0', 't2', 't1']);
+});
+
+test('a track the output fails on is marked unavailable until it plays', async () => {
+  const { out, player } = readyPlayer();
+  const only = track(0);
+  await player.playTracks([only], 0);
+  out.emit({ type: 'error', message: 'decode', trackUri: only.uri });
+  await tick();
+  assert.ok(player.unavailable.has(only.id));
+  await player.play();
+  out.emit({ type: 'play' });
+  assert.strictEqual(player.unavailable.size, 0);
+});

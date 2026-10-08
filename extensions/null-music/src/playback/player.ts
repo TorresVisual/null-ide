@@ -40,6 +40,8 @@ export class Player {
   private pending = false;
   private loadedId: string | undefined;
   private skipStreak = 0;
+  /** Ids of tracks the output failed to play; a track leaves the set when it plays. */
+  readonly unavailable = new Set<string>();
   private lastTrackId: string | null = null;
   private saveTimer: NodeJS.Timeout | undefined;
   private readonly subscription: Disposable;
@@ -151,6 +153,35 @@ export class Player {
     this.changed();
   }
 
+  async jump(key: number): Promise<void> {
+    if (!this.queue.jumpTo(key)) return;
+    this.skipStreak = 0;
+    await this.startCurrent(true, 0, true);
+  }
+
+  async removeFromQueue(key: number): Promise<void> {
+    const wasCurrent = this.queue.snapshot().current?.key === key;
+    const autoplay = this.playing || this.pending;
+    this.queue.removeKey(key);
+    if (!wasCurrent) {
+      this.changed();
+    } else if (this.queue.current) {
+      await this.startCurrent(autoplay, 0, true);
+    } else {
+      this.stopAtEnd();
+    }
+  }
+
+  moveInQueue(key: number, beforeKey: number | null): void {
+    this.queue.moveBefore(key, beforeKey);
+    this.changed();
+  }
+
+  clearQueue(): void {
+    this.queue.clear();
+    this.stopAtEnd();
+  }
+
   /** Re-emit state (e.g. after a like toggled). */
   refresh(): void {
     this.changed();
@@ -260,6 +291,7 @@ export class Player {
         this.playing = true;
         this.pending = false;
         this.skipStreak = 0;
+        if (current) this.unavailable.delete(current.id);
         break;
       case 'pause':
         if (e.positionMs !== undefined) {
@@ -306,6 +338,7 @@ export class Player {
       return;
     }
     const failed = this.queue.current;
+    if (failed) this.unavailable.add(failed.id);
     this.skipStreak++;
     if (this.skipStreak >= this.queue.length) {
       this.skipStreak = 0;

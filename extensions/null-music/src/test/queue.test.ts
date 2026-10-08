@@ -121,3 +121,65 @@ test('remove and move keep the current item current', () => {
   assert.strictEqual(q.current, undefined);
   assert.strictEqual(q.index, -1);
 });
+
+test('snapshot: list order when not shuffling, shuffle order when shuffling', () => {
+  const q = new Queue(seeded(7));
+  q.replace(tracks(4), 1);
+  const plain = q.snapshot();
+  assert.deepStrictEqual(plain.history, []);
+  assert.strictEqual(plain.current?.track.name, 't1');
+  assert.deepStrictEqual(plain.upcoming.map((e) => e.track.name), ['t2', 't3']);
+
+  q.setShuffle(true);
+  const shuffled = q.snapshot();
+  assert.strictEqual(shuffled.current?.track.name, 't1');
+  assert.deepStrictEqual(shuffled.upcoming.map((e) => e.track.name).sort(), ['t0', 't2', 't3']);
+  assert.strictEqual(q.next()?.name, shuffled.upcoming[0].track.name);
+  assert.strictEqual(q.snapshot().history[0].track.name, 't1');
+});
+
+test('snapshot of an empty queue has no current', () => {
+  const s = new Queue().snapshot();
+  assert.strictEqual(s.current, null);
+  assert.deepStrictEqual(s.upcoming, []);
+});
+
+test('moveBefore reorders by key, null moves to the end, unknown keys are ignored', () => {
+  const q = new Queue();
+  q.replace(tracks(4), 0);
+  const snap = q.snapshot();
+  const [a, b, c, d] = [snap.current!, ...snap.upcoming];
+  q.moveBefore(a.key, d.key);
+  assert.deepStrictEqual(names(q), ['t1', 't2', 't0', 't3']);
+  q.moveBefore(d.key, b.key);
+  assert.deepStrictEqual(names(q), ['t3', 't1', 't2', 't0']);
+  q.moveBefore(b.key, null);
+  assert.deepStrictEqual(names(q), ['t3', 't2', 't0', 't1']);
+  q.moveBefore(999, null);
+  q.moveBefore(c.key, 999);
+  assert.deepStrictEqual(names(q), ['t3', 't2', 't0', 't1']);
+  assert.strictEqual(q.current?.name, 't0'); // the playing entry moved with its key
+});
+
+test('removeKey removes one entry and ignores unknown keys', () => {
+  const q = new Queue();
+  q.replace(tracks(3), 0);
+  const [, b] = [q.snapshot().current!, ...q.snapshot().upcoming];
+  q.removeKey(b.key);
+  q.removeKey(12345);
+  assert.deepStrictEqual(names(q), ['t0', 't2']);
+});
+
+test('jumpTo makes an upcoming or history entry current and records history', () => {
+  const q = new Queue();
+  q.replace(tracks(4), 0);
+  const upcoming = q.snapshot().upcoming;
+  assert.strictEqual(q.jumpTo(upcoming[2].key)?.name, 't3');
+  assert.strictEqual(q.current?.name, 't3');
+  assert.deepStrictEqual(q.snapshot().history.map((e) => e.track.name), ['t0']);
+  const back = q.snapshot().history[0];
+  assert.strictEqual(q.jumpTo(back.key)?.name, 't0');
+  assert.deepStrictEqual(q.snapshot().history.map((e) => e.track.name), ['t3']);
+  assert.strictEqual(q.jumpTo(999), undefined);
+  assert.strictEqual(q.current?.name, 't0');
+});
