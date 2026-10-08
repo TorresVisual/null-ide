@@ -68,6 +68,17 @@ function makeDeps(overrides = {}) {
     const api = (0, api_1.createApi)(makeDeps({ tokenProviders: { github: { getToken: async () => { throw new Error('offline'); } } } }));
     node_assert_1.default.strictEqual(await api.getToken(gh), undefined);
 });
+(0, node_test_1.test)('getToken resolves undefined for an SSH account without asking any provider', async () => {
+    const ssh = { id: 'a3', provider: 'gitlab', host: 'git.uni.example', username: 'ada', email: 'a@uni.example', authMethod: 'ssh', sshKeyPath: '~/.ssh/id' };
+    let asked = 0;
+    const gitlab = { getToken: async () => { asked++; return 'x'; } };
+    const api = (0, api_1.createApi)(makeDeps({
+        accounts: { list: () => [ssh], get: id => (id === ssh.id ? ssh : undefined) },
+        tokenProviders: { gitlab },
+    }));
+    node_assert_1.default.strictEqual(await api.getToken(ssh, undefined, { interactive: true }), undefined);
+    node_assert_1.default.strictEqual(asked, 0);
+});
 (0, node_test_1.test)('onDidChange is the supplied event, not a wrapper', () => {
     node_assert_1.default.strictEqual((0, api_1.createApi)(makeDeps()).onDidChange, noopEvent);
 });

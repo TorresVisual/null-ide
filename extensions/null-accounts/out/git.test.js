@@ -23,4 +23,20 @@ const git_1 = require("./git");
         (0, node_fs_1.rmSync)(dir, { recursive: true, force: true });
     }
 });
+(0, node_test_1.test)('runGit reports the exit code, feeds stdin, and tells "git could not start" apart from "git said no"', async () => {
+    const dir = (0, node_fs_1.mkdtempSync)(node_path_1.default.join((0, node_os_1.tmpdir)(), 'null-accounts-rungit-'));
+    try {
+        const notRepo = await (0, git_1.runGit)(dir, ['rev-parse', '--is-inside-work-tree']);
+        node_assert_1.default.strictEqual(notRepo.code, 128);
+        node_assert_1.default.notStrictEqual(notRepo.stderr, '');
+        // The blob id of "hello\n" is fixed, so a matching id proves the input reached git's stdin.
+        const hashed = await (0, git_1.runGit)(dir, ['hash-object', '--stdin'], 'hello\n');
+        node_assert_1.default.deepStrictEqual([hashed.code, hashed.stdout.trim()], [0, 'ce013625030ba8dba906f756967f9e9ca394464a']);
+        const gone = await (0, git_1.runGit)(node_path_1.default.join(dir, 'does-not-exist'), ['--version']);
+        node_assert_1.default.strictEqual(gone.code, git_1.GIT_UNAVAILABLE);
+    }
+    finally {
+        (0, node_fs_1.rmSync)(dir, { recursive: true, force: true });
+    }
+});
 //# sourceMappingURL=git.test.js.map

@@ -35,11 +35,16 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.activate = activate;
 exports.deactivate = deactivate;
+const fs = __importStar(require("node:fs"));
+const os = __importStar(require("node:os"));
 const vscode = __importStar(require("vscode"));
 const accountStore_1 = require("./accountStore");
 const accountSetup_1 = require("./accountSetup");
 const api_1 = require("./api");
 const changeEmitter_1 = require("./changeEmitter");
+const git_1 = require("./git");
+const gitCredentials_1 = require("./gitCredentials");
+const gitWiring_1 = require("./gitWiring");
 const projectBinding_1 = require("./projectBinding");
 const github_1 = require("./providers/github");
 const gitlab_1 = require("./providers/gitlab");
@@ -50,6 +55,9 @@ const accountsMenuModel_1 = require("./ui/accountsMenuModel");
 const accountsPanel_1 = require("./ui/accountsPanel");
 const statusBarController_1 = require("./ui/statusBarController");
 const IMPORT_OFFERED_KEY = 'null-accounts.importOffered';
+// ponytail: GitLab tokens last ~2 h and nothing else wakes the extension for a terminal-only session, so poll;
+// the OS-store token can lag a rotation by up to this long. Schedule from the token's expiry if that proves too coarse.
+const GIT_SYNC_INTERVAL_MS = 5 * 60_000;
 function activate(context) {
     const store = new accountStore_1.AccountStore(context.globalState, context.secrets);
     const bindings = new projectBinding_1.ProjectBinding(context.globalState);
@@ -119,8 +127,42 @@ function activate(context) {
         // they would otherwise be a prompt-free way to add or delete accounts.
         context.subscriptions.push(vscode.commands.registerCommand('null-accounts.test.addAccount', (account, secret) => store.add(account, secret)), vscode.commands.registerCommand('null-accounts.test.removeAccount', (id) => store.remove(id)));
     }
+    registerGitSync(context, store, bindings, changed, api);
     void offerImport(context, store, bindings, github).catch(() => { });
     return api;
+}
+/** Keeps repo-local git config and the OS credential store in line with the bindings (see gitWiring.ts, gitCredentials.ts). */
+function registerGitSync(context, store, bindings, changed, api) {
+    const wiring = new gitWiring_1.GitWiring({
+        meta: context.globalState, git: git_1.runGit, bindings, accounts: store, exists: fs.existsSync, home: os.homedir(),
+    });
+    const credentials = new gitCredentials_1.CredentialSync({
+        meta: context.globalState, git: git_1.runGit, bindings, accounts: store, token: account => api.getToken(account), cwd: os.tmpdir(),
+    });
+    const warned = new Set();
+    const syncGit = async () => {
+        const outcomes = await wiring.reconcile();
+        await credentials.sync();
+        const open = new Map((vscode.workspace.workspaceFolders ?? []).map(f => [(0, projectBinding_1.folderKey)(f.uri.fsPath), f.name]));
+        for (const outcome of outcomes) {
+            const name = open.get(outcome.folder);
+            if (outcome.status !== 'skipped' || name === undefined) {
+                continue;
+            } // only folders the user is looking at
+            const message = (0, gitWiring_1.describeSkip)(outcome, name);
+            const once = `${outcome.folder}|${outcome.reason}|${outcome.detail ?? ''}`;
+            if (message && !warned.has(once)) {
+                warned.add(once);
+                void vscode.window.showWarningMessage(`Null Accounts: ${message}`);
+            }
+        }
+    };
+    const trigger = () => { void syncGit().catch(() => { }); };
+    const timer = setInterval(trigger, GIT_SYNC_INTERVAL_MS);
+    context.subscriptions.push(changed.event(trigger), // accounts, bindings and re-auth state
+    store.onDidChangeSecret(trigger), // a refreshed or replaced token
+    { dispose: () => clearInterval(timer) });
+    trigger();
 }
 /** Once: offer to keep an already-signed-in GitHub account instead of silently logging existing users out. */
 async function offerImport(context, store, bindings, github) {

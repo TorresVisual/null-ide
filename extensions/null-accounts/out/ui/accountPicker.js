@@ -39,13 +39,18 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.addAccount = addAccount;
 exports.reauthenticate = reauthenticate;
 exports.chooseAccountForFolder = chooseAccountForFolder;
+const fs = __importStar(require("node:fs"));
+const os = __importStar(require("node:os"));
 const node_path_1 = __importDefault(require("node:path"));
 const vscode = __importStar(require("vscode"));
 const accountInput_1 = require("../accountInput");
 const accountSetup_1 = require("../accountSetup");
 const git_1 = require("../git");
+const gitPlan_1 = require("../gitPlan");
 const gitlab_1 = require("../providers/gitlab");
 const gitlabOAuth_1 = require("../providers/gitlabOAuth");
+const sshAccount_1 = require("../sshAccount");
+const sshCheck_1 = require("../sshCheck");
 const suggest_1 = require("../suggest");
 const pickItems_1 = require("./pickItems");
 function reportFailure(what, err) {
@@ -124,6 +129,78 @@ async function addGitlabTokenAccount(deps) {
         return undefined;
     }
 }
+const problemOf = (check) => (value) => {
+    try {
+        check(value);
+        return undefined;
+    }
+    catch (err) {
+        return err.message;
+    }
+};
+/** What the server says about the key, shown after the account is saved: a failed test never blocks saving. */
+async function reportSshTest(account) {
+    const check = await (0, sshCheck_1.checkSsh)(account.host, (0, gitPlan_1.expandKeyPath)(account.sshKeyPath ?? '', os.homedir()));
+    const who = `${account.username}@${account.host}`;
+    if (!check.ok) {
+        void vscode.window.showWarningMessage(`Saved ${who}, but the SSH test failed: ${check.message}`);
+    }
+    else if (check.user && check.user.toLowerCase() !== account.username.toLowerCase()) {
+        void vscode.window.showWarningMessage(`Saved ${who}, but ${account.host} says this key belongs to ${check.user}, not ${account.username}.`);
+    }
+    else {
+        void vscode.window.showInformationMessage(`${check.message} Git in projects using ${who} will use this key.`);
+    }
+}
+/** An account that signs in with an SSH key only: no OAuth, no token. Asks for the server, who you are there, and the key file. */
+async function addSshAccount(deps) {
+    const host = await vscode.window.showInputBox({
+        title: 'SSH account: server',
+        prompt: 'Host name of the GitLab (or GitHub) server, e.g. gitlab.example.edu — no port',
+        validateInput: problemOf(sshAccount_1.normalizeSshHost),
+        ignoreFocusOut: true,
+    });
+    if (host === undefined) {
+        return undefined;
+    }
+    const username = await vscode.window.showInputBox({
+        title: `Your username on ${(0, sshAccount_1.normalizeSshHost)(host)}`,
+        prompt: 'The name shown on your profile there (it is also used as the git author name)',
+        validateInput: v => (v.trim() ? undefined : 'A username is required.'),
+        ignoreFocusOut: true,
+    });
+    if (username === undefined) {
+        return undefined;
+    }
+    const email = await vscode.window.showInputBox({
+        title: 'Email for commits',
+        prompt: 'Written to user.email in projects that use this account',
+        validateInput: problemOf(v => (0, accountInput_1.validateNewAccount)({ provider: 'gitlab', host: 'x.example', username: 'x', email: v, authMethod: 'oauth' })),
+        ignoreFocusOut: true,
+    });
+    if (email === undefined) {
+        return undefined;
+    }
+    const keys = await vscode.window.showOpenDialog({
+        title: `Private SSH key for ${(0, sshAccount_1.normalizeSshHost)(host)}`,
+        openLabel: 'Use this key',
+        canSelectMany: false,
+        canSelectFolders: false,
+        defaultUri: vscode.Uri.file(node_path_1.default.join(os.homedir(), '.ssh')),
+    });
+    if (!keys?.length) {
+        return undefined;
+    }
+    try {
+        const account = await deps.accounts.add((0, sshAccount_1.buildSshAccount)({ host, username, email, keyPath: keys[0].fsPath }, os.homedir(), fs.existsSync));
+        void reportSshTest(account).catch(() => { });
+        return account;
+    }
+    catch (err) {
+        reportFailure('add the SSH account', err);
+        return undefined;
+    }
+}
 /** Asks which provider, then signs in and stores the account. `undefined` if the user backs out or sign-in fails. */
 async function addAccount(deps) {
     const picked = await vscode.window.showQuickPick((0, pickItems_1.providerPickItems)(), { placeHolder: 'Add an account from…' });
@@ -135,6 +212,9 @@ async function addAccount(deps) {
     }
     if (picked.choice === 'gitlab-token') {
         return addGitlabTokenAccount(deps);
+    }
+    if (picked.choice === 'ssh') {
+        return addSshAccount(deps);
     }
     const host = picked.choice === 'gitlab' ? gitlab_1.GITLAB_COM : await askSelfHostedHost();
     return host ? addGitlabAccount(deps, host) : undefined;

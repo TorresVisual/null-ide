@@ -134,4 +134,17 @@ const octocat = {
     meta.data.set(accountStore_1.ACCOUNTS_KEY, [good, { ...good, id: 'bad', externalId: 42 }]);
     node_assert_1.default.deepStrictEqual(store.list(), [good]);
 });
+(0, node_test_1.test)('setSecret fires onDidChangeSecret but not onDidChange; add does the opposite', async () => {
+    const { store } = makeStore();
+    let secretEvents = 0;
+    let changeEvents = 0;
+    store.onDidChangeSecret(() => { secretEvents++; });
+    store.onDidChange(() => { changeEvents++; });
+    const account = await store.add(octocat, 'first');
+    node_assert_1.default.deepStrictEqual([secretEvents, changeEvents], [0, 1]);
+    await store.setSecret(account.id, 'second');
+    node_assert_1.default.deepStrictEqual([secretEvents, changeEvents], [1, 1]);
+    await node_assert_1.default.rejects(store.setSecret('missing', 'x'), /No account/);
+    node_assert_1.default.strictEqual(secretEvents, 1);
+});
 //# sourceMappingURL=accountStore.test.js.map

@@ -29,6 +29,9 @@ class AccountStore {
     newId;
     emitter = new changeEmitter_1.ChangeEmitter();
     onDidChange = this.emitter.event;
+    secretEmitter = new changeEmitter_1.ChangeEmitter();
+    /** Fires after a stored secret is replaced (token refresh, re-sign-in). `add` and `remove` fire `onDidChange` instead. */
+    onDidChangeSecret = this.secretEmitter.event;
     constructor(meta, secrets, newId = node_crypto_1.randomUUID) {
         this.meta = meta;
         this.secrets = secrets;
@@ -94,6 +97,7 @@ class AccountStore {
             throw new Error(`No account with id ${id}`);
         }
         await this.secrets.store(secretKey(id), value);
+        this.secretEmitter.fire();
     }
     assertUnique(candidate, ignoreId) {
         if (this.list().some(a => a.id !== ignoreId && (0, exports.sameIdentity)(a, candidate))) {

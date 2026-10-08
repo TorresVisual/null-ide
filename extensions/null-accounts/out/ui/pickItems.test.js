@@ -29,8 +29,8 @@ const kinds = (items) => items.map(i => (i.action.kind === 'account' ? i.action.
 (0, node_test_1.test)('with no accounts only the add action remains', () => {
     node_assert_1.default.deepStrictEqual(kinds((0, pickItems_1.buildPickItems)([])), ['add']);
 });
-(0, node_test_1.test)('the provider choices are GitHub, gitlab.com, self-hosted GitLab and GitLab with an access token, in that order', () => {
-    node_assert_1.default.deepStrictEqual((0, pickItems_1.providerPickItems)().map(p => p.choice), ['github', 'gitlab', 'gitlab-self-hosted', 'gitlab-token']);
+(0, node_test_1.test)('the provider choices are GitHub, gitlab.com, self-hosted GitLab, an access token and an SSH key, in that order', () => {
+    node_assert_1.default.deepStrictEqual((0, pickItems_1.providerPickItems)().map(p => p.choice), ['github', 'gitlab', 'gitlab-self-hosted', 'gitlab-token', 'ssh']);
     node_assert_1.default.strictEqual(pickItems_1.ADD_ACCOUNT_LABEL, '$(add) Add account…');
 });
 //# sourceMappingURL=pickItems.test.js.map
