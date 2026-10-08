@@ -42,6 +42,9 @@ export const sameIdentity = (a: NewAccount, b: NewAccount): boolean =>
 export class AccountStore {
   private readonly emitter = new ChangeEmitter();
   readonly onDidChange = this.emitter.event;
+  private readonly secretEmitter = new ChangeEmitter();
+  /** Fires after a stored secret is replaced (token refresh, re-sign-in). `add` and `remove` fire `onDidChange` instead. */
+  readonly onDidChangeSecret = this.secretEmitter.event;
 
   constructor(
     private readonly meta: MetadataStore,
@@ -108,6 +111,7 @@ export class AccountStore {
   async setSecret(id: string, value: string): Promise<void> {
     if (!this.get(id)) { throw new Error(`No account with id ${id}`); }
     await this.secrets.store(secretKey(id), value);
+    this.secretEmitter.fire();
   }
 
   private assertUnique(candidate: NewAccount, ignoreId?: string): void {

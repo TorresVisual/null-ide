@@ -151,3 +151,17 @@ test('list skips an entry whose externalId is not a string', async () => {
   meta.data.set(ACCOUNTS_KEY, [good, { ...good, id: 'bad', externalId: 42 }]);
   assert.deepStrictEqual(store.list(), [good]);
 });
+
+test('setSecret fires onDidChangeSecret but not onDidChange; add does the opposite', async () => {
+  const { store } = makeStore();
+  let secretEvents = 0;
+  let changeEvents = 0;
+  store.onDidChangeSecret(() => { secretEvents++; });
+  store.onDidChange(() => { changeEvents++; });
+  const account = await store.add(octocat, 'first');
+  assert.deepStrictEqual([secretEvents, changeEvents], [0, 1]);
+  await store.setSecret(account.id, 'second');
+  assert.deepStrictEqual([secretEvents, changeEvents], [1, 1]);
+  await assert.rejects(store.setSecret('missing', 'x'), /No account/);
+  assert.strictEqual(secretEvents, 1);
+});

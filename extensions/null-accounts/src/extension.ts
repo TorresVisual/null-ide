@@ -1,11 +1,16 @@
 'use strict';
 
+import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as vscode from 'vscode';
 import { AccountStore } from './accountStore';
 import { findAccount, importExisting } from './accountSetup';
 import { createApi, NullAccountsApi } from './api';
 import { ChangeEmitter } from './changeEmitter';
-import { ProjectBinding } from './projectBinding';
+import { runGit } from './git';
+import { CredentialSync } from './gitCredentials';
+import { describeSkip, GitWiring } from './gitWiring';
+import { folderKey, ProjectBinding } from './projectBinding';
 import { fetchGithub, GithubProvider } from './providers/github';
 import { fetchGitlab, fetchPostForm, GitlabProvider, resolveClientId } from './providers/gitlab';
 import { addAccount, chooseAccountForFolder, PickerDeps, reauthenticate } from './ui/accountPicker';
@@ -17,6 +22,9 @@ import { registerStatusBar, SWITCH_COMMAND } from './ui/statusBarController';
 import { NewAccount } from './types';
 
 const IMPORT_OFFERED_KEY = 'null-accounts.importOffered';
+// ponytail: GitLab tokens last ~2 h and nothing else wakes the extension for a terminal-only session, so poll;
+// the OS-store token can lag a rotation by up to this long. Schedule from the token's expiry if that proves too coarse.
+const GIT_SYNC_INTERVAL_MS = 5 * 60_000;
 
 export function activate(context: vscode.ExtensionContext): NullAccountsApi {
   const store = new AccountStore(context.globalState, context.secrets);
@@ -105,8 +113,52 @@ export function activate(context: vscode.ExtensionContext): NullAccountsApi {
     );
   }
 
+  registerGitSync(context, store, bindings, changed, api);
+
   void offerImport(context, store, bindings, github).catch(() => { /* a failed offer must never break activation */ });
   return api;
+}
+
+/** Keeps repo-local git config and the OS credential store in line with the bindings (see gitWiring.ts, gitCredentials.ts). */
+function registerGitSync(
+  context: vscode.ExtensionContext,
+  store: AccountStore,
+  bindings: ProjectBinding,
+  changed: ChangeEmitter,
+  api: NullAccountsApi,
+): void {
+  const wiring = new GitWiring({
+    meta: context.globalState, git: runGit, bindings, accounts: store, exists: fs.existsSync, home: os.homedir(),
+  });
+  const credentials = new CredentialSync({
+    meta: context.globalState, git: runGit, bindings, accounts: store, token: account => api.getToken(account), cwd: os.tmpdir(),
+  });
+  const warned = new Set<string>();
+
+  const syncGit = async (): Promise<void> => {
+    const outcomes = await wiring.reconcile();
+    await credentials.sync();
+    const open = new Map((vscode.workspace.workspaceFolders ?? []).map(f => [folderKey(f.uri.fsPath), f.name]));
+    for (const outcome of outcomes) {
+      const name = open.get(outcome.folder);
+      if (outcome.status !== 'skipped' || name === undefined) { continue; } // only folders the user is looking at
+      const message = describeSkip(outcome, name);
+      const once = `${outcome.folder}|${outcome.reason}|${outcome.detail ?? ''}`;
+      if (message && !warned.has(once)) {
+        warned.add(once);
+        void vscode.window.showWarningMessage(`Null Accounts: ${message}`);
+      }
+    }
+  };
+  const trigger = (): void => { void syncGit().catch(() => { /* git wiring must never break the extension */ }); };
+
+  const timer = setInterval(trigger, GIT_SYNC_INTERVAL_MS);
+  context.subscriptions.push(
+    changed.event(trigger), // accounts, bindings and re-auth state
+    store.onDidChangeSecret(trigger), // a refreshed or replaced token
+    { dispose: () => clearInterval(timer) },
+  );
+  trigger();
 }
 
 /** Once: offer to keep an already-signed-in GitHub account instead of silently logging existing users out. */
