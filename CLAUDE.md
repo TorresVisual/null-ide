@@ -9,8 +9,8 @@ This file provides guidance to Claude Code when working with code in this reposi
 Key characteristics:
 - Binary name: `null.exe` — accessible from the terminal as `null .`
 - Built on VSCodium, which strips Microsoft telemetry from VS Code
-- Nine built-in extensions bundled at build time: `null-theme`, `null-icons`, `null-tools`, `null-markdown`, `null-cpp`, `null-actions`, `null-accounts`, `null-format`, `null-music`
-- **Code Spell Checker** (`streetsidesoftware.code-spell-checker`) bundled as a tenth built-in extension; version pinned via `CSPELL_TAG` env var in `build.yml`
+- Ten built-in extensions bundled at build time: `null-theme`, `null-icons`, `null-tools`, `null-markdown`, `null-cpp`, `null-actions`, `null-accounts`, `null-format`, `null-music`, `null-activity`
+- **Code Spell Checker** (`streetsidesoftware.code-spell-checker`) bundled as an eleventh built-in extension; version pinned via `CSPELL_TAG` env var in `build.yml`
 - CI builds on `windows-2022`; the developer authors source changes locally
 - Releases publish a portable ZIP and an Inno Setup installer to GitHub Releases
 - The in-app updater (`null-tools`) checks GitHub Releases on startup and can self-update
@@ -50,8 +50,8 @@ The entire build runs in GitHub Actions on a `windows-2022` runner — do **not*
 1. Clone VSCodium at `VSCODIUM_TAG` and VS Code at the matching `MS_TAG`.
 2. Apply VSCodium's own patches, then every `patches/*.patch` in name order (`git apply --ignore-whitespace`).
 3. Deep-merge `product.json` overlay into `vscode-src/product.json`.
-4. `npm ci --prefix extensions/null-markdown`; `npm ci && npm run compile` in each other TS extension (`null-tools`, `null-cpp`, `null-actions`, `null-accounts`, `null-format`, `null-music`).
-5. Copy all nine built-in extensions into `vscode-src/extensions/`; bundle Code Spell Checker from `CSPELL_TAG`.
+4. `npm ci --prefix extensions/null-markdown`; `npm ci && npm run compile` in each other TS extension (`null-tools`, `null-cpp`, `null-actions`, `null-accounts`, `null-format`, `null-music`, `null-activity`).
+5. Copy all ten built-in extensions into `vscode-src/extensions/`; bundle Code Spell Checker from `CSPELL_TAG`.
 6. Replace upstream icons with files from `icons/`.
 7. Copy `workbench/custom.css` → `null-custom.css` and `workbench/splash.js` → `null-splash.js` into the source tree; inject `<link>` / `<script>` tags into `workbench.html`.
 8. `npm ci && npx gulp vscode-win32-x64` produces `VSCode-win32-x64/`.
@@ -79,6 +79,9 @@ Prettier (in-process), rustfmt and clang-format formatting providers. Editable f
 
 ### null-music (`extensions/null-music/`)
 Local-file music player: activity-bar view `null.musicView`, status bar item, `Ctrl+Alt+…` media keybindings. The extension host owns all state — `Library` (folders + `.m3u8`, tags and cover art via the in-house `library/tagReader.ts`, JSON cache in `globalStorageUri`), `Queue` (history-aware shuffle, play next/add), `Player` (single position clock, paused session restore under `globalState` key `null-music.session`) and an `AudioOutput`. Sound comes from an `<audio>` element in the sidebar webview (`WebviewAudioOutput`): commands reveal the view and wait for its `ready`, and closing the view stops playback. `isPlaying` is true only after the output reports `play`. There is no provider abstraction; do not add one. The sidebar UI is vanilla TS in `src/webview/music/` (`module: none`, no imports; `tsconfig.webview-music.json` compiles it into the tracked `lib/music.js`, and `lib/music.css` is hand-written — the only hand-edited file in `lib/`). Pure `dom.ts`/`model.ts` are also compiled by `tsconfig.webview-music-shared.json` so `node --test` can load them through `vm` (top-level `function` declarations only). Host and webview share the typed `HostToWebview`/`WebviewToHost` unions in `protocol.ts` (the host pulls them in with a triple-slash reference); `MusicViewController` publishes `player`/`queue`/`library`/`liked` snapshots and the webview only sends intents. Rows carry `data-vscode-context` and the manifest's `webview/context` menu contributes the `null-music.track.*` commands. `sync-local.ps1` copies `lib/`. Designs: `docs/specs/null-music-engine-design.md`, `docs/specs/null-music-player-ui-design.md`; plans: `docs/plans/null-music-engine.md`, `docs/plans/null-music-player-ui.md`.
+
+### null-activity (`extensions/null-activity/`)
+Local-only activity tracking (issue #113; engine only — dashboard, git stats, badge and WakaTime import are later specs). Activated on `onStartupFinished`; returns `NullActivityApi` (`getIntervals`, `getDailyStats`, `getProjectStats`, `getLanguageStats`, `getSessions`, `recordActivity`, `start/pause/endSession`, `onDidChange`) from `activate`. Deletion is deliberately not on the API. Everything is derived from an append-only interval log: `intervals-YYYY-MM-<windowId>.jsonl` under `globalStorageUri`, one file per window session so concurrent windows never clobber each other; `stats.ts` merges and clips overlaps. `Tracker` is a pure state machine over `Heartbeat`s with an injected clock (one close rule: end at the closing time if within `idleTimeout` of the last heartbeat, else at the last heartbeat); only `heartbeatSource.ts`, `statusBar.ts`, `commands.ts` and `extension.ts` import `vscode`. Heartbeats count only while the window is focused and only for edits to the active editor; terminal activity is shell-integration command start/end (no keystroke API exists). Project key is the normalized git remote (worktree-aware), falling back to the folder path. `null-activity.enabled` is the master switch. No network code. Design: `docs/specs/null-activity-engine-design.md`; plan: `docs/plans/null-activity-engine.md`. Integration spec: `npm run test:integration` (via `/verify-local null-activity`).
 
 ### null-tools (`extensions/null-tools/`)
 Written in TypeScript (`src/`). Activated on `onStartupFinished`. Provides:
