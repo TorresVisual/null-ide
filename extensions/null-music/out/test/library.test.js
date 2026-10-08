@@ -218,4 +218,20 @@ function make(fx, state = new fixtures_1.MemState()) {
     node_assert_1.default.strictEqual(fired, 2);
     lib.dispose();
 });
+(0, node_test_1.test)('isScanning is true while a rescan or addFolder runs', async () => {
+    const dir = fs.mkdtempSync(path.join(root, 'scanning-'));
+    const lib = new library_1.Library({ state: new fixtures_1.MemState(), cacheFile: path.join(dir, 'c.json'), artDir: path.join(dir, 'art'), extensions: () => ['.mp3'] });
+    node_assert_1.default.strictEqual(lib.isScanning, false);
+    const rescan = lib.rescan();
+    node_assert_1.default.strictEqual(lib.isScanning, true);
+    await rescan;
+    node_assert_1.default.strictEqual(lib.isScanning, false);
+    const music = path.join(dir, 'music');
+    fs.mkdirSync(music);
+    const add = lib.addFolder((0, uri_1.pathToUri)(music));
+    node_assert_1.default.strictEqual(lib.isScanning, true);
+    await add;
+    node_assert_1.default.strictEqual(lib.isScanning, false);
+    lib.dispose();
+});
 //# sourceMappingURL=library.test.js.map

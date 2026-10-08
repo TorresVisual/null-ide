@@ -149,7 +149,7 @@ function registerCommands(context, player, library) {
         vscode.window.showInformationMessage(liked ? `Saved "${track.name}" to Liked Songs` : `Removed "${track.name}" from Liked Songs`);
     });
     // Row context-menu commands: the webview row's data-vscode-context payload arrives as the argument.
-    const trackFrom = (ctx) => (ctx?.trackId ? library.trackById(ctx.trackId) : undefined);
+    const trackFrom = (ctx) => (typeof ctx?.trackId === 'string' ? library.trackById(ctx.trackId) : undefined);
     register('null-music.track.playNext', (ctx) => {
         const t = trackFrom(ctx);
         if (t)
@@ -161,7 +161,7 @@ function registerCommands(context, player, library) {
             player.addToQueue(t);
     });
     register('null-music.track.favorite', async (ctx) => {
-        if (!ctx?.trackId)
+        if (typeof ctx?.trackId !== 'string')
             return;
         await library.toggleLike(ctx.trackId);
         player.refresh();

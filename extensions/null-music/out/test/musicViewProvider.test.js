@@ -81,7 +81,7 @@ async function setup() {
     node_assert_1.default.deepStrictEqual(posted.map((m) => m.type), ['player', 'queue', 'library', 'liked']);
     const lib = posted[2];
     node_assert_1.default.strictEqual(lib.tracks.length, 3);
-    node_assert_1.default.deepStrictEqual(lib.scan, { scanned: 3, total: 3 });
+    node_assert_1.default.deepStrictEqual(lib.scan, { scanned: 3, total: 3, active: false });
     node_assert_1.default.strictEqual(lib.folders[0].trackCount, 3);
     node_assert_1.default.deepStrictEqual(lib.extensions, ['.mp3']);
     node_assert_1.default.ok(lib.tracks.every((t) => !('uri' in t))); // ids are `local:<uri>` by design; only the uri field stays host-side

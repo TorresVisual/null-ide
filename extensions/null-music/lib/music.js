@@ -269,7 +269,7 @@ const app = {
     byId: new Map(),
     folders: [],
     playlists: [],
-    scan: { scanned: 0, total: 0 },
+    scan: { scanned: 0, total: 0, active: false },
     extensions: [],
     liked: new Set(),
     libraryLoaded: false,
@@ -469,6 +469,17 @@ function updateRowFlags() {
         if (like)
             like.setAttribute('aria-pressed', String(app.liked.has(id)));
     });
+}
+function isScanning() {
+    return app.scan.active || app.scan.total > app.scan.scanned;
+}
+/** Placeholder rows shown before the first tracks of a scan arrive. */
+function skeletonRows(count = 8) {
+    const wrap = h('div', { class: 'np-list', 'aria-busy': 'true', 'aria-label': 'Loading' });
+    for (let i = 0; i < count; i++) {
+        wrap.appendChild(h('div', { class: 'np-row np-skel', 'aria-hidden': 'true' }, h('div', { class: 'np-skel-block' }), h('div', { class: 'np-row-text' }, h('div', { class: 'np-skel-line wide' }), h('div', { class: 'np-skel-line' }))));
+    }
+    return wrap;
 }
 const audio = h('audio', { id: 'audio-player', preload: 'auto' });
 let audioTrackUri;
@@ -731,10 +742,486 @@ function renderPlayer() {
         updateScrubber(s.progressMs, s.durationMs);
     scrubbedTrackId = trackId;
 }
-const headerEl = h('header', { class: 'np-header' }, h('div', { class: 'np-brand' }, h('span', { class: 'np-brand-mark', 'aria-hidden': 'true' }, '∅'), 'Music'));
-function renderHeader() {
-    // Nothing dynamic yet; Task 10 fills this in.
+let queueDragKey = null;
+let focusQueueKeyAfterRender = null;
+function clearDropMarks() {
+    document.querySelectorAll('.drop-before, .drop-end-active').forEach((n) => n.classList.remove('drop-before', 'drop-end-active'));
 }
+/** Put the dragged entry before `beforeKey` (`null` = last). */
+function dropQueueEntry(beforeKey) {
+    const key = queueDragKey;
+    queueDragKey = null;
+    clearDropMarks();
+    if (key !== null && key !== beforeKey)
+        send({ type: 'queueMove', key, beforeKey });
+}
+function queueRow(item, kind) {
+    const row = trackRow(item.track, {
+        key: item.key,
+        query: app.query,
+        onPlay: () => send(kind === 'current' ? { type: 'playPause' } : { type: 'queueJump', key: item.key }),
+        extra: [iconButton('close', 'Remove from queue', () => send({ type: 'queueRemove', key: item.key }), 'np-remove')],
+    });
+    if (kind === 'upcoming' && app.queue.reorderable) {
+        row.setAttribute('draggable', 'true');
+        row.addEventListener('dragstart', (e) => {
+            queueDragKey = item.key;
+            row.classList.add('dragging');
+            if (e.dataTransfer) {
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', String(item.key));
+            }
+        });
+        row.addEventListener('dragend', () => {
+            queueDragKey = null;
+            row.classList.remove('dragging');
+            clearDropMarks();
+        });
+        row.addEventListener('dragover', (e) => {
+            if (queueDragKey === null)
+                return;
+            e.preventDefault();
+            clearDropMarks();
+            row.classList.add('drop-before');
+        });
+        row.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropQueueEntry(item.key);
+        });
+    }
+    return row;
+}
+function renderQueueView(el) {
+    const q = app.queue;
+    if (!q.current) {
+        el.replaceChildren(hasNoSources()
+            ? noLibraryState()
+            : emptyState('list', 'The queue is empty', app.tracks.length ? 'Pick a track in Library, or play everything.' : '', app.tracks.length ? [textButton('Play library', () => send({ type: 'playPause' }), true)] : []));
+        return;
+    }
+    const keep = (i) => matchesTrack(i.track, app.query);
+    const upcoming = q.upcoming.filter(keep);
+    const history = q.history.filter(keep).reverse(); // newest first
+    if (app.query.trim() && !keep(q.current) && upcoming.length === 0 && history.length === 0) {
+        el.replaceChildren(noResultsState());
+        return;
+    }
+    const list = h('div', { class: 'np-list', role: 'listbox', 'aria-label': 'Queue' });
+    list.append(sectionHeading('Now playing'), queueRow(q.current, 'current'));
+    if (upcoming.length > 0) {
+        list.appendChild(sectionHeading('Next up (' + q.upcoming.length + ')'));
+        for (const item of upcoming)
+            list.appendChild(queueRow(item, 'upcoming'));
+        if (q.reorderable && !app.query.trim()) {
+            const end = h('div', { class: 'np-drop-end', 'aria-hidden': 'true' });
+            end.addEventListener('dragover', (e) => {
+                if (queueDragKey === null)
+                    return;
+                e.preventDefault();
+                clearDropMarks();
+                end.classList.add('drop-end-active');
+            });
+            end.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropQueueEntry(null);
+            });
+            list.appendChild(end);
+        }
+    }
+    if (history.length > 0) {
+        const toggle = h('button', { class: 'np-section-btn', type: 'button', 'aria-expanded': String(app.historyOpen) }, icon('back'), 'History (' + q.history.length + ')');
+        toggle.addEventListener('click', () => {
+            app.historyOpen = !app.historyOpen;
+            invalidate('content');
+        });
+        list.appendChild(h('div', { class: 'np-section' }, toggle));
+        if (app.historyOpen)
+            for (const item of history)
+                list.appendChild(queueRow(item, 'history'));
+    }
+    list.addEventListener('keydown', (e) => {
+        if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') || !app.queue.reorderable)
+            return;
+        const raw = e.target.getAttribute('data-key');
+        if (raw === null)
+            return;
+        const key = Number(raw);
+        const before = reorderTarget(app.queue.upcoming.map((i) => i.key), key, e.key === 'ArrowUp' ? -1 : 1);
+        if (before === undefined)
+            return;
+        e.preventDefault();
+        focusQueueKeyAfterRender = key;
+        send({ type: 'queueMove', key, beforeKey: before });
+    });
+    makeRoving(list);
+    const toolbar = h('div', { class: 'np-toolbar' }, h('span', { class: 'np-toolbar-title' }, q.upcoming.length + 1 + (q.upcoming.length === 0 ? ' track' : ' tracks')), textButton('Clear queue', () => send({ type: 'queueClear' })));
+    el.replaceChildren(toolbar, list);
+    if (focusQueueKeyAfterRender !== null) {
+        const row = list.querySelector('[data-key="' + focusQueueKeyAfterRender + '"]');
+        focusQueueKeyAfterRender = null;
+        if (row)
+            row.focus();
+    }
+}
+tabRenderers.queue = renderQueueView;
+function renderDetailView(el, d) {
+    const visible = d.tracks.filter((t) => matchesTrack(t, app.query));
+    const play = (shuffle) => {
+        if (visible.length > 0)
+            send({ type: 'playTracks', ids: visible.map((t) => t.id), startId: visible[0].id, shuffle });
+    };
+    const playBtn = textButton('Play', () => play(false), true);
+    const shuffleBtn = textButton('Shuffle', () => play(true));
+    playBtn.disabled = shuffleBtn.disabled = visible.length === 0;
+    const parts = [
+        h('div', { class: 'np-detail-head' }, iconButton('back', 'Back', d.onBack, 'np-back'), cover(d.artUrl, d.seed, 'np-detail-cover'), h('div', { class: 'np-detail-text' }, h('div', { class: 'np-detail-title' }, d.title), h('div', { class: 'np-detail-sub' }, d.subtitle))),
+        h('div', { class: 'np-detail-actions' }, playBtn, shuffleBtn),
+    ];
+    if (d.tracks.length === 0) {
+        parts.push(emptyState('list', 'No tracks', ''));
+    }
+    else if (visible.length === 0) {
+        parts.push(noResultsState());
+    }
+    else {
+        if (d.albums && d.albums.length > 0)
+            parts.push(sectionHeading('Albums'), albumGrid(d.albums), sectionHeading('All tracks'));
+        const list = h('div', { class: 'np-list', role: 'listbox', 'aria-label': d.title });
+        renderChunked(list, visible, (t) => trackRow(t, { query: app.query, onPlay: () => playTrackList(visible, t.id) }));
+        makeRoving(list);
+        parts.push(list);
+    }
+    el.replaceChildren(...parts);
+}
+function openLibraryDetail(kind, id) {
+    app.detailScroll = contentEl.scrollTop;
+    app.libraryDetail = { kind, id };
+    invalidate('content');
+}
+function closeLibraryDetail() {
+    app.libraryDetail = null;
+    app.restoreScroll = true;
+    invalidate('content');
+}
+function albumCard(a) {
+    const card = h('button', { class: 'np-card', type: 'button', 'data-row': true, 'aria-label': a.name + ' by ' + a.artist }, cover(a.artUrl, a.name, 'np-card-cover'), h('div', { class: 'np-card-title' }, ...markText(a.name, app.query)), h('div', { class: 'np-card-sub' }, a.artist + (a.year ? ' · ' + a.year : '')));
+    card.addEventListener('click', () => openLibraryDetail('album', a.key));
+    return card;
+}
+function albumGrid(albums) {
+    const grid = h('div', { class: 'np-grid' });
+    renderChunked(grid, albums, albumCard);
+    return grid;
+}
+function albumsBody(base) {
+    const albums = rankItems(groupAlbums(base), app.query, (a) => [a.name, a.artist]);
+    if (albums.length === 0)
+        return emptyLibraryBody();
+    const grid = albumGrid(albums);
+    makeRoving(grid);
+    return grid;
+}
+function plural(n, one, many) {
+    return n + ' ' + (n === 1 ? one : many);
+}
+function artistRow(a) {
+    const row = h('button', { class: 'np-row np-artist-row', type: 'button', 'data-row': true }, cover(a.artUrl, a.name, 'np-avatar'), h('div', { class: 'np-row-text' }, h('div', { class: 'np-row-title' }, ...markText(a.name, app.query)), h('div', { class: 'np-row-sub' }, plural(a.albums.length, 'album', 'albums') + ' · ' + plural(a.tracks.length, 'track', 'tracks'))));
+    row.addEventListener('click', () => openLibraryDetail('artist', a.key));
+    return row;
+}
+function artistsBody(base) {
+    const artists = rankItems(groupArtists(base), app.query, (a) => [a.name]);
+    if (artists.length === 0)
+        return emptyLibraryBody();
+    const list = h('div', { class: 'np-list', 'aria-label': 'Artists' });
+    renderChunked(list, artists, artistRow);
+    makeRoving(list);
+    return list;
+}
+/** Renders the open album/artist; false when it no longer exists (e.g. the folder was removed). */
+function renderLibraryDetail(el) {
+    const d = app.libraryDetail;
+    if (!d)
+        return false;
+    if (d.kind === 'album') {
+        const album = groupAlbums(app.tracks).find((a) => a.key === d.id);
+        if (!album)
+            return false;
+        renderDetailView(el, {
+            title: album.name,
+            subtitle: album.artist + (album.year ? ' · ' + album.year : '') + ' · ' + plural(album.tracks.length, 'track', 'tracks'),
+            artUrl: album.artUrl,
+            seed: album.name,
+            tracks: album.tracks,
+            onBack: closeLibraryDetail,
+        });
+        return true;
+    }
+    const artist = groupArtists(app.tracks).find((a) => a.key === d.id);
+    if (!artist)
+        return false;
+    renderDetailView(el, {
+        title: artist.name,
+        subtitle: plural(artist.albums.length, 'album', 'albums') + ' · ' + plural(artist.tracks.length, 'track', 'tracks'),
+        artUrl: artist.artUrl,
+        seed: artist.name,
+        tracks: artist.tracks,
+        albums: artist.albums,
+        onBack: closeLibraryDetail,
+    });
+    return true;
+}
+const SEGMENTS = [
+    ['tracks', 'Tracks'],
+    ['albums', 'Albums'],
+    ['artists', 'Artists'],
+];
+const SORTS = [
+    ['title', 'Title'],
+    ['artist', 'Artist'],
+    ['album', 'Album'],
+    ['duration', 'Duration'],
+];
+/** Replaces the queue with `list` and starts at `startId`. */
+function playTrackList(list, startId) {
+    send({ type: 'playTracks', ids: list.map((t) => t.id), startId });
+}
+function libraryToolbar() {
+    const segments = h('div', { class: 'np-seg', role: 'group', 'aria-label': 'Browse by' });
+    for (const [id, label] of SEGMENTS) {
+        const b = h('button', { class: 'np-seg-btn', type: 'button', 'aria-pressed': String(app.segment === id) }, label);
+        b.addEventListener('click', () => {
+            app.segment = id;
+            app.libraryDetail = null;
+            invalidate('content');
+        });
+        segments.appendChild(b);
+    }
+    const liked = h('button', { class: 'np-chip', type: 'button', 'aria-pressed': String(app.likedOnly) }, icon('heart'), 'Liked');
+    liked.addEventListener('click', () => {
+        app.likedOnly = !app.likedOnly;
+        invalidate('content');
+    });
+    const sort = h('select', { class: 'np-select', 'aria-label': 'Sort by', disabled: app.query.trim() !== '' || app.segment !== 'tracks' });
+    for (const [id, label] of SORTS)
+        sort.appendChild(h('option', { value: id, selected: app.sort === id }, label));
+    sort.addEventListener('change', () => {
+        app.sort = sort.value;
+        invalidate('content');
+    });
+    return h('div', { class: 'np-toolbar np-lib-toolbar' }, segments, liked, sort);
+}
+/** What the active filters leave of the library (the Liked chip applies to every segment). */
+function libraryBase() {
+    return app.likedOnly ? app.tracks.filter((t) => app.liked.has(t.id)) : app.tracks;
+}
+function emptyLibraryBody() {
+    if (app.query.trim())
+        return noResultsState();
+    if (app.likedOnly)
+        return emptyState('heart', 'No liked tracks yet', 'Use the heart on a track to keep it here.');
+    if (isScanning() || !app.libraryLoaded)
+        return skeletonRows();
+    if (app.folders.length > 0) {
+        const where = app.folders.map((f) => f.name).join(', ');
+        return emptyState('folder', 'No audio files found', 'Looked in ' + where + '. Supported: ' + app.extensions.join(' ') + '.', [
+            textButton('Rescan', () => send({ type: 'rescan' }), true),
+            textButton('Add folder', () => send({ type: 'addFolder' })),
+        ]);
+    }
+    return emptyState('note', 'No tracks', '');
+}
+function tracksBody(base) {
+    const list = app.query.trim() ? rankTracks(base, app.query) : sortTracks(base, app.sort);
+    if (list.length === 0)
+        return emptyLibraryBody();
+    const body = h('div', { class: 'np-list', role: 'listbox', 'aria-label': 'Tracks' });
+    renderChunked(body, list, (t) => trackRow(t, { query: app.query, onPlay: () => playTrackList(list, t.id) }));
+    makeRoving(body);
+    return body;
+}
+function renderLibraryView(el) {
+    if (hasNoSources()) {
+        el.replaceChildren(noLibraryState());
+        return;
+    }
+    if (app.libraryDetail && renderLibraryDetail(el))
+        return;
+    app.libraryDetail = null; // the open album/artist is gone
+    const base = libraryBase();
+    const body = app.segment === 'albums' ? albumsBody(base) : app.segment === 'artists' ? artistsBody(base) : tracksBody(base);
+    el.replaceChildren(libraryToolbar(), body);
+}
+tabRenderers.library = renderLibraryView;
+function openPlaylist(id) {
+    app.detailScroll = contentEl.scrollTop;
+    app.playlistId = id;
+    invalidate('content');
+}
+function closePlaylist() {
+    app.playlistId = null;
+    app.restoreScroll = true;
+    invalidate('content');
+}
+function playlistArt(p) {
+    const withArt = p.tracks.find((t) => !!t.artUrl);
+    return withArt ? withArt.artUrl : undefined;
+}
+function playlistRow(p) {
+    const row = h('div', { class: 'np-row', role: 'option', tabindex: -1, 'data-row': true }, cover(playlistArt(p), p.name, 'np-thumb'), h('div', { class: 'np-row-text' }, h('div', { class: 'np-row-title' }, ...markText(p.name, app.query)), h('div', { class: 'np-row-sub' }, plural(p.tracks.length, 'track', 'tracks'))), iconButton('close', 'Remove playlist (keeps the file)', () => send({ type: 'removePlaylist', id: p.id }), 'np-remove'));
+    row.addEventListener('click', (e) => {
+        if (e.target.closest('button'))
+            return;
+        openPlaylist(p.id);
+    });
+    return row;
+}
+function renderPlaylistsView(el) {
+    if (app.playlistId) {
+        const pl = app.playlists.find((p) => p.id === app.playlistId);
+        if (pl) {
+            renderDetailView(el, {
+                title: pl.name,
+                subtitle: plural(pl.tracks.length, 'track', 'tracks'),
+                artUrl: playlistArt(pl),
+                seed: pl.name,
+                tracks: pl.tracks,
+                onBack: closePlaylist,
+            });
+            return;
+        }
+        app.playlistId = null; // the open playlist was removed
+    }
+    if (app.playlists.length === 0) {
+        el.replaceChildren(hasNoSources()
+            ? noLibraryState()
+            : emptyState('list', 'No playlists', 'Import an .m3u8 playlist and it shows up here.', [textButton('Import playlist', () => send({ type: 'importPlaylist' }), true)]));
+        return;
+    }
+    const toolbar = h('div', { class: 'np-toolbar' }, h('span', { class: 'np-toolbar-title' }, plural(app.playlists.length, 'playlist', 'playlists')), textButton('Import', () => send({ type: 'importPlaylist' })));
+    const playlists = rankItems(app.playlists, app.query, (p) => [p.name]);
+    if (playlists.length === 0) {
+        el.replaceChildren(toolbar, noResultsState());
+        return;
+    }
+    const list = h('div', { class: 'np-list', role: 'listbox', 'aria-label': 'Playlists' });
+    renderChunked(list, playlists, playlistRow);
+    makeRoving(list);
+    el.replaceChildren(toolbar, list);
+}
+tabRenderers.playlists = renderPlaylistsView;
+function closeFolders() {
+    app.showFolders = false;
+    app.restoreScroll = true;
+    invalidate('content');
+}
+function folderPath(uri) {
+    try {
+        return decodeURIComponent(uri.replace(/^file:\/\/\/?/, ''));
+    }
+    catch (_a) {
+        return uri;
+    }
+}
+function folderRow(f) {
+    const path = folderPath(f.uri);
+    return h('div', { class: 'np-row np-folder-row' }, icon('folder'), h('div', { class: 'np-row-text' }, h('div', { class: 'np-row-title' }, f.name), h('div', { class: 'np-row-sub', title: path }, path + ' · ' + plural(f.trackCount, 'track', 'tracks'))), iconButton('close', 'Remove folder ' + f.name, () => send({ type: 'removeFolder', uri: f.uri }), 'np-remove'));
+}
+function renderFoldersView(el) {
+    const head = h('div', { class: 'np-detail-head' }, iconButton('back', 'Back', closeFolders, 'np-back'), h('div', { class: 'np-detail-text' }, h('div', { class: 'np-detail-title' }, 'Music folders')));
+    const actions = h('div', { class: 'np-detail-actions' }, textButton('Add folder', () => send({ type: 'addFolder' }), true), textButton('Rescan', () => send({ type: 'rescan' })));
+    const body = app.folders.length === 0 ? emptyState('folder', 'No folders yet', 'Add a folder to scan it for music.') : h('div', { class: 'np-list' }, ...app.folders.map(folderRow));
+    el.replaceChildren(head, actions, body);
+}
+const scanPill = h('span', { class: 'np-pill', role: 'status', hidden: true });
+const searchInput = h('input', { class: 'np-search', type: 'search', placeholder: 'Search  ( / )', 'aria-label': 'Search music', spellcheck: 'false' });
+searchInput.addEventListener('input', () => setQuery(searchInput.value));
+const menuEl = h('div', { class: 'np-menu', role: 'menu', hidden: true });
+const menuBtn = iconButton('more', 'More actions', () => (menuEl.hidden ? openMenu() : closeMenu()), 'np-menu-btn');
+menuBtn.setAttribute('aria-haspopup', 'menu');
+menuBtn.setAttribute('aria-expanded', 'false');
+function menuItem(label, onClick) {
+    const b = h('button', { class: 'np-menu-item', type: 'button', role: 'menuitem' }, label);
+    b.addEventListener('click', () => {
+        closeMenu();
+        onClick();
+    });
+    return b;
+}
+menuEl.append(menuItem('Add folder…', () => send({ type: 'addFolder' })), menuItem('Import playlist…', () => send({ type: 'importPlaylist' })), menuItem('Manage folders', () => {
+    app.detailScroll = contentEl.scrollTop;
+    app.showFolders = true;
+    invalidate('content');
+}), menuItem('Rescan', () => send({ type: 'rescan' })));
+function openMenu() {
+    menuEl.hidden = false;
+    menuBtn.setAttribute('aria-expanded', 'true');
+    menuEl.querySelector('button').focus();
+}
+function closeMenu() {
+    menuEl.hidden = true;
+    menuBtn.setAttribute('aria-expanded', 'false');
+}
+menuEl.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp')
+        return;
+    e.preventDefault();
+    const items = Array.prototype.slice.call(menuEl.querySelectorAll('button'));
+    const at = items.indexOf(document.activeElement);
+    items[(at + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length].focus();
+});
+document.addEventListener('click', (e) => {
+    if (!menuEl.hidden && !menuEl.contains(e.target))
+        closeMenu();
+});
+const headerEl = h('header', { class: 'np-header' }, h('div', { class: 'np-header-row' }, h('div', { class: 'np-brand' }, h('span', { class: 'np-brand-mark', 'aria-hidden': 'true' }, '∅'), 'Music'), scanPill, menuBtn), h('div', { class: 'np-search-row' }, searchInput), menuEl);
+function renderHeader() {
+    const scanning = app.scan.total > app.scan.scanned;
+    scanPill.hidden = !scanning;
+    if (scanning)
+        scanPill.textContent = 'Scanning ' + app.scan.scanned + '/' + app.scan.total;
+    if (searchInput.value !== app.query)
+        searchInput.value = app.query;
+}
+/** Esc: close the menu, then clear the search, then step out of folders / album / playlist detail. */
+function navigateBack() {
+    if (!menuEl.hidden) {
+        closeMenu();
+        menuBtn.focus();
+        return true;
+    }
+    if (app.query) {
+        setQuery('');
+        return true;
+    }
+    if (app.showFolders) {
+        closeFolders();
+        return true;
+    }
+    if (app.tab === 'library' && app.libraryDetail) {
+        closeLibraryDetail();
+        return true;
+    }
+    if (app.tab === 'playlists' && app.playlistId) {
+        closePlaylist();
+        return true;
+    }
+    return false;
+}
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        if (navigateBack())
+            e.preventDefault();
+        return;
+    }
+    const target = e.target;
+    const typing = ['INPUT', 'TEXTAREA', 'SELECT'].indexOf(target.tagName) >= 0;
+    if (e.key === '/' && !typing && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        searchInput.focus();
+        searchInput.select();
+    }
+});
 const contentEl = h('main', { class: 'np-content', id: 'np-content', role: 'tabpanel', tabindex: -1 });
 const TABS = [
     ['queue', 'Queue'],
@@ -759,6 +1246,7 @@ tabsEl.addEventListener('keydown', (e) => {
     tabButtons[next].focus();
 });
 function setTab(tab) {
+    app.showFolders = false;
     app.tab = tab;
     for (const [id] of TABS) {
         const selected = id === tab;
@@ -779,7 +1267,7 @@ function renderContent() {
     wantedScroll = key === lastViewKey ? contentEl.scrollTop : app.restoreScroll ? app.detailScroll : 0;
     lastViewKey = key;
     app.restoreScroll = false;
-    const render = tabRenderers[app.tab];
+    const render = app.showFolders ? renderFoldersView : tabRenderers[app.tab];
     if (render)
         render(contentEl);
     contentEl.scrollTop = wantedScroll;

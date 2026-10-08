@@ -100,6 +100,7 @@ class Library {
     flat;
     index;
     scanned = 0;
+    adding = 0; // addFolder calls in flight (they scan without going through `scanning`)
     total = 0;
     scanning;
     scanAgain = false;
@@ -148,6 +149,10 @@ class Library {
     /** Audio extensions the scanner accepts, as configured (e.g. `.mp3`). */
     get supportedExtensions() {
         return this.options.extensions();
+    }
+    /** A rescan or an addFolder is walking and reading files right now. */
+    get isScanning() {
+        return this.scanning !== undefined || this.adding > 0;
     }
     get progress() {
         return { scanned: this.scanned, total: this.total };
@@ -270,18 +275,24 @@ class Library {
         return this.scanning;
     }
     async addFolder(folder) {
-        if (!this.folderUris.includes(folder)) {
-            this.folderUris.push(folder);
-            await this.options.state.update(KEY_FOLDERS, [...this.folderUris]);
-            this.sourcesEmitter.fire();
+        this.adding++;
+        try {
+            if (!this.folderUris.includes(folder)) {
+                this.folderUris.push(folder);
+                await this.options.state.update(KEY_FOLDERS, [...this.folderUris]);
+                this.sourcesEmitter.fire();
+            }
+            this.scanned = 0;
+            this.total = 0;
+            await this.scanFolder(folder);
+            await this.cache.save();
+            this.scanned = this.total;
+            this.fireNow();
+            return this.tracksInFolder(folder);
         }
-        this.scanned = 0;
-        this.total = 0;
-        await this.scanFolder(folder);
-        await this.cache.save();
-        this.scanned = this.total;
-        this.fireNow();
-        return this.tracksInFolder(folder);
+        finally {
+            this.adding--;
+        }
     }
     async removeFolder(folder) {
         this.folderUris = this.folderUris.filter((u) => u !== folder);
