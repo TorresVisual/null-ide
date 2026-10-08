@@ -60,7 +60,7 @@ export function toWireLibrary(library: Library, artUrl: ArtUrl): Extract<HostToW
       trackCount: library.tracksInFolder(uri).length,
     })),
     playlists: library.playlists.map((p) => ({ id: p.id, name: p.name, tracks: p.tracks.map((t) => toWireTrack(t, artUrl)) })),
-    scan: library.progress,
+    scan: { ...library.progress, active: library.isScanning },
     extensions: library.supportedExtensions,
   };
 }

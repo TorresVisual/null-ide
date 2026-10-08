@@ -53,6 +53,14 @@ function libraryBase(): WireTrack[] {
 function emptyLibraryBody(): HTMLElement {
   if (app.query.trim()) return noResultsState();
   if (app.likedOnly) return emptyState('heart', 'No liked tracks yet', 'Use the heart on a track to keep it here.');
+  if (isScanning() || !app.libraryLoaded) return skeletonRows();
+  if (app.folders.length > 0) {
+    const where = app.folders.map((f) => f.name).join(', ');
+    return emptyState('folder', 'No audio files found', 'Looked in ' + where + '. Supported: ' + app.extensions.join(' ') + '.', [
+      textButton('Rescan', () => send({ type: 'rescan' }), true),
+      textButton('Add folder', () => send({ type: 'addFolder' })),
+    ]);
+  }
   return emptyState('note', 'No tracks', '');
 }
 

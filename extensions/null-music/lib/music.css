@@ -168,3 +168,24 @@ body.vscode-high-contrast .np-cover, body.vscode-high-contrast-light .np-cover {
 .np-detail-title { font-weight: 600; font-size: 1.1em; overflow-wrap: anywhere; }
 .np-detail-sub { color: var(--np-muted); }
 .np-detail-actions { display: flex; gap: 6px; padding: 4px 8px 8px; }
+
+/* header: scan pill, search, menu */
+.np-header { position: relative; flex-direction: column; align-items: stretch; gap: 6px; }
+.np-header-row { display: flex; align-items: center; gap: 6px; }
+.np-pill { padding: 1px 8px; border-radius: 10px; font-size: 0.85em; color: var(--vscode-badge-foreground); background: var(--vscode-badge-background); white-space: nowrap; }
+.np-search { width: 100%; min-height: 24px; padding: 2px 8px; color: var(--vscode-input-foreground); background: var(--np-input-bg); border: 1px solid var(--vscode-input-border, transparent); border-radius: 3px; font: inherit; }
+.np-search::placeholder { color: var(--vscode-input-placeholderForeground); }
+.np-search:focus { outline: 1px solid var(--np-accent); outline-offset: -1px; }
+.np-menu { position: absolute; top: 34px; right: 8px; z-index: 5; display: flex; flex-direction: column; min-width: 160px; padding: 4px 0; color: var(--vscode-menu-foreground); background: var(--vscode-menu-background); border: 1px solid var(--vscode-menu-border, var(--np-border)); border-radius: 4px; box-shadow: 0 2px 8px var(--vscode-widget-shadow); }
+.np-menu-item { padding: 4px 12px; text-align: left; }
+.np-menu-item:hover, .np-menu-item:focus-visible { color: var(--vscode-menu-selectionForeground); background: var(--vscode-menu-selectionBackground); outline: none; }
+.np-folder-row .np-remove { opacity: 1; }
+
+/* loading skeleton */
+.np-skel { cursor: default; }
+.np-skel:hover { background: none; }
+.np-skel-block, .np-skel-line { background: var(--np-hover); border-radius: 3px; animation: np-pulse 1.4s ease-in-out infinite; }
+.np-skel-block { width: 32px; height: 32px; flex: none; }
+.np-skel-line { height: 9px; width: 45%; margin: 4px 0; }
+.np-skel-line.wide { width: 70%; }
+@media (prefers-reduced-motion: reduce) { .np-skel-block, .np-skel-line { animation: none; } }

@@ -24,6 +24,7 @@ tabsEl.addEventListener('keydown', (e: KeyboardEvent) => {
 });
 
 function setTab(tab: TabId): void {
+  app.showFolders = false;
   app.tab = tab;
   for (const [id] of TABS) {
     const selected = id === tab;
@@ -47,7 +48,7 @@ function renderContent(): void {
   wantedScroll = key === lastViewKey ? contentEl.scrollTop : app.restoreScroll ? app.detailScroll : 0;
   lastViewKey = key;
   app.restoreScroll = false;
-  const render = tabRenderers[app.tab];
+  const render = app.showFolders ? renderFoldersView : tabRenderers[app.tab];
   if (render) render(contentEl);
   contentEl.scrollTop = wantedScroll;
   updateRowFlags();

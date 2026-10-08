@@ -205,3 +205,20 @@ test('toggleLike fires onDidChangeLikes', async () => {
   assert.strictEqual(fired, 2);
   lib.dispose();
 });
+
+test('isScanning is true while a rescan or addFolder runs', async () => {
+  const dir = fs.mkdtempSync(path.join(root, 'scanning-'));
+  const lib = new Library({ state: new MemState(), cacheFile: path.join(dir, 'c.json'), artDir: path.join(dir, 'art'), extensions: () => ['.mp3'] });
+  assert.strictEqual(lib.isScanning, false);
+  const rescan = lib.rescan();
+  assert.strictEqual(lib.isScanning, true);
+  await rescan;
+  assert.strictEqual(lib.isScanning, false);
+  const music = path.join(dir, 'music');
+  fs.mkdirSync(music);
+  const add = lib.addFolder(pathToUri(music));
+  assert.strictEqual(lib.isScanning, true);
+  await add;
+  assert.strictEqual(lib.isScanning, false);
+  lib.dispose();
+});

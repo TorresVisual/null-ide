@@ -166,3 +166,18 @@ function updateRowFlags(): void {
     if (like) like.setAttribute('aria-pressed', String(app.liked.has(id)));
   });
 }
+
+function isScanning(): boolean {
+  return app.scan.active || app.scan.total > app.scan.scanned;
+}
+
+/** Placeholder rows shown before the first tracks of a scan arrive. */
+function skeletonRows(count: number = 8): HTMLElement {
+  const wrap = h('div', { class: 'np-list', 'aria-busy': 'true', 'aria-label': 'Loading' });
+  for (let i = 0; i < count; i++) {
+    wrap.appendChild(
+      h('div', { class: 'np-row np-skel', 'aria-hidden': 'true' }, h('div', { class: 'np-skel-block' }), h('div', { class: 'np-row-text' }, h('div', { class: 'np-skel-line wide' }), h('div', { class: 'np-skel-line' })))
+    );
+  }
+  return wrap;
+}

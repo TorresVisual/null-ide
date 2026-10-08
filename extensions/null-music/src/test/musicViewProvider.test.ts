@@ -53,7 +53,7 @@ test('ready sends every snapshot once, with no filesystem uri on the wire', asyn
   assert.deepStrictEqual(posted.map((m) => m.type), ['player', 'queue', 'library', 'liked']);
   const lib = posted[2];
   assert.strictEqual(lib.tracks.length, 3);
-  assert.deepStrictEqual(lib.scan, { scanned: 3, total: 3 });
+  assert.deepStrictEqual(lib.scan, { scanned: 3, total: 3, active: false });
   assert.strictEqual(lib.folders[0].trackCount, 3);
   assert.deepStrictEqual(lib.extensions, ['.mp3']);
   assert.ok(lib.tracks.every((t: object) => !('uri' in t))); // ids are `local:<uri>` by design; only the uri field stays host-side

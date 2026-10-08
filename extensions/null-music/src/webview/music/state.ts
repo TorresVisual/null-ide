@@ -14,7 +14,7 @@ const app = {
   byId: new Map<string, WireTrack>(),
   folders: [] as WireFolder[],
   playlists: [] as WirePlaylist[],
-  scan: { scanned: 0, total: 0 },
+  scan: { scanned: 0, total: 0, active: false },
   extensions: [] as string[],
   liked: new Set<string>(),
   libraryLoaded: false,

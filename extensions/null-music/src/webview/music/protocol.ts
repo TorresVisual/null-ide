@@ -51,7 +51,7 @@ interface WirePlaylist {
 type HostToWebview =
   | { type: 'player'; state: WirePlayerState; unavailable: string[] }
   | { type: 'queue'; history: WireQueueItem[]; current: WireQueueItem | null; upcoming: WireQueueItem[]; reorderable: boolean }
-  | { type: 'library'; tracks: WireTrack[]; folders: WireFolder[]; playlists: WirePlaylist[]; scan: { scanned: number; total: number }; extensions: string[] }
+  | { type: 'library'; tracks: WireTrack[]; folders: WireFolder[]; playlists: WirePlaylist[]; scan: { scanned: number; total: number; active: boolean }; extensions: string[] }
   | { type: 'liked'; ids: string[] }
   // audio element commands (owned by WebviewAudioOutput; unchanged from the engine)
   | { type: 'localLoad'; uri: string; trackUri: string; startMs: number; autoplay: boolean }
