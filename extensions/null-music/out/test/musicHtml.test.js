@@ -4,41 +4,28 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const node_assert_1 = __importDefault(require("node:assert"));
+const node_fs_1 = require("node:fs");
+const node_path_1 = __importDefault(require("node:path"));
 const node_test_1 = require("node:test");
 const musicHtml_1 = require("../ui/musicHtml");
-(0, node_test_1.test)('getMusicWebviewHtml contains CSP nonce, controls, and clean local elements', () => {
-    const nonce = 'test-nonce-12345';
-    const html = (0, musicHtml_1.getMusicWebviewHtml)(nonce);
-    node_assert_1.default.ok(html.includes(`nonce-${nonce}`));
-    node_assert_1.default.ok(html.includes('id="btn-play-pause"'));
-    node_assert_1.default.ok(html.includes('id="btn-prev"'));
-    node_assert_1.default.ok(html.includes('id="btn-next"'));
-    node_assert_1.default.ok(html.includes('id="btn-shuffle"'));
-    node_assert_1.default.ok(html.includes('id="btn-repeat"'));
-    node_assert_1.default.ok(html.includes('id="btn-like"'));
-    node_assert_1.default.ok(html.includes('id="volume-slider"'));
-    node_assert_1.default.ok(html.includes('id="progress-bar-container"'));
-    node_assert_1.default.ok(html.includes('id="search-input"'));
-    node_assert_1.default.ok(html.includes('id="btn-add-folder"'));
-    node_assert_1.default.ok(html.includes('id="audio-player"'));
-    node_assert_1.default.ok(html.includes('id="pane-tracks"'));
-    node_assert_1.default.ok(html.includes('id="pane-playlists"'));
-    node_assert_1.default.ok(html.includes('id="pane-folders"'));
-    node_assert_1.default.ok(html.includes('id="pane-favorites"'));
-    node_assert_1.default.ok(html.includes('id="btn-import-playlist"'));
-    node_assert_1.default.ok(html.includes('id="btn-rewind-10"'));
-    node_assert_1.default.ok(html.includes('id="btn-forward-10"'));
-    node_assert_1.default.ok(html.includes('id="error-banner"'));
-    // Ensure slop is completely removed
-    node_assert_1.default.ok(!html.includes('Spotify'));
-    node_assert_1.default.ok(!html.includes('Lo-Fi Radio'));
-    node_assert_1.default.ok(!html.includes('input-client-id'));
-    node_assert_1.default.ok(!html.includes('link-dev-dash'));
-    node_assert_1.default.ok(!html.includes('select-provider'));
-    // Engine protocol: loads carry autoplay + start offset, interrupted play() is not a failure.
-    node_assert_1.default.ok(html.includes("case 'localLoad':"));
-    node_assert_1.default.ok(!html.includes("case 'localPlay':"));
-    node_assert_1.default.ok(html.includes("err.name === 'AbortError'"));
-    node_assert_1.default.ok(html.includes('t.folder === f'));
+(0, node_test_1.test)('the shell sets a strict CSP, links the bundle and carries no inline script or style', () => {
+    const html = (0, musicHtml_1.getMusicWebviewHtml)('test-nonce', 'vscode-webview-resource:', 'vscode:music.js', 'vscode:music.css');
+    node_assert_1.default.ok(html.includes("script-src 'nonce-test-nonce'"));
+    node_assert_1.default.ok(html.includes('<script nonce="test-nonce" src="vscode:music.js"></script>'));
+    node_assert_1.default.ok(html.includes('<link rel="stylesheet" href="vscode:music.css">'));
+    node_assert_1.default.ok(html.includes('id="app"'));
+    node_assert_1.default.ok(!html.includes("'unsafe-inline'"));
+    node_assert_1.default.ok(!html.includes('<style'));
+    node_assert_1.default.ok(!/<script(?![^>]*\bsrc=)/.test(html), 'no inline <script>');
+    node_assert_1.default.ok(html.split('\n').length < 40, 'the shell stays tiny');
+});
+(0, node_test_1.test)('the compiled bundle keeps the engine audio protocol and the AbortError filter', () => {
+    const bundle = node_path_1.default.join(__dirname, '..', '..', 'lib', 'music.js');
+    node_assert_1.default.ok((0, node_fs_1.existsSync)(bundle), 'run `npm run compile` first');
+    const js = (0, node_fs_1.readFileSync)(bundle, 'utf8');
+    for (const message of ['localLoad', 'localPause', 'localResume', 'localSeek', 'localVolume', 'localAudioPlayStarted', 'localAudioEnded']) {
+        node_assert_1.default.ok(js.includes(`'${message}'`), `bundle handles ${message}`);
+    }
+    node_assert_1.default.ok(js.includes("err.name === 'AbortError'"), 'an interrupted play() must not count as a failure');
 });
 //# sourceMappingURL=musicHtml.test.js.map

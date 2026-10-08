@@ -117,4 +117,60 @@ const names = (q) => q.tracks.map((t) => t.name);
     node_assert_1.default.strictEqual(q.current, undefined);
     node_assert_1.default.strictEqual(q.index, -1);
 });
+(0, node_test_1.test)('snapshot: list order when not shuffling, shuffle order when shuffling', () => {
+    const q = new queue_1.Queue(seeded(7));
+    q.replace(tracks(4), 1);
+    const plain = q.snapshot();
+    node_assert_1.default.deepStrictEqual(plain.history, []);
+    node_assert_1.default.strictEqual(plain.current?.track.name, 't1');
+    node_assert_1.default.deepStrictEqual(plain.upcoming.map((e) => e.track.name), ['t2', 't3']);
+    q.setShuffle(true);
+    const shuffled = q.snapshot();
+    node_assert_1.default.strictEqual(shuffled.current?.track.name, 't1');
+    node_assert_1.default.deepStrictEqual(shuffled.upcoming.map((e) => e.track.name).sort(), ['t0', 't2', 't3']);
+    node_assert_1.default.strictEqual(q.next()?.name, shuffled.upcoming[0].track.name);
+    node_assert_1.default.strictEqual(q.snapshot().history[0].track.name, 't1');
+});
+(0, node_test_1.test)('snapshot of an empty queue has no current', () => {
+    const s = new queue_1.Queue().snapshot();
+    node_assert_1.default.strictEqual(s.current, null);
+    node_assert_1.default.deepStrictEqual(s.upcoming, []);
+});
+(0, node_test_1.test)('moveBefore reorders by key, null moves to the end, unknown keys are ignored', () => {
+    const q = new queue_1.Queue();
+    q.replace(tracks(4), 0);
+    const snap = q.snapshot();
+    const [a, b, c, d] = [snap.current, ...snap.upcoming];
+    q.moveBefore(a.key, d.key);
+    node_assert_1.default.deepStrictEqual(names(q), ['t1', 't2', 't0', 't3']);
+    q.moveBefore(d.key, b.key);
+    node_assert_1.default.deepStrictEqual(names(q), ['t3', 't1', 't2', 't0']);
+    q.moveBefore(b.key, null);
+    node_assert_1.default.deepStrictEqual(names(q), ['t3', 't2', 't0', 't1']);
+    q.moveBefore(999, null);
+    q.moveBefore(c.key, 999);
+    node_assert_1.default.deepStrictEqual(names(q), ['t3', 't2', 't0', 't1']);
+    node_assert_1.default.strictEqual(q.current?.name, 't0'); // the playing entry moved with its key
+});
+(0, node_test_1.test)('removeKey removes one entry and ignores unknown keys', () => {
+    const q = new queue_1.Queue();
+    q.replace(tracks(3), 0);
+    const [, b] = [q.snapshot().current, ...q.snapshot().upcoming];
+    q.removeKey(b.key);
+    q.removeKey(12345);
+    node_assert_1.default.deepStrictEqual(names(q), ['t0', 't2']);
+});
+(0, node_test_1.test)('jumpTo makes an upcoming or history entry current and records history', () => {
+    const q = new queue_1.Queue();
+    q.replace(tracks(4), 0);
+    const upcoming = q.snapshot().upcoming;
+    node_assert_1.default.strictEqual(q.jumpTo(upcoming[2].key)?.name, 't3');
+    node_assert_1.default.strictEqual(q.current?.name, 't3');
+    node_assert_1.default.deepStrictEqual(q.snapshot().history.map((e) => e.track.name), ['t0']);
+    const back = q.snapshot().history[0];
+    node_assert_1.default.strictEqual(q.jumpTo(back.key)?.name, 't0');
+    node_assert_1.default.deepStrictEqual(q.snapshot().history.map((e) => e.track.name), ['t3']);
+    node_assert_1.default.strictEqual(q.jumpTo(999), undefined);
+    node_assert_1.default.strictEqual(q.current?.name, 't0');
+});
 //# sourceMappingURL=queue.test.js.map

@@ -122,6 +122,47 @@ class Queue {
         this.currentKey = key;
         return this.current;
     }
+    snapshot() {
+        const byKey = new Map(this.entries.map((e) => [e.key, e]));
+        const pick = (keys) => keys.map((k) => byKey.get(k)).filter((e) => !!e);
+        const at = this.index;
+        return {
+            history: pick(this.history),
+            current: at >= 0 ? this.entries[at] : null,
+            upcoming: this.shuffleOn ? pick(this.upcoming) : at >= 0 ? this.entries.slice(at + 1) : [],
+        };
+    }
+    removeKey(key) {
+        const i = this.entries.findIndex((e) => e.key === key);
+        if (i >= 0)
+            this.remove(i);
+    }
+    /** Move the entry with `key` to just before `beforeKey` (`null` = the end). Unknown keys are ignored. */
+    moveBefore(key, beforeKey) {
+        const from = this.entries.findIndex((e) => e.key === key);
+        if (from < 0 || key === beforeKey)
+            return;
+        let to = beforeKey === null ? this.entries.length - 1 : this.entries.findIndex((e) => e.key === beforeKey);
+        if (to < 0)
+            return;
+        if (beforeKey !== null && from < to)
+            to--;
+        this.move(from, to);
+    }
+    /** Make `key` current (from history or upcoming); the old current goes to history. */
+    jumpTo(key) {
+        const e = this.entries.find((x) => x.key === key);
+        if (!e || key === this.currentKey)
+            return e?.track;
+        this.history = this.history.filter((k) => k !== key);
+        if (this.currentKey !== -1)
+            this.history.push(this.currentKey);
+        if (this.history.length > HISTORY_LIMIT)
+            this.history.shift();
+        this.upcoming = this.upcoming.filter((k) => k !== key);
+        this.currentKey = key;
+        return e.track;
+    }
     rebuild() {
         this.upcoming = this.shuffleOn ? this.shuffled(this.otherKeys()) : [];
     }

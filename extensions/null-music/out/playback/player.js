@@ -26,6 +26,8 @@ class Player {
     pending = false;
     loadedId;
     skipStreak = 0;
+    /** Ids of tracks the output failed to play; a track leaves the set when it plays. */
+    unavailable = new Set();
     lastTrackId = null;
     saveTimer;
     subscription;
@@ -126,6 +128,34 @@ class Player {
     addToQueue(track) {
         this.queue.add(track);
         this.changed();
+    }
+    async jump(key) {
+        if (!this.queue.jumpTo(key))
+            return;
+        this.skipStreak = 0;
+        await this.startCurrent(true, 0, true);
+    }
+    async removeFromQueue(key) {
+        const wasCurrent = this.queue.snapshot().current?.key === key;
+        const autoplay = this.playing || this.pending;
+        this.queue.removeKey(key);
+        if (!wasCurrent) {
+            this.changed();
+        }
+        else if (this.queue.current) {
+            await this.startCurrent(autoplay, 0, true);
+        }
+        else {
+            this.stopAtEnd();
+        }
+    }
+    moveInQueue(key, beforeKey) {
+        this.queue.moveBefore(key, beforeKey);
+        this.changed();
+    }
+    clearQueue() {
+        this.queue.clear();
+        this.stopAtEnd();
     }
     /** Re-emit state (e.g. after a like toggled). */
     refresh() {
@@ -238,6 +268,8 @@ class Player {
                 this.playing = true;
                 this.pending = false;
                 this.skipStreak = 0;
+                if (current)
+                    this.unavailable.delete(current.id);
                 break;
             case 'pause':
                 if (e.positionMs !== undefined) {
@@ -284,6 +316,8 @@ class Player {
             return;
         }
         const failed = this.queue.current;
+        if (failed)
+            this.unavailable.add(failed.id);
         this.skipStreak++;
         if (this.skipStreak >= this.queue.length) {
             this.skipStreak = 0;

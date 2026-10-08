@@ -107,10 +107,13 @@ class Library {
     saveTimer;
     changeEmitter = new emitter_1.Emitter();
     sourcesEmitter = new emitter_1.Emitter();
+    likesEmitter = new emitter_1.Emitter();
     /** Tracks, scan progress or likes-affecting data changed (throttled while scanning). */
     onDidChange = this.changeEmitter.event;
     /** Folders or playlists were added/removed/reloaded. */
     onDidChangeSources = this.sourcesEmitter.event;
+    /** A like was added or removed (cheap: carries no data, the UI re-reads `likedTracks()`). */
+    onDidChangeLikes = this.likesEmitter.event;
     constructor(options) {
         this.options = options;
         this.cache = new libraryCache_1.LibraryCache(options.cacheFile);
@@ -141,6 +144,10 @@ class Library {
                 dirs.add(path.dirname((0, uri_1.uriToPath)(t.uri)));
         }
         return [...dirs];
+    }
+    /** Audio extensions the scanner accepts, as configured (e.g. `.mp3`). */
+    get supportedExtensions() {
+        return this.options.extensions();
     }
     get progress() {
         return { scanned: this.scanned, total: this.total };
@@ -196,6 +203,7 @@ class Library {
         if (!this.liked.delete(id))
             this.liked.add(id);
         await this.options.state.update(KEY_LIKED, [...this.liked]);
+        this.likesEmitter.fire();
         return this.liked.has(id);
     }
     /** Called with the duration the audio element measured on first play. */
@@ -216,6 +224,7 @@ class Library {
         void this.cache.save();
         this.changeEmitter.dispose();
         this.sourcesEmitter.dispose();
+        this.likesEmitter.dispose();
     }
     lookup() {
         if (!this.index) {

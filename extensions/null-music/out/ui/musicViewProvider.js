@@ -54,7 +54,10 @@ class MusicViewProvider {
         this.library = library;
         this.output = output;
         this.artDir = artDir;
-        this.subscriptions.push(this.player.onDidChange(() => this.controller?.sendPlaybackState()), this.library.onDidChange(() => this.controller?.sendLocalLibrary()), this.library.onDidChangeSources(() => {
+        this.subscriptions.push(this.player.onDidChange(() => {
+            this.controller?.sendPlayer();
+            this.controller?.sendQueue();
+        }), this.library.onDidChange(() => this.controller?.sendLibrary()), this.library.onDidChangeLikes(() => this.controller?.sendLiked()), this.library.onDidChangeSources(() => {
             if (this.view)
                 this.refreshLocalResourceRoots(this.view);
         }));
@@ -68,7 +71,8 @@ class MusicViewProvider {
             postMessage: (message) => webview.postMessage(message),
             resolveUri: (uri) => webview.asWebviewUri(vscode.Uri.parse(uri)).toString(),
         });
-        webview.html = (0, musicHtml_1.getMusicWebviewHtml)(this.getNonce(), webview.cspSource);
+        const asset = (file) => webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'lib', file)).toString();
+        webview.html = (0, musicHtml_1.getMusicWebviewHtml)(this.getNonce(), webview.cspSource, asset('music.js'), asset('music.css'));
         this.controller = new musicViewController_1.MusicViewController(this.player, this.library, { postMessage: (msg) => void webview.postMessage(msg) }, {
             executeCommand: async (cmd, ...args) => await vscode.commands.executeCommand(cmd, ...args),
             showErrorMessage: (msg) => void vscode.window.showErrorMessage(msg),

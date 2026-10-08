@@ -1,12 +1,15 @@
+/// <reference path="../webview/music/protocol.ts" />
 'use strict';
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MusicViewController = void 0;
-/** Translates webview messages into Player/Library calls. Audio events go to WebviewAudioOutput, not here. */
+const wire_1 = require("./wire");
+/** Translates webview intents into Player/Library calls and publishes snapshots. Audio events go to WebviewAudioOutput, not here. */
 class MusicViewController {
     player;
     library;
     messenger;
     host;
+    lastQueue = '';
     constructor(player, library, messenger, host) {
         this.player = player;
         this.library = library;
@@ -14,23 +17,16 @@ class MusicViewController {
         this.host = host;
     }
     async handleMessage(data) {
-        if (!data || !data.type) {
+        if (!data || typeof data.type !== 'string')
             return;
-        }
+        const msg = data;
         try {
-            switch (data.type) {
+            switch (msg.type) {
                 case 'ready':
-                    this.sendPlaybackState();
-                    this.sendLocalLibrary();
+                    this.sendAll();
                     break;
                 case 'playPause':
                     await this.player.playPause();
-                    break;
-                case 'play':
-                    await this.player.play();
-                    break;
-                case 'pause':
-                    this.player.pause();
                     break;
                 case 'previous':
                     await this.player.previous();
@@ -39,12 +35,12 @@ class MusicViewController {
                     await this.player.next();
                     break;
                 case 'seek':
-                    if (typeof data.positionMs === 'number')
-                        this.player.seek(data.positionMs);
+                    if (typeof msg.positionMs === 'number')
+                        this.player.seek(msg.positionMs);
                     break;
                 case 'setVolume':
-                    if (typeof data.volumePercent === 'number')
-                        this.player.setVolume(data.volumePercent);
+                    if (typeof msg.volumePercent === 'number')
+                        this.player.setVolume(msg.volumePercent);
                     break;
                 case 'toggleShuffle':
                     this.player.toggleShuffle();
@@ -52,46 +48,59 @@ class MusicViewController {
                 case 'toggleRepeat':
                     this.player.toggleRepeat();
                     break;
+                case 'playTracks':
+                    await this.playTracks(msg);
+                    break;
                 case 'toggleLike': {
-                    const track = this.player.getState().track;
-                    if (track)
-                        await this.toggleLike(track.id);
+                    const id = msg.trackId ?? this.player.getState().track?.id;
+                    if (id) {
+                        await this.library.toggleLike(id);
+                        this.player.refresh();
+                    }
                     break;
                 }
-                case 'toggleTrackLike':
-                    if (data.trackId)
-                        await this.toggleLike(data.trackId);
+                case 'queuePlayNext': {
+                    const t = this.library.trackById(msg.trackId);
+                    if (t)
+                        this.player.playNext(t);
                     break;
-                case 'localOpenFolder':
+                }
+                case 'queueAdd': {
+                    const t = this.library.trackById(msg.trackId);
+                    if (t)
+                        this.player.addToQueue(t);
+                    break;
+                }
+                case 'queueRemove':
+                    await this.player.removeFromQueue(msg.key);
+                    break;
+                case 'queueMove':
+                    // Upcoming order is random while shuffling, so a manual order would mean nothing.
+                    if (!this.player.queue.shuffle)
+                        this.player.moveInQueue(msg.key, msg.beforeKey);
+                    break;
+                case 'queueClear':
+                    this.player.clearQueue();
+                    break;
+                case 'queueJump':
+                    await this.player.jump(msg.key);
+                    break;
+                case 'addFolder':
                     await this.host.executeCommand('null-music.openLocalFolder');
                     break;
-                case 'localRemoveFolder':
-                    if (data.folderUri)
-                        await this.library.removeFolder(data.folderUri);
-                    break;
-                case 'localImportPlaylist':
+                case 'importPlaylist':
                     await this.host.executeCommand('null-music.importPlaylist');
                     break;
-                case 'localRemovePlaylist':
-                    if (data.playlistId)
-                        await this.library.removePlaylist(data.playlistId);
+                case 'removeFolder':
+                    if (msg.uri)
+                        await this.library.removeFolder(msg.uri);
                     break;
-                case 'localPlayTrack': {
-                    const context = data.trackUri ? this.library.contextFor(data.trackUri) : undefined;
-                    if (context)
-                        await this.player.playTracks(context.tracks, context.index);
+                case 'removePlaylist':
+                    if (msg.id)
+                        await this.library.removePlaylist(msg.id);
                     break;
-                }
-                case 'localPlayFolder':
-                    if (data.folderUri)
-                        await this.playAll(this.library.tracksInFolder(data.folderUri));
-                    break;
-                case 'localPlayPlaylist':
-                    if (data.playlistId)
-                        await this.playAll(this.library.playlistTracks(data.playlistId));
-                    break;
-                case 'localGetLibrary':
-                    this.sendLocalLibrary();
+                case 'rescan':
+                    await this.library.rescan();
                     break;
             }
         }
@@ -99,31 +108,54 @@ class MusicViewController {
             this.host.showErrorMessage(`Null Music: ${err.message || err}`);
         }
     }
-    sendPlaybackState() {
-        this.messenger.postMessage({ type: 'stateUpdate', state: this.player.getState() });
+    /** A (re)loaded webview starts empty: give it everything, including a fresh copy of the queue. */
+    sendAll() {
+        this.lastQueue = '';
+        this.sendPlayer();
+        this.sendQueue();
+        this.sendLibrary();
+        this.sendLiked();
     }
-    sendLocalLibrary() {
-        const tracks = this.library.tracks.map((t) => ({
-            ...t,
-            isLiked: this.library.isLiked(t.id),
-            albumArtUrl: t.artKey ? this.host.artUrl(t.artKey) : undefined,
-        }));
+    sendPlayer() {
         this.messenger.postMessage({
-            type: 'localLibraryUpdate',
-            tracks,
-            folders: this.library.folders,
-            playlists: this.library.playlists,
-            progress: this.library.progress,
+            type: 'player',
+            state: (0, wire_1.toWirePlayerState)(this.player.getState(), this.host.artUrl),
+            unavailable: [...this.player.unavailable],
         });
     }
-    async toggleLike(trackId) {
-        await this.library.toggleLike(trackId);
-        this.player.refresh();
-        this.sendLocalLibrary();
+    /** Skips the post when nothing the Queue tab shows has changed (position ticks fire constantly). */
+    sendQueue() {
+        const snapshot = this.player.queue.snapshot();
+        const signature = [
+            snapshot.history.map((e) => e.key).join(','),
+            snapshot.current?.key ?? '',
+            snapshot.upcoming.map((e) => e.key).join(','),
+            this.player.queue.shuffle,
+        ].join('|');
+        if (signature === this.lastQueue)
+            return;
+        this.lastQueue = signature;
+        this.messenger.postMessage((0, wire_1.toWireQueue)(snapshot, this.player.queue.shuffle, this.host.artUrl));
     }
-    async playAll(tracks) {
-        if (tracks.length > 0)
-            await this.player.playTracks(tracks, 0);
+    sendLibrary() {
+        this.messenger.postMessage((0, wire_1.toWireLibrary)(this.library, this.host.artUrl));
+    }
+    sendLiked() {
+        this.messenger.postMessage({ type: 'liked', ids: this.library.likedTracks().map((t) => t.id) });
+    }
+    async playTracks(msg) {
+        if (!Array.isArray(msg.ids))
+            return;
+        const tracks = msg.ids.map((id) => this.library.trackById(id)).filter((t) => !!t);
+        if (tracks.length === 0)
+            return;
+        let start = Math.max(0, tracks.findIndex((t) => t.id === msg.startId));
+        if (msg.shuffle) {
+            if (!this.player.queue.shuffle)
+                this.player.toggleShuffle();
+            start = Math.floor(Math.random() * tracks.length);
+        }
+        await this.player.playTracks(tracks, start);
     }
 }
 exports.MusicViewController = MusicViewController;

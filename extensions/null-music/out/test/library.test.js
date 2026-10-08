@@ -208,4 +208,14 @@ function make(fx, state = new fixtures_1.MemState()) {
     node_assert_1.default.deepStrictEqual(lib.externalDirs, [path.dirname(outside)]);
     lib.dispose();
 });
+(0, node_test_1.test)('toggleLike fires onDidChangeLikes', async () => {
+    const dir = fs.mkdtempSync(path.join(root, 'likes-'));
+    const lib = new library_1.Library({ state: new fixtures_1.MemState(), cacheFile: path.join(dir, 'c.json'), artDir: path.join(dir, 'art'), extensions: () => ['.mp3'] });
+    let fired = 0;
+    lib.onDidChangeLikes(() => fired++);
+    node_assert_1.default.strictEqual(await lib.toggleLike('local:x'), true);
+    node_assert_1.default.strictEqual(await lib.toggleLike('local:x'), false);
+    node_assert_1.default.strictEqual(fired, 2);
+    lib.dispose();
+});
 //# sourceMappingURL=library.test.js.map
