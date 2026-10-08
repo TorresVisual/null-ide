@@ -40,7 +40,8 @@
     }
   },
   "scripts": {
-    "compile": "tsc -p tsconfig.json"
+    "compile": "tsc -p tsconfig.json",
+    "test": "tsc -p tsconfig.json && node --test out/test/tracker.test.js"
   },
   "devDependencies": {
     "typescript": "^5.8.0",
