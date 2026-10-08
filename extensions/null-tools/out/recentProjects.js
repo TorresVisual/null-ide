@@ -42,6 +42,8 @@ exports.touchRecentProject = touchRecentProject;
 exports.setRecentProjectPinned = setRecentProjectPinned;
 exports.removeRecentProject = removeRecentProject;
 exports.replaceRecentProjectPath = replaceRecentProjectPath;
+exports.findCurrentRecentProject = findCurrentRecentProject;
+exports.relocateRecentProject = relocateRecentProject;
 const fs = __importStar(require("node:fs"));
 const path = __importStar(require("node:path"));
 function getRecentProjectsFilePath() {
@@ -134,5 +136,23 @@ function replaceRecentProjectPath(filePath, requestedPath, replacementPath, repl
     const key = normalizeRecentProjectPath(requestedPath);
     return updateRecentProjects(filePath, entries => entries.map(entry => normalizeRecentProjectPath(entry.path) === key
         ? { ...entry, path: replacementPath, label: replacementLabel } : entry), maxItems);
+}
+/** The stored entry for `requestedPath`, read fresh from disk. Undefined if it was removed or replaced. */
+function findCurrentRecentProject(filePath, requestedPath) {
+    const key = normalizeRecentProjectPath(requestedPath);
+    return readRecentProjects(filePath).find(entry => normalizeRecentProjectPath(entry.path) === key);
+}
+/** Points an existing entry at a directory the user chose. Refuses anything that is not a directory. */
+function relocateRecentProject(filePath, requestedPath, replacementPath, maxItems) {
+    try {
+        if (!fs.statSync(replacementPath).isDirectory()) {
+            return false;
+        }
+    }
+    catch {
+        return false;
+    }
+    const label = path.basename(replacementPath) || replacementPath;
+    return replaceRecentProjectPath(filePath, requestedPath, replacementPath, label, maxItems);
 }
 //# sourceMappingURL=recentProjects.js.map

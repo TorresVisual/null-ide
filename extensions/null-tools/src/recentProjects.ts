@@ -102,3 +102,20 @@ export function replaceRecentProjectPath(filePath: string, requestedPath: string
   return updateRecentProjects(filePath, entries => entries.map(entry => normalizeRecentProjectPath(entry.path) === key
     ? { ...entry, path: replacementPath, label: replacementLabel } : entry), maxItems);
 }
+
+/** The stored entry for `requestedPath`, read fresh from disk. Undefined if it was removed or replaced. */
+export function findCurrentRecentProject(filePath: string, requestedPath: string): RecentProjectEntry | undefined {
+  const key = normalizeRecentProjectPath(requestedPath);
+  return readRecentProjects(filePath).find(entry => normalizeRecentProjectPath(entry.path) === key);
+}
+
+/** Points an existing entry at a directory the user chose. Refuses anything that is not a directory. */
+export function relocateRecentProject(filePath: string, requestedPath: string, replacementPath: string, maxItems: number): boolean {
+  try {
+    if (!fs.statSync(replacementPath).isDirectory()) { return false; }
+  } catch {
+    return false;
+  }
+  const label = path.basename(replacementPath) || replacementPath;
+  return replaceRecentProjectPath(filePath, requestedPath, replacementPath, label, maxItems);
+}

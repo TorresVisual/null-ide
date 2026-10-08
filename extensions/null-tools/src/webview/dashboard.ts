@@ -1,90 +1,55 @@
 'use strict';
 
-interface RecentProjectEntry {
-  path: string;
-  label: string;
-  isWorkspaceFile: boolean;
-  timestamp: number;
-}
-
-interface GitStatus {
-  branch: string;
-  dirty: boolean;
-}
-
-type OutboundMessage =
-  | { type: 'projects'; projects: RecentProjectEntry[] }
-  | { type: 'gitStatus'; path: string; status: GitStatus | null };
-
+interface RecentProjectEntry { path: string; label: string; isWorkspaceFile: boolean; timestamp: number; pinned: boolean; }
+interface GitStatus { branch: string; dirty: boolean; }
+interface LauncherProject extends RecentProjectEntry { available: boolean; projectType?: string; gitStatus: GitStatus | null; }
+type OutboundMessage = { type: 'projects'; projects: LauncherProject[] } | { type: 'gitStatus'; path: string; status: GitStatus | null };
 declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
+declare function projectSections(projects: LauncherProject[], query: string, sort: 'lastOpened' | 'name' | 'location'): Array<{ title: string; projects: LauncherProject[] }>;
+declare function relativeProjectTime(timestamp: number): string;
 
 (function main(): void {
   const vscode = acquireVsCodeApi();
-  const cardsEl = document.getElementById('cards')!;
-  const cardByPath = new Map<string, HTMLElement>();
+  const cards = document.getElementById('cards')!;
+  const search = document.getElementById('search') as HTMLInputElement;
+  const sort = document.getElementById('sort') as HTMLSelectElement;
+  let projects: LauncherProject[] = [];
 
-  function formatTimestamp(ts: number): string {
-    return new Date(ts).toLocaleString();
+  function action(label: string, type: string, project: LauncherProject, extra: object = {}): HTMLButtonElement {
+    const button = document.createElement('button'); button.className = 'secondary'; button.textContent = label;
+    button.addEventListener('click', event => { event.stopPropagation(); vscode.postMessage({ type, path: project.path, ...extra }); }); return button;
   }
-
-  function render(projects: RecentProjectEntry[]): void {
-    cardsEl.innerHTML = '';
-    cardByPath.clear();
-    if (projects.length === 0) {
-      const empty = document.createElement('div');
-      empty.id = 'empty';
-      empty.textContent = 'No recent projects yet.';
-      cardsEl.appendChild(empty);
-      return;
-    }
-    for (const project of projects) {
-      const card = document.createElement('div');
-      card.className = 'card';
-      card.innerHTML = `
-        <div class="label"></div>
-        <div class="path"></div>
-        <div class="meta"></div>
-      `;
-      card.querySelector('.label')!.textContent = project.label;
-      card.querySelector('.path')!.textContent = project.path;
-      const meta = card.querySelector('.meta')!;
-      const timestamp = document.createElement('span');
-      timestamp.className = 'timestamp';
-      timestamp.textContent = formatTimestamp(project.timestamp);
-      meta.appendChild(timestamp);
-      card.addEventListener('click', () => vscode.postMessage({ type: 'openProject', path: project.path }));
-      cardsEl.appendChild(card);
-      cardByPath.set(project.path, card);
+  function render(): void {
+    cards.replaceChildren();
+    const sections = projectSections(projects, search.value, sort.value as 'lastOpened' | 'name' | 'location');
+    if (!sections.length) { const empty = document.createElement('div'); empty.id = 'empty'; empty.textContent = 'No matching recent projects.'; cards.appendChild(empty); return; }
+    for (const section of sections) {
+      const heading = document.createElement('div'); heading.className = 'section-title'; heading.textContent = section.title; cards.appendChild(heading);
+      const grid = document.createElement('div'); grid.className = 'section-projects';
+      for (const project of section.projects) {
+        const card = document.createElement('div'); card.className = 'card'; card.tabIndex = 0;
+        const label = document.createElement('div'); label.className = 'label'; label.textContent = project.label;
+        const projectPath = document.createElement('div'); projectPath.className = 'path'; projectPath.textContent = project.path;
+        const meta = document.createElement('div'); meta.className = 'meta'; meta.textContent = `${project.available ? '' : 'Missing · '}${relativeProjectTime(project.timestamp)}`;
+        if (project.projectType) meta.textContent += ` · ${project.projectType}`;
+        if (project.gitStatus) meta.textContent += ` · ${project.gitStatus.branch}${project.gitStatus.dirty ? ' ●' : ''}`;
+        const actions = document.createElement('div'); actions.className = 'meta';
+        if (project.available) { actions.append(action('Open New', 'openProject', project, { forceNewWindow: true }), action(project.pinned ? 'Unpin' : 'Pin', 'setPinned', project, { pinned: !project.pinned }), action('Reveal', 'revealProject', project), action('Copy', 'copyProjectPath', project)); }
+        else actions.append(action('Locate', 'locateProject', project));
+        actions.append(action('Remove', 'removeProject', project));
+        const open = (): void => { if (project.available) vscode.postMessage({ type: 'openProject', path: project.path }); };
+        card.append(label, projectPath, meta, actions); card.addEventListener('click', open);
+        card.addEventListener('keydown', event => { if (event.key === 'Enter') open(); }); grid.appendChild(card);
+      }
+      cards.appendChild(grid);
     }
   }
-
-  function applyGitStatus(path: string, status: GitStatus | null): void {
-    const card = cardByPath.get(path);
-    if (!card || !status) return;
-    const meta = card.querySelector('.meta')!;
-    const branch = document.createElement('span');
-    branch.className = 'branch';
-    branch.textContent = status.branch;
-    meta.appendChild(branch);
-    if (status.dirty) {
-      const dirty = document.createElement('span');
-      dirty.className = 'dirty';
-      dirty.textContent = '●';
-      dirty.title = 'Uncommitted changes';
-      meta.appendChild(dirty);
-    }
-  }
-
   window.addEventListener('message', (event: MessageEvent<OutboundMessage>) => {
-    const msg = event.data;
-    if (msg.type === 'projects') render(msg.projects);
-    else if (msg.type === 'gitStatus') applyGitStatus(msg.path, msg.status);
+    const message = event.data;
+    if (message.type === 'projects') { projects = message.projects.map(project => ({ ...project, gitStatus: null })); render(); }
+    else { const project = projects.find(item => item.path === message.path); if (project) { project.gitStatus = message.status; render(); } }
   });
-
-  document.getElementById('refresh')!.addEventListener('click', () => vscode.postMessage({ type: 'refresh' }));
-  document.getElementById('open-folder')!.addEventListener('click', () => vscode.postMessage({ type: 'openFolder' }));
-  document.getElementById('new-project')!.addEventListener('click', () => vscode.postMessage({ type: 'newProject' }));
-  document.getElementById('clone-repo')!.addEventListener('click', () => vscode.postMessage({ type: 'cloneRepo' }));
-
+  search.addEventListener('input', render); sort.addEventListener('change', render);
+  for (const id of ['refresh', 'open-folder', 'new-project', 'clone-repo']) document.getElementById(id)!.addEventListener('click', () => vscode.postMessage({ type: id.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase()) }));
   vscode.postMessage({ type: 'ready' });
 })();
