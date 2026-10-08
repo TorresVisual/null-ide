@@ -22,6 +22,7 @@
     "src/webview/music/detailView.ts",
     "src/webview/music/albumsView.ts",
     "src/webview/music/libraryView.ts",
+    "src/webview/music/playlistsView.ts",
     "src/webview/music/header.ts",
     "src/webview/music/main.ts"
   ]
