@@ -113,6 +113,12 @@ function activate(context) {
             void vscode.window.showInformationMessage('That account no longer exists.');
         }
     }), vscode.commands.registerCommand(accountsMenuModel_1.ADD_ACCOUNT_COMMAND, async () => { await (0, accountPicker_1.addAccount)(pickerDeps); }), (0, statusBarController_1.registerStatusBar)(api), (0, accountsMenuController_1.registerAccountsMenu)(api));
+    if (context.extensionMode === vscode.ExtensionMode.Test) {
+        // Integration specs cannot sign in to a provider, so they add and remove accounts through these two commands.
+        // Not contributed in package.json and registered only when an extensionTestsPath run hosts the extension:
+        // they would otherwise be a prompt-free way to add or delete accounts.
+        context.subscriptions.push(vscode.commands.registerCommand('null-accounts.test.addAccount', (account, secret) => store.add(account, secret)), vscode.commands.registerCommand('null-accounts.test.removeAccount', (id) => store.remove(id)));
+    }
     void offerImport(context, store, bindings, github).catch(() => { });
     return api;
 }
