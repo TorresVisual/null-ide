@@ -41,7 +41,7 @@
   },
   "scripts": {
     "compile": "tsc -p tsconfig.json && tsc -p tsconfig.webview-dashboard-shared.json && tsc -p tsconfig.webview-dashboard.json",
-    "test": "tsc -p tsconfig.json && tsc -p tsconfig.webview-dashboard-shared.json && tsc -p tsconfig.webview-dashboard.json && node --test out/test/tracker.test.js out/test/stats.test.js out/test/intervalStore.test.js out/test/projectIdentity.test.js out/test/activityService.test.js out/test/privacy.test.js out/test/dashboardModel.test.js out/test/dashboardWebviewModel.test.js",
+    "test": "tsc -p tsconfig.json && tsc -p tsconfig.webview-dashboard-shared.json && tsc -p tsconfig.webview-dashboard.json && node --test out/test/tracker.test.js out/test/stats.test.js out/test/intervalStore.test.js out/test/projectIdentity.test.js out/test/activityService.test.js out/test/privacy.test.js out/test/dashboardModel.test.js out/test/dashboardWebviewModel.test.js out/test/dashboardHtml.test.js",
     "pretest:integration": "tsc -p tsconfig.json",
     "test:integration": "node ./out/test/runTest.js"
   },
