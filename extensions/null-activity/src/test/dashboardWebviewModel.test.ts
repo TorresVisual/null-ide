@@ -41,6 +41,7 @@ const w = sandbox as unknown as {
   formatDateTime(ts: number): string;
   filesTitle(files: string[], max: number): string;
   nextIndex(index: number, count: number, key: string): number | undefined;
+  formatGit(t: { commits: number; filesChanged: number; linesAdded: number; linesRemoved: number }): { text: string; added: string; removed: string };
 };
 /** Arrays made inside the vm have another realm's prototype; round-trip them before deepStrictEqual. */
 const plain = <T>(v: T): T => JSON.parse(JSON.stringify(v));
@@ -117,4 +118,13 @@ test('nextIndex implements tab-list arrow navigation with wrap-around', () => {
   assert.strictEqual(w.nextIndex(2, 5, 'Home'), 0);
   assert.strictEqual(w.nextIndex(2, 5, 'End'), 4);
   assert.strictEqual(w.nextIndex(2, 5, 'Enter'), undefined);
+});
+
+test('formatGit: singular and plural, thousands separators, zero lines', () => {
+  assert.deepStrictEqual(plain(w.formatGit({ commits: 1, filesChanged: 1, linesAdded: 0, linesRemoved: 0 })), {
+    text: '1 commit · 1 file', added: '+0', removed: '−0',
+  });
+  assert.deepStrictEqual(plain(w.formatGit({ commits: 12, filesChanged: 40, linesAdded: 1234567, linesRemoved: 89 })), {
+    text: '12 commits · 40 files', added: '+1,234,567', removed: '−89',
+  });
 });

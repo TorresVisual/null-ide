@@ -48,7 +48,7 @@ function renderBody(model: DashboardModel): Node[] {
   if (model.totalMs === 0) return [h('p', { class: 'empty' }, 'Nothing tracked in this range.')];
   return [
     renderGraph(model),
-    h('div', { class: 'columns' }, renderBreakdown('Projects', model.projects), renderBreakdown('Languages', model.languages)),
+    h('div', { class: 'columns' }, renderBreakdown('Projects', model.projects, model.git), renderBreakdown('Languages', model.languages)),
     renderSessions(model.sessions),
   ];
 }
@@ -68,7 +68,13 @@ function render(model: DashboardModel): void {
     );
   }
   parts.push(
-    h('section', { class: 'total' }, h('div', { class: 'total-value' }, formatDuration(model.totalMs)), h('div', { class: 'total-label' }, model.rangeLabel)),
+    h(
+      'section',
+      { class: 'total' },
+      h('div', { class: 'total-value' }, formatDuration(model.totalMs)),
+      h('div', { class: 'total-label' }, model.rangeLabel),
+      model.git && model.git.totals.commits > 0 ? h('div', { class: 'total-git' }, renderGitLine(model.git.totals)) : null,
+    ),
     ...renderBody(model),
     h('footer', { class: 'foot' }, linkButton("What's tracked?", { type: 'showTrackedData' }), linkButton('Settings', { type: 'openSettings' })),
   );

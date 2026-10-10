@@ -279,3 +279,28 @@ button:focus-visible,
   gap: 16px;
   color: var(--muted);
 }
+
+.namecell {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.git {
+  color: var(--muted);
+  font-size: 0.85em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.git .add {
+  color: var(--vscode-charts-green, #388a34);
+}
+
+.git .del {
+  color: var(--vscode-charts-red, #e51400);
+}
+
+.total-git {
+  margin-top: 4px;
+}
