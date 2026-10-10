@@ -15,6 +15,7 @@ function parsePanelMessage(raw) {
             return { type };
         case 'remove':
         case 'editEmail':
+        case 'setGlobalIdentity':
         case 'reauth':
         case 'generateKey':
         case 'attachKey':

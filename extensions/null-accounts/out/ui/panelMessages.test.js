@@ -11,6 +11,7 @@ const panelMessages_1 = require("./panelMessages");
     node_assert_1.default.deepStrictEqual((0, panelMessages_1.parsePanelMessage)({ type: 'add', evil: 1 }), { type: 'add' });
     node_assert_1.default.deepStrictEqual((0, panelMessages_1.parsePanelMessage)({ type: 'remove', id: 'a1', extra: true }), { type: 'remove', id: 'a1' });
     node_assert_1.default.deepStrictEqual((0, panelMessages_1.parsePanelMessage)({ type: 'editEmail', id: 'a1' }), { type: 'editEmail', id: 'a1' });
+    node_assert_1.default.deepStrictEqual((0, panelMessages_1.parsePanelMessage)({ type: 'setGlobalIdentity', id: 'a1' }), { type: 'setGlobalIdentity', id: 'a1' });
     node_assert_1.default.deepStrictEqual((0, panelMessages_1.parsePanelMessage)({ type: 'unbind', key: 'c:/repo' }), { type: 'unbind', key: 'c:/repo' });
     node_assert_1.default.deepStrictEqual((0, panelMessages_1.parsePanelMessage)({ type: 'reauth', id: 'a1', extra: 1 }), { type: 'reauth', id: 'a1' });
 });

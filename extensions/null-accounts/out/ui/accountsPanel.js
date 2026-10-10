@@ -39,6 +39,8 @@ const fs = __importStar(require("node:fs"));
 const os = __importStar(require("node:os"));
 const vscode = __importStar(require("vscode"));
 const accountInput_1 = require("../accountInput");
+const git_1 = require("../git");
+const globalIdentity_1 = require("../globalIdentity");
 const sshKeyOps_1 = require("../sshKeyOps");
 const accountsHtml_1 = require("./accountsHtml");
 const accountsView_1 = require("./accountsView");
@@ -113,6 +115,9 @@ class AccountsPanel {
                 case 'editEmail':
                     await this.editEmail(msg.id);
                     break;
+                case 'setGlobalIdentity':
+                    await this.setGlobalIdentity(msg.id);
+                    break;
                 case 'generateKey':
                     await this.deps.keys.generate(msg.id);
                     break;
@@ -151,6 +156,13 @@ class AccountsPanel {
             return;
         }
         await this.deps.accounts.remove(id); // extension.ts prunes the now-dangling bindings
+    }
+    async setGlobalIdentity(id) {
+        const account = this.deps.accounts.get(id);
+        if (!account) {
+            return;
+        }
+        void vscode.window.showInformationMessage(`Null Accounts: ${await (0, globalIdentity_1.applyGlobalIdentity)(git_1.runGit, account, os.tmpdir())}`);
     }
     async editEmail(id) {
         const account = this.deps.accounts.get(id);
