@@ -6,8 +6,8 @@ import type * as vscode from 'vscode';
 import { AccountLike, AccountsApiLike, resolveGithubSession } from './githubSession';
 
 const folder = { fsPath: 'C:\\repo' } as vscode.Uri;
-const octocat: AccountLike = { provider: 'github', host: 'github.com', username: 'octocat' };
-const tanuki: AccountLike = { provider: 'gitlab', host: 'gitlab.com', username: 'tanuki' };
+const octocat: AccountLike = { provider: 'github', username: 'octocat' };
+const tanuki: AccountLike = { provider: 'gitlab', username: 'tanuki' };
 
 function makeApi(opts: { bound?: AccountLike; picked?: AccountLike; token?: string } = {}) {
   const log: string[] = [];

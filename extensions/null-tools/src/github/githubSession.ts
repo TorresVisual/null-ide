@@ -4,7 +4,7 @@ import type * as vscode from 'vscode';
 
 // null-tools and null-accounts are built separately, so this is a structural copy of the slice of
 // NullAccountsApi (extensions/null-accounts/src/api.ts) that null-tools uses.
-export interface AccountLike { provider: string; username: string; host: string }
+export interface AccountLike { provider: string; username: string }
 
 export interface AccountsApiLike {
   getAccountForFolder(folder: vscode.Uri): AccountLike | undefined;
