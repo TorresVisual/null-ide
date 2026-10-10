@@ -90,3 +90,12 @@ function nextIndex(index, count, key) {
             return undefined;
     }
 }
+/** "7 commits · 12 files" plus the signed line counts, split so the UI can colour them. */
+function formatGit(t) {
+    const count = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+    return {
+        text: `${count(t.commits, 'commit', 'commits')} · ${count(t.filesChanged, 'file', 'files')}`,
+        added: `+${t.linesAdded.toLocaleString('en-US')}`,
+        removed: `−${t.linesRemoved.toLocaleString('en-US')}`,
+    };
+}

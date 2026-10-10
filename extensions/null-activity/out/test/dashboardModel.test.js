@@ -175,4 +175,20 @@ const sum = (bars) => bars.reduce((n, b) => n + b.ms, 0);
         node_assert_1.default.strictEqual((0, dashboardModel_1.parseWebviewMessage)(bad), undefined);
     }
 });
+(0, node_test_1.test)('git is passed through; only project rows carry a key, never "Other"', () => {
+    const git = {
+        totals: { commits: 1, filesChanged: 1, linesAdded: 2, linesRemoved: 3 },
+        byProject: { k0: { commits: 1, filesChanged: 1, linesAdded: 2, linesRemoved: 3 } },
+    };
+    const data = Array.from({ length: 9 }, (_, i) => iv(at(8, 1 + i), at(8, 1 + i, 30), { project: { key: `k${i}`, name: `p${i}` } }));
+    const model = (0, dashboardModel_1.buildDashboardModel)(source(data), 'today', NOW, true, git);
+    node_assert_1.default.strictEqual(model.git, git);
+    node_assert_1.default.strictEqual(model.projects[7].name, 'Other');
+    node_assert_1.default.strictEqual(model.projects[7].key, undefined);
+    node_assert_1.default.ok(model.projects.slice(0, 7).every((p) => /^k\d$/.test(p.key ?? '')));
+    node_assert_1.default.ok(model.languages.every((l) => l.key === undefined));
+});
+(0, node_test_1.test)('without git data the model has no git field', () => {
+    node_assert_1.default.ok(!('git' in build([iv(at(8, 10), at(8, 11))], 'today')));
+});
 //# sourceMappingURL=dashboardModel.test.js.map

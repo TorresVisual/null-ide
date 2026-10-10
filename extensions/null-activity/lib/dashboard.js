@@ -90,6 +90,15 @@ function nextIndex(index, count, key) {
             return undefined;
     }
 }
+/** "7 commits · 12 files" plus the signed line counts, split so the UI can colour them. */
+function formatGit(t) {
+    const count = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+    return {
+        text: `${count(t.commits, 'commit', 'commits')} · ${count(t.filesChanged, 'file', 'files')}`,
+        added: `+${t.linesAdded.toLocaleString('en-US')}`,
+        removed: `−${t.linesRemoved.toLocaleString('en-US')}`,
+    };
+}
 const GRAPH_HEIGHT = 120; // viewBox height; the SVG is stretched to the container by CSS
 const BAR_SLOT = 10;
 /** Inline-SVG bars scaled to the largest bucket; every bar is focusable, with a hover/focus tooltip. */
@@ -137,13 +146,30 @@ function renderGraph(model) {
     });
     return h('section', { class: 'graph' }, h('div', { class: 'plot' }, svg, tip), h('div', { class: 'axis' }, ...ticks));
 }
-/** One card: a ranked list of name, proportional bar (relative to the largest row), duration and percent. */
-function renderBreakdown(title, shares) {
+/** "7 commits · 12 files +512 −120", with the line counts coloured. */
+function renderGitLine(t) {
+    const f = formatGit(t);
+    return h('span', { class: 'git' }, `${f.text} `, h('span', { class: 'add' }, f.added), ' ', h('span', { class: 'del' }, f.removed));
+}
+/** Under a project name: its git numbers, "—" when it has none, nothing when it has no commits in the range. */
+function projectGitCell(share, git) {
+    if (share.key === undefined)
+        return null;
+    if (!Object.prototype.hasOwnProperty.call(git.byProject, share.key)) {
+        return h('span', { class: 'git', title: 'No git data for this project (not open, or git unavailable)' }, '—');
+    }
+    const totals = git.byProject[share.key];
+    return totals.commits > 0 ? renderGitLine(totals) : null;
+}
+/** One card: a ranked list of name, proportional bar (relative to the largest row), duration and percent. `git` adds a line under project names. */
+function renderBreakdown(title, shares, git) {
     const widths = barScale(shares.map((share) => share.ms), 100, 0);
     const rows = shares.map((share, i) => {
         const fillBar = h('div', { class: 'fill' });
         fillBar.style.setProperty('width', `${widths[i]}%`);
-        return h('li', { class: 'row' }, h('span', { class: 'name', title: share.name }, share.name), h('div', { class: 'track' }, fillBar), h('span', { class: 'dur' }, formatDuration(share.ms)), h('span', { class: 'pct' }, formatPercent(share.percent, share.ms)));
+        const name = h('span', { class: 'name', title: share.name }, share.name);
+        const gitCell = git ? projectGitCell(share, git) : null;
+        return h('li', { class: 'row' }, gitCell ? h('div', { class: 'namecell' }, name, gitCell) : name, h('div', { class: 'track' }, fillBar), h('span', { class: 'dur' }, formatDuration(share.ms)), h('span', { class: 'pct' }, formatPercent(share.percent, share.ms)));
     });
     return h('section', { class: 'card' }, h('h2', null, title), h('ul', { class: 'rows' }, ...rows));
 }
@@ -194,7 +220,7 @@ function renderBody(model) {
         return [h('p', { class: 'empty' }, 'Nothing tracked in this range.')];
     return [
         renderGraph(model),
-        h('div', { class: 'columns' }, renderBreakdown('Projects', model.projects), renderBreakdown('Languages', model.languages)),
+        h('div', { class: 'columns' }, renderBreakdown('Projects', model.projects, model.git), renderBreakdown('Languages', model.languages)),
         renderSessions(model.sessions),
     ];
 }
@@ -206,7 +232,7 @@ function render(model) {
     if (!model.enabled) {
         parts.push(h('div', { class: 'banner', role: 'status' }, h('span', null, 'Tracking is off. Existing data is still shown.'), linkButton('Enable', { type: 'enableTracking' })));
     }
-    parts.push(h('section', { class: 'total' }, h('div', { class: 'total-value' }, formatDuration(model.totalMs)), h('div', { class: 'total-label' }, model.rangeLabel)), ...renderBody(model), h('footer', { class: 'foot' }, linkButton("What's tracked?", { type: 'showTrackedData' }), linkButton('Settings', { type: 'openSettings' })));
+    parts.push(h('section', { class: 'total' }, h('div', { class: 'total-value' }, formatDuration(model.totalMs)), h('div', { class: 'total-label' }, model.rangeLabel), model.git && model.git.totals.commits > 0 ? h('div', { class: 'total-git' }, renderGitLine(model.git.totals)) : null), ...renderBody(model), h('footer', { class: 'foot' }, linkButton("What's tracked?", { type: 'showTrackedData' }), linkButton('Settings', { type: 'openSettings' })));
     appRoot.replaceChildren(...parts);
     if (tabsHadFocus)
         (_a = appRoot.querySelector('.tab.active')) === null || _a === void 0 ? void 0 : _a.focus();

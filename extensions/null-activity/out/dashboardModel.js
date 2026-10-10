@@ -124,16 +124,21 @@ function monthlyBars(intervals, now) {
     }
     return bars;
 }
-/** Ranks by time, keeps at most MAX_SHARES rows (the last one "Other" when folding) and rounds percents. */
+/** Ranks by time, keeps at most MAX_SHARES rows (the last one "Other" when folding) and rounds percents. `key` is passed through on kept rows. */
 function toShares(items, totalMs) {
     const ranked = items.filter((i) => i.ms > 0).sort((a, b) => b.ms - a.ms);
     const shown = ranked.length > exports.MAX_SHARES ? ranked.slice(0, exports.MAX_SHARES - 1) : ranked;
     const rest = ranked.slice(shown.length).reduce((n, i) => n + i.ms, 0);
     if (rest > 0)
         shown.push({ name: 'Other', ms: rest });
-    return shown.map((i) => ({ name: i.name, ms: i.ms, percent: totalMs > 0 ? Math.round((i.ms / totalMs) * 100) : 0 }));
+    return shown.map((i) => ({
+        name: i.name,
+        ms: i.ms,
+        percent: totalMs > 0 ? Math.round((i.ms / totalMs) * 100) : 0,
+        ...(i.key !== undefined ? { key: i.key } : {}),
+    }));
 }
-function buildDashboardModel(api, range, now, enabled) {
+function buildDashboardModel(api, range, now, enabled, git) {
     const r = rangeFor(range, now);
     const projects = api.getProjectStats(r);
     const totalMs = projects.reduce((n, p) => n + p.ms, 0);
@@ -158,7 +163,7 @@ function buildDashboardModel(api, range, now, enabled) {
         totalMs,
         bars,
         barUnit,
-        projects: toShares(projects.map((p) => ({ name: p.project.name, ms: p.ms })), totalMs),
+        projects: toShares(projects.map((p) => ({ name: p.project.name, ms: p.ms, key: p.project.key })), totalMs),
         languages: toShares(api.getLanguageStats(r).map((l) => ({ name: l.language || exports.TERMINAL_LABEL, ms: l.ms })), totalMs),
         sessions: api
             .getSessions(r)
@@ -172,6 +177,7 @@ function buildDashboardModel(api, range, now, enabled) {
             languages: s.languages,
             files: s.files,
         })),
+        ...(git ? { git } : {}),
     };
 }
 //# sourceMappingURL=dashboardModel.js.map

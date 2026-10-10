@@ -39,6 +39,9 @@ const crypto = __importStar(require("crypto"));
 const vscode = __importStar(require("vscode"));
 const dashboardModel_1 = require("./dashboardModel");
 const dashboardHtml_1 = require("./dashboardHtml");
+const gitExec_1 = require("./gitExec");
+const gitStatsService_1 = require("./gitStatsService");
+const projectIdentity_1 = require("./projectIdentity");
 const VIEW_TYPE = 'null-activity.dashboard';
 const RANGE_KEY = 'null-activity.dashboard.range';
 const THROTTLE_MS = 1_000;
@@ -53,12 +56,23 @@ class DashboardPanel {
     lastPush = 0;
     pending;
     openDisposables = [];
+    gitStats;
+    /** `from:to` of the git load in progress, so the 1 s push throttle does not start a second one. */
+    loadingGit;
     constructor(context, service, log) {
         this.context = context;
         this.service = service;
         this.log = log;
         const saved = context.workspaceState.get(RANGE_KEY);
         this.range = (0, dashboardModel_1.isDashboardRange)(saved) ? saved : 'today';
+        this.gitStats = new gitStatsService_1.GitStatsService({
+            folders: () => (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath),
+            trusted: () => vscode.workspace.isTrusted,
+            resolveKey: (folder) => (0, projectIdentity_1.resolveProject)(folder).key,
+            exec: gitExec_1.execGit,
+            now: () => Date.now(),
+            log: (message) => this.log(message),
+        });
     }
     reveal() {
         if (this.panel) {
@@ -137,15 +151,41 @@ class DashboardPanel {
             return;
         this.lastPush = Date.now();
         try {
+            const now = Date.now();
+            const dateRange = (0, dashboardModel_1.rangeFor)(this.range, now);
+            // Stale numbers are better than none: they stay on screen while a reload runs.
+            const { fresh, git } = this.gitStats.peek(dateRange);
             const message = {
                 type: 'model',
-                model: (0, dashboardModel_1.buildDashboardModel)(this.service, this.range, Date.now(), this.service.enabled),
+                model: (0, dashboardModel_1.buildDashboardModel)(this.service, this.range, now, this.service.enabled, git),
             };
             void panel.webview.postMessage(message);
+            if (!fresh)
+                void this.refreshGit(dateRange);
         }
         catch (err) {
             this.log(`dashboard: could not build the model (${err instanceof Error ? err.message : String(err)})`);
         }
+    }
+    /**
+     * Loads git data for `range`, then pushes again for whatever range is selected by then: the load only
+     * warms the cache, so a range change mid-load can never show another range's numbers. `load` never
+     * rejects and stores failures too, so this cannot loop.
+     */
+    async refreshGit(range) {
+        const id = `${range.from}:${range.to}`;
+        if (this.loadingGit === id)
+            return;
+        this.loadingGit = id;
+        try {
+            await this.gitStats.load(range);
+        }
+        finally {
+            if (this.loadingGit === id)
+                this.loadingGit = undefined;
+        }
+        if (this.panel)
+            this.push();
     }
 }
 exports.DashboardPanel = DashboardPanel;

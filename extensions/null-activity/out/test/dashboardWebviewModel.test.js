@@ -104,4 +104,12 @@ const plain = (v) => JSON.parse(JSON.stringify(v));
     node_assert_1.default.strictEqual(w.nextIndex(2, 5, 'End'), 4);
     node_assert_1.default.strictEqual(w.nextIndex(2, 5, 'Enter'), undefined);
 });
+(0, node_test_1.test)('formatGit: singular and plural, thousands separators, zero lines', () => {
+    node_assert_1.default.deepStrictEqual(plain(w.formatGit({ commits: 1, filesChanged: 1, linesAdded: 0, linesRemoved: 0 })), {
+        text: '1 commit · 1 file', added: '+0', removed: '−0',
+    });
+    node_assert_1.default.deepStrictEqual(plain(w.formatGit({ commits: 12, filesChanged: 40, linesAdded: 1234567, linesRemoved: 89 })), {
+        text: '12 commits · 40 files', added: '+1,234,567', removed: '−89',
+    });
+});
 //# sourceMappingURL=dashboardWebviewModel.test.js.map
