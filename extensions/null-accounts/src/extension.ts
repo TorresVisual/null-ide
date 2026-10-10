@@ -8,11 +8,13 @@ import { AvatarCache, fetchAvatarImage, fetchAvatarJson } from './avatars';
 import { findAccount, importExisting } from './accountSetup';
 import { createApi, NullAccountsApi } from './api';
 import { ChangeEmitter } from './changeEmitter';
-import { runGit } from './git';
+import { applyDefaultAccount } from './defaultAccount';
+import { originUrl, runGit } from './git';
 import { CredentialSync } from './gitCredentials';
 import { describeSkip, GitWiring } from './gitWiring';
 import { uploadPublicKey } from './keyUpload';
 import { folderKey, ProjectBinding } from './projectBinding';
+import { serial } from './serial';
 import { fetchGithub, GithubProvider } from './providers/github';
 import { fetchGitlab, fetchPostForm, GitlabProvider, resolveClientId } from './providers/gitlab';
 import { checkSsh } from './sshCheck';
@@ -152,10 +154,25 @@ export function activate(context: vscode.ExtensionContext): NullAccountsApi {
     );
   }
 
+  registerDefaultAccount(context, store, bindings);
   registerGitSync(context, store, bindings, changed, api);
 
   void offerImport(context, store, bindings, github).catch(() => { /* a failed offer must never break activation */ });
   return api;
+}
+
+/** Binds each open folder that has never had an account to the default one (see defaultAccount.ts). */
+function registerDefaultAccount(context: vscode.ExtensionContext, store: AccountStore, bindings: ProjectBinding): void {
+  const queue = serial();
+  const apply = (): void => {
+    const folders = (vscode.workspace.workspaceFolders ?? []).map(f => f.uri.fsPath);
+    void queue(() => applyDefaultAccount({ bindings, accounts: store, originUrl }, folders)).catch(() => { /* a missing default must never break the extension */ });
+  };
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeWorkspaceFolders(apply),
+    bindings.onDidChange(apply), // the default was set or changed
+  );
+  apply();
 }
 
 /** Keeps repo-local git config and the OS credential store in line with the bindings (see gitWiring.ts, gitCredentials.ts). */

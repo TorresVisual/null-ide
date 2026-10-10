@@ -95,3 +95,43 @@ test('a folder key from entries() can be passed straight back to unbind, on Wind
   await b.unbind(key);
   assert.deepStrictEqual(b.entries(), []);
 });
+
+test('the default account is stored, cleared, and dropped by prune when its account is gone', async () => {
+  const { binding } = makeBinding();
+  let fired = 0;
+  binding.onDidChange(() => fired++);
+  assert.strictEqual(binding.defaultId(), undefined);
+
+  await binding.setDefault('a1');
+  await binding.setDefault('a1'); // unchanged
+  assert.strictEqual(binding.defaultId(), 'a1');
+  assert.strictEqual(fired, 1);
+
+  await binding.prune(new Set(['a1']));
+  assert.strictEqual(binding.defaultId(), 'a1');
+  await binding.prune(new Set(['a2']));
+  assert.strictEqual(binding.defaultId(), undefined);
+
+  await binding.setDefault('a2');
+  await binding.setDefault(undefined);
+  assert.strictEqual(binding.defaultId(), undefined);
+});
+
+test('adoptFolder binds an unbound folder once, so unbinding it afterwards sticks', async () => {
+  const { binding } = makeBinding();
+  await binding.adoptFolder('C:\Repo', 'a1');
+  assert.strictEqual(binding.accountIdFor('C:\Repo'), 'a1');
+  assert.ok(binding.wasAdopted('c:/repo/'));
+
+  await binding.unbind('C:\Repo');
+  await binding.adoptFolder('C:\Repo', 'a1'); // already adopted: stays unbound
+  assert.strictEqual(binding.accountIdFor('C:\Repo'), undefined);
+});
+
+test('adoptFolder never replaces an existing binding', async () => {
+  const { binding } = makeBinding();
+  await binding.bind('C:\Repo', 'a2');
+  await binding.adoptFolder('C:\Repo', 'a1');
+  assert.strictEqual(binding.accountIdFor('C:\Repo'), 'a2');
+  assert.ok(binding.wasAdopted('C:\Repo'));
+});

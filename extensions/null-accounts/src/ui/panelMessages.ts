@@ -8,7 +8,7 @@ export type PanelMessage =
   | { type: 'reauth'; id: string }
   | { type: 'unbind'; key: string }
   | { type: 'generateKey' | 'attachKey' | 'copyPublicKey' | 'uploadKey' | 'testKey' | 'removeKey'; id: string }
-  | { type: 'setSigning'; id: string; on: boolean };
+  | { type: 'setSigning' | 'setDefault'; id: string; on: boolean };
 
 const nonEmpty = (v: unknown): v is string => typeof v === 'string' && v.length > 0;
 
@@ -34,6 +34,7 @@ export function parsePanelMessage(raw: unknown): PanelMessage | undefined {
     case 'removeKey':
       return nonEmpty(m.id) ? { type, id: m.id } : undefined;
     case 'setSigning':
+    case 'setDefault':
       return nonEmpty(m.id) && typeof m.on === 'boolean' ? { type, id: m.id, on: m.on } : undefined;
     case 'unbind':
       return nonEmpty(m.key) ? { type, key: m.key } : undefined;

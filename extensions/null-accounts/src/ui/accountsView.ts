@@ -27,6 +27,8 @@ export interface AccountRow {
   authMethod: Account['authMethod'];
   /** The sign-in has expired and cannot be refreshed; the panel offers Re-authenticate. */
   needsReauth: boolean;
+  /** New projects start with this account. */
+  isDefault: boolean;
   /** Present when the account has an SSH key. */
   key?: KeyRow;
   projects: ProjectRef[];
@@ -42,6 +44,7 @@ export function buildRows(
   needsReauth: (id: string) => boolean = () => false,
   keys: ReadonlyMap<string, KeyRow> = new Map(),
   avatarOf: (id: string) => string | undefined = () => undefined,
+  defaultId?: string,
 ): AccountRow[] {
   return accounts.map(a => ({
     id: a.id,
@@ -53,6 +56,7 @@ export function buildRows(
     ...(avatarOf(a.id) ? { avatar: avatarOf(a.id) } : {}),
     authMethod: a.authMethod,
     needsReauth: needsReauth(a.id),
+    isDefault: a.id === defaultId,
     ...(keys.has(a.id) ? { key: keys.get(a.id) } : {}),
     projects: entries
       .filter(([, accountId]) => accountId === a.id)

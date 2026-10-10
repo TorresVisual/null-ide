@@ -19,14 +19,16 @@ export interface PickOptions {
   suggestedId?: string;
   /** The account the folder is bound to now. */
   currentId?: string;
+  /** The default account for new projects. */
+  defaultId?: string;
 }
 
 export const ADD_ACCOUNT_LABEL = '$(add) Add account…';
 export const UNBIND_LABEL = '$(circle-slash) Use no account for this project';
 
-/** Current account first, then the suggested one, then the rest in stored order; add; and "no account" when bound. */
-export function buildPickItems(accounts: readonly Account[], { suggestedId, currentId }: PickOptions = {}): PickItem[] {
-  const rank = (id: string): number => (id === currentId ? 0 : id === suggestedId ? 1 : 2);
+/** Current account first, then the suggested one, then the default, then the rest in stored order; add; and "no account" when bound. */
+export function buildPickItems(accounts: readonly Account[], { suggestedId, currentId, defaultId }: PickOptions = {}): PickItem[] {
+  const rank = (id: string): number => (id === currentId ? 0 : id === suggestedId ? 1 : id === defaultId ? 2 : 3);
   const items = [...accounts]
     .sort((a, b) => rank(a.id) - rank(b.id)) // stable: ties keep their stored order
     .map((account): PickItem => ({
@@ -34,7 +36,8 @@ export function buildPickItems(accounts: readonly Account[], { suggestedId, curr
       description: account.host,
       detail: account.id === currentId
         ? 'Current'
-        : account.id === suggestedId ? 'Suggested — matches this repository’s remote' : undefined,
+        : account.id === suggestedId ? 'Suggested — matches this repository’s remote'
+        : account.id === defaultId ? 'Default' : undefined,
       action: { kind: 'account', account },
     }));
   items.push({ label: ADD_ACCOUNT_LABEL, action: { kind: 'add' } });

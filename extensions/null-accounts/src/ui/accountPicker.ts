@@ -194,7 +194,7 @@ export async function chooseAccountForFolder(deps: PickerDeps, folder: vscode.Ur
     suggestedId = origin ? suggestAccount(origin, deps.accounts.list())?.id : undefined;
   }
   const picked = await vscode.window.showQuickPick<PickItem>(
-    buildPickItems(deps.accounts.list(), { suggestedId, currentId }),
+    buildPickItems(deps.accounts.list(), { suggestedId, currentId, defaultId: deps.bindings.defaultId() }),
     { placeHolder: `Which account should "${path.basename(folder.fsPath)}" use?` },
   );
   if (!picked) { return undefined; }

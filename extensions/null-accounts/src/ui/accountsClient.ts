@@ -160,6 +160,7 @@ function accountCard(row) {
   h2.id = label;
   const where = el('div', 'where');
   where.append((PROVIDERS[row.provider] || row.provider) + ' · ' + row.host, el('span', 'tag', AUTH[row.authMethod] || row.authMethod));
+  if (row.isDefault) { where.append(el('span', 'tag', 'Default')); }
   who.append(h2, where);
   top.append(
     avatar(row),
@@ -185,6 +186,15 @@ function accountCard(row) {
   );
   const foot = el('div', 'identity-foot');
   foot.append(button({ label: 'Set as global git identity', cls: 'ghost', title: 'Set as global git identity', fk: row.id + '|setGlobalIdentity', onClick: () => vscode.postMessage({ type: 'setGlobalIdentity', id: row.id }) }));
+  const def = el('button', 'switch');
+  def.type = 'button';
+  def.setAttribute('role', 'switch');
+  def.setAttribute('aria-checked', String(row.isDefault));
+  def.dataset.fk = row.id + '|setDefault';
+  def.title = 'New projects start with this account (unless the repository’s remote matches another)';
+  def.append(el('span', 'track'), el('span', '', 'Default for new projects'));
+  def.addEventListener('click', () => vscode.postMessage({ type: 'setDefault', id: row.id, on: !row.isDefault }));
+  foot.append(def);
   const idBox = el('div', 'identity-box');
   idBox.append(identity, foot);
   card.append(idBox, keySection(row), projectsSection(row));

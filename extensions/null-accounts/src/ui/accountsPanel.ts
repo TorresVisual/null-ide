@@ -80,7 +80,7 @@ export class AccountsPanel {
     const accounts = this.deps.accounts.list();
     const keys = await describeKeys(accounts, { home: os.homedir(), exists: fs.existsSync, fingerprintOf: file => fingerprintOf(file) });
     if (turn !== this.seq) { return; } // a newer state is already on its way
-    const rows = buildRows(accounts, this.deps.bindings.entries(), resolveFolder, id => this.deps.needsReauth(id), keys, id => this.deps.avatarOf(id));
+    const rows = buildRows(accounts, this.deps.bindings.entries(), resolveFolder, id => this.deps.needsReauth(id), keys, id => this.deps.avatarOf(id), this.deps.bindings.defaultId());
     void this.panel.webview.postMessage({ type: 'state', rows });
   }
 
@@ -104,6 +104,7 @@ export class AccountsPanel {
         case 'testKey': await this.deps.keys.test(msg.id); break;
         case 'setSigning': await this.deps.keys.setSigning(msg.id, msg.on); break;
         case 'removeKey': await this.deps.keys.removeKey(msg.id); break;
+        case 'setDefault': await this.deps.bindings.setDefault(msg.on ? msg.id : undefined); break;
       }
     } catch (err) {
       void vscode.window.showErrorMessage(`Null Accounts: ${(err as Error).message}`);

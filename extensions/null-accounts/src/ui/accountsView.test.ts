@@ -47,7 +47,7 @@ test('the resolved (real-cased) path is shown; a missing or throwing folder fall
 test('rows carry only display fields — no secrets or provider internals', () => {
   const rows = buildRows([{ ...acct('a1'), externalId: 'ext-1' }], [], exists);
   assert.deepStrictEqual(Object.keys(rows[0]).sort(),
-    ['authMethod', 'email', 'gitName', 'host', 'id', 'needsReauth', 'projects', 'provider', 'username']);
+    ['authMethod', 'email', 'gitName', 'host', 'id', 'isDefault', 'needsReauth', 'projects', 'provider', 'username']);
 });
 
 test('needsReauth is taken from the callback per account and defaults to false', () => {
@@ -76,4 +76,9 @@ test('a row carries the account picture only when one is supplied', () => {
   const rows = buildRows([acct('a1'), acct('a2')], [], exists, () => false, new Map(), id => (id === 'a2' ? 'data:image/png;base64,AQID' : undefined));
   assert.ok(!('avatar' in rows[0]));
   assert.strictEqual(rows[1].avatar, 'data:image/png;base64,AQID');
+});
+
+test('only the default account is flagged as default', () => {
+  const rows = buildRows([acct('a1'), acct('a2')], [], exists, undefined, undefined, undefined, 'a2');
+  assert.deepStrictEqual(rows.map(r => r.isDefault), [false, true]);
 });

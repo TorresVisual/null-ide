@@ -40,3 +40,9 @@ test('the provider choices are GitHub, gitlab.com, self-hosted GitLab, an access
   assert.deepStrictEqual(providerPickItems().map(p => p.choice), ['github', 'gitlab', 'gitlab-self-hosted', 'gitlab-token', 'ssh']);
   assert.strictEqual(ADD_ACCOUNT_LABEL, '$(add) Add account…');
 });
+
+test('the default account ranks after current and suggested, and is marked', () => {
+  const items = buildPickItems([acct('a1'), acct('a2'), acct('a3')], { defaultId: 'a3' });
+  assert.deepStrictEqual(kinds(items).slice(0, 3), ['a3', 'a1', 'a2']);
+  assert.strictEqual(items[0].detail, 'Default');
+});

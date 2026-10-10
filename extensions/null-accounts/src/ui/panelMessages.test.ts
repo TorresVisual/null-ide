@@ -35,6 +35,8 @@ test('key messages carry an account id, and setSigning a real boolean', () => {
   }
   assert.deepStrictEqual(parsePanelMessage({ type: 'setSigning', id: 'a1', on: true }), { type: 'setSigning', id: 'a1', on: true });
   assert.deepStrictEqual(parsePanelMessage({ type: 'setSigning', id: 'a1', on: false }), { type: 'setSigning', id: 'a1', on: false });
+  assert.deepStrictEqual(parsePanelMessage({ type: 'setDefault', id: 'a1', on: true }), { type: 'setDefault', id: 'a1', on: true });
+  assert.strictEqual(parsePanelMessage({ type: 'setDefault', id: 'a1' }), undefined);
   for (const bad of [{ type: 'setSigning', id: 'a1' }, { type: 'setSigning', id: 'a1', on: 'yes' }, { type: 'setSigning', on: true }]) {
     assert.strictEqual(parsePanelMessage(bad), undefined, JSON.stringify(bad));
   }
