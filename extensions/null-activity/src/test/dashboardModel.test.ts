@@ -195,3 +195,21 @@ test('parseWebviewMessage keeps valid intents, strips extra fields and ignores e
     assert.strictEqual(parseWebviewMessage(bad), undefined);
   }
 });
+
+test('git is passed through; only project rows carry a key, never "Other"', () => {
+  const git = {
+    totals: { commits: 1, filesChanged: 1, linesAdded: 2, linesRemoved: 3 },
+    byProject: { k0: { commits: 1, filesChanged: 1, linesAdded: 2, linesRemoved: 3 } },
+  };
+  const data = Array.from({ length: 9 }, (_, i) => iv(at(8, 1 + i), at(8, 1 + i, 30), { project: { key: `k${i}`, name: `p${i}` } }));
+  const model = buildDashboardModel(source(data), 'today', NOW, true, git);
+  assert.strictEqual(model.git, git);
+  assert.strictEqual(model.projects[7].name, 'Other');
+  assert.strictEqual(model.projects[7].key, undefined);
+  assert.ok(model.projects.slice(0, 7).every((p) => /^k\d$/.test(p.key ?? '')));
+  assert.ok(model.languages.every((l) => l.key === undefined));
+});
+
+test('without git data the model has no git field', () => {
+  assert.ok(!('git' in build([iv(at(8, 10), at(8, 11))], 'today')));
+});
