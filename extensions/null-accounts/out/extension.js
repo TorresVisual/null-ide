@@ -50,6 +50,7 @@ const projectBinding_1 = require("./projectBinding");
 const github_1 = require("./providers/github");
 const gitlab_1 = require("./providers/gitlab");
 const sshCheck_1 = require("./sshCheck");
+const sshConfig_1 = require("./sshConfig");
 const sshKeyOps_1 = require("./sshKeyOps");
 const keyActions_1 = require("./ui/keyActions");
 const keyUi_1 = require("./ui/keyUi");
@@ -164,6 +165,7 @@ function registerGitSync(context, store, bindings, changed, api) {
     });
     const warned = new Set();
     const syncGit = async () => {
+        await (0, sshConfig_1.syncSshConfig)(store.list(), os.homedir()).catch(() => { });
         const outcomes = await wiring.reconcile();
         await credentials.sync();
         const open = new Map((vscode.workspace.workspaceFolders ?? []).map(f => [(0, projectBinding_1.folderKey)(f.uri.fsPath), f.name]));
