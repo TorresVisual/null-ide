@@ -15,6 +15,7 @@ import { folderKey, ProjectBinding } from './projectBinding';
 import { fetchGithub, GithubProvider } from './providers/github';
 import { fetchGitlab, fetchPostForm, GitlabProvider, resolveClientId } from './providers/gitlab';
 import { checkSsh } from './sshCheck';
+import { syncSshConfig } from './sshConfig';
 import { canSign, deleteManagedKey, generateKey, readPublicKey } from './sshKeyOps';
 import { KeyActions } from './ui/keyActions';
 import { keyUi } from './ui/keyUi';
@@ -159,6 +160,7 @@ function registerGitSync(
   const warned = new Set<string>();
 
   const syncGit = async (): Promise<void> => {
+    await syncSshConfig(store.list(), os.homedir()).catch(() => { /* ~/.ssh may be read-only; repo-local sshCommand still works */ });
     const outcomes = await wiring.reconcile();
     await credentials.sync();
     const open = new Map((vscode.workspace.workspaceFolders ?? []).map(f => [folderKey(f.uri.fsPath), f.name]));
