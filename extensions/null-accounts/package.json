@@ -41,7 +41,7 @@
   },
   "scripts": {
     "compile": "tsc -p tsconfig.json",
-    "test": "tsc -p tsconfig.json && node --test out/accountInput.test.js out/accountStore.test.js out/api.test.js out/projectBinding.test.js out/suggest.test.js out/git.test.js out/providers/github.test.js out/accountSetup.test.js out/ui/pickItems.test.js out/ui/accountsView.test.js out/ui/statusBarModel.test.js out/ui/panelMessages.test.js out/ui/accountsHtml.test.js out/ui/accountsMenuModel.test.js out/ui/accountsMenuActions.test.js out/providers/gitlabOAuth.test.js out/providers/gitlab.test.js out/serial.test.js out/gitPlan.test.js out/gitWiring.test.js out/gitCredentials.test.js out/sshAccount.test.js out/sshCheck.test.js out/tool.test.js out/sshKey.test.js out/sshKeyOps.test.js out/keyUpload.test.js",
+    "test": "tsc -p tsconfig.json && node --test out/accountInput.test.js out/accountStore.test.js out/api.test.js out/projectBinding.test.js out/suggest.test.js out/git.test.js out/providers/github.test.js out/accountSetup.test.js out/ui/pickItems.test.js out/ui/accountsView.test.js out/ui/statusBarModel.test.js out/ui/panelMessages.test.js out/ui/accountsHtml.test.js out/ui/accountsMenuModel.test.js out/ui/accountsMenuActions.test.js out/providers/gitlabOAuth.test.js out/providers/gitlab.test.js out/serial.test.js out/gitPlan.test.js out/gitWiring.test.js out/gitCredentials.test.js out/sshAccount.test.js out/sshCheck.test.js out/tool.test.js out/sshKey.test.js out/sshKeyOps.test.js out/keyUpload.test.js out/ui/keyActions.test.js",
     "pretest:integration": "tsc -p tsconfig.json",
     "test:integration": "node ./out/test/runTest.js"
   },

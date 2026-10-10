@@ -1,6 +1,7 @@
 'use strict';
 
 import { execFile } from 'node:child_process';
+import type { Account } from './types';
 
 export interface SshCheck {
   ok: boolean;
@@ -43,6 +44,19 @@ export function interpretSshReply(output: string, host: string): SshCheck {
   }
   const firstLine = output.split(/\r?\n/).map(l => l.trim()).find(Boolean);
   return fail(firstLine ?? `Could not reach ${host} over SSH.`);
+}
+
+/** What to tell the user after a test: informational when it worked as expected, a warning otherwise. */
+export function describeSshTest(
+  account: Pick<Account, 'username' | 'host'>,
+  check: SshCheck,
+): { level: 'info' | 'warn'; text: string } {
+  const who = `${account.username}@${account.host}`;
+  if (!check.ok) { return { level: 'warn', text: `The SSH test for ${who} failed: ${check.message}` }; }
+  if (check.user && check.user.toLowerCase() !== account.username.toLowerCase()) {
+    return { level: 'warn', text: `${account.host} says this key belongs to ${check.user}, not ${account.username}.` };
+  }
+  return { level: 'info', text: `${check.message} Git in projects using ${who} will use this key.` };
 }
 
 export async function checkSsh(host: string, keyFile: string, run: RunSsh = runSsh): Promise<SshCheck> {

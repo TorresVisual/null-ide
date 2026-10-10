@@ -2,7 +2,7 @@
 
 import assert from 'node:assert';
 import { test } from 'node:test';
-import { checkSsh, interpretSshReply, sshCheckArgs } from './sshCheck';
+import { checkSsh, describeSshTest, interpretSshReply, sshCheckArgs } from './sshCheck';
 
 test('GitLab and GitHub greetings are a success that names the user the key belongs to', () => {
   assert.deepStrictEqual(interpretSshReply('Welcome to GitLab, @ada!\n', 'gitlab.uni.example'), {
@@ -30,4 +30,15 @@ test('checkSsh asks ssh to use only this key, never to prompt, and passes the ke
   assert.ok(seen.includes('BatchMode=yes') && seen.includes('IdentitiesOnly=yes'));
   assert.strictEqual(seen[seen.indexOf('-i') + 1], 'C:/Users/me/.ssh/id uni');
   assert.strictEqual(seen.at(-1), 'git@g.example');
+});
+
+test('describeSshTest: success is informational; a failure or another user\'s key is a warning', () => {
+  const ada = { username: 'ada', host: 'g.example' };
+  assert.deepStrictEqual(describeSshTest(ada, { ok: true, user: 'Ada', message: 'Connected to g.example as Ada.' }),
+    { level: 'info', text: 'Connected to g.example as Ada. Git in projects using ada@g.example will use this key.' });
+  assert.deepStrictEqual(describeSshTest(ada, { ok: false, message: 'did not accept this key' }),
+    { level: 'warn', text: 'The SSH test for ada@g.example failed: did not accept this key' });
+  const other = describeSshTest(ada, { ok: true, user: 'bob', message: 'Connected to g.example as bob.' });
+  assert.strictEqual(other.level, 'warn');
+  assert.match(other.text, /belongs to bob, not ada/);
 });
