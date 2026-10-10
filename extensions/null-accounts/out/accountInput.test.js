@@ -42,14 +42,19 @@ const base = {
     node_assert_1.default.throws(() => (0, accountInput_1.validateNewAccount)({ ...base, provider: 'bitbucket' }), /provider/i);
     node_assert_1.default.throws(() => (0, accountInput_1.validateNewAccount)({ ...base, authMethod: 'magic' }), /auth/i);
 });
-(0, node_test_1.test)('validateNewAccount requires an SSH key path for ssh accounts only', () => {
+(0, node_test_1.test)('validateNewAccount requires an SSH key path for ssh accounts, and keeps one on any other account', () => {
     node_assert_1.default.throws(() => (0, accountInput_1.validateNewAccount)({ ...base, authMethod: 'ssh' }), /ssh key/i);
     node_assert_1.default.throws(() => (0, accountInput_1.validateNewAccount)({ ...base, authMethod: 'ssh', sshKeyPath: '  ' }), /ssh key/i);
-    const ssh = (0, accountInput_1.validateNewAccount)({ ...base, authMethod: 'ssh', sshKeyPath: ' C:\keys\id_ed25519 ' });
-    node_assert_1.default.strictEqual(ssh.sshKeyPath, 'C:\keys\id_ed25519');
-    // A stray key path on a non-ssh account is dropped, not stored.
-    const oauth = (0, accountInput_1.validateNewAccount)({ ...base, sshKeyPath: 'C:\keys\id_ed25519' });
-    node_assert_1.default.strictEqual('sshKeyPath' in oauth, false);
+    node_assert_1.default.strictEqual((0, accountInput_1.validateNewAccount)({ ...base, authMethod: 'ssh', sshKeyPath: ' C:/keys/id_ed25519 ' }).sshKeyPath, 'C:/keys/id_ed25519');
+    // A token account may carry a key too: git pushes over SSH with it while the token serves the API.
+    node_assert_1.default.strictEqual((0, accountInput_1.validateNewAccount)({ ...base, sshKeyPath: ' C:/keys/id_ed25519 ' }).sshKeyPath, 'C:/keys/id_ed25519');
+    node_assert_1.default.strictEqual('sshKeyPath' in (0, accountInput_1.validateNewAccount)({ ...base, sshKeyPath: '  ' }), false);
+    node_assert_1.default.strictEqual('sshKeyPath' in (0, accountInput_1.validateNewAccount)(base), false);
+});
+(0, node_test_1.test)('signCommits needs a key, and is stored only when true', () => {
+    node_assert_1.default.throws(() => (0, accountInput_1.validateNewAccount)({ ...base, signCommits: true }), /signing needs an ssh key/i);
+    node_assert_1.default.strictEqual((0, accountInput_1.validateNewAccount)({ ...base, sshKeyPath: '/k/id', signCommits: true }).signCommits, true);
+    node_assert_1.default.strictEqual('signCommits' in (0, accountInput_1.validateNewAccount)({ ...base, sshKeyPath: '/k/id', signCommits: false }), false);
 });
 (0, node_test_1.test)('validateNewAccount keeps a trimmed externalId and drops a blank one', () => {
     node_assert_1.default.strictEqual((0, accountInput_1.validateNewAccount)({ ...base, externalId: ' 583231 ' }).externalId, '583231');

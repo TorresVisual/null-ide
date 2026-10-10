@@ -52,4 +52,10 @@ const exists = (key) => ({ path: key, exists: true });
     node_assert_1.default.match((0, accountsView_1.removeConfirmation)({ username: 'o', host: 'h' }, 3).detail, /3 projects will lose/);
     node_assert_1.default.match(none.detail, /not affected/);
 });
+(0, node_test_1.test)('a key row is attached to its account only when one is supplied', () => {
+    const key = { path: '/k/id', exists: true, managed: false, signCommits: false, removable: true };
+    const rows = (0, accountsView_1.buildRows)([acct('a1'), acct('a2')], [], exists, () => false, new Map([['a2', key]]));
+    node_assert_1.default.ok(!('key' in rows[0]));
+    node_assert_1.default.deepStrictEqual(rows[1].key, key);
+});
 //# sourceMappingURL=accountsView.test.js.map

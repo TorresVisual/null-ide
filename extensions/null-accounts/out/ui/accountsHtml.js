@@ -20,12 +20,15 @@ button.danger{color:var(--vscode-errorForeground);}
 .name{font-size:14px;font-weight:600;}
 .meta,.email,.ppath{color:var(--vscode-descriptionForeground);}
 .warn{color:var(--vscode-editorWarning-foreground);margin:2px 0 0;}
-.actions{display:flex;gap:6px;margin:8px 0 10px;}
-.projects h3{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--vscode-descriptionForeground);margin:0 0 4px;}
+.actions{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 10px;}
+.projects h3,.key h3{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--vscode-descriptionForeground);margin:0 0 4px;}
 .project{display:flex;align-items:center;gap:10px;padding:2px 0;}
 .pname{font-weight:600;}
 .ppath{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .project.missing .pname,.project.missing .ppath{text-decoration:line-through;opacity:.7;}
+.key{margin:0 0 10px;}
+.kpath,.kfp{color:var(--vscode-descriptionForeground);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.kfp{font-family:var(--vscode-editor-font-family);}
 `;
 /** The panel page. Contains no account data — the host posts that after the script announces `ready`. */
 function buildHtml(nonce) {

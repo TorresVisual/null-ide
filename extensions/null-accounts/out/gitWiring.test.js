@@ -179,4 +179,49 @@ function setup(initial, git = git_1.runGit) {
     node_assert_1.default.strictEqual(second[0].status, 'unchanged');
     node_assert_1.default.strictEqual(config(dir, 'user.email'), 'alice@example.com');
 });
+(0, node_test_1.test)('a signing account writes git SSH-signing settings; unbinding restores a hand-set commit.gpgsign', async () => {
+    const dir = makeRepo();
+    (0, node_child_process_1.execFileSync)('git', ['config', '--local', 'commit.gpgsign', 'false'], { cwd: dir });
+    const key = node_path_1.default.join(scratch, 'id_sign');
+    (0, node_fs_1.writeFileSync)(key, 'not a real key');
+    const signer = { ...alice, id: 'a4', authMethod: 'ssh', sshKeyPath: key, signCommits: true };
+    const { wiring, bound } = setup([[dir, signer]]);
+    await wiring.reconcile();
+    node_assert_1.default.strictEqual(config(dir, 'gpg.format'), 'ssh');
+    node_assert_1.default.strictEqual(config(dir, 'user.signingkey'), key.replace(/\\/g, '/'));
+    node_assert_1.default.strictEqual(config(dir, 'commit.gpgsign'), 'true');
+    bound.delete(dir);
+    await wiring.reconcile();
+    node_assert_1.default.strictEqual(config(dir, 'commit.gpgsign'), 'false');
+    node_assert_1.default.strictEqual(config(dir, 'gpg.format'), undefined);
+    node_assert_1.default.strictEqual(config(dir, 'user.signingkey'), undefined);
+});
+(0, node_test_1.test)('switching signing off rewrites the repo and puts the hand-set value back', async () => {
+    const dir = makeRepo();
+    (0, node_child_process_1.execFileSync)('git', ['config', '--local', 'commit.gpgsign', 'false'], { cwd: dir });
+    const key = node_path_1.default.join(scratch, 'id_sign2');
+    (0, node_fs_1.writeFileSync)(key, 'not a real key');
+    const signer = { ...alice, id: 'a5', authMethod: 'ssh', sshKeyPath: key, signCommits: true };
+    const { wiring, accounts } = setup([[dir, signer]]);
+    await wiring.reconcile();
+    accounts.set(signer.id, { ...signer, signCommits: undefined });
+    node_assert_1.default.deepStrictEqual(await wiring.reconcile(), [{ folder: dir, status: 'wired' }]);
+    node_assert_1.default.strictEqual(config(dir, 'commit.gpgsign'), 'false');
+    node_assert_1.default.strictEqual(config(dir, 'gpg.format'), undefined);
+    node_assert_1.default.strictEqual(config(dir, 'core.sshCommand'), `ssh -i '${key.replace(/\\/g, '/')}' -o IdentitiesOnly=yes`);
+});
+(0, node_test_1.test)('a token account whose key file is gone keeps its identity and credential, and loses only the SSH settings', async () => {
+    const dir = makeRepo();
+    const key = node_path_1.default.join(scratch, 'id_vanished');
+    const withKey = { ...alice, id: 'a6', sshKeyPath: key, signCommits: true };
+    const { wiring } = setup([[dir, withKey]]);
+    node_assert_1.default.deepStrictEqual(await wiring.reconcile(), [{ folder: dir, status: 'wired' }]);
+    node_assert_1.default.strictEqual(config(dir, 'user.email'), 'alice@example.com');
+    node_assert_1.default.strictEqual(config(dir, CRED_ALICE), 'alice');
+    node_assert_1.default.strictEqual(config(dir, 'core.sshCommand'), undefined);
+    node_assert_1.default.strictEqual(config(dir, 'commit.gpgsign'), undefined);
+    (0, node_fs_1.writeFileSync)(key, 'not a real key'); // the key comes back: the next reconcile adds the SSH settings
+    node_assert_1.default.deepStrictEqual(await wiring.reconcile(), [{ folder: dir, status: 'wired' }]);
+    node_assert_1.default.strictEqual(config(dir, 'commit.gpgsign'), 'true');
+});
 //# sourceMappingURL=gitWiring.test.js.map

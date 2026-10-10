@@ -26,4 +26,16 @@ const panelMessages_1 = require("./panelMessages");
         node_assert_1.default.strictEqual((0, panelMessages_1.parsePanelMessage)(bad), undefined, JSON.stringify(bad));
     }
 });
+(0, node_test_1.test)('key messages carry an account id, and setSigning a real boolean', () => {
+    for (const type of ['generateKey', 'attachKey', 'copyPublicKey', 'uploadKey', 'testKey', 'removeKey']) {
+        node_assert_1.default.deepStrictEqual((0, panelMessages_1.parsePanelMessage)({ type, id: 'a1', evil: 1 }), { type, id: 'a1' });
+        node_assert_1.default.strictEqual((0, panelMessages_1.parsePanelMessage)({ type }), undefined, type);
+        node_assert_1.default.strictEqual((0, panelMessages_1.parsePanelMessage)({ type, id: '' }), undefined, type);
+    }
+    node_assert_1.default.deepStrictEqual((0, panelMessages_1.parsePanelMessage)({ type: 'setSigning', id: 'a1', on: true }), { type: 'setSigning', id: 'a1', on: true });
+    node_assert_1.default.deepStrictEqual((0, panelMessages_1.parsePanelMessage)({ type: 'setSigning', id: 'a1', on: false }), { type: 'setSigning', id: 'a1', on: false });
+    for (const bad of [{ type: 'setSigning', id: 'a1' }, { type: 'setSigning', id: 'a1', on: 'yes' }, { type: 'setSigning', on: true }]) {
+        node_assert_1.default.strictEqual((0, panelMessages_1.parsePanelMessage)(bad), undefined, JSON.stringify(bad));
+    }
+});
 //# sourceMappingURL=panelMessages.test.js.map

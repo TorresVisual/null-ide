@@ -45,9 +45,14 @@ const changeEmitter_1 = require("./changeEmitter");
 const git_1 = require("./git");
 const gitCredentials_1 = require("./gitCredentials");
 const gitWiring_1 = require("./gitWiring");
+const keyUpload_1 = require("./keyUpload");
 const projectBinding_1 = require("./projectBinding");
 const github_1 = require("./providers/github");
 const gitlab_1 = require("./providers/gitlab");
+const sshCheck_1 = require("./sshCheck");
+const sshKeyOps_1 = require("./sshKeyOps");
+const keyActions_1 = require("./ui/keyActions");
+const keyUi_1 = require("./ui/keyUi");
 const accountPicker_1 = require("./ui/accountPicker");
 const accountsMenuActions_1 = require("./ui/accountsMenuActions");
 const accountsMenuController_1 = require("./ui/accountsMenuController");
@@ -90,7 +95,24 @@ function activate(context) {
         void bindings.prune(new Set(store.list().map(a => a.id)));
         changed.fire();
     }), bindings.onDidChange(() => changed.fire()), gitlab.onDidChange(() => changed.fire()));
-    const pickerDeps = { accounts: store, bindings, github, gitlab };
+    const home = os.homedir();
+    // `api` is created below; the actions only call it later, from a button.
+    const keys = new keyActions_1.KeyActions({
+        accounts: store,
+        getToken: (account, scopes, options) => api.getToken(account, scopes, options),
+        ui: keyUi_1.keyUi,
+        home,
+        hostname: os.hostname(),
+        now: () => new Date(),
+        exists: fs.existsSync,
+        generate: input => (0, sshKeyOps_1.generateKey)({ home, ...input }),
+        readPublicKey: sshKeyOps_1.readPublicKey,
+        canSign: file => (0, sshKeyOps_1.canSign)(file),
+        deleteManagedKey: file => (0, sshKeyOps_1.deleteManagedKey)(file, home),
+        upload: keyUpload_1.uploadPublicKey,
+        checkSsh: (host, file) => (0, sshCheck_1.checkSsh)(host, file),
+    });
+    const pickerDeps = { accounts: store, bindings, github, gitlab, keys };
     const api = (0, api_1.createApi)({
         accounts: store,
         accountIdForFolder: folder => bindings.accountIdFor(folder.fsPath),
@@ -101,6 +123,7 @@ function activate(context) {
     context.subscriptions.push(vscode.commands.registerCommand('null-accounts.open', () => accountsPanel_1.AccountsPanel.createOrShow({
         accounts: store,
         bindings,
+        keys,
         add: () => (0, accountPicker_1.addAccount)(pickerDeps),
         reauth: id => (0, accountPicker_1.reauthenticate)(pickerDeps, id),
         needsReauth: id => gitlab.needsReauth(id),

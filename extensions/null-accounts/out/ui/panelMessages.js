@@ -16,7 +16,15 @@ function parsePanelMessage(raw) {
         case 'remove':
         case 'editEmail':
         case 'reauth':
+        case 'generateKey':
+        case 'attachKey':
+        case 'copyPublicKey':
+        case 'uploadKey':
+        case 'testKey':
+        case 'removeKey':
             return nonEmpty(m.id) ? { type, id: m.id } : undefined;
+        case 'setSigning':
+            return nonEmpty(m.id) && typeof m.on === 'boolean' ? { type, id: m.id, on: m.on } : undefined;
         case 'unbind':
             return nonEmpty(m.key) ? { type, key: m.key } : undefined;
         default:

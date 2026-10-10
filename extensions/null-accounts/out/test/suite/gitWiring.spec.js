@@ -37,6 +37,7 @@ const assert = __importStar(require("assert"));
 const child_process_1 = require("child_process");
 const fs = __importStar(require("fs"));
 const vscode = __importStar(require("vscode"));
+const helpers_1 = require("./helpers");
 // A GitLab access-token account: its token is the raw stored secret, so no provider or network is involved.
 const NEW_ACCOUNT = {
     provider: 'gitlab', host: 'gitlab.example.test', username: 'spec-user', email: 'spec-user@example.test', authMethod: 'https',
@@ -44,25 +45,6 @@ const NEW_ACCOUNT = {
 const TOKEN = 'glpat-integration-spec-token';
 const CREDENTIAL_KEY = `credential.https://${NEW_ACCOUNT.host}.username`;
 const HAND_SET_EMAIL = 'me@work.example';
-/** Output of `git <args>` in `cwd`; '' when git exits non-zero (an unset config key). */
-function git(cwd, ...args) {
-    try {
-        return (0, child_process_1.execFileSync)('git', args, { cwd, encoding: 'utf8' }).trim();
-    }
-    catch {
-        return '';
-    }
-}
-/** Wiring runs asynchronously after a bind or a removal, so poll instead of reading once. */
-async function waitFor(what, done) {
-    for (let i = 0; i < 100; i++) {
-        if (done()) {
-            return;
-        }
-        await new Promise(resolve => setTimeout(resolve, 100));
-    }
-    assert.fail(`timed out waiting for ${what}`);
-}
 suite('null-accounts git wiring', () => {
     test('binding wires the repo and the credential store; removing the account undoes both', async function () {
         this.timeout(30_000);
@@ -82,18 +64,18 @@ suite('null-accounts git wiring', () => {
             // recent-projects.json and the binding can spell one path differently; the lookup normalises both.
             assert.strictEqual(api.getAccountForFolder(vscode.Uri.file(repo.toUpperCase()))?.id, added.id);
         }
-        await waitFor('the account to be written into the repo', () => git(repo, 'config', '--local', 'user.email') === NEW_ACCOUNT.email
-            && git(repo, 'config', '--local', 'user.name') === NEW_ACCOUNT.username
-            && git(repo, 'config', '--local', CREDENTIAL_KEY) === NEW_ACCOUNT.username);
-        assert.strictEqual(git(repo, 'config', '--global', 'user.email'), '', 'the global config must stay untouched');
-        await waitFor('the token to reach the credential store', () => stored().includes(`https://${NEW_ACCOUNT.username}:${TOKEN}@${NEW_ACCOUNT.host}`));
+        await (0, helpers_1.waitFor)('the account to be written into the repo', () => (0, helpers_1.git)(repo, 'config', '--local', 'user.email') === NEW_ACCOUNT.email
+            && (0, helpers_1.git)(repo, 'config', '--local', 'user.name') === NEW_ACCOUNT.username
+            && (0, helpers_1.git)(repo, 'config', '--local', CREDENTIAL_KEY) === NEW_ACCOUNT.username);
+        assert.strictEqual((0, helpers_1.git)(repo, 'config', '--global', 'user.email'), '', 'the global config must stay untouched');
+        await (0, helpers_1.waitFor)('the token to reach the credential store', () => stored().includes(`https://${NEW_ACCOUNT.username}:${TOKEN}@${NEW_ACCOUNT.host}`));
         // The call the Issues panel and every other consumer makes.
         assert.strictEqual(await api.getToken(added), TOKEN);
         await vscode.commands.executeCommand('null-accounts.test.removeAccount', added.id);
-        await waitFor('the repo to be restored', () => git(repo, 'config', '--local', 'user.email') === HAND_SET_EMAIL
-            && git(repo, 'config', '--local', 'user.name') === ''
-            && git(repo, 'config', '--local', CREDENTIAL_KEY) === '');
-        await waitFor('the credential to be withdrawn', () => !stored().includes(NEW_ACCOUNT.host));
+        await (0, helpers_1.waitFor)('the repo to be restored', () => (0, helpers_1.git)(repo, 'config', '--local', 'user.email') === HAND_SET_EMAIL
+            && (0, helpers_1.git)(repo, 'config', '--local', 'user.name') === ''
+            && (0, helpers_1.git)(repo, 'config', '--local', CREDENTIAL_KEY) === '');
+        await (0, helpers_1.waitFor)('the credential to be withdrawn', () => !stored().includes(NEW_ACCOUNT.host));
         assert.strictEqual(api.getAccountForFolder(folder), undefined);
         // Leaves the account list empty, as activation.spec.ts expects whatever order the specs run in.
         assert.deepStrictEqual(api.getAccounts(), []);

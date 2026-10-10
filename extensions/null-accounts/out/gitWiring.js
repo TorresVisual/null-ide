@@ -43,7 +43,10 @@ class GitWiring {
                 ? { folder, status: 'cleared' }
                 : { folder, status: 'skipped', reason: 'git-missing' };
         }
-        const plan = (0, gitPlan_1.planFor)(account, this.deps.home);
+        const keyFile = (0, gitPlan_1.sshKeyFile)(account, this.deps.home);
+        const keyMissing = keyFile !== '' && !this.deps.exists(keyFile);
+        // A token account's key is optional: without the file it keeps its identity and credential, minus the SSH settings.
+        const plan = (0, gitPlan_1.planFor)(keyMissing && account.authMethod !== 'ssh' ? { ...account, sshKeyPath: undefined, signCommits: undefined } : account, this.deps.home);
         if (old && old.accountId === account.id && sameConfig(old.entries, plan)) {
             return { folder, status: 'unchanged' };
         }
@@ -58,11 +61,8 @@ class GitWiring {
         if (!this.deps.exists(folder)) {
             return skip('folder-missing');
         }
-        if (account.authMethod === 'ssh') {
-            const keyFile = (0, gitPlan_1.sshKeyFile)(account, this.deps.home);
-            if (!this.deps.exists(keyFile)) {
-                return skip('ssh-key-missing', keyFile);
-            }
+        if (keyMissing && account.authMethod === 'ssh') {
+            return skip('ssh-key-missing', keyFile);
         }
         const probe = await this.deps.git(folder, INSIDE_REPO);
         if (probe.code === git_1.GIT_UNAVAILABLE) {

@@ -20,6 +20,33 @@ function button(label, onClick, cls) {
   return b;
 }
 
+function keySection(row) {
+  const box = el('div', 'key');
+  box.append(el('h3', '', 'SSH key'));
+  const send = type => () => vscode.postMessage({ type, id: row.id });
+  const actions = el('div', 'actions');
+  const k = row.key;
+  if (!k) {
+    box.append(el('div', 'kfp', 'No SSH key. Generate one to push and sign commits over SSH with this account.'));
+  } else {
+    box.append(el('div', 'kpath', k.exists ? k.path : k.path + ' (not found)'));
+    if (k.fingerprint) { box.append(el('div', 'kfp', k.fingerprint)); }
+    if (k.signCommits) { box.append(el('div', 'kfp', 'Commits are signed with this key.')); }
+    if (k.exists) {
+      actions.append(
+        button('Copy public key', send('copyPublicKey')),
+        button(row.authMethod === 'ssh' ? 'Copy & open ' + row.host : 'Upload to ' + row.host, send('uploadKey')),
+        button('Test', send('testKey')),
+        button(k.signCommits ? 'Stop signing commits' : 'Sign commits', () => vscode.postMessage({ type: 'setSigning', id: row.id, on: !k.signCommits })),
+      );
+    }
+  }
+  actions.append(button(k ? 'Replace with a new key' : 'Generate key', send('generateKey')), button('Use existing key…', send('attachKey')));
+  if (k && k.removable) { actions.append(button(k.managed ? 'Delete key' : 'Stop using key', send('removeKey'), 'danger')); }
+  box.append(actions);
+  return box;
+}
+
 function render(rows) {
   list.replaceChildren();
   empty.classList.toggle('visible', rows.length === 0);
@@ -49,7 +76,7 @@ function render(rows) {
     }
     const lines = [head, el('div', 'email', row.email)];
     if (row.needsReauth) { lines.push(el('div', 'warn', 'Sign-in expired. Re-authenticate to use this account again.')); }
-    card.append(...lines, actions, projects);
+    card.append(...lines, actions, keySection(row), projects);
     list.append(card);
   }
 }

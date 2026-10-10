@@ -29,4 +29,9 @@ const accountsHtml_1 = require("./accountsHtml");
 (0, node_test_1.test)('the client script can ask the host to re-authenticate an account', () => {
     node_assert_1.default.match(accountsClient_1.CLIENT_SCRIPT, /type: 'reauth'/);
 });
+(0, node_test_1.test)('the client script can send every key message the host understands', () => {
+    for (const type of ['generateKey', 'attachKey', 'copyPublicKey', 'uploadKey', 'testKey', 'removeKey', 'setSigning']) {
+        node_assert_1.default.ok(accountsClient_1.CLIENT_SCRIPT.includes(`'${type}'`), type);
+    }
+});
 //# sourceMappingURL=accountsHtml.test.js.map

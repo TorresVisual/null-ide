@@ -36,10 +36,13 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AccountsPanel = void 0;
 const node_crypto_1 = require("node:crypto");
 const fs = __importStar(require("node:fs"));
+const os = __importStar(require("node:os"));
 const vscode = __importStar(require("vscode"));
 const accountInput_1 = require("../accountInput");
+const sshKeyOps_1 = require("../sshKeyOps");
 const accountsHtml_1 = require("./accountsHtml");
 const accountsView_1 = require("./accountsView");
+const keyInfo_1 = require("./keyInfo");
 const panelMessages_1 = require("./panelMessages");
 /** Real-cased path when the folder exists (binding keys are lower-cased on Windows). */
 const resolveFolder = key => {
@@ -55,6 +58,7 @@ class AccountsPanel {
     panel;
     deps;
     static current;
+    seq = 0;
     static createOrShow(deps) {
         if (AccountsPanel.current) {
             AccountsPanel.current.panel.reveal();
@@ -67,15 +71,21 @@ class AccountsPanel {
         this.panel = panel;
         this.deps = deps;
         panel.webview.html = (0, accountsHtml_1.buildHtml)((0, node_crypto_1.randomBytes)(16).toString('hex'));
-        const changes = deps.onDidChange(() => this.postState());
+        const changes = deps.onDidChange(() => void this.postState());
         panel.webview.onDidReceiveMessage(raw => void this.handle(raw));
         panel.onDidDispose(() => {
             changes.dispose();
             AccountsPanel.current = undefined;
         });
     }
-    postState() {
-        const rows = (0, accountsView_1.buildRows)(this.deps.accounts.list(), this.deps.bindings.entries(), resolveFolder, id => this.deps.needsReauth(id));
+    async postState() {
+        const turn = ++this.seq;
+        const accounts = this.deps.accounts.list();
+        const keys = await (0, keyInfo_1.describeKeys)(accounts, { home: os.homedir(), exists: fs.existsSync, fingerprintOf: file => (0, sshKeyOps_1.fingerprintOf)(file) });
+        if (turn !== this.seq) {
+            return;
+        } // a newer state is already on its way
+        const rows = (0, accountsView_1.buildRows)(accounts, this.deps.bindings.entries(), resolveFolder, id => this.deps.needsReauth(id), keys);
         void this.panel.webview.postMessage({ type: 'state', rows });
     }
     async handle(raw) {
@@ -86,7 +96,7 @@ class AccountsPanel {
         try {
             switch (msg.type) {
                 case 'ready':
-                    this.postState();
+                    await this.postState();
                     break;
                 case 'add':
                     await this.deps.add();
@@ -102,6 +112,27 @@ class AccountsPanel {
                     break;
                 case 'editEmail':
                     await this.editEmail(msg.id);
+                    break;
+                case 'generateKey':
+                    await this.deps.keys.generate(msg.id);
+                    break;
+                case 'attachKey':
+                    await this.deps.keys.attach(msg.id);
+                    break;
+                case 'copyPublicKey':
+                    await this.deps.keys.copyPublic(msg.id);
+                    break;
+                case 'uploadKey':
+                    await this.deps.keys.upload(msg.id);
+                    break;
+                case 'testKey':
+                    await this.deps.keys.test(msg.id);
+                    break;
+                case 'setSigning':
+                    await this.deps.keys.setSigning(msg.id, msg.on);
+                    break;
+                case 'removeKey':
+                    await this.deps.keys.removeKey(msg.id);
                     break;
             }
         }

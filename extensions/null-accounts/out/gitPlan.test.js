@@ -42,4 +42,22 @@ const github = {
 (0, node_test_1.test)('an SSH account without a key path plans an empty key, which the caller reports as a missing file', () => {
     node_assert_1.default.strictEqual((0, gitPlan_1.sshKeyFile)({ ...github, authMethod: 'ssh' }, '/home/me'), '');
 });
+(0, node_test_1.test)('a token account with a key gets core.sshCommand as well as its credential entry', () => {
+    const both = { ...github, sshKeyPath: '/k/id' };
+    const plan = (0, gitPlan_1.planFor)(both, '/home/me');
+    node_assert_1.default.deepStrictEqual(plan.config.map(e => e.key), ['user.name', 'user.email', 'core.sshCommand', 'credential.https://github.com.username']);
+    node_assert_1.default.deepStrictEqual(plan.credential, { host: 'github.com', username: 'octocat' });
+});
+(0, node_test_1.test)('signCommits adds git SSH-signing settings that point at the private key, with plain separators and no quoting', () => {
+    const signer = { ...github, authMethod: 'ssh', sshKeyPath: 'C:\\Users\\me\\.ssh\\id work', signCommits: true };
+    node_assert_1.default.deepStrictEqual((0, gitPlan_1.planFor)(signer, 'C:\\Users\\me').config.slice(3), [
+        { key: 'gpg.format', value: 'ssh' },
+        { key: 'user.signingkey', value: 'C:/Users/me/.ssh/id work' },
+        { key: 'commit.gpgsign', value: 'true' },
+    ]);
+});
+(0, node_test_1.test)('signCommits without a key plans no signing', () => {
+    const stale = { ...github, signCommits: true };
+    node_assert_1.default.ok(!(0, gitPlan_1.planFor)(stale, '/home/me').config.some(e => e.key === 'commit.gpgsign'));
+});
 //# sourceMappingURL=gitPlan.test.js.map
