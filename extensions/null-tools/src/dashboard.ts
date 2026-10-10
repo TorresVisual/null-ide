@@ -15,8 +15,10 @@ import {
 } from './recentProjects';
 import { computeGitStatuses, GitStatus } from './dashboardGitStatus';
 import { runNewProjectFlow, runCloneRepoFlow } from './dashboardActions';
+import { withAccounts } from './dashboardAccounts';
+import { getAccountsApi } from './github/githubAuth';
 
-type LauncherProject = RecentProjectEntry & { available: boolean; projectType?: string; icon?: string };
+type LauncherProject = RecentProjectEntry & { available: boolean; projectType?: string; icon?: string; account?: string };
 
 type OutboundMessage =
   | { type: 'projects'; projects: LauncherProject[] }
@@ -53,6 +55,9 @@ export class DashboardEditorProvider implements vscode.CustomReadonlyEditorProvi
     };
     panel.webview.html = this._buildHtml(panel.webview);
     panel.webview.onDidReceiveMessage((msg: InboundMessage) => this._handleMessage(msg, panel.webview));
+    // A bind, rebind or removed account changes a card's label; a visible dashboard shouldn't wait for Refresh.
+    const accountsChanged = getAccountsApi()?.onDidChange(() => this._sendProjectsAndStatuses(panel.webview));
+    panel.onDidDispose(() => accountsChanged?.dispose());
   }
 
   private _handleMessage(msg: InboundMessage, webview: vscode.Webview): void {
@@ -126,10 +131,14 @@ export class DashboardEditorProvider implements vscode.CustomReadonlyEditorProvi
 
   private _sendProjectsAndStatuses(webview: vscode.Webview): void {
     const projects = readRecentProjects(getRecentProjectsFilePath());
-    const launcherProjects: LauncherProject[] = projects.map(project => {
-      const available = fs.existsSync(project.path);
-      return { ...project, available, ...(available ? detectProjectType(project.path) : undefined) };
-    });
+    const accounts = getAccountsApi();
+    const launcherProjects: LauncherProject[] = withAccounts(
+      projects.map(project => {
+        const available = fs.existsSync(project.path);
+        return { ...project, available, ...(available ? detectProjectType(project.path) : undefined) };
+      }),
+      folder => accounts?.getAccountForFolder(vscode.Uri.file(folder)),
+    );
     webview.postMessage({ type: 'projects', projects: launcherProjects } as OutboundMessage);
     void computeGitStatuses(
       projects.map(p => p.path),
