@@ -1,0 +1,282 @@
+:root {
+  --signal: #0078d4;
+  --signal-hover: #026ec1;
+  --surface: var(--vscode-editorWidget-background, rgba(128, 128, 128, 0.08));
+  --border: var(--vscode-widget-border, var(--vscode-panel-border, rgba(128, 128, 128, 0.35)));
+  --muted: var(--vscode-descriptionForeground, rgba(128, 128, 128, 0.9));
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 24px;
+  color: var(--vscode-foreground);
+  background: var(--vscode-editor-background);
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+}
+
+#app {
+  max-width: 960px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.4em;
+  font-weight: 600;
+}
+
+h2 {
+  margin: 0 0 12px;
+  font-size: 1em;
+  font-weight: 600;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+button:focus-visible,
+.bar:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
+}
+
+.top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tabs {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.tab {
+  padding: 4px 12px;
+  background: transparent;
+  border: 0;
+  border-right: 1px solid var(--border);
+}
+
+.tab:last-child {
+  border-right: 0;
+}
+
+.tab:hover {
+  background: var(--surface);
+}
+
+.tab.active {
+  background: var(--signal);
+  color: #fff;
+}
+
+.tab.active:hover {
+  background: var(--signal-hover);
+}
+
+.banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--signal);
+  border-radius: 4px;
+  background: var(--surface);
+}
+
+.link {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--vscode-textLink-foreground, var(--signal));
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.total-value {
+  font-size: 2.6em;
+  font-weight: 600;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.total-label {
+  color: var(--muted);
+}
+
+.empty {
+  margin: 24px 0;
+  color: var(--muted);
+}
+
+.plot {
+  position: relative;
+}
+
+.graph-svg {
+  display: block;
+  width: 100%;
+  height: 140px;
+}
+
+.bar {
+  fill: var(--signal);
+}
+
+.bar:hover,
+.bar:focus {
+  fill: var(--signal-hover);
+  outline: none;
+}
+
+.bar:focus-visible {
+  stroke: var(--vscode-focusBorder);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.tip {
+  position: absolute;
+  bottom: 100%;
+  transform: translateX(-50%);
+  padding: 2px 8px;
+  white-space: nowrap;
+  pointer-events: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--vscode-editorHoverWidget-background, var(--surface));
+  color: var(--vscode-editorHoverWidget-foreground, var(--vscode-foreground));
+}
+
+.tip[hidden] {
+  display: none;
+}
+
+.axis {
+  position: relative;
+  height: 1.5em;
+  margin-top: 4px;
+}
+
+.tick {
+  position: absolute;
+  transform: translateX(-50%);
+  font-size: 0.85em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 700px) {
+  .columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+.card {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  min-width: 0;
+}
+
+.rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 80px 64px 40px;
+  align-items: center;
+  gap: 8px;
+}
+
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.fill {
+  height: 100%;
+  background: var(--signal);
+}
+
+.dur,
+.pct {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.pct {
+  color: var(--muted);
+}
+
+.sessions {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.sessions th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.sessions th,
+.sessions td {
+  padding: 6px 8px 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.sessions tr:last-child td {
+  border-bottom: 0;
+}
+
+.sessions .num {
+  text-align: right;
+}
+
+.foot {
+  display: flex;
+  gap: 16px;
+  color: var(--muted);
+}

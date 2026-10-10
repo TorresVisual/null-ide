@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "module": "none",
+    "lib": ["ES2017", "DOM"],
+    "outFile": "./lib/dashboard.js",
+    "strict": true,
+    "sourceMap": false,
+    "skipLibCheck": true
+  },
+  "include": [
+    "src/protocol.ts",
+    "src/webview/dashboard/dom.ts",
+    "src/webview/dashboard/model.ts",
+    "src/webview/dashboard/graph.ts",
+    "src/webview/dashboard/breakdown.ts",
+    "src/webview/dashboard/sessions.ts",
+    "src/webview/dashboard/main.ts"
+  ]
+}
