@@ -149,7 +149,7 @@ Workbench chrome customisations (CSS/JS injection, icon swaps) are handled by di
 - `004-null-dashboard-help-welcome.patch` — wires the dashboard into Help > Welcome
 - `005-claude-code-command-center-button.patch` — restores the icon and chevron on the command-center Claude split button
 - `006-settings-toc-split-extensions.patch` — splits the Settings editor's Extensions node into Null / Installed Extensions / Built-in Extensions sections
-- `007-accounts-menu-null-accounts.patch` — the Accounts menu lists null-accounts' accounts (read from the `null.accounts.menu` context key, each row with its round `data:` picture) and drops VS Code's provider-session and Settings Sync / Copilot / Edit Sessions / tunnel rows; the activity-bar Accounts button shows the picture under `null.accounts.avatar`
+- `007-accounts-menu-null-accounts.patch` — the Accounts menu lists null-accounts' accounts (read from the `null.accounts.menu` context key, each row with its round `data:` picture or provider glyph, the host dimmed after the name, and a "Project: <folder>" heading) and drops VS Code's provider-session and Settings Sync / Copilot / Edit Sessions / tunnel rows; the activity-bar Accounts button shows the picture under `null.accounts.avatar`
 
 To add a patch against the VS Code source:
 ```bash

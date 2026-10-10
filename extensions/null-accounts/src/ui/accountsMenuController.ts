@@ -13,7 +13,7 @@ export function registerAccountsMenu(api: NullAccountsApi, avatarOf: (id: string
     return folder ? api.getAccountForFolder(folder.uri)?.id : undefined;
   };
   const refresh = (): void => {
-    void publishAccountsMenu(() => accountsMenuModel(api.getAccounts(), currentId(), avatarOf), setContext);
+    void publishAccountsMenu(() => accountsMenuModel(api.getAccounts(), currentId(), avatarOf, vscode.workspace.workspaceFolders?.[0]?.name), setContext);
     void setContext(AVATAR_CONTEXT_KEY, activityAvatar(api.getAccounts(), currentId(), avatarOf));
   };
   refresh();
