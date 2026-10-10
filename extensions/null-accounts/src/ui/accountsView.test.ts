@@ -47,7 +47,7 @@ test('the resolved (real-cased) path is shown; a missing or throwing folder fall
 test('rows carry only display fields — no secrets or provider internals', () => {
   const rows = buildRows([{ ...acct('a1'), externalId: 'ext-1' }], [], exists);
   assert.deepStrictEqual(Object.keys(rows[0]).sort(),
-    ['authMethod', 'email', 'host', 'id', 'needsReauth', 'projects', 'provider', 'username']);
+    ['authMethod', 'email', 'gitName', 'host', 'id', 'needsReauth', 'projects', 'provider', 'username']);
 });
 
 test('needsReauth is taken from the callback per account and defaults to false', () => {

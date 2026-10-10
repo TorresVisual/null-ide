@@ -1,6 +1,7 @@
 'use strict';
 
 import path from 'node:path';
+import { gitNameOf } from '../gitPlan';
 import { Account } from '../types';
 import { KeyRow } from './keyInfo';
 
@@ -18,6 +19,8 @@ export interface AccountRow {
   provider: Account['provider'];
   host: string;
   username: string;
+  /** The author name commits get (`user.name`): the account's `gitName`, else its username. */
+  gitName: string;
   email: string;
   authMethod: Account['authMethod'];
   /** The sign-in has expired and cannot be refreshed; the panel offers Re-authenticate. */
@@ -42,6 +45,7 @@ export function buildRows(
     provider: a.provider,
     host: a.host,
     username: a.username,
+    gitName: gitNameOf(a),
     email: a.email,
     authMethod: a.authMethod,
     needsReauth: needsReauth(a.id),
