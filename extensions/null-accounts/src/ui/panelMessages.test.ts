@@ -9,6 +9,7 @@ test('well-formed messages parse and drop unknown fields', () => {
   assert.deepStrictEqual(parsePanelMessage({ type: 'add', evil: 1 }), { type: 'add' });
   assert.deepStrictEqual(parsePanelMessage({ type: 'remove', id: 'a1', extra: true }), { type: 'remove', id: 'a1' });
   assert.deepStrictEqual(parsePanelMessage({ type: 'editEmail', id: 'a1' }), { type: 'editEmail', id: 'a1' });
+  assert.deepStrictEqual(parsePanelMessage({ type: 'setGlobalIdentity', id: 'a1' }), { type: 'setGlobalIdentity', id: 'a1' });
   assert.deepStrictEqual(parsePanelMessage({ type: 'unbind', key: 'c:/repo' }), { type: 'unbind', key: 'c:/repo' });
   assert.deepStrictEqual(parsePanelMessage({ type: 'reauth', id: 'a1', extra: 1 }), { type: 'reauth', id: 'a1' });
 });

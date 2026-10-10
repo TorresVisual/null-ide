@@ -6,6 +6,8 @@ import * as os from 'node:os';
 import * as vscode from 'vscode';
 import { validateNewAccount } from '../accountInput';
 import { AccountStore } from '../accountStore';
+import { runGit } from '../git';
+import { applyGlobalIdentity } from '../globalIdentity';
 import { ProjectBinding } from '../projectBinding';
 import { fingerprintOf } from '../sshKeyOps';
 import { Account } from '../types';
@@ -84,6 +86,7 @@ export class AccountsPanel {
         case 'unbind': await this.deps.bindings.unbind(msg.key); break;
         case 'remove': await this.remove(msg.id); break;
         case 'editEmail': await this.editEmail(msg.id); break;
+        case 'setGlobalIdentity': await this.setGlobalIdentity(msg.id); break;
         case 'generateKey': await this.deps.keys.generate(msg.id); break;
         case 'attachKey': await this.deps.keys.attach(msg.id); break;
         case 'copyPublicKey': await this.deps.keys.copyPublic(msg.id); break;
@@ -104,6 +107,12 @@ export class AccountsPanel {
     const { message, detail } = removeConfirmation(account, used);
     if (await vscode.window.showWarningMessage(message, { modal: true, detail }, 'Remove') !== 'Remove') { return; }
     await this.deps.accounts.remove(id); // extension.ts prunes the now-dangling bindings
+  }
+
+  private async setGlobalIdentity(id: string): Promise<void> {
+    const account = this.deps.accounts.get(id);
+    if (!account) { return; }
+    void vscode.window.showInformationMessage(`Null Accounts: ${await applyGlobalIdentity(runGit, account, os.tmpdir())}`);
   }
 
   private async editEmail(id: string): Promise<void> {

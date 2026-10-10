@@ -59,6 +59,7 @@ function render(rows) {
     }
     actions.append(
       button('Edit email', () => vscode.postMessage({ type: 'editEmail', id: row.id })),
+      button('Set as global git identity', () => vscode.postMessage({ type: 'setGlobalIdentity', id: row.id })),
       button('Remove', () => vscode.postMessage({ type: 'remove', id: row.id }), 'danger'),
     );
     const projects = el('div', 'projects');
