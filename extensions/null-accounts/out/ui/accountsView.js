@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.buildRows = buildRows;
 exports.removeConfirmation = removeConfirmation;
 const node_path_1 = __importDefault(require("node:path"));
+const gitPlan_1 = require("../gitPlan");
 /** Everything the panel shows, as plain data. Deliberately copies display fields only. */
 function buildRows(accounts, entries, resolve, needsReauth = () => false, keys = new Map()) {
     return accounts.map(a => ({
@@ -13,6 +14,7 @@ function buildRows(accounts, entries, resolve, needsReauth = () => false, keys =
         provider: a.provider,
         host: a.host,
         username: a.username,
+        gitName: (0, gitPlan_1.gitNameOf)(a),
         email: a.email,
         authMethod: a.authMethod,
         needsReauth: needsReauth(a.id),
