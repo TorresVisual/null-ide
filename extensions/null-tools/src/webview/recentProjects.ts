@@ -35,21 +35,34 @@ function compareProjects(sort: ProjectSort): (left: LauncherProject, right: Laun
   return (left, right) => right.timestamp - left.timestamp;
 }
 
-function projectSections(projects: LauncherProject[], query: string, sort: ProjectSort): Array<{ kind: 'pinned' | 'directory'; title: string; projects: LauncherProject[] }> {
+type ProjectSection = { kind: 'pinned' | 'recent' | 'directory'; title: string; projects: LauncherProject[] };
+
+function recencyTitle(timestamp: number, now: number): string {
+  const startOfToday = new Date(now).setHours(0, 0, 0, 0);
+  const day = 86_400_000;
+  if (timestamp >= startOfToday) return 'Today';
+  if (timestamp >= startOfToday - day) return 'Yesterday';
+  if (timestamp >= startOfToday - 6 * day) return 'This week';
+  return 'Earlier';
+}
+
+function projectSections(projects: LauncherProject[], query: string, sort: ProjectSort, now = Date.now()): ProjectSection[] {
   const needle = searchable(query.trim());
   const filtered = projects.filter(project => !needle || searchable(project.label).includes(needle) || searchable(project.path).includes(needle));
   const ordered = [...filtered].sort(compareProjects(sort));
   const pinned = ordered.filter(project => project.pinned);
-  const directories = new Map<string, LauncherProject[]>();
-  for (const project of ordered.filter(project => !project.pinned)) {
-    const directory = projectDirectory(project.path);
-    const group = directories.get(directory) ?? [];
+  const rest = ordered.filter(project => !project.pinned);
+  const groups = new Map<string, LauncherProject[]>();
+  const kind = sort === 'location' ? 'directory' : 'recent';
+  for (const project of rest) {
+    const title = sort === 'location' ? projectDirectory(project.path) : sort === 'name' ? 'Projects' : recencyTitle(project.timestamp, now);
+    const group = groups.get(title) ?? [];
     group.push(project);
-    directories.set(directory, group);
+    groups.set(title, group);
   }
   return [
     ...(pinned.length ? [{ kind: 'pinned' as const, title: 'Pinned', projects: pinned }] : []),
-    ...[...directories].map(([title, groupedProjects]) => ({ kind: 'directory' as const, title, projects: groupedProjects })),
+    ...[...groups].map(([title, groupedProjects]) => ({ kind: kind as 'recent' | 'directory', title, projects: groupedProjects })),
   ];
 }
 
@@ -61,4 +74,21 @@ function relativeProjectTime(timestamp: number, now = Date.now()): string {
   if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
   const days = Math.floor(hours / 24);
   return `${days} day${days === 1 ? '' : 's'} ago`;
+}
+
+/** Row-sized age: "now", "5m", "3h", "2d", "6w". */
+function shortProjectTime(timestamp: number, now = Date.now()): string {
+  const minutes = Math.max(0, Math.floor((now - timestamp) / 60_000));
+  if (minutes < 1) return 'now';
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  return days < 14 ? `${days}d` : `${Math.floor(days / 7)}w`;
+}
+
+/** "3h 12m", "45m", "0m". */
+function formatDuration(ms: number): string {
+  const minutes = Math.max(0, Math.floor(ms / 60_000));
+  return minutes < 60 ? `${minutes}m` : `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, '0')}m`;
 }
