@@ -4,6 +4,7 @@ import * as crypto from 'crypto';
 import * as vscode from 'vscode';
 import { ActivityService, ActivitySettings, normalizeSettings } from './activityService';
 import { registerCommands } from './commands';
+import { DashboardPanel } from './dashboardPanel';
 import { startHeartbeatSource } from './heartbeatSource';
 import { IntervalStore } from './intervalStore';
 import { resolveProject } from './projectIdentity';
@@ -24,6 +25,7 @@ export function activate(context: vscode.ExtensionContext): NullActivityApi {
   const service = new ActivityService({ store, resolveProject, settings: readSettings });
   service.setFocused(vscode.window.state.focused);
   const statusBar = new StatusBar(service);
+  const dashboard = new DashboardPanel(context, service, (message) => output.appendLine(message));
 
   const timers = [setInterval(() => service.tick(), 15_000), setInterval(() => service.flush(), 30_000)];
 
@@ -31,6 +33,7 @@ export function activate(context: vscode.ExtensionContext): NullActivityApi {
     output,
     service,
     statusBar,
+    dashboard,
     startHeartbeatSource(service),
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration('null-activity')) {
@@ -40,7 +43,7 @@ export function activate(context: vscode.ExtensionContext): NullActivityApi {
     }),
     { dispose: () => timers.forEach(clearInterval) },
   );
-  registerCommands(context, service, storageDir);
+  registerCommands(context, service, storageDir, dashboard);
 
   // Expose the read/session API only; deletion stays behind the user-confirmed commands.
   return {

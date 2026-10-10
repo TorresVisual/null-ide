@@ -10,6 +10,7 @@
   "activationEvents": ["onStartupFinished"],
   "contributes": {
     "commands": [
+      { "command": "null-activity.openDashboard", "title": "Null Activity: Open Dashboard" },
       { "command": "null-activity.showTrackedData", "title": "Null Activity: Show Tracked Data" },
       { "command": "null-activity.deleteRange", "title": "Null Activity: Delete Tracked Data for a Range…" },
       { "command": "null-activity.deleteAll", "title": "Null Activity: Delete All Tracked Data…" }

@@ -10,12 +10,19 @@ interface RangePick extends vscode.QuickPickItem {
   id: RangeChoice | 'custom';
 }
 
-export function registerCommands(context: vscode.ExtensionContext, service: ActivityService, storageDir: string): void {
+export function registerCommands(
+  context: vscode.ExtensionContext,
+  service: ActivityService,
+  storageDir: string,
+  dashboard: { reveal(): void },
+): void {
   const report = () => trackedDataReport({ storageDir, enabled: service.enabled, months: service.getMonthlyTotals() });
 
   context.subscriptions.push(
     // A content provider is read-only by construction; a fresh query per call forces a fresh read.
     vscode.workspace.registerTextDocumentContentProvider(SCHEME, { provideTextDocumentContent: report }),
+
+    vscode.commands.registerCommand('null-activity.openDashboard', () => dashboard.reveal()),
 
     vscode.commands.registerCommand('null-activity.showTrackedData', async () => {
       const uri = vscode.Uri.from({ scheme: SCHEME, path: '/Tracked data.txt', query: String(Date.now()) });
