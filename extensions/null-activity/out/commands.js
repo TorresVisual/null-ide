@@ -37,11 +37,11 @@ exports.registerCommands = registerCommands;
 const vscode = __importStar(require("vscode"));
 const privacy_1 = require("./privacy");
 const SCHEME = 'null-activity';
-function registerCommands(context, service, storageDir) {
+function registerCommands(context, service, storageDir, dashboard) {
     const report = () => (0, privacy_1.trackedDataReport)({ storageDir, enabled: service.enabled, months: service.getMonthlyTotals() });
     context.subscriptions.push(
     // A content provider is read-only by construction; a fresh query per call forces a fresh read.
-    vscode.workspace.registerTextDocumentContentProvider(SCHEME, { provideTextDocumentContent: report }), vscode.commands.registerCommand('null-activity.showTrackedData', async () => {
+    vscode.workspace.registerTextDocumentContentProvider(SCHEME, { provideTextDocumentContent: report }), vscode.commands.registerCommand('null-activity.openDashboard', () => dashboard.reveal()), vscode.commands.registerCommand('null-activity.showTrackedData', async () => {
         const uri = vscode.Uri.from({ scheme: SCHEME, path: '/Tracked data.txt', query: String(Date.now()) });
         await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(uri), { preview: true });
     }), vscode.commands.registerCommand('null-activity.deleteRange', async () => {
