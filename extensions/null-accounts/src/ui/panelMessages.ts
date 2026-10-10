@@ -4,7 +4,7 @@ export type PanelMessage =
   | { type: 'ready' }
   | { type: 'add' }
   | { type: 'remove'; id: string }
-  | { type: 'editEmail' | 'setGlobalIdentity'; id: string }
+  | { type: 'editEmail' | 'editName' | 'setGlobalIdentity'; id: string }
   | { type: 'reauth'; id: string }
   | { type: 'unbind'; key: string }
   | { type: 'generateKey' | 'attachKey' | 'copyPublicKey' | 'uploadKey' | 'testKey' | 'removeKey'; id: string }
@@ -23,6 +23,7 @@ export function parsePanelMessage(raw: unknown): PanelMessage | undefined {
       return { type };
     case 'remove':
     case 'editEmail':
+    case 'editName':
     case 'setGlobalIdentity':
     case 'reauth':
     case 'generateKey':

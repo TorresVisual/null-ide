@@ -10,6 +10,8 @@ export interface Account {
   host: string;
   username: string;
   email: string;
+  /** Author name for commits (`user.name`) when it should differ from the login; defaults to `username`. */
+  gitName?: string;
   authMethod: AuthMethod;
   /** Private key git uses over SSH for this account. Required for "ssh" accounts; any other account may have one too. */
   sshKeyPath?: string;

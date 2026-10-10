@@ -69,3 +69,9 @@ test('validateNewAccount keeps a trimmed externalId and drops a blank one', () =
   assert.strictEqual(validateNewAccount({ ...base, externalId: ' 583231 ' }).externalId, '583231');
   assert.strictEqual('externalId' in validateNewAccount({ ...base, externalId: '  ' }), false);
 });
+
+test('a git name is trimmed and kept; a blank one is dropped', () => {
+  const base = { provider: 'github' as const, host: 'github.com', username: 'octocat', email: 'o@example.com', authMethod: 'oauth' as const };
+  assert.strictEqual(validateNewAccount({ ...base, gitName: '  Octo Cat ' }).gitName, 'Octo Cat');
+  assert.strictEqual('gitName' in validateNewAccount({ ...base, gitName: '  ' }), false);
+});

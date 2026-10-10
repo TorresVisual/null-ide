@@ -7,6 +7,7 @@ import * as vscode from 'vscode';
 import { validateNewAccount } from '../accountInput';
 import { AccountStore } from '../accountStore';
 import { runGit } from '../git';
+import { gitNameOf } from '../gitPlan';
 import { applyGlobalIdentity } from '../globalIdentity';
 import { ProjectBinding } from '../projectBinding';
 import { fingerprintOf } from '../sshKeyOps';
@@ -85,6 +86,7 @@ export class AccountsPanel {
         case 'reauth': await this.deps.reauth(msg.id); break;
         case 'unbind': await this.deps.bindings.unbind(msg.key); break;
         case 'remove': await this.remove(msg.id); break;
+        case 'editName': await this.editName(msg.id); break;
         case 'editEmail': await this.editEmail(msg.id); break;
         case 'setGlobalIdentity': await this.setGlobalIdentity(msg.id); break;
         case 'generateKey': await this.deps.keys.generate(msg.id); break;
@@ -113,6 +115,18 @@ export class AccountsPanel {
     const account = this.deps.accounts.get(id);
     if (!account) { return; }
     void vscode.window.showInformationMessage(`Null Accounts: ${await applyGlobalIdentity(runGit, account, os.tmpdir())}`);
+  }
+
+  private async editName(id: string): Promise<void> {
+    const account = this.deps.accounts.get(id);
+    if (!account) { return; }
+    const name = await vscode.window.showInputBox({
+      title: `Git name for ${account.username}`,
+      prompt: 'Name on commits in repos bound to this account (git user.name). Leave empty to use the username.',
+      value: gitNameOf(account),
+    });
+    if (name === undefined || name.trim() === gitNameOf(account)) { return; }
+    await this.deps.accounts.update(id, { gitName: name.trim() === account.username ? '' : name }); // empty clears it
   }
 
   private async editEmail(id: string): Promise<void> {

@@ -68,3 +68,9 @@ test('signCommits without a key plans no signing', () => {
   const stale: Account = { ...github, signCommits: true };
   assert.ok(!planFor(stale, '/home/me').config.some(e => e.key === 'commit.gpgsign'));
 });
+
+test('user.name is the git name when the account has one, else the username', () => {
+  const name = (a: Account): string | undefined => planFor(a, '/home/me').config.find(e => e.key === 'user.name')?.value;
+  assert.strictEqual(name({ ...github, gitName: 'Octo Cat' }), 'Octo Cat');
+  assert.strictEqual(name(github), 'octocat');
+});

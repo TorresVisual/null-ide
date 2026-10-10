@@ -21,6 +21,9 @@ export function expandKeyPath(raw: string, home: string): string {
   return expanded.replace(/\\/g, '/');
 }
 
+/** The name commits are authored under. */
+export const gitNameOf = (account: Account): string => account.gitName || account.username;
+
 export const sshKeyFile = (account: Account, home: string): string => expandKeyPath(account.sshKeyPath ?? '', home);
 
 /** The credential entry for a token account (GitHub OAuth, GitLab OAuth or access token); SSH accounts have none. */
@@ -33,7 +36,7 @@ const shellQuote = (s: string): string => `'${s.replace(/'/g, `'\\''`)}'`;
 
 export function planFor(account: Account, home: string): WiringPlan {
   const config: ConfigEntry[] = [
-    { key: 'user.name', value: account.username },
+    { key: 'user.name', value: gitNameOf(account) },
     { key: 'user.email', value: account.email },
   ];
   const keyFile = sshKeyFile(account, home);
