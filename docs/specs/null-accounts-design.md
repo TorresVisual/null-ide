@@ -111,6 +111,7 @@ system config are never modified. Unbinding removes the keys this extension set
 |---|---|
 | any | `user.name` = username, `user.email` = account email |
 | SSH | `core.sshCommand` = `ssh -i '<sshKeyPath>' -o IdentitiesOnly=yes` (single-quoted, `/` separators, leading `~/` expanded) |
+| SSH key + `signCommits` | `gpg.format` = `ssh`, `user.signingkey` = private key path, `commit.gpgsign` = `true` (see `null-accounts-ssh-keys-design.md`); any account with a key also gets the SSH row's `core.sshCommand` |
 | HTTPS / OAuth | `credential.https://<host>.username` = username; token stored in the OS credential store via `git credential approve` for (host, username) |
 
 Rationale for the HTTPS/OAuth row: Git then selects the right credential for that
@@ -199,3 +200,4 @@ import it as an account so existing users are not logged out.
 5. **GitLab** — device flow, refresh, self-hosted host. — landed (`docs/plans/null-accounts-phase5-gitlab.md`)
 6. **Git wiring** — identity, SSH, HTTPS/OAuth credential store, cleanup on unbind. — landed (`docs/plans/null-accounts-phase6-git-wiring.md`)
 7. **Integration** — dashboard shows each project's account; docs; verify-local spec.
+8. **SSH keys** — create, fingerprint, upload, test, sign commits, delete; keys on any account (`null-accounts-ssh-keys-design.md`, `docs/plans/null-accounts-phase8-ssh-keys.md`).
