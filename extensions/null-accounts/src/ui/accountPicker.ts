@@ -8,13 +8,12 @@ import { normalizeHost, validateNewAccount } from '../accountInput';
 import { AccountStore } from '../accountStore';
 import { addOrRefresh, addOrReuse } from '../accountSetup';
 import { originUrl } from '../git';
-import { expandKeyPath } from '../gitPlan';
 import { ProjectBinding } from '../projectBinding';
 import { GithubProvider } from '../providers/github';
 import { DeviceFlowUi, GITLAB_COM, GitlabProvider } from '../providers/gitlab';
 import { OAuthError } from '../providers/gitlabOAuth';
 import { buildSshAccount, normalizeSshHost } from '../sshAccount';
-import { checkSsh } from '../sshCheck';
+import { generateKey } from '../sshKeyOps';
 import { suggestAccount } from '../suggest';
 import { Account } from '../types';
 import { KeyActions } from './keyActions';
@@ -102,19 +101,6 @@ const problemOf = (check: (value: string) => unknown) => (value: string): string
   try { check(value); return undefined; } catch (err) { return (err as Error).message; }
 };
 
-/** What the server says about the key, shown after the account is saved: a failed test never blocks saving. */
-async function reportSshTest(account: Account): Promise<void> {
-  const check = await checkSsh(account.host, expandKeyPath(account.sshKeyPath ?? '', os.homedir()));
-  const who = `${account.username}@${account.host}`;
-  if (!check.ok) {
-    void vscode.window.showWarningMessage(`Saved ${who}, but the SSH test failed: ${check.message}`);
-  } else if (check.user && check.user.toLowerCase() !== account.username.toLowerCase()) {
-    void vscode.window.showWarningMessage(`Saved ${who}, but ${account.host} says this key belongs to ${check.user}, not ${account.username}.`);
-  } else {
-    void vscode.window.showInformationMessage(`${check.message} Git in projects using ${who} will use this key.`);
-  }
-}
-
 /** An account that signs in with an SSH key only: no OAuth, no token. Asks for the server, who you are there, and the key file. */
 async function addSshAccount(deps: PickerDeps): Promise<Account | undefined> {
   const host = await vscode.window.showInputBox({
@@ -138,17 +124,38 @@ async function addSshAccount(deps: PickerDeps): Promise<Account | undefined> {
     ignoreFocusOut: true,
   });
   if (email === undefined) { return undefined; }
-  const keys = await vscode.window.showOpenDialog({
-    title: `Private SSH key for ${normalizeSshHost(host)}`,
-    openLabel: 'Use this key',
-    canSelectMany: false,
-    canSelectFolders: false,
-    defaultUri: vscode.Uri.file(path.join(os.homedir(), '.ssh')),
-  });
-  if (!keys?.length) { return undefined; }
+  const mode = await vscode.window.showQuickPick(
+    [
+      { label: '$(key) Generate a new key', description: 'recommended — no passphrase, kept in ~/.ssh/null-accounts', generate: true },
+      { label: '$(file) Use an existing key…', description: 'a private key file you already have', generate: false },
+    ],
+    { placeHolder: 'Which SSH key should this account use?', ignoreFocusOut: true },
+  );
+  if (!mode) { return undefined; }
+  let keyPath: string;
+  if (mode.generate) {
+    try {
+      keyPath = await generateKey({ home: os.homedir(), host: normalizeSshHost(host), username: username.trim(), email: email.trim() });
+    } catch (err) {
+      reportFailure('create the SSH key', err);
+      return undefined;
+    }
+  } else {
+    const picked = await vscode.window.showOpenDialog({
+      title: `Private SSH key for ${normalizeSshHost(host)}`,
+      openLabel: 'Use this key',
+      canSelectMany: false,
+      canSelectFolders: false,
+      defaultUri: vscode.Uri.file(path.join(os.homedir(), '.ssh')),
+    });
+    if (!picked?.length) { return undefined; }
+    keyPath = picked[0].fsPath;
+  }
   try {
-    const account = await deps.accounts.add(buildSshAccount({ host, username, email, keyPath: keys[0].fsPath }, os.homedir(), fs.existsSync));
-    void reportSshTest(account).catch(() => { /* the test is a courtesy; the account is already saved */ });
+    const account = await deps.accounts.add(buildSshAccount({ host, username, email, keyPath }, os.homedir(), fs.existsSync));
+    // A new key is not on the server yet, so testing it now would only fail: offer to put it there first.
+    const next = mode.generate ? deps.keys.afterNewKey(account.id) : deps.keys.test(account.id);
+    void next.catch(err => reportFailure('finish setting up the key', err));
     return account;
   } catch (err) {
     reportFailure('add the SSH account', err);
