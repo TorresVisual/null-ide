@@ -45,7 +45,7 @@ function registerAccountsMenu(api, avatarOf) {
         return folder ? api.getAccountForFolder(folder.uri)?.id : undefined;
     };
     const refresh = () => {
-        void (0, accountsMenuActions_1.publishAccountsMenu)(() => (0, accountsMenuModel_1.accountsMenuModel)(api.getAccounts(), currentId(), avatarOf), setContext);
+        void (0, accountsMenuActions_1.publishAccountsMenu)(() => (0, accountsMenuModel_1.accountsMenuModel)(api.getAccounts(), currentId(), avatarOf, vscode.workspace.workspaceFolders?.[0]?.name), setContext);
         void setContext(accountsMenuModel_1.AVATAR_CONTEXT_KEY, (0, accountsMenuModel_1.activityAvatar)(api.getAccounts(), currentId(), avatarOf));
     };
     refresh();

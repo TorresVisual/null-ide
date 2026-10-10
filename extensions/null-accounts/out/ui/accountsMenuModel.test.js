@@ -7,20 +7,26 @@ const node_assert_1 = __importDefault(require("node:assert"));
 const node_test_1 = require("node:test");
 const accountsMenuModel_1 = require("./accountsMenuModel");
 const acct = (id, host = 'github.com') => ({ id, provider: 'github', host, username: id, email: `${id}@e.com`, authMethod: 'oauth' });
-const ADD = { label: 'Add Account…', command: accountsMenuModel_1.ADD_ACCOUNT_COMMAND };
-const MANAGE = { label: 'Manage Accounts…', command: accountsMenuModel_1.MANAGE_COMMAND };
+const ADD = { label: 'Add Account…', icon: 'add', command: accountsMenuModel_1.ADD_ACCOUNT_COMMAND };
+const MANAGE = { label: 'Manage Accounts…', icon: 'gear', command: accountsMenuModel_1.MANAGE_COMMAND };
 (0, node_test_1.test)('no accounts: just Add and Manage, no leading separator', () => {
     node_assert_1.default.deepStrictEqual((0, accountsMenuModel_1.accountsMenuModel)([]), [ADD, MANAGE]);
 });
 (0, node_test_1.test)('each account becomes a row that binds the folder to it, then a separator, then Add and Manage', () => {
     const m = (0, accountsMenuModel_1.accountsMenuModel)([acct('octo'), acct('hub', 'ghe.example.org')]);
     node_assert_1.default.deepStrictEqual(m, [
-        { label: 'octo', description: 'github.com', checked: false, command: accountsMenuModel_1.BIND_COMMAND, args: ['octo'] },
-        { label: 'hub', description: 'ghe.example.org', checked: false, command: accountsMenuModel_1.BIND_COMMAND, args: ['hub'] },
+        { label: 'octo', description: 'github.com', provider: 'github', checked: false, command: accountsMenuModel_1.BIND_COMMAND, args: ['octo'] },
+        { label: 'hub', description: 'ghe.example.org', provider: 'github', checked: false, command: accountsMenuModel_1.BIND_COMMAND, args: ['hub'] },
         'separator',
         ADD,
         MANAGE,
     ]);
+});
+(0, node_test_1.test)('a Project heading leads the accounts when a folder is open, and never without accounts', () => {
+    const m = (0, accountsMenuModel_1.accountsMenuModel)([acct('a1')], undefined, undefined, 'my-repo');
+    node_assert_1.default.deepStrictEqual(m[0], { label: 'Project: my-repo', enabled: false, command: accountsMenuModel_1.MANAGE_COMMAND });
+    node_assert_1.default.deepStrictEqual((0, accountsMenuModel_1.accountsMenuModel)([], undefined, undefined, 'my-repo'), [ADD, MANAGE]);
+    node_assert_1.default.ok(!(0, accountsMenuModel_1.accountsMenuModel)([acct('a1')]).some(e => e !== 'separator' && e.enabled === false));
 });
 (0, node_test_1.test)('only the current account is checked', () => {
     const m = (0, accountsMenuModel_1.accountsMenuModel)([acct('a1'), acct('a2'), acct('a3')], 'a2');
