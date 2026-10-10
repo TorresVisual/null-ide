@@ -78,7 +78,7 @@ const octocat = {
     const { deps, calls } = makeDeps({ session: session('vsc-583231', 'octocat', 'ghp_x') });
     const provider = new github_1.GithubProvider(deps);
     node_assert_1.default.strictEqual(await provider.getToken(octocat, ['read:org', 'repo']), 'ghp_x');
-    node_assert_1.default.deepStrictEqual(calls[0].scopes, ['repo', 'user:email', 'read:org']);
+    node_assert_1.default.deepStrictEqual(calls[0].scopes, [...github_1.GITHUB_SCOPES, 'read:org']);
     node_assert_1.default.deepStrictEqual(calls[0].options, { account: { id: 'vsc-583231', label: 'octocat' }, silent: true });
     await provider.getToken(octocat, undefined, { interactive: true });
     node_assert_1.default.deepStrictEqual(calls[1].scopes, github_1.GITHUB_SCOPES);

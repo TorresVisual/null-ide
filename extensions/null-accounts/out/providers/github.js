@@ -2,8 +2,8 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.GithubProvider = exports.GITHUB_SCOPES = void 0;
 exports.fetchGithub = fetchGithub;
-/** `repo` is what the Issues panel needs; `user:email` lets us read the primary email. */
-exports.GITHUB_SCOPES = ['repo', 'user:email'];
+/** `repo` is what the Issues panel needs; `user:email` lets us read the primary email; `workflow` lets the token we store for git push `.github/workflows` files. */
+exports.GITHUB_SCOPES = ['repo', 'user:email', 'workflow'];
 /** The real `GithubDeps.api`. */
 async function fetchGithub(path, token) {
     const res = await fetch(`https://api.github.com${path}`, {
