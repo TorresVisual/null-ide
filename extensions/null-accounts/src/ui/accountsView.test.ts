@@ -71,3 +71,9 @@ test('a key row is attached to its account only when one is supplied', () => {
   assert.ok(!('key' in rows[0]));
   assert.deepStrictEqual(rows[1].key, key);
 });
+
+test('a row carries the account picture only when one is supplied', () => {
+  const rows = buildRows([acct('a1'), acct('a2')], [], exists, () => false, new Map(), id => (id === 'a2' ? 'data:image/png;base64,AQID' : undefined));
+  assert.ok(!('avatar' in rows[0]));
+  assert.strictEqual(rows[1].avatar, 'data:image/png;base64,AQID');
+});

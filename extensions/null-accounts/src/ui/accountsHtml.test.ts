@@ -5,6 +5,10 @@ import { test } from 'node:test';
 import { CLIENT_SCRIPT } from './accountsClient';
 import { buildHtml } from './accountsHtml';
 
+test('images may only be data URIs', () => {
+  assert.match(buildHtml('n'), /img-src data:;/);
+});
+
 test('the CSP is nonce-only and the same nonce guards the style and script tags', () => {
   const html = buildHtml('abc123');
   assert.match(html, /Content-Security-Policy[^>]*default-src 'none'/);

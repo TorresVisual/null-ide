@@ -31,6 +31,10 @@ export interface PanelDeps {
   onDidChange: vscode.Event<void>;
   /** The SSH key buttons (ui/keyActions). */
   keys: KeyActions;
+  /** Profile picture of an account as a `data:` URI, if one has been fetched. */
+  avatarOf(id: string): string | undefined;
+  /** Where the extension's media (the tab icon) lives. */
+  extensionUri: vscode.Uri;
 }
 
 /** Real-cased path when the folder exists (binding keys are lower-cased on Windows). */
@@ -54,6 +58,10 @@ export class AccountsPanel {
       vscode.ViewColumn.One,
       { enableScripts: true, localResourceRoots: [] },
     );
+    panel.iconPath = {
+      light: vscode.Uri.joinPath(deps.extensionUri, 'media', 'accounts-light.svg'),
+      dark: vscode.Uri.joinPath(deps.extensionUri, 'media', 'accounts-dark.svg'),
+    };
     AccountsPanel.current = new AccountsPanel(panel, deps);
   }
 
@@ -72,7 +80,7 @@ export class AccountsPanel {
     const accounts = this.deps.accounts.list();
     const keys = await describeKeys(accounts, { home: os.homedir(), exists: fs.existsSync, fingerprintOf: file => fingerprintOf(file) });
     if (turn !== this.seq) { return; } // a newer state is already on its way
-    const rows = buildRows(accounts, this.deps.bindings.entries(), resolveFolder, id => this.deps.needsReauth(id), keys);
+    const rows = buildRows(accounts, this.deps.bindings.entries(), resolveFolder, id => this.deps.needsReauth(id), keys, id => this.deps.avatarOf(id));
     void this.panel.webview.postMessage({ type: 'state', rows });
   }
 

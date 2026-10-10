@@ -22,6 +22,8 @@ export interface AccountRow {
   /** The author name commits get (`user.name`): the account's `gitName`, else its username. */
   gitName: string;
   email: string;
+  /** `data:` URI of the profile picture; absent until one has been fetched. */
+  avatar?: string;
   authMethod: Account['authMethod'];
   /** The sign-in has expired and cannot be refreshed; the panel offers Re-authenticate. */
   needsReauth: boolean;
@@ -39,6 +41,7 @@ export function buildRows(
   resolve: ResolveFolder,
   needsReauth: (id: string) => boolean = () => false,
   keys: ReadonlyMap<string, KeyRow> = new Map(),
+  avatarOf: (id: string) => string | undefined = () => undefined,
 ): AccountRow[] {
   return accounts.map(a => ({
     id: a.id,
@@ -47,6 +50,7 @@ export function buildRows(
     username: a.username,
     gitName: gitNameOf(a),
     email: a.email,
+    ...(avatarOf(a.id) ? { avatar: avatarOf(a.id) } : {}),
     authMethod: a.authMethod,
     needsReauth: needsReauth(a.id),
     ...(keys.has(a.id) ? { key: keys.get(a.id) } : {}),

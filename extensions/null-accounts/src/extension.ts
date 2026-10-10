@@ -4,6 +4,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as vscode from 'vscode';
 import { AccountStore } from './accountStore';
+import { AvatarCache, fetchAvatarImage, fetchAvatarJson } from './avatars';
 import { findAccount, importExisting } from './accountSetup';
 import { createApi, NullAccountsApi } from './api';
 import { ChangeEmitter } from './changeEmitter';
@@ -68,6 +69,18 @@ export function activate(context: vscode.ExtensionContext): NullAccountsApi {
     gitlab.onDidChange(() => changed.fire()),
   );
 
+  const avatars = new AvatarCache({
+    meta: context.globalState,
+    accounts: () => store.list(),
+    getJson: fetchAvatarJson,
+    getImage: fetchAvatarImage,
+  });
+  context.subscriptions.push(
+    store.onDidChange(() => { void avatars.refresh(); }),
+    avatars.onDidChange(() => changed.fire()),
+  );
+  void avatars.refresh();
+
   const home = os.homedir();
   // `api` is created below; the actions only call it later, from a button.
   const keys = new KeyActions({
@@ -105,6 +118,8 @@ export function activate(context: vscode.ExtensionContext): NullAccountsApi {
         reauth: id => reauthenticate(pickerDeps, id),
         needsReauth: id => gitlab.needsReauth(id),
         onDidChange: changed.event,
+        avatarOf: id => avatars.get(id),
+        extensionUri: context.extensionUri,
       })),
     vscode.commands.registerCommand(SWITCH_COMMAND, async () => {
       const folder = vscode.workspace.workspaceFolders?.[0];
@@ -124,7 +139,7 @@ export function activate(context: vscode.ExtensionContext): NullAccountsApi {
     }),
     vscode.commands.registerCommand(ADD_ACCOUNT_COMMAND, async () => { await addAccount(pickerDeps); }),
     registerStatusBar(api),
-    registerAccountsMenu(api),
+    registerAccountsMenu(api, id => avatars.get(id)),
   );
 
   if (context.extensionMode === vscode.ExtensionMode.Test) {
