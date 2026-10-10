@@ -40,6 +40,7 @@ const os = __importStar(require("node:os"));
 const vscode = __importStar(require("vscode"));
 const accountInput_1 = require("../accountInput");
 const git_1 = require("../git");
+const gitPlan_1 = require("../gitPlan");
 const globalIdentity_1 = require("../globalIdentity");
 const sshKeyOps_1 = require("../sshKeyOps");
 const accountsHtml_1 = require("./accountsHtml");
@@ -112,6 +113,9 @@ class AccountsPanel {
                 case 'remove':
                     await this.remove(msg.id);
                     break;
+                case 'editName':
+                    await this.editName(msg.id);
+                    break;
                 case 'editEmail':
                     await this.editEmail(msg.id);
                     break;
@@ -163,6 +167,21 @@ class AccountsPanel {
             return;
         }
         void vscode.window.showInformationMessage(`Null Accounts: ${await (0, globalIdentity_1.applyGlobalIdentity)(git_1.runGit, account, os.tmpdir())}`);
+    }
+    async editName(id) {
+        const account = this.deps.accounts.get(id);
+        if (!account) {
+            return;
+        }
+        const name = await vscode.window.showInputBox({
+            title: `Git name for ${account.username}`,
+            prompt: 'Name on commits in repos bound to this account (git user.name). Leave empty to use the username.',
+            value: (0, gitPlan_1.gitNameOf)(account),
+        });
+        if (name === undefined || name.trim() === (0, gitPlan_1.gitNameOf)(account)) {
+            return;
+        }
+        await this.deps.accounts.update(id, { gitName: name.trim() === account.username ? '' : name }); // empty clears it
     }
     async editEmail(id) {
         const account = this.deps.accounts.get(id);

@@ -60,4 +60,9 @@ const base = {
     node_assert_1.default.strictEqual((0, accountInput_1.validateNewAccount)({ ...base, externalId: ' 583231 ' }).externalId, '583231');
     node_assert_1.default.strictEqual('externalId' in (0, accountInput_1.validateNewAccount)({ ...base, externalId: '  ' }), false);
 });
+(0, node_test_1.test)('a git name is trimmed and kept; a blank one is dropped', () => {
+    const base = { provider: 'github', host: 'github.com', username: 'octocat', email: 'o@example.com', authMethod: 'oauth' };
+    node_assert_1.default.strictEqual((0, accountInput_1.validateNewAccount)({ ...base, gitName: '  Octo Cat ' }).gitName, 'Octo Cat');
+    node_assert_1.default.strictEqual('gitName' in (0, accountInput_1.validateNewAccount)({ ...base, gitName: '  ' }), false);
+});
 //# sourceMappingURL=accountInput.test.js.map

@@ -59,6 +59,7 @@ function render(rows) {
       actions.append(button('Re-authenticate', () => vscode.postMessage({ type: 'reauth', id: row.id }), 'primary'));
     }
     actions.append(
+      button('Edit git name', () => vscode.postMessage({ type: 'editName', id: row.id })),
       button('Edit email', () => vscode.postMessage({ type: 'editEmail', id: row.id })),
       button('Set as global git identity', () => vscode.postMessage({ type: 'setGlobalIdentity', id: row.id })),
       button('Remove', () => vscode.postMessage({ type: 'remove', id: row.id }), 'danger'),

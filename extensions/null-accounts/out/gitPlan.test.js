@@ -60,4 +60,9 @@ const github = {
     const stale = { ...github, signCommits: true };
     node_assert_1.default.ok(!(0, gitPlan_1.planFor)(stale, '/home/me').config.some(e => e.key === 'commit.gpgsign'));
 });
+(0, node_test_1.test)('user.name is the git name when the account has one, else the username', () => {
+    const name = (a) => (0, gitPlan_1.planFor)(a, '/home/me').config.find(e => e.key === 'user.name')?.value;
+    node_assert_1.default.strictEqual(name({ ...github, gitName: 'Octo Cat' }), 'Octo Cat');
+    node_assert_1.default.strictEqual(name(github), 'octocat');
+});
 //# sourceMappingURL=gitPlan.test.js.map

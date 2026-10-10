@@ -42,6 +42,10 @@ function validateNewAccount(input) {
         email,
         authMethod: input.authMethod,
     };
+    const gitName = input.gitName?.trim();
+    if (gitName) {
+        out.gitName = gitName;
+    }
     const key = input.sshKeyPath?.trim();
     if (input.authMethod === 'ssh' && !key) {
         throw new Error('An SSH key path is required for SSH accounts.');

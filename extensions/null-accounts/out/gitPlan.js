@@ -1,6 +1,6 @@
 'use strict';
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sshKeyFile = void 0;
+exports.sshKeyFile = exports.gitNameOf = void 0;
 exports.expandKeyPath = expandKeyPath;
 exports.credentialFor = credentialFor;
 exports.planFor = planFor;
@@ -10,6 +10,9 @@ function expandKeyPath(raw, home) {
     const expanded = /^~[\\/]/.test(trimmed) ? `${home.replace(/[\\/]+$/, '')}/${trimmed.slice(2)}` : trimmed;
     return expanded.replace(/\\/g, '/');
 }
+/** The name commits are authored under. */
+const gitNameOf = (account) => account.gitName || account.username;
+exports.gitNameOf = gitNameOf;
 const sshKeyFile = (account, home) => expandKeyPath(account.sshKeyPath ?? '', home);
 exports.sshKeyFile = sshKeyFile;
 /** The credential entry for a token account (GitHub OAuth, GitLab OAuth or access token); SSH accounts have none. */
@@ -20,7 +23,7 @@ function credentialFor(account) {
 const shellQuote = (s) => `'${s.replace(/'/g, `'\\''`)}'`;
 function planFor(account, home) {
     const config = [
-        { key: 'user.name', value: account.username },
+        { key: 'user.name', value: (0, exports.gitNameOf)(account) },
         { key: 'user.email', value: account.email },
     ];
     const keyFile = (0, exports.sshKeyFile)(account, home);
