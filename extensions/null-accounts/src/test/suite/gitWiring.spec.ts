@@ -6,6 +6,7 @@ import * as fs from 'fs';
 import * as vscode from 'vscode';
 import { NullAccountsApi } from '../../api';
 import { Account, NewAccount } from '../../types';
+import { git, waitFor } from './helpers';
 
 // A GitLab access-token account: its token is the raw stored secret, so no provider or network is involved.
 const NEW_ACCOUNT: NewAccount = {
@@ -14,20 +15,6 @@ const NEW_ACCOUNT: NewAccount = {
 const TOKEN = 'glpat-integration-spec-token';
 const CREDENTIAL_KEY = `credential.https://${NEW_ACCOUNT.host}.username`;
 const HAND_SET_EMAIL = 'me@work.example';
-
-/** Output of `git <args>` in `cwd`; '' when git exits non-zero (an unset config key). */
-function git(cwd: string, ...args: string[]): string {
-  try { return execFileSync('git', args, { cwd, encoding: 'utf8' }).trim(); } catch { return ''; }
-}
-
-/** Wiring runs asynchronously after a bind or a removal, so poll instead of reading once. */
-async function waitFor(what: string, done: () => boolean): Promise<void> {
-  for (let i = 0; i < 100; i++) {
-    if (done()) { return; }
-    await new Promise(resolve => setTimeout(resolve, 100));
-  }
-  assert.fail(`timed out waiting for ${what}`);
-}
 
 suite('null-accounts git wiring', () => {
   test('binding wires the repo and the credential store; removing the account undoes both', async function () {
