@@ -4,8 +4,8 @@ import type * as vscode from 'vscode';
 import { TokenOptions, TokenProvider } from '../api';
 import { Account, NewAccount } from '../types';
 
-/** `repo` is what the Issues panel needs; `user:email` lets us read the primary email. */
-export const GITHUB_SCOPES = ['repo', 'user:email'];
+/** `repo` is what the Issues panel needs; `user:email` lets us read the primary email; `workflow` lets the token we store for git push `.github/workflows` files. */
+export const GITHUB_SCOPES = ['repo', 'user:email', 'workflow'];
 
 export interface GithubDeps {
   getSession(

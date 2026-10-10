@@ -93,7 +93,7 @@ test('getToken is silent by default, targets the account, and unions scopes with
   const { deps, calls } = makeDeps({ session: session('vsc-583231', 'octocat', 'ghp_x') });
   const provider = new GithubProvider(deps);
   assert.strictEqual(await provider.getToken(octocat, ['read:org', 'repo']), 'ghp_x');
-  assert.deepStrictEqual(calls[0].scopes, ['repo', 'user:email', 'read:org']);
+  assert.deepStrictEqual(calls[0].scopes, [...GITHUB_SCOPES, 'read:org']);
   assert.deepStrictEqual(calls[0].options, { account: { id: 'vsc-583231', label: 'octocat' }, silent: true });
 
   await provider.getToken(octocat, undefined, { interactive: true });
