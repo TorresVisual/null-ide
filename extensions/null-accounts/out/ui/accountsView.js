@@ -8,7 +8,7 @@ exports.removeConfirmation = removeConfirmation;
 const node_path_1 = __importDefault(require("node:path"));
 const gitPlan_1 = require("../gitPlan");
 /** Everything the panel shows, as plain data. Deliberately copies display fields only. */
-function buildRows(accounts, entries, resolve, needsReauth = () => false, keys = new Map(), avatarOf = () => undefined) {
+function buildRows(accounts, entries, resolve, needsReauth = () => false, keys = new Map(), avatarOf = () => undefined, defaultId) {
     return accounts.map(a => ({
         id: a.id,
         provider: a.provider,
@@ -19,6 +19,7 @@ function buildRows(accounts, entries, resolve, needsReauth = () => false, keys =
         ...(avatarOf(a.id) ? { avatar: avatarOf(a.id) } : {}),
         authMethod: a.authMethod,
         needsReauth: needsReauth(a.id),
+        isDefault: a.id === defaultId,
         ...(keys.has(a.id) ? { key: keys.get(a.id) } : {}),
         projects: entries
             .filter(([, accountId]) => accountId === a.id)

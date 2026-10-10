@@ -92,7 +92,7 @@ class AccountsPanel {
         if (turn !== this.seq) {
             return;
         } // a newer state is already on its way
-        const rows = (0, accountsView_1.buildRows)(accounts, this.deps.bindings.entries(), resolveFolder, id => this.deps.needsReauth(id), keys, id => this.deps.avatarOf(id));
+        const rows = (0, accountsView_1.buildRows)(accounts, this.deps.bindings.entries(), resolveFolder, id => this.deps.needsReauth(id), keys, id => this.deps.avatarOf(id), this.deps.bindings.defaultId());
         void this.panel.webview.postMessage({ type: 'state', rows });
     }
     async handle(raw) {
@@ -146,6 +146,9 @@ class AccountsPanel {
                     break;
                 case 'removeKey':
                     await this.deps.keys.removeKey(msg.id);
+                    break;
+                case 'setDefault':
+                    await this.deps.bindings.setDefault(msg.on ? msg.id : undefined);
                     break;
             }
         }

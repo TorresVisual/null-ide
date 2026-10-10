@@ -35,6 +35,8 @@ const panelMessages_1 = require("./panelMessages");
     }
     node_assert_1.default.deepStrictEqual((0, panelMessages_1.parsePanelMessage)({ type: 'setSigning', id: 'a1', on: true }), { type: 'setSigning', id: 'a1', on: true });
     node_assert_1.default.deepStrictEqual((0, panelMessages_1.parsePanelMessage)({ type: 'setSigning', id: 'a1', on: false }), { type: 'setSigning', id: 'a1', on: false });
+    node_assert_1.default.deepStrictEqual((0, panelMessages_1.parsePanelMessage)({ type: 'setDefault', id: 'a1', on: true }), { type: 'setDefault', id: 'a1', on: true });
+    node_assert_1.default.strictEqual((0, panelMessages_1.parsePanelMessage)({ type: 'setDefault', id: 'a1' }), undefined);
     for (const bad of [{ type: 'setSigning', id: 'a1' }, { type: 'setSigning', id: 'a1', on: 'yes' }, { type: 'setSigning', on: true }]) {
         node_assert_1.default.strictEqual((0, panelMessages_1.parsePanelMessage)(bad), undefined, JSON.stringify(bad));
     }

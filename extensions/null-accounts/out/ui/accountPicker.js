@@ -247,7 +247,7 @@ async function chooseAccountForFolder(deps, folder) {
         const origin = await (0, git_1.originUrl)(folder.fsPath);
         suggestedId = origin ? (0, suggest_1.suggestAccount)(origin, deps.accounts.list())?.id : undefined;
     }
-    const picked = await vscode.window.showQuickPick((0, pickItems_1.buildPickItems)(deps.accounts.list(), { suggestedId, currentId }), { placeHolder: `Which account should "${node_path_1.default.basename(folder.fsPath)}" use?` });
+    const picked = await vscode.window.showQuickPick((0, pickItems_1.buildPickItems)(deps.accounts.list(), { suggestedId, currentId, defaultId: deps.bindings.defaultId() }), { placeHolder: `Which account should "${node_path_1.default.basename(folder.fsPath)}" use?` });
     if (!picked) {
         return undefined;
     }

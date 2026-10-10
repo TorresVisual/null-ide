@@ -43,11 +43,13 @@ const avatars_1 = require("./avatars");
 const accountSetup_1 = require("./accountSetup");
 const api_1 = require("./api");
 const changeEmitter_1 = require("./changeEmitter");
+const defaultAccount_1 = require("./defaultAccount");
 const git_1 = require("./git");
 const gitCredentials_1 = require("./gitCredentials");
 const gitWiring_1 = require("./gitWiring");
 const keyUpload_1 = require("./keyUpload");
 const projectBinding_1 = require("./projectBinding");
+const serial_1 = require("./serial");
 const github_1 = require("./providers/github");
 const gitlab_1 = require("./providers/gitlab");
 const sshCheck_1 = require("./sshCheck");
@@ -162,9 +164,20 @@ function activate(context) {
         // they would otherwise be a prompt-free way to add or delete accounts.
         context.subscriptions.push(vscode.commands.registerCommand('null-accounts.test.addAccount', (account, secret) => store.add(account, secret)), vscode.commands.registerCommand('null-accounts.test.removeAccount', (id) => store.remove(id)));
     }
+    registerDefaultAccount(context, store, bindings);
     registerGitSync(context, store, bindings, changed, api);
     void offerImport(context, store, bindings, github).catch(() => { });
     return api;
+}
+/** Binds each open folder that has never had an account to the default one (see defaultAccount.ts). */
+function registerDefaultAccount(context, store, bindings) {
+    const queue = (0, serial_1.serial)();
+    const apply = () => {
+        const folders = (vscode.workspace.workspaceFolders ?? []).map(f => f.uri.fsPath);
+        void queue(() => (0, defaultAccount_1.applyDefaultAccount)({ bindings, accounts: store, originUrl: git_1.originUrl }, folders)).catch(() => { });
+    };
+    context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(apply), bindings.onDidChange(apply));
+    apply();
 }
 /** Keeps repo-local git config and the OS credential store in line with the bindings (see gitWiring.ts, gitCredentials.ts). */
 function registerGitSync(context, store, bindings, changed, api) {

@@ -33,4 +33,9 @@ const kinds = (items) => items.map(i => (i.action.kind === 'account' ? i.action.
     node_assert_1.default.deepStrictEqual((0, pickItems_1.providerPickItems)().map(p => p.choice), ['github', 'gitlab', 'gitlab-self-hosted', 'gitlab-token', 'ssh']);
     node_assert_1.default.strictEqual(pickItems_1.ADD_ACCOUNT_LABEL, '$(add) Add account…');
 });
+(0, node_test_1.test)('the default account ranks after current and suggested, and is marked', () => {
+    const items = (0, pickItems_1.buildPickItems)([acct('a1'), acct('a2'), acct('a3')], { defaultId: 'a3' });
+    node_assert_1.default.deepStrictEqual(kinds(items).slice(0, 3), ['a3', 'a1', 'a2']);
+    node_assert_1.default.strictEqual(items[0].detail, 'Default');
+});
 //# sourceMappingURL=pickItems.test.js.map

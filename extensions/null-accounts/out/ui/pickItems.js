@@ -4,9 +4,9 @@ exports.providerPickItems = exports.UNBIND_LABEL = exports.ADD_ACCOUNT_LABEL = v
 exports.buildPickItems = buildPickItems;
 exports.ADD_ACCOUNT_LABEL = '$(add) Add account…';
 exports.UNBIND_LABEL = '$(circle-slash) Use no account for this project';
-/** Current account first, then the suggested one, then the rest in stored order; add; and "no account" when bound. */
-function buildPickItems(accounts, { suggestedId, currentId } = {}) {
-    const rank = (id) => (id === currentId ? 0 : id === suggestedId ? 1 : 2);
+/** Current account first, then the suggested one, then the default, then the rest in stored order; add; and "no account" when bound. */
+function buildPickItems(accounts, { suggestedId, currentId, defaultId } = {}) {
+    const rank = (id) => (id === currentId ? 0 : id === suggestedId ? 1 : id === defaultId ? 2 : 3);
     const items = [...accounts]
         .sort((a, b) => rank(a.id) - rank(b.id)) // stable: ties keep their stored order
         .map((account) => ({
@@ -14,7 +14,8 @@ function buildPickItems(accounts, { suggestedId, currentId } = {}) {
         description: account.host,
         detail: account.id === currentId
             ? 'Current'
-            : account.id === suggestedId ? 'Suggested — matches this repository’s remote' : undefined,
+            : account.id === suggestedId ? 'Suggested — matches this repository’s remote'
+                : account.id === defaultId ? 'Default' : undefined,
         action: { kind: 'account', account },
     }));
     items.push({ label: exports.ADD_ACCOUNT_LABEL, action: { kind: 'add' } });
