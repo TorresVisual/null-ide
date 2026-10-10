@@ -21,14 +21,30 @@ const projects = [
     strict_1.default.deepEqual(Array.from(projection.projectSections(projects, 'D:/WORK', 'location'), section => section.title), ['Pinned', 'D:\\work']);
 });
 (0, node_test_1.default)('projectSections sorts pinned first then by the requested property', () => {
-    strict_1.default.deepEqual(Array.from(projection.projectSections(projects, '', 'name')[1].projects, project => project.label), ['Alpha']);
+    strict_1.default.deepEqual(Array.from(projection.projectSections(projects, '', 'name')[1].projects, project => project.label), ['Alpha', 'Gamma']);
     strict_1.default.deepEqual(Array.from(projection.projectSections(projects, '', 'location'), section => section.title), ['Pinned', 'C:\\other', 'D:\\work']);
 });
-(0, node_test_1.default)('projectSections does not create empty directory sections after filtering', () => {
-    strict_1.default.deepEqual(Array.from(projection.projectSections(projects, 'gamma', 'lastOpened'), section => section.title), ['C:\\other']);
+(0, node_test_1.default)('projectSections does not create empty sections after filtering', () => {
+    strict_1.default.deepEqual(Array.from(projection.projectSections(projects, 'gamma', 'lastOpened', NOW), section => section.title), ['Earlier']);
+});
+(0, node_test_1.default)('projectSections groups last-opened projects by recency in order', () => {
+    const hour = 60 * 60_000;
+    const day = 24 * hour;
+    const startOfToday = new Date(NOW).setHours(0, 0, 0, 0);
+    const at = (label, timestamp) => ({ path: `D:\\${label}`, label, timestamp, pinned: false, available: true, isWorkspaceFile: false, gitStatus: null });
+    const sections = projection.projectSections([at('old', NOW - 30 * day), at('week', startOfToday - 3 * day), at('yday', startOfToday - hour), at('now', NOW)], '', 'lastOpened', NOW);
+    strict_1.default.deepEqual(Array.from(sections, section => section.title), ['Today', 'Yesterday', 'This week', 'Earlier']);
 });
 (0, node_test_1.default)('relativeProjectTime produces concise deterministic labels', () => {
     strict_1.default.equal(projection.relativeProjectTime(NOW - 60_000, NOW), '1 minute ago');
     strict_1.default.equal(projection.relativeProjectTime(NOW - 2 * 60 * 60_000, NOW), '2 hours ago');
+});
+(0, node_test_1.default)('shortProjectTime and formatDuration stay compact', () => {
+    strict_1.default.equal(projection.shortProjectTime(NOW - 5 * 60_000, NOW), '5m');
+    strict_1.default.equal(projection.shortProjectTime(NOW - 3 * 60 * 60_000, NOW), '3h');
+    strict_1.default.equal(projection.shortProjectTime(NOW - 3 * 24 * 60 * 60_000, NOW), '3d');
+    strict_1.default.equal(projection.shortProjectTime(NOW - 21 * 24 * 60 * 60_000, NOW), '3w');
+    strict_1.default.equal(projection.formatDuration(45 * 60_000), '45m');
+    strict_1.default.equal(projection.formatDuration((3 * 60 + 5) * 60_000), '3h 05m');
 });
 //# sourceMappingURL=recentProjectsProjection.test.js.map
