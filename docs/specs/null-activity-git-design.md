@@ -32,8 +32,8 @@ Committer time is used because it is what `--since`/`--until` filter on; the par
 
 | File | Responsibility |
 |---|---|
-| `src/gitLog.ts` | Pure, no imports beyond types. `gitLogArgs(range) → string[]` and `parseGitLog(stdout, email, range) → GitTotals`. |
-| `src/gitStatsService.ts` | No `vscode` import. `class GitStatsService` with injected deps (`folders()`, `trusted()`, `exec`, `now`, `log`). `cached(range) → DashboardGit \| undefined` and `load(range) → Promise<DashboardGit>`. Resolves keys, dedupes repos, runs git, caches. |
+| `src/gitLog.ts` | Pure, no imports beyond types. `gitLogArgs(range, email) → string[]` and `parseGitLog(stdout, email, range) → GitTotals`. |
+| `src/gitStatsService.ts` | No `vscode` import. `class GitStatsService` with injected deps (`folders()`, `trusted()`, `exec`, `now`, `log`). `peek(range) → { fresh: boolean; git?: DashboardGit }` (may return stale numbers while `fresh` is false) and `load(range) → Promise<DashboardGit \| undefined>`. Resolves keys, dedupes repos, runs git, caches. |
 | `src/protocol.ts` | Add `GitTotals`, `DashboardGit`; `Share.key?`; `DashboardModel.git?`. |
 | `src/dashboardModel.ts` | `buildDashboardModel(..., git?: DashboardGit)` copies it into the model; `toShares` passes an optional `key` through (projects only). |
 | `src/dashboardPanel.ts` | Constructs the service with real `vscode`/`child_process` deps. After each push, if git for the range is missing or stale, loads it and re-posts the model with `git` attached. |
@@ -43,7 +43,7 @@ Committer time is used because it is what `--since`/`--until` filter on; the par
 ### `gitLog.ts`
 
 ```ts
-export function gitLogArgs(range: DateRange): string[];
+export function gitLogArgs(range: DateRange, email: string): string[];
 export function parseGitLog(stdout: string, email: string, range: DateRange): GitTotals;
 ```
 
@@ -82,9 +82,9 @@ interface DashboardGit {
 
 ## Flow
 
-1. `push()` builds and posts the model synchronously as today, with `git` taken from `service.cached(range)` when fresh.
-2. If the cache is missing or stale, `load(range)` starts. When it resolves and the panel is still open on the same range, the panel posts the model again with `git` attached.
-3. A range change repeats this for the new range. Rapid range changes are safe: a result for a range that is no longer selected is dropped.
+1. `push()` builds and posts the model synchronously as today, with `git` taken from `service.peek(range)` (stale numbers are shown rather than none, so a refresh does not flicker).
+2. If `peek` is not fresh, `load(range)` starts (one at a time per range). When it resolves and the panel is still open, the panel pushes again for whatever range is then selected, which now finds fresh data.
+3. A range change repeats this for the new range. Rapid range changes are safe: a finished load only warms the cache, and the push that follows always uses the current range.
 
 No new webview→host message types; `parseWebviewMessage` is unchanged.
 
@@ -108,7 +108,7 @@ No new webview→host message types; `parseWebviewMessage` is unchanged.
 `node --test`, registered in the `test` script in `package.json`:
 
 - **`gitLog.test.ts`:** parses a fixture with several commits and files; exact-email filter (substring and different-case email); half-open bounds (commit exactly at `from` counts, exactly at `to` does not); distinct files counted once across commits; binary `-\t-` lines; merge-free output only; empty output; garbage and torn lines skipped; `gitLogArgs` omits `--since`/`--until` for `ALL_TIME`.
-- **`gitStatsService.test.ts`:** a fake `exec`. Same key from two folders queries once; untrusted → empty; missing `user.email` drops the repo; one failing repo does not affect another; cache hit within TTL and refetch after it; in-flight de-duplication; a result for an old range is not returned from `cached` of the new one.
+- **`gitStatsService.test.ts`:** a fake `exec`. Same key from two folders queries once; untrusted → empty; missing `user.email` drops the repo; one failing repo does not affect another; cache hit within TTL and refetch after it; in-flight de-duplication; ranges are cached separately (`peek` of another range is not fresh and has no data).
 - **`gitStatsService.git.test.ts`:** against a real temporary repository created with `git init` (skipped when `git` is not on `PATH`): two commits with known line counts under a configured `user.email`, a commit by another author, and a commit on a non-checked-out branch; asserts the totals end to end. This is the only test that runs real git.
 - **`dashboardModel.test.ts`:** `git` is passed through unchanged; `Share.key` on project rows only.
 - **`dashboardWebviewModel.test.ts`:** `formatGit` (singular/plural, zero lines, large numbers).
