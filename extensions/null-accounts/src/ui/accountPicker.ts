@@ -17,6 +17,7 @@ import { buildSshAccount, normalizeSshHost } from '../sshAccount';
 import { checkSsh } from '../sshCheck';
 import { suggestAccount } from '../suggest';
 import { Account } from '../types';
+import { KeyActions } from './keyActions';
 import { buildPickItems, PickItem, providerPickItems } from './pickItems';
 
 export interface PickerDeps {
@@ -24,6 +25,7 @@ export interface PickerDeps {
   bindings: ProjectBinding;
   github: GithubProvider;
   gitlab: GitlabProvider;
+  keys: KeyActions;
 }
 
 function reportFailure(what: string, err: unknown): void {

@@ -64,3 +64,10 @@ test('removeConfirmation counts projects with correct plurals and never claims t
   assert.match(removeConfirmation({ username: 'o', host: 'h' }, 3).detail, /3 projects will lose/);
   assert.match(none.detail, /not affected/);
 });
+
+test('a key row is attached to its account only when one is supplied', () => {
+  const key = { path: '/k/id', exists: true, managed: false, signCommits: false, removable: true };
+  const rows = buildRows([acct('a1'), acct('a2')], [], exists, () => false, new Map([['a2', key]]));
+  assert.ok(!('key' in rows[0]));
+  assert.deepStrictEqual(rows[1].key, key);
+});

@@ -10,9 +10,14 @@ import { ChangeEmitter } from './changeEmitter';
 import { runGit } from './git';
 import { CredentialSync } from './gitCredentials';
 import { describeSkip, GitWiring } from './gitWiring';
+import { uploadPublicKey } from './keyUpload';
 import { folderKey, ProjectBinding } from './projectBinding';
 import { fetchGithub, GithubProvider } from './providers/github';
 import { fetchGitlab, fetchPostForm, GitlabProvider, resolveClientId } from './providers/gitlab';
+import { checkSsh } from './sshCheck';
+import { canSign, deleteManagedKey, generateKey, readPublicKey } from './sshKeyOps';
+import { KeyActions } from './ui/keyActions';
+import { keyUi } from './ui/keyUi';
 import { addAccount, chooseAccountForFolder, PickerDeps, reauthenticate } from './ui/accountPicker';
 import { bindFolderToAccount } from './ui/accountsMenuActions';
 import { registerAccountsMenu } from './ui/accountsMenuController';
@@ -62,7 +67,24 @@ export function activate(context: vscode.ExtensionContext): NullAccountsApi {
     gitlab.onDidChange(() => changed.fire()),
   );
 
-  const pickerDeps: PickerDeps = { accounts: store, bindings, github, gitlab };
+  const home = os.homedir();
+  // `api` is created below; the actions only call it later, from a button.
+  const keys = new KeyActions({
+    accounts: store,
+    getToken: (account, scopes, options) => api.getToken(account, scopes, options),
+    ui: keyUi,
+    home,
+    hostname: os.hostname(),
+    now: () => new Date(),
+    exists: fs.existsSync,
+    generate: input => generateKey({ home, ...input }),
+    readPublicKey,
+    canSign: file => canSign(file),
+    deleteManagedKey: file => deleteManagedKey(file, home),
+    upload: uploadPublicKey,
+    checkSsh: (host, file) => checkSsh(host, file),
+  });
+  const pickerDeps: PickerDeps = { accounts: store, bindings, github, gitlab, keys };
 
   const api = createApi({
     accounts: store,
@@ -77,6 +99,7 @@ export function activate(context: vscode.ExtensionContext): NullAccountsApi {
       AccountsPanel.createOrShow({
         accounts: store,
         bindings,
+        keys,
         add: () => addAccount(pickerDeps),
         reauth: id => reauthenticate(pickerDeps, id),
         needsReauth: id => gitlab.needsReauth(id),

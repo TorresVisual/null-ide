@@ -2,13 +2,17 @@
 
 import { randomBytes } from 'node:crypto';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as vscode from 'vscode';
 import { validateNewAccount } from '../accountInput';
 import { AccountStore } from '../accountStore';
 import { ProjectBinding } from '../projectBinding';
+import { fingerprintOf } from '../sshKeyOps';
 import { Account } from '../types';
 import { buildHtml } from './accountsHtml';
 import { buildRows, removeConfirmation, ResolveFolder } from './accountsView';
+import { KeyActions } from './keyActions';
+import { describeKeys } from './keyInfo';
 import { parsePanelMessage } from './panelMessages';
 
 export interface PanelDeps {
@@ -22,6 +26,8 @@ export interface PanelDeps {
   needsReauth(id: string): boolean;
   /** Fires when accounts, bindings or re-auth state change. */
   onDidChange: vscode.Event<void>;
+  /** The SSH key buttons (ui/keyActions). */
+  keys: KeyActions;
 }
 
 /** Real-cased path when the folder exists (binding keys are lower-cased on Windows). */
@@ -32,6 +38,7 @@ const resolveFolder: ResolveFolder = key => {
 /** The Accounts tab in the main editor area. One at a time; state is re-posted on every change. */
 export class AccountsPanel {
   private static current: AccountsPanel | undefined;
+  private seq = 0;
 
   static createOrShow(deps: PanelDeps): void {
     if (AccountsPanel.current) {
@@ -49,7 +56,7 @@ export class AccountsPanel {
 
   private constructor(private readonly panel: vscode.WebviewPanel, private readonly deps: PanelDeps) {
     panel.webview.html = buildHtml(randomBytes(16).toString('hex'));
-    const changes = deps.onDidChange(() => this.postState());
+    const changes = deps.onDidChange(() => void this.postState());
     panel.webview.onDidReceiveMessage(raw => void this.handle(raw));
     panel.onDidDispose(() => {
       changes.dispose();
@@ -57,8 +64,12 @@ export class AccountsPanel {
     });
   }
 
-  private postState(): void {
-    const rows = buildRows(this.deps.accounts.list(), this.deps.bindings.entries(), resolveFolder, id => this.deps.needsReauth(id));
+  private async postState(): Promise<void> {
+    const turn = ++this.seq;
+    const accounts = this.deps.accounts.list();
+    const keys = await describeKeys(accounts, { home: os.homedir(), exists: fs.existsSync, fingerprintOf: file => fingerprintOf(file) });
+    if (turn !== this.seq) { return; } // a newer state is already on its way
+    const rows = buildRows(accounts, this.deps.bindings.entries(), resolveFolder, id => this.deps.needsReauth(id), keys);
     void this.panel.webview.postMessage({ type: 'state', rows });
   }
 
@@ -67,12 +78,19 @@ export class AccountsPanel {
     if (!msg) { return; }
     try {
       switch (msg.type) {
-        case 'ready': this.postState(); break;
+        case 'ready': await this.postState(); break;
         case 'add': await this.deps.add(); break; // the store's change event refreshes the list
         case 'reauth': await this.deps.reauth(msg.id); break;
         case 'unbind': await this.deps.bindings.unbind(msg.key); break;
         case 'remove': await this.remove(msg.id); break;
         case 'editEmail': await this.editEmail(msg.id); break;
+        case 'generateKey': await this.deps.keys.generate(msg.id); break;
+        case 'attachKey': await this.deps.keys.attach(msg.id); break;
+        case 'copyPublicKey': await this.deps.keys.copyPublic(msg.id); break;
+        case 'uploadKey': await this.deps.keys.upload(msg.id); break;
+        case 'testKey': await this.deps.keys.test(msg.id); break;
+        case 'setSigning': await this.deps.keys.setSigning(msg.id, msg.on); break;
+        case 'removeKey': await this.deps.keys.removeKey(msg.id); break;
       }
     } catch (err) {
       void vscode.window.showErrorMessage(`Null Accounts: ${(err as Error).message}`);

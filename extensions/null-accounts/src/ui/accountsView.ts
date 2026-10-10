@@ -2,6 +2,7 @@
 
 import path from 'node:path';
 import { Account } from '../types';
+import { KeyRow } from './keyInfo';
 
 export interface ProjectRef {
   /** `folderKey` form; what the panel sends back to unbind. */
@@ -21,6 +22,8 @@ export interface AccountRow {
   authMethod: Account['authMethod'];
   /** The sign-in has expired and cannot be refreshed; the panel offers Re-authenticate. */
   needsReauth: boolean;
+  /** Present when the account has an SSH key. */
+  key?: KeyRow;
   projects: ProjectRef[];
 }
 
@@ -32,6 +35,7 @@ export function buildRows(
   entries: ReadonlyArray<readonly [string, string]>,
   resolve: ResolveFolder,
   needsReauth: (id: string) => boolean = () => false,
+  keys: ReadonlyMap<string, KeyRow> = new Map(),
 ): AccountRow[] {
   return accounts.map(a => ({
     id: a.id,
@@ -41,6 +45,7 @@ export function buildRows(
     email: a.email,
     authMethod: a.authMethod,
     needsReauth: needsReauth(a.id),
+    ...(keys.has(a.id) ? { key: keys.get(a.id) } : {}),
     projects: entries
       .filter(([, accountId]) => accountId === a.id)
       .map(([key]): ProjectRef => {

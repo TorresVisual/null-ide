@@ -25,3 +25,16 @@ test('anything else is rejected without throwing', () => {
     assert.strictEqual(parsePanelMessage(bad), undefined, JSON.stringify(bad));
   }
 });
+
+test('key messages carry an account id, and setSigning a real boolean', () => {
+  for (const type of ['generateKey', 'attachKey', 'copyPublicKey', 'uploadKey', 'testKey', 'removeKey']) {
+    assert.deepStrictEqual(parsePanelMessage({ type, id: 'a1', evil: 1 }), { type, id: 'a1' });
+    assert.strictEqual(parsePanelMessage({ type }), undefined, type);
+    assert.strictEqual(parsePanelMessage({ type, id: '' }), undefined, type);
+  }
+  assert.deepStrictEqual(parsePanelMessage({ type: 'setSigning', id: 'a1', on: true }), { type: 'setSigning', id: 'a1', on: true });
+  assert.deepStrictEqual(parsePanelMessage({ type: 'setSigning', id: 'a1', on: false }), { type: 'setSigning', id: 'a1', on: false });
+  for (const bad of [{ type: 'setSigning', id: 'a1' }, { type: 'setSigning', id: 'a1', on: 'yes' }, { type: 'setSigning', on: true }]) {
+    assert.strictEqual(parsePanelMessage(bad), undefined, JSON.stringify(bad));
+  }
+});

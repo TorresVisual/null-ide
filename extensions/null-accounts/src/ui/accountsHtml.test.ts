@@ -30,3 +30,9 @@ test('account and folder text only ever reaches the DOM as text', () => {
 test('the client script can ask the host to re-authenticate an account', () => {
   assert.match(CLIENT_SCRIPT, /type: 'reauth'/);
 });
+
+test('the client script can send every key message the host understands', () => {
+  for (const type of ['generateKey', 'attachKey', 'copyPublicKey', 'uploadKey', 'testKey', 'removeKey', 'setSigning']) {
+    assert.ok(CLIENT_SCRIPT.includes(`'${type}'`), type);
+  }
+});
