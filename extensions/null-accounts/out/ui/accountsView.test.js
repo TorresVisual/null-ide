@@ -58,4 +58,9 @@ const exists = (key) => ({ path: key, exists: true });
     node_assert_1.default.ok(!('key' in rows[0]));
     node_assert_1.default.deepStrictEqual(rows[1].key, key);
 });
+(0, node_test_1.test)('a row carries the account picture only when one is supplied', () => {
+    const rows = (0, accountsView_1.buildRows)([acct('a1'), acct('a2')], [], exists, () => false, new Map(), id => (id === 'a2' ? 'data:image/png;base64,AQID' : undefined));
+    node_assert_1.default.ok(!('avatar' in rows[0]));
+    node_assert_1.default.strictEqual(rows[1].avatar, 'data:image/png;base64,AQID');
+});
 //# sourceMappingURL=accountsView.test.js.map

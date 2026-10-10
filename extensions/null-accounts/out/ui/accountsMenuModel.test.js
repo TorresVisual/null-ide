@@ -31,4 +31,18 @@ const MANAGE = { label: 'Manage Accounts…', command: accountsMenuModel_1.MANAG
     const m = (0, accountsMenuModel_1.accountsMenuModel)([acct('a1')], 'gone');
     node_assert_1.default.ok(m.every(e => e === 'separator' || !e.checked));
 });
+(0, node_test_1.test)('a row carries its picture only when there is one', () => {
+    const m = (0, accountsMenuModel_1.accountsMenuModel)([acct('a1'), acct('a2')], undefined, id => (id === 'a2' ? 'data:image/png;base64,AQID' : undefined));
+    node_assert_1.default.ok(!('avatar' in m[0]));
+    node_assert_1.default.strictEqual(m[1].avatar, 'data:image/png;base64,AQID');
+});
+(0, node_test_1.test)('the activity bar picture is the current account\'s, else the first one found, else empty', () => {
+    const pics = { a2: 'two', a3: 'three' };
+    const of = (id) => pics[id];
+    const all = [acct('a1'), acct('a2'), acct('a3')];
+    node_assert_1.default.strictEqual((0, accountsMenuModel_1.activityAvatar)(all, 'a3', of), 'three');
+    node_assert_1.default.strictEqual((0, accountsMenuModel_1.activityAvatar)(all, 'a1', of), 'two');
+    node_assert_1.default.strictEqual((0, accountsMenuModel_1.activityAvatar)(all, undefined, of), 'two');
+    node_assert_1.default.strictEqual((0, accountsMenuModel_1.activityAvatar)([acct('a1')], undefined, of), '');
+});
 //# sourceMappingURL=accountsMenuModel.test.js.map

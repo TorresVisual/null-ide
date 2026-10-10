@@ -38,12 +38,15 @@ const vscode = __importStar(require("vscode"));
 const accountsMenuActions_1 = require("./accountsMenuActions");
 const accountsMenuModel_1 = require("./accountsMenuModel");
 /** Keeps the `null.accounts.menu` context key (rendered by the workbench Accounts menu) in sync with accounts, bindings and the open folder. */
-function registerAccountsMenu(api) {
+function registerAccountsMenu(api, avatarOf) {
+    const setContext = (key, value) => vscode.commands.executeCommand('setContext', key, value);
+    const currentId = () => {
+        const folder = vscode.workspace.workspaceFolders?.[0];
+        return folder ? api.getAccountForFolder(folder.uri)?.id : undefined;
+    };
     const refresh = () => {
-        void (0, accountsMenuActions_1.publishAccountsMenu)(() => {
-            const folder = vscode.workspace.workspaceFolders?.[0];
-            return (0, accountsMenuModel_1.accountsMenuModel)(api.getAccounts(), folder ? api.getAccountForFolder(folder.uri)?.id : undefined);
-        }, (key, value) => vscode.commands.executeCommand('setContext', key, value));
+        void (0, accountsMenuActions_1.publishAccountsMenu)(() => (0, accountsMenuModel_1.accountsMenuModel)(api.getAccounts(), currentId(), avatarOf), setContext);
+        void setContext(accountsMenuModel_1.AVATAR_CONTEXT_KEY, (0, accountsMenuModel_1.activityAvatar)(api.getAccounts(), currentId(), avatarOf));
     };
     refresh();
     return vscode.Disposable.from(api.onDidChange(refresh), vscode.workspace.onDidChangeWorkspaceFolders(refresh));

@@ -68,6 +68,10 @@ class AccountsPanel {
             return;
         }
         const panel = vscode.window.createWebviewPanel('null-accounts.panel', 'Null Accounts', vscode.ViewColumn.One, { enableScripts: true, localResourceRoots: [] });
+        panel.iconPath = {
+            light: vscode.Uri.joinPath(deps.extensionUri, 'media', 'accounts-light.svg'),
+            dark: vscode.Uri.joinPath(deps.extensionUri, 'media', 'accounts-dark.svg'),
+        };
         AccountsPanel.current = new AccountsPanel(panel, deps);
     }
     constructor(panel, deps) {
@@ -88,7 +92,7 @@ class AccountsPanel {
         if (turn !== this.seq) {
             return;
         } // a newer state is already on its way
-        const rows = (0, accountsView_1.buildRows)(accounts, this.deps.bindings.entries(), resolveFolder, id => this.deps.needsReauth(id), keys);
+        const rows = (0, accountsView_1.buildRows)(accounts, this.deps.bindings.entries(), resolveFolder, id => this.deps.needsReauth(id), keys, id => this.deps.avatarOf(id));
         void this.panel.webview.postMessage({ type: 'state', rows });
     }
     async handle(raw) {

@@ -138,6 +138,18 @@ function projectsSection(row) {
   return box;
 }
 
+/** The profile picture, or the username's initial when there is none (or it fails to load). */
+function avatar(row) {
+  const box = el('div', 'avatar', Array.from(row.username)[0] || '?');
+  if (row.avatar) {
+    const img = document.createElement('img');
+    img.alt = '';
+    img.src = row.avatar;
+    img.addEventListener('load', () => box.replaceChildren(img));
+  }
+  return box;
+}
+
 function accountCard(row) {
   const card = el('section', 'account');
   const label = 'name-' + row.id;
@@ -151,7 +163,7 @@ function accountCard(row) {
   where.append((PROVIDERS[row.provider] || row.provider) + ' · ' + row.host, el('span', 'tag', AUTH[row.authMethod] || row.authMethod));
   who.append(h2, where);
   top.append(
-    el('div', 'avatar', Array.from(row.username)[0] || '?'),
+    avatar(row),
     who,
     button({ icon: 'trash', cls: 'icon danger', title: 'Remove ' + row.username, fk: row.id + '|remove', onClick: () => vscode.postMessage({ type: 'remove', id: row.id }) }),
   );

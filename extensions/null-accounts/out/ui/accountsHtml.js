@@ -44,7 +44,8 @@ button.danger:hover,button.icon.danger:hover{color:var(--vscode-errorForeground)
 .account>*{padding:16px 18px;}
 .account>*+*{border-top:1px solid var(--line);}
 .who-row{display:flex;align-items:center;gap:12px;}
-.avatar{width:36px;height:36px;flex:none;border-radius:8px;display:grid;place-items:center;font-size:15px;font-weight:600;background:var(--control);border:1px solid var(--line);text-transform:uppercase;}
+.avatar{width:36px;height:36px;flex:none;border-radius:50%;display:grid;place-items:center;overflow:hidden;font-size:15px;font-weight:600;background:var(--control);border:1px solid var(--line);text-transform:uppercase;}
+.avatar img{width:100%;height:100%;object-fit:cover;display:block;}
 .who{flex:1;min-width:0;}
 .who h2{font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .where{display:flex;flex-wrap:wrap;align-items:center;gap:6px;color:var(--muted);}
@@ -96,7 +97,7 @@ function buildHtml(nonce) {
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}'; img-src data:; script-src 'nonce-${nonce}';">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Null Accounts</title>
 <style nonce="${nonce}">${CSS}</style>

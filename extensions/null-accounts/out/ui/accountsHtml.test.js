@@ -7,6 +7,9 @@ const node_assert_1 = __importDefault(require("node:assert"));
 const node_test_1 = require("node:test");
 const accountsClient_1 = require("./accountsClient");
 const accountsHtml_1 = require("./accountsHtml");
+(0, node_test_1.test)('images may only be data URIs', () => {
+    node_assert_1.default.match((0, accountsHtml_1.buildHtml)('n'), /img-src data:;/);
+});
 (0, node_test_1.test)('the CSP is nonce-only and the same nonce guards the style and script tags', () => {
     const html = (0, accountsHtml_1.buildHtml)('abc123');
     node_assert_1.default.match(html, /Content-Security-Policy[^>]*default-src 'none'/);

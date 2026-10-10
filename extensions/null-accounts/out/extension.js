@@ -39,6 +39,7 @@ const fs = __importStar(require("node:fs"));
 const os = __importStar(require("node:os"));
 const vscode = __importStar(require("vscode"));
 const accountStore_1 = require("./accountStore");
+const avatars_1 = require("./avatars");
 const accountSetup_1 = require("./accountSetup");
 const api_1 = require("./api");
 const changeEmitter_1 = require("./changeEmitter");
@@ -96,6 +97,14 @@ function activate(context) {
         void bindings.prune(new Set(store.list().map(a => a.id)));
         changed.fire();
     }), bindings.onDidChange(() => changed.fire()), gitlab.onDidChange(() => changed.fire()));
+    const avatars = new avatars_1.AvatarCache({
+        meta: context.globalState,
+        accounts: () => store.list(),
+        getJson: avatars_1.fetchAvatarJson,
+        getImage: avatars_1.fetchAvatarImage,
+    });
+    context.subscriptions.push(store.onDidChange(() => { void avatars.refresh(); }), avatars.onDidChange(() => changed.fire()));
+    void avatars.refresh();
     const home = os.homedir();
     // `api` is created below; the actions only call it later, from a button.
     const keys = new keyActions_1.KeyActions({
@@ -129,6 +138,8 @@ function activate(context) {
         reauth: id => (0, accountPicker_1.reauthenticate)(pickerDeps, id),
         needsReauth: id => gitlab.needsReauth(id),
         onDidChange: changed.event,
+        avatarOf: id => avatars.get(id),
+        extensionUri: context.extensionUri,
     })), vscode.commands.registerCommand(statusBarController_1.SWITCH_COMMAND, async () => {
         const folder = vscode.workspace.workspaceFolders?.[0];
         if (!folder) {
@@ -144,7 +155,7 @@ function activate(context) {
         if (result === 'no-account') {
             void vscode.window.showInformationMessage('That account no longer exists.');
         }
-    }), vscode.commands.registerCommand(accountsMenuModel_1.ADD_ACCOUNT_COMMAND, async () => { await (0, accountPicker_1.addAccount)(pickerDeps); }), (0, statusBarController_1.registerStatusBar)(api), (0, accountsMenuController_1.registerAccountsMenu)(api));
+    }), vscode.commands.registerCommand(accountsMenuModel_1.ADD_ACCOUNT_COMMAND, async () => { await (0, accountPicker_1.addAccount)(pickerDeps); }), (0, statusBarController_1.registerStatusBar)(api), (0, accountsMenuController_1.registerAccountsMenu)(api, id => avatars.get(id)));
     if (context.extensionMode === vscode.ExtensionMode.Test) {
         // Integration specs cannot sign in to a provider, so they add and remove accounts through these two commands.
         // Not contributed in package.json and registered only when an extensionTestsPath run hosts the extension:
