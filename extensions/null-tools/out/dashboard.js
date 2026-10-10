@@ -41,6 +41,8 @@ const projectType_1 = require("./projectType");
 const recentProjects_1 = require("./recentProjects");
 const dashboardGitStatus_1 = require("./dashboardGitStatus");
 const dashboardActions_1 = require("./dashboardActions");
+const dashboardAccounts_1 = require("./dashboardAccounts");
+const githubAuth_1 = require("./github/githubAuth");
 class DashboardEditorProvider {
     extensionUri;
     context;
@@ -59,6 +61,9 @@ class DashboardEditorProvider {
         };
         panel.webview.html = this._buildHtml(panel.webview);
         panel.webview.onDidReceiveMessage((msg) => this._handleMessage(msg, panel.webview));
+        // A bind, rebind or removed account changes a card's label; a visible dashboard shouldn't wait for Refresh.
+        const accountsChanged = (0, githubAuth_1.getAccountsApi)()?.onDidChange(() => this._sendProjectsAndStatuses(panel.webview));
+        panel.onDidDispose(() => accountsChanged?.dispose());
     }
     _handleMessage(msg, webview) {
         switch (msg.type) {
@@ -140,10 +145,11 @@ class DashboardEditorProvider {
     }
     _sendProjectsAndStatuses(webview) {
         const projects = (0, recentProjects_1.readRecentProjects)((0, recentProjects_1.getRecentProjectsFilePath)());
-        const launcherProjects = projects.map(project => {
+        const accounts = (0, githubAuth_1.getAccountsApi)();
+        const launcherProjects = (0, dashboardAccounts_1.withAccounts)(projects.map(project => {
             const available = fs.existsSync(project.path);
             return { ...project, available, ...(available ? (0, projectType_1.detectProjectType)(project.path) : undefined) };
-        });
+        }), folder => accounts?.getAccountForFolder(vscode.Uri.file(folder)));
         webview.postMessage({ type: 'projects', projects: launcherProjects });
         void (0, dashboardGitStatus_1.computeGitStatuses)(projects.map(p => p.path), (path, status) => webview.postMessage({ type: 'gitStatus', path, status }));
     }
