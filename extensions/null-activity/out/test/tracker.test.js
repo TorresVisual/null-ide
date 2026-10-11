@@ -147,4 +147,10 @@ function hb(ts, over = {}) {
     node_assert_1.default.deepStrictEqual((0, tracker_1.lineDelta)([{ text: 'x\r\ny', range: range(4, 4) }]), { linesAdded: 1, linesRemoved: 0 });
     node_assert_1.default.deepStrictEqual((0, tracker_1.lineDelta)([{ text: 'a\n', range: range(0, 0) }, { text: '', range: range(9, 10) }]), { linesAdded: 1, linesRemoved: 1 });
 });
+(0, node_test_1.test)('lineDelta ignores a single change that inserts more than 50 lines (paste / agent write)', () => {
+    const range = { start: { line: 0 }, end: { line: 0 } };
+    node_assert_1.default.strictEqual((0, tracker_1.lineDelta)([{ text: '\n'.repeat(50), range }]).linesAdded, 50);
+    node_assert_1.default.strictEqual((0, tracker_1.lineDelta)([{ text: '\n'.repeat(51), range }]).linesAdded, 0);
+    node_assert_1.default.strictEqual((0, tracker_1.lineDelta)([{ text: '\n'.repeat(51), range }, { text: 'a\n', range }]).linesAdded, 1);
+});
 //# sourceMappingURL=tracker.test.js.map

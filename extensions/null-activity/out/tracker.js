@@ -89,13 +89,18 @@ class Tracker {
     }
 }
 exports.Tracker = Tracker;
-/** Lines added = newlines inserted; lines removed = lines spanned by the replaced range. */
+/** One change inserting more lines than this is a paste or an agent write, not typing (WakaTime uses 50 too). */
+const MAX_TYPED_LINES = 50;
+/** Lines added = newlines inserted (a single change over MAX_TYPED_LINES counts 0); lines removed = lines spanned by the replaced range. */
 function lineDelta(changes) {
     let linesAdded = 0;
     let linesRemoved = 0;
     for (const c of changes) {
+        let added = 0;
         for (let i = c.text.indexOf('\n'); i !== -1; i = c.text.indexOf('\n', i + 1))
-            linesAdded++;
+            added++;
+        if (added <= MAX_TYPED_LINES)
+            linesAdded += added;
         linesRemoved += c.range.end.line - c.range.start.line;
     }
     return { linesAdded, linesRemoved };
