@@ -1,11 +1,12 @@
 'use strict';
 
+import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { nextPeriodStart } from './stats';
 import { DateRange, Interval } from './types';
 
-const FILE_RE = /^intervals-(\d{4})-(\d{2})-.+\.jsonl$/;
+const FILE_RE = /^intervals-(\d{4})-(\d{2})-(.+)\.jsonl$/;
 const DEFAULT_MAX_BUFFERED = 5_000;
 const EVERYTHING: DateRange = { from: -Infinity, to: Infinity };
 
@@ -20,6 +21,9 @@ export function monthKey(ts: number): string {
   const d = new Date(ts);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
+
+/** A fresh id per extension-host launch. `env.sessionId` is shared by every window of one app launch, so it cannot tell windows apart. */
+export const newWindowId = (): string => crypto.randomBytes(5).toString('hex');
 
 function parseInterval(line: string): Interval | undefined {
   try {
@@ -42,6 +46,10 @@ export class IntervalStore {
   private buffer: Interval[] = [];
 
   constructor(private readonly opts: IntervalStoreOptions) {}
+
+  get windowId(): string {
+    return this.opts.windowId;
+  }
 
   /** Splits at local month boundaries; lines stay on the first piece. */
   private split(interval: Interval): Interval[] {
@@ -95,8 +103,11 @@ export class IntervalStore {
 
   read(range: DateRange): Interval[] {
     const out: Interval[] = [];
-    for (const name of this.listFiles(range)) out.push(...this.parseFile(path.join(this.opts.dir, name)));
-    out.push(...this.buffer);
+    for (const name of this.listFiles(range)) {
+      const window = FILE_RE.exec(name)![3];
+      for (const i of this.parseFile(path.join(this.opts.dir, name))) out.push({ ...i, window });
+    }
+    for (const i of this.buffer) out.push({ ...i, window: this.opts.windowId });
     return out.filter((i) => overlaps(i, range));
   }
 

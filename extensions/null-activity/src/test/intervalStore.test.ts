@@ -5,7 +5,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
-import { IntervalStore } from '../intervalStore';
+import { IntervalStore, newWindowId } from '../intervalStore';
 import { dayRange } from '../stats';
 import { Interval } from '../types';
 
@@ -159,4 +159,37 @@ test('replaceWindow keeps every interval even beyond maxBuffered', () => {
   const many = Array.from({ length: 2_000 }, (_, n) => iv(at(8, 0) + n * 120_000, at(8, 0) + n * 120_000 + 60_000));
   store.replaceWindow('import-wakatime', many);
   assert.strictEqual(store.read({ from: -Infinity, to: Infinity }).length, 2_000);
+});
+
+test('read tags every interval with its window: files by file name, the unflushed buffer with its own id', () => {
+  const dir = tmpDir();
+  const a = new IntervalStore({ dir, windowId: 'w1' });
+  const b = new IntervalStore({ dir, windowId: 'w2' });
+  a.append(iv(at(8, 10), at(8, 11)));
+  a.flush();
+  b.append(iv(at(8, 12), at(8, 13)));
+  fs.writeFileSync(path.join(dir, 'intervals-2026-10-import-wakatime.jsonl'), JSON.stringify(iv(at(8, 14), at(8, 15))) + '\n');
+  const got = a.read(dayRange(at(8, 12))).sort(byStart);
+  assert.deepStrictEqual(got.map((i) => i.window), ['w1', 'import-wakatime'], 'a does not see the unflushed buffer of b');
+  const own = b.read(dayRange(at(8, 12))).sort(byStart);
+  assert.deepStrictEqual(own.map((i) => i.window), ['w1', 'w2', 'import-wakatime']);
+  assert.strictEqual(b.windowId, 'w2');
+});
+
+test('the window tag is never written to disk, not even by deleteRange', () => {
+  const dir = tmpDir();
+  const store = new IntervalStore({ dir, windowId: 'w1' });
+  store.append(iv(at(8, 10), at(8, 11)));
+  store.append(iv(at(9, 10), at(9, 11)));
+  store.flush();
+  store.deleteRange(dayRange(at(9, 12)));
+  const text = fs.readFileSync(path.join(dir, 'intervals-2026-10-w1.jsonl'), 'utf8');
+  assert.ok(!text.includes('"window"'), text);
+  assert.strictEqual(store.read({ from: at(1, 0), to: at(30, 0) }).length, 1);
+});
+
+test('newWindowId yields a fresh filename-safe id on every call', () => {
+  const ids = new Set(Array.from({ length: 50 }, () => newWindowId()));
+  assert.strictEqual(ids.size, 50);
+  assert.ok([...ids].every((id) => /^[0-9a-f]{10}$/.test(id)));
 });

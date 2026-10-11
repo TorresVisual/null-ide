@@ -1,6 +1,5 @@
 'use strict';
 
-import * as crypto from 'crypto';
 import * as vscode from 'vscode';
 import { ActivityService, ActivitySettings, normalizeSettings } from './activityService';
 import { registerBadges } from './badgeCommands';
@@ -8,7 +7,7 @@ import { registerCommands } from './commands';
 import { DashboardPanel } from './dashboardPanel';
 import { startHeartbeatSource } from './heartbeatSource';
 import { registerImport } from './importCommand';
-import { IntervalStore } from './intervalStore';
+import { IntervalStore, newWindowId } from './intervalStore';
 import { resolveProject } from './projectIdentity';
 import { StatusBar } from './statusBar';
 import { NullActivityApi } from './types';
@@ -21,7 +20,7 @@ function readSettings(): ActivitySettings {
 export function activate(context: vscode.ExtensionContext): NullActivityApi {
   const output = vscode.window.createOutputChannel('Null Activity');
   const storageDir = context.globalStorageUri.fsPath;
-  const windowId = crypto.createHash('sha1').update(vscode.env.sessionId).digest('hex').slice(0, 10);
+  const windowId = newWindowId();
 
   const store = new IntervalStore({ dir: storageDir, windowId, log: (message) => output.appendLine(message) });
   const service = new ActivityService({ store, resolveProject, settings: readSettings });

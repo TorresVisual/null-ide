@@ -20,6 +20,7 @@ export interface Interval {
   branch?: string;
   linesAdded: number;
   linesRemoved: number;
+  window?: string; // set when read back from the log (the file name's window id), never persisted
 }
 
 export interface Heartbeat {
