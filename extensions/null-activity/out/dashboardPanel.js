@@ -84,6 +84,10 @@ class DashboardPanel {
             enableScripts: true,
             localResourceRoots: [lib],
         });
+        panel.iconPath = {
+            light: vscode.Uri.joinPath(this.context.extensionUri, 'media', 'activity-light.svg'),
+            dark: vscode.Uri.joinPath(this.context.extensionUri, 'media', 'activity-dark.svg'),
+        };
         this.panel = panel;
         const asset = (file) => panel.webview.asWebviewUri(vscode.Uri.joinPath(lib, file)).toString();
         panel.webview.html = (0, dashboardHtml_1.getDashboardHtml)(crypto.randomBytes(16).toString('base64'), panel.webview.cspSource, asset('dashboard.js'), asset('dashboard.css'));
