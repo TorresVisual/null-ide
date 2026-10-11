@@ -5,19 +5,22 @@ import * as vscode from 'vscode';
 import { ActivityService } from './activityService';
 import { lineDelta } from './tracker';
 
-const TRACKED_SCHEMES = new Set(['file', 'untitled']);
+// A notebook cell's URI is the notebook's file URI plus a fragment, so its time lands on the notebook file.
+const TRACKED_SCHEMES = new Set(['file', 'untitled', 'vscode-notebook-cell']);
 
 const isTracked = (doc: vscode.TextDocument | undefined): doc is vscode.TextDocument =>
   !!doc && TRACKED_SCHEMES.has(doc.uri.scheme);
 
 function contextOf(doc: vscode.TextDocument | undefined): { file?: string; language: string; workspace?: string } {
-  const folder = (doc && vscode.workspace.getWorkspaceFolder(doc.uri)) ?? vscode.workspace.workspaceFolders?.[0];
+  const docUri = doc?.uri;
+  const uri = docUri?.scheme === 'vscode-notebook-cell' ? docUri.with({ scheme: 'file' }) : docUri;
+  const folder = (uri && vscode.workspace.getWorkspaceFolder(uri)) ?? vscode.workspace.workspaceFolders?.[0];
   const workspace = folder?.uri.fsPath;
   const language = doc?.languageId ?? '';
-  if (doc?.uri.scheme !== 'file') return { language, workspace };
-  const rel = folder ? path.relative(folder.uri.fsPath, doc.uri.fsPath) : '';
+  if (!uri || uri.scheme !== 'file') return { language, workspace };
+  const rel = folder ? path.relative(folder.uri.fsPath, uri.fsPath) : '';
   const inside = rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel);
-  return { file: (inside ? rel : path.basename(doc.uri.fsPath)).replace(/\\/g, '/'), language, workspace };
+  return { file: (inside ? rel : path.basename(uri.fsPath)).replace(/\\/g, '/'), language, workspace };
 }
 
 /**

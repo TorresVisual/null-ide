@@ -162,3 +162,10 @@ test('lineDelta counts inserted newlines and removed lines', () => {
     { linesAdded: 1, linesRemoved: 1 },
   );
 });
+
+test('lineDelta ignores a single change that inserts more than 50 lines (paste / agent write)', () => {
+  const range = { start: { line: 0 }, end: { line: 0 } };
+  assert.strictEqual(lineDelta([{ text: '\n'.repeat(50), range }]).linesAdded, 50);
+  assert.strictEqual(lineDelta([{ text: '\n'.repeat(51), range }]).linesAdded, 0);
+  assert.strictEqual(lineDelta([{ text: '\n'.repeat(51), range }, { text: 'a\n', range }]).linesAdded, 1);
+});
