@@ -47,10 +47,18 @@ class Tracker {
     closeOpen() {
         this.closeAtLast();
     }
-    /** The in-progress interval up to its last heartbeat, for live readouts. */
+    /**
+     * The in-progress interval for live readouts. While the gap since the last heartbeat is within the idle
+     * timeout it runs up to now, since the next heartbeat would credit the gap; once idle it stops at the last
+     * heartbeat, where tick() will close it.
+     */
     peek() {
         const o = this.open;
-        return o && o.last > o.start ? this.toInterval(o, o.last) : undefined;
+        if (!o)
+            return undefined;
+        const now = this.opts.clock();
+        const end = now - o.last <= this.opts.idleTimeoutMs() ? Math.max(now, o.last) : o.last;
+        return end > o.start ? this.toInterval(o, end) : undefined;
     }
     /** No heartbeat to close on: end at the last one, so a long idle timeout never credits silence. */
     closeAtLast() {

@@ -15,6 +15,7 @@ exports.periodStats = periodStats;
 exports.projectStats = projectStats;
 exports.languageStats = languageStats;
 exports.sessions = sessions;
+exports.formatClock = formatClock;
 exports.formatDuration = formatDuration;
 const wakatimeImport_1 = require("./wakatimeImport");
 exports.ALL_TIME = { from: 0, to: Number.MAX_SAFE_INTEGER };
@@ -195,6 +196,12 @@ function sessions(intervals, range, gapMs) {
             g.files.add(i.file);
     }
     return groups.map((g) => ({ ...g.session, projects: [...g.projects.values()], languages: [...g.languages], files: [...g.files] }));
+}
+/** Like formatDuration with seconds, for the ticking status bar readout. */
+function formatClock(ms) {
+    const s = Math.floor(ms / 1000) % 60;
+    const minutes = Math.floor(ms / 60_000);
+    return minutes >= 60 ? `${Math.floor(minutes / 60)}h ${minutes % 60}m ${s}s` : `${minutes}m ${s}s`;
 }
 function formatDuration(ms) {
     const minutes = Math.floor(ms / 60_000);

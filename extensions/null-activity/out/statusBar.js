@@ -45,7 +45,7 @@ class StatusBar {
         this.service = service;
         this.item.command = 'null-activity.openDashboard';
         this.subscription = service.onDidChange(() => this.update());
-        this.timer = setInterval(() => this.update(), 60_000);
+        this.timer = setInterval(() => this.update(), 1_000);
         this.update();
         this.item.show();
     }
@@ -56,7 +56,7 @@ class StatusBar {
             return;
         }
         const ms = this.service.getDailyStats((0, stats_1.dayRange)(Date.now())).reduce((n, d) => n + d.ms, 0);
-        this.item.text = `$(clock) ${(0, stats_1.formatDuration)(ms)}`;
+        this.item.text = `$(clock) ${(0, stats_1.formatClock)(ms)}`;
         this.item.tooltip = 'Null Activity: time tracked today. Click to open the dashboard.';
     }
     dispose() {

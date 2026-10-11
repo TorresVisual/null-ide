@@ -124,13 +124,20 @@ function hb(ts, over = {}) {
     tracker.closeOpen();
     node_assert_1.default.deepStrictEqual(out.map((i) => [i.start, i.end]), [[0, 10_000], [40_000, 50_000]]);
 });
-(0, node_test_1.test)('peek() reports the open interval up to the last heartbeat without closing it', () => {
-    const { tracker, out } = setup();
+(0, node_test_1.test)('peek() runs the open interval up to now while within the idle timeout, without closing it', () => {
+    const { tracker, out, at } = setup();
     node_assert_1.default.strictEqual(tracker.peek(), undefined);
     tracker.heartbeat(hb(0));
     node_assert_1.default.strictEqual(tracker.peek(), undefined, 'a single heartbeat has no duration yet');
     tracker.heartbeat(hb(5_000));
+    at(5_000);
     node_assert_1.default.deepStrictEqual([tracker.peek()?.start, tracker.peek()?.end], [0, 5_000]);
+    at(8_000);
+    node_assert_1.default.strictEqual(tracker.peek()?.end, 8_000);
+    at(5_000 + IDLE);
+    node_assert_1.default.strictEqual(tracker.peek()?.end, 5_000 + IDLE);
+    at(5_000 + IDLE + 1);
+    node_assert_1.default.strictEqual(tracker.peek()?.end, 5_000, 'idle past the timeout: back to the last heartbeat');
     node_assert_1.default.strictEqual(out.length, 0);
 });
 (0, node_test_1.test)('lineDelta counts inserted newlines and removed lines', () => {

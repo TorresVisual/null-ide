@@ -105,6 +105,12 @@ const iv = (start, end, over = {}) => ({
     node_assert_1.default.strictEqual((0, stats_1.formatDuration)(12 * MIN), '12m');
     node_assert_1.default.strictEqual((0, stats_1.formatDuration)((4 * 60 + 32) * MIN), '4h 32m');
 });
+(0, node_test_1.test)('formatClock', () => {
+    node_assert_1.default.strictEqual((0, stats_1.formatClock)(0), '0m 0s');
+    node_assert_1.default.strictEqual((0, stats_1.formatClock)(59_999), '0m 59s');
+    node_assert_1.default.strictEqual((0, stats_1.formatClock)(12 * MIN + 5_000), '12m 5s');
+    node_assert_1.default.strictEqual((0, stats_1.formatClock)((4 * 60 + 32) * MIN + 41_000), '4h 32m 41s');
+});
 const proj = (key) => ({ key, name: key.toUpperCase() });
 (0, node_test_1.test)('three parallel windows: projects and languages sum, the daily total and session duration stay the union', () => {
     const day = (0, stats_1.dayRange)(at(8, 12));
