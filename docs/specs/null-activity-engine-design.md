@@ -21,7 +21,7 @@ Pieces 2–5 depend only on the `NullActivityApi` and the interval format define
 ## Decisions
 
 - **Home:** new extension `extensions/null-activity/` (TypeScript, `out/` tracked), following `null-music`'s conventions: pure classes, wiring in `extension.ts`, API returned from `activate`, data under `globalStorageUri`. No dependency on other Null extensions.
-- **Active definition (lenient):** any interaction counts while the Null IDE window is focused — edits, cursor moves, scrolling, switching files, saves, terminal input, debug sessions. A gap longer than `null-activity.idleTimeout` (default 120 s) is idle.
+- **Active definition (lenient):** any interaction counts while the Null IDE window is focused — edits, cursor moves, scrolling, switching files, saves, terminal input, debug sessions. A gap longer than `null-activity.idleTimeout` (default 900 s, matching WakaTime's 15 min timeout, issue #123) is idle. Closes without a heartbeat (focus loss, pause, shutdown) end at the last heartbeat, never at the closing time, so the long timeout does not credit trailing silence.
 - **Storage:** an append-only interval log; every statistic is derived from it. No SQLite, no native module.
 - **Project identity:** git remote URL, falling back to the folder path. Display name = folder name, so renaming a folder does not split history.
 - **Language:** the document's `languageId`.
@@ -100,7 +100,7 @@ interface NullActivityApi {
 
 ## Settings
 
-`null-activity.enabled`, `null-activity.idleTimeout` (seconds, 120), `null-activity.sessionGap` (minutes, 15). No other configuration.
+`null-activity.enabled`, `null-activity.idleTimeout` (seconds, 900), `null-activity.sessionGap` (minutes, 15). No other configuration.
 
 ## Testing
 

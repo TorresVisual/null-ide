@@ -69,7 +69,7 @@ test('turning the master switch off closes the open interval and stops collectio
   settings.enabled = false;
   service.refresh();
   assert.strictEqual(service.enabled, false);
-  assert.deepStrictEqual(service.getIntervals(day).map((i) => [i.start, i.end]), [[at(8, 9), at(8, 9, 2)]]);
+  assert.deepStrictEqual(service.getIntervals(day).map((i) => [i.start, i.end]), [[at(8, 9), at(8, 9, 1)]]);
   service.recordActivity(hb(at(8, 9, 3)));
   service.startSession(); // no-op while disabled
   service.recordActivity(hb(at(8, 9, 4)));
@@ -85,6 +85,7 @@ test('turning the master switch off closes the open interval and stops collectio
 test('pauseSession stops counting until startSession', () => {
   const { service, at: setNow } = setup();
   service.recordActivity(hb(at(8, 9)));
+  service.recordActivity(hb(at(8, 9, 0, 30)));
   setNow(at(8, 9, 1));
   service.pauseSession();
   service.recordActivity(hb(at(8, 9, 2)));
@@ -111,13 +112,13 @@ test('deleting a range while an interval is open does not bring the interval bac
 });
 
 test('normalizeSettings clamps nonsense to sane values', () => {
-  const d = { enabled: true, idleTimeoutMs: 120_000, sessionGapMs: 15 * MIN };
+  const d = { enabled: true, idleTimeoutMs: 900_000, sessionGapMs: 15 * MIN };
   assert.deepStrictEqual(normalizeSettings({}), d);
   assert.deepStrictEqual(normalizeSettings({ enabled: false }), { ...d, enabled: false });
   assert.strictEqual(normalizeSettings({ idleTimeout: 0 }).idleTimeoutMs, 10_000);
   assert.strictEqual(normalizeSettings({ idleTimeout: -5 }).idleTimeoutMs, 10_000);
-  assert.strictEqual(normalizeSettings({ idleTimeout: Number.NaN }).idleTimeoutMs, 120_000);
-  assert.strictEqual(normalizeSettings({ idleTimeout: 'abc' }).idleTimeoutMs, 120_000);
+  assert.strictEqual(normalizeSettings({ idleTimeout: Number.NaN }).idleTimeoutMs, 900_000);
+  assert.strictEqual(normalizeSettings({ idleTimeout: 'abc' }).idleTimeoutMs, 900_000);
   assert.strictEqual(normalizeSettings({ idleTimeout: 1e9 }).idleTimeoutMs, 3_600_000);
   assert.strictEqual(normalizeSettings({ sessionGap: 0 }).sessionGapMs, MIN);
   assert.strictEqual(normalizeSettings({ sessionGap: 1e9 }).sessionGapMs, 1_440 * MIN);

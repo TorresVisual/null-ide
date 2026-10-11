@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import { Tracker, lineDelta } from '../tracker';
 import { Heartbeat, Interval } from '../types';
 
-const IDLE = 120_000;
+const IDLE = 900_000;
 
 function setup() {
   let now = 0;
@@ -84,7 +84,7 @@ test('switching file, language or project closes at the switch and re-resolves t
     assert.strictEqual(out.length, 1, JSON.stringify(change));
     assert.deepStrictEqual([out[0].start, out[0].end], [0, 30_000]);
     assert.strictEqual(resolveCount(), 2);
-    at(40_000);
+    tracker.heartbeat(hb(40_000, change));
     tracker.closeOpen();
     assert.deepStrictEqual([out[1].start, out[1].end, out[1].linesAdded], [30_000, 40_000, 4]);
   }
@@ -96,14 +96,14 @@ test('focus loss closes the interval; heartbeats while unfocused are ignored', (
   tracker.heartbeat(hb(10_000));
   at(40_000);
   tracker.setFocused(false);
-  assert.deepStrictEqual(out.map((i) => [i.start, i.end]), [[0, 40_000]]);
+  assert.deepStrictEqual(out.map((i) => [i.start, i.end]), [[0, 10_000]], 'ends at the last heartbeat, not at the loss');
   tracker.heartbeat(hb(50_000));
   tracker.setFocused(true);
   tracker.heartbeat(hb(60_000));
   tracker.heartbeat(hb(70_000));
   at(70_000);
   tracker.closeOpen();
-  assert.deepStrictEqual(out.map((i) => [i.start, i.end]), [[0, 40_000], [60_000, 70_000]]);
+  assert.deepStrictEqual(out.map((i) => [i.start, i.end]), [[0, 10_000], [60_000, 70_000]]);
 });
 
 test('focus loss after a long silence ends at the last heartbeat, not at the loss', () => {
@@ -141,14 +141,14 @@ test('setActive(false) closes the open interval and ignores heartbeats until re-
   tracker.heartbeat(hb(10_000));
   at(20_000);
   tracker.setActive(false);
-  assert.deepStrictEqual(out.map((i) => [i.start, i.end]), [[0, 20_000]]);
+  assert.deepStrictEqual(out.map((i) => [i.start, i.end]), [[0, 10_000]]);
   tracker.heartbeat(hb(30_000));
   tracker.setActive(true);
   tracker.heartbeat(hb(40_000));
   tracker.heartbeat(hb(50_000));
   at(50_000);
   tracker.closeOpen();
-  assert.deepStrictEqual(out.map((i) => [i.start, i.end]), [[0, 20_000], [40_000, 50_000]]);
+  assert.deepStrictEqual(out.map((i) => [i.start, i.end]), [[0, 10_000], [40_000, 50_000]]);
 });
 
 test('peek() reports the open interval up to the last heartbeat without closing it', () => {

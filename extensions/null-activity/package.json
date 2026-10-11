@@ -28,7 +28,7 @@
         },
         "null-activity.idleTimeout": {
           "type": "number",
-          "default": 120,
+          "default": 900,
           "minimum": 10,
           "maximum": 3600,
           "description": "Seconds without interaction before time stops counting."

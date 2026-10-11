@@ -51,12 +51,12 @@ export class Tracker {
   }
 
   setFocused(focused: boolean): void {
-    if (!focused) this.close(this.opts.clock());
+    if (!focused) this.closeAtLast();
     this.focused = focused;
   }
 
   setActive(active: boolean): void {
-    if (!active) this.close(this.opts.clock());
+    if (!active) this.closeAtLast();
     this.active = active;
   }
 
@@ -68,13 +68,18 @@ export class Tracker {
   }
 
   closeOpen(): void {
-    this.close(this.opts.clock());
+    this.closeAtLast();
   }
 
   /** The in-progress interval up to its last heartbeat, for live readouts. */
   peek(): Interval | undefined {
     const o = this.open;
     return o && o.last > o.start ? this.toInterval(o, o.last) : undefined;
+  }
+
+  /** No heartbeat to close on: end at the last one, so a long idle timeout never credits silence. */
+  private closeAtLast(): void {
+    if (this.open) this.close(this.open.last);
   }
 
   private close(t: number): void {
