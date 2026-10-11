@@ -31,7 +31,7 @@ function readText(file: string): string | undefined {
   }
 }
 
-function findGitDirs(start: string): { gitDir: string; commonDir: string } | undefined {
+function findGitDirs(start: string): { gitDir: string; commonDir: string; root: string } | undefined {
   for (let dir = path.resolve(start); ; dir = path.dirname(dir)) {
     const dotGit = path.join(dir, '.git');
     let stat: fs.Stats | undefined;
@@ -40,17 +40,22 @@ function findGitDirs(start: string): { gitDir: string; commonDir: string } | und
     } catch {
       stat = undefined;
     }
-    if (stat?.isDirectory()) return { gitDir: dotGit, commonDir: dotGit };
+    if (stat?.isDirectory()) return { gitDir: dotGit, commonDir: dotGit, root: dir };
     if (stat?.isFile()) {
       const m = /^gitdir:\s*(.+)$/m.exec(readText(dotGit) ?? '');
       if (m) {
         const gitDir = path.resolve(dir, m[1].trim());
         const common = readText(path.join(gitDir, 'commondir'))?.trim();
-        return { gitDir, commonDir: common ? path.resolve(gitDir, common) : gitDir };
+        return { gitDir, commonDir: common ? path.resolve(gitDir, common) : gitDir, root: dir };
       }
     }
     if (path.dirname(dir) === dir) return undefined;
   }
+}
+
+/** The folder that contains the `.git` found at or above `start`, if any. */
+export function repoRoot(start: string): string | undefined {
+  return findGitDirs(start)?.root;
 }
 
 function remoteUrl(config: string): string | undefined {

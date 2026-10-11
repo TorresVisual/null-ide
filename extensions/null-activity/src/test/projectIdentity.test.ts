@@ -5,7 +5,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
-import { NO_FOLDER, normalizeRemote, resolveProject } from '../projectIdentity';
+import { NO_FOLDER, normalizeRemote, repoRoot, resolveProject } from '../projectIdentity';
 
 const tmpDir = () => fs.mkdtempSync(path.join(os.tmpdir(), 'null-activity-proj-'));
 
@@ -96,4 +96,15 @@ test('a git worktree (.git file) uses the common config and its own HEAD', () =>
   fs.mkdirSync(wt);
   fs.writeFileSync(path.join(wt, '.git'), `gitdir: ${wtGit}\n`);
   assert.deepStrictEqual(resolveProject(wt), { key: 'github.com/o/r', name: 'wt', branch: 'issue-1-x' });
+});
+
+test('repoRoot finds the folder containing .git from a nested folder, and undefined without git', () => {
+  const root = tmpDir();
+  repo(root, { origin: 'git@github.com:o/r.git' });
+  const nested = path.join(root, 'a', 'b');
+  fs.mkdirSync(nested, { recursive: true });
+  assert.strictEqual(repoRoot(nested), root);
+  const plain = path.join(tmpDir(), 'plain');
+  fs.mkdirSync(plain);
+  assert.strictEqual(repoRoot(plain), undefined);
 });
