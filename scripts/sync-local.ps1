@@ -256,7 +256,8 @@ $Extensions = [ordered]@{
         CompileScript = "compile"
         Copy          = @(
             "package.json",
-            "out"
+            "out",
+            "media"
         )
     }
 
