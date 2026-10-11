@@ -13,6 +13,17 @@ A third view for `.md` files, **Markdown Editor**: the document is shown rendere
 - Not a full WYSIWYG editor.
 - `null-markdown` is plain JS with no build step; keep it that way.
 
+## Views of one file
+
+```text
+example.md
+    ├── Markdown Source    (built-in text editor, listed by VS Code as "Text Editor")
+    ├── Markdown Editor    (null-markdown.editor — rendered, editable)
+    └── Markdown Preview   (null-markdown.previewEditor — rendered, read-only, same tab)
+```
+
+All three appear in **Reopen Editor With… / Open With…** and switch in place on the same `TextDocument`. The existing `null-markdown.openPreview` side-by-side panel is unchanged and remains the quick "preview beside source" path.
+
 ## Editing model: block-level source reveal
 
 Granularity is the **top-level block** (paragraph, whole list, table, fence, html block, heading).
@@ -32,19 +43,19 @@ Granularity is the **top-level block** (paragraph, whole list, table, fence, htm
 | Piece | Responsibility |
 |---|---|
 | `extension.js` (modified) | `data-line-end` attribute in the source-map rule; shared `buildPage(webview, ctx, html, extraScripts)` used by Preview, Slides' shell stays as is; `openPreview` falls back to the Editor's document; checkbox toggle edits the document instead of requiring a visible text editor; registers the provider and the new commands. |
-| `editor.js` (new, host) | `NullMarkdownEditorProvider` (`CustomTextEditorProvider`): renders, posts `update`, answers `blockSource`, applies `replaceBlock`, handles `wikiLink`/`checkboxToggle` (same as Preview), ignores `scroll`. |
+| `editor.js` (new, host) | `NullMarkdownEditorProvider` (`CustomTextEditorProvider`), constructed twice with `{ readOnly }`: renders, posts `update`, handles `wikiLink`/`checkboxToggle` (same as Preview), ignores `scroll`. When not read-only it also answers `blockSource` and applies `replaceBlock`, and loads `preview/editor.js`. |
 | `blockEdit.js` (new, pure) | `getBlockLines(text, start, end)` and `replaceBlockLines(text, start, end, original, newText)` → new text or `null` on mismatch. Handles `\n`/`\r\n`. Unit-tested. |
 | `preview/editor.js` (new, webview) | Click-to-edit layer: finds the top-level `[data-line]` child of `#content`, textarea lifecycle, update queueing, conflict handling. Reuses `preview.js` for KaTeX, Mermaid, wiki links, checkboxes. |
 | `preview/null-markdown.css` (modified) | Textarea styling (monospace, matches block width, themed). |
-| `package.json` (modified) | `customEditors` entry (`viewType: null-markdown.editor`, `filenamePattern: *.md`, `priority: option`), commands, `editor/title` menu items, `test` script. |
+| `package.json` (modified) | two `customEditors` entries (`null-markdown.editor` "Markdown Editor", `null-markdown.previewEditor` "Markdown Preview"; `filenamePattern: *.md`, `priority: option`), commands, `editor/title` menu items, `test` script. |
 
 ## Commands and toolbar
 
 - `Markdown: Open Editor` → `vscode.openWith(uri, 'null-markdown.editor')`.
 - `Markdown: Open Source` → `vscode.openWith(uri, 'default')`.
-- `Markdown: Open Preview` → existing `null-markdown.openPreview`, retitled "Open Preview"; works when the active tab is the Editor.
-- `editor/title`: "Open Editor" icon on Source tabs for `.md`; "Open Source" icon when `activeCustomEditorId == null-markdown.editor`.
-- Reopen With lists all three views (Source, Editor via `customEditors`; Preview stays a command).
+- `Markdown: Open Preview` → `vscode.openWith(uri, 'null-markdown.previewEditor')` (in-tab, read-only). The side-by-side panel stays on `null-markdown.openPreview` (Ctrl+Shift+V, `markdown.showPreview*` intercepts), which also works when the active tab is the Editor or in-tab Preview.
+- `editor/title`: "Open Editor" icon on Source tabs for `.md`; "Open Source" icon when `activeCustomEditorId` is either null-markdown view.
+- Reopen With lists all three views: Source (built-in), Editor and Preview (both `customEditors`, `priority: option`).
 
 ## Behaviour owned by the platform
 
@@ -53,7 +64,7 @@ Dirty state, save, external file changes, undo/redo, Reopen With and tab replace
 ## Testing
 
 - `node --test` for `blockEdit.js` (LF/CRLF, first/last block, mismatch → `null`, empty new text, append at EOF). New `test` script in `package.json`.
-- Manual checklist (plan): open from Explorer, search and Source Control; untitled `.md`; undo/redo after block commit, including from the webview (verify that Ctrl+Z in the webview reaches the document); dirty/save; external file change with and without an open textarea; Source ↔ Editor ↔ Preview side by side; checkbox toggle in Preview next to an Editor tab; KaTeX/Mermaid/alerts/wiki links identical to Preview.
+- Manual checklist (plan): Reopen With shows Source / Editor / Preview and each switch keeps one tab and one document; open from Explorer, search and Source Control; untitled `.md`; undo/redo after block commit, including from the webview (verify that Ctrl+Z in the webview reaches the document); dirty/save; external file change with and without an open textarea; Source ↔ Editor ↔ Preview side by side; checkbox toggle in Preview next to an Editor tab; KaTeX/Mermaid/alerts/wiki links identical to Preview.
 - `null-markdown` has no integration specs today, so `/verify-local` does not apply; confirm `sync-local.ps1` copies the new files.
 
 ## Out of scope / known ceilings
