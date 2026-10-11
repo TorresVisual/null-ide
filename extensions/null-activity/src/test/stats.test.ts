@@ -3,10 +3,11 @@
 import assert from 'node:assert';
 import { test } from 'node:test';
 import {
-  dayKey, dayRange, formatDuration, languageStats, lastDaysRange, mergeClip, monthRange, nextPeriodStart,
+  attributedIntervals, dayKey, dayRange, formatDuration, languageStats, lastDaysRange, mergeClip, monthRange, nextPeriodStart,
   normalizeIntervals, periodStart, periodStats, projectStats, sessions,
 } from '../stats';
 import { Interval } from '../types';
+import { WAKATIME_WINDOW_ID } from '../wakatimeImport';
 
 const MIN = 60_000;
 /** Local time; month is zero-based and defaults to October 2026 (Thu 8 Oct 2026). */
@@ -125,4 +126,46 @@ test('formatDuration', () => {
   assert.strictEqual(formatDuration(59_000), '0m');
   assert.strictEqual(formatDuration(12 * MIN), '12m');
   assert.strictEqual(formatDuration((4 * 60 + 32) * MIN), '4h 32m');
+});
+
+const proj = (key: string) => ({ key, name: key.toUpperCase() });
+
+test('three parallel windows: projects and languages sum, the daily total and session duration stay the union', () => {
+  const day = dayRange(at(8, 12));
+  const data = ['a', 'b', 'c'].map((w) => iv(at(8, 10), at(8, 10, 10), { window: w, project: proj(w) }));
+  assert.deepStrictEqual(projectStats(data, day).map((p) => p.ms), [10 * MIN, 10 * MIN, 10 * MIN]);
+  assert.strictEqual(languageStats(data, day)[0].ms, 30 * MIN);
+  assert.deepStrictEqual(periodStats(data, day, 'day'), [{ day: '2026-10-08', ms: 10 * MIN }]);
+  const [session] = sessions(data, day, 15 * MIN);
+  assert.strictEqual(session.durationMs, 10 * MIN);
+  assert.deepStrictEqual(session.projects.map((p) => p.name), ['A', 'B', 'C']);
+});
+
+test('intervals without a window behave as one window: overlaps are still clipped', () => {
+  const day = dayRange(at(8, 12));
+  const data = [iv(at(8, 10), at(8, 10, 10)), iv(at(8, 10, 5), at(8, 10, 15), { project: proj('k2') })];
+  assert.deepStrictEqual(projectStats(data, day).map((p) => [p.project.key, p.ms]), [['k', 10 * MIN], ['k2', 5 * MIN]]);
+});
+
+test('a WakaTime import only fills the gaps live windows left', () => {
+  const day = dayRange(at(8, 12));
+  const live = iv(at(8, 10, 5), at(8, 10, 10), { window: 'w1', project: proj('live'), linesAdded: 7 });
+  const imported = iv(at(8, 10), at(8, 10, 20), { window: WAKATIME_WINDOW_ID, project: proj('imp') });
+  const by = Object.fromEntries(projectStats([live, imported], day).map((p) => [p.project.key, p]));
+  assert.strictEqual(by.live.ms, 5 * MIN);
+  assert.strictEqual(by.live.linesAdded, 7);
+  assert.strictEqual(by.imp.ms, 15 * MIN, '10:00-10:05 and 10:10-10:20');
+  assert.deepStrictEqual(attributedIntervals([live, imported], day).map((i) => [i.project.key, i.start, i.end]), [
+    ['imp', at(8, 10), at(8, 10, 5)],
+    ['live', at(8, 10, 5), at(8, 10, 10)],
+    ['imp', at(8, 10, 10), at(8, 10, 20)],
+  ]);
+  assert.deepStrictEqual(periodStats([live, imported], day, 'day'), [{ day: '2026-10-08', ms: 20 * MIN }]);
+});
+
+test('an import completely covered by live windows contributes nothing', () => {
+  const day = dayRange(at(8, 12));
+  const live = iv(at(8, 10), at(8, 11), { window: 'w1', project: proj('live') });
+  const imported = iv(at(8, 10, 10), at(8, 10, 40), { window: WAKATIME_WINDOW_ID, project: proj('imp') });
+  assert.deepStrictEqual(projectStats([live, imported], day).map((p) => p.project.key), ['live']);
 });
