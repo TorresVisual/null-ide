@@ -40,20 +40,22 @@ All three appear in **Reopen Editor With… / Open With…** (`priority: option`
 | `package.json` (modified) | Two `customEditors` entries, commands, `editor/title` items, `build` script (esbuild), `test` script, CodeMirror/lezer deps, `esbuild` devDependency. |
 | `scripts/sync-local.ps1`, `build.yml` (modified) | Copy `lib/`; run `npm ci && npm run build` for `null-markdown`. |
 
-Dependencies: `@codemirror/{state,view,commands,language,lang-markdown}`, `@lezer/markdown`; roughly 300–400 KB bundled.
+Dependencies (dev only; bundled into `lib/editor.js`, about 500 KB minified): `@codemirror/{state,view,commands,language,lang-markdown}`, `@lezer/markdown`, `esbuild`. The decoration plan, sync client and formatting commands are plain `.mjs` modules so `node --test` can import them directly; host files stay CommonJS `.js`.
 
 ## Sync protocol
 
 The `TextDocument` is the source of truth; the CM6 doc is a mirror.
 
-- **Webview → host:** `edit { baseVersion, changes: [{from, to, insert}] }`. The host applies it as one `WorkspaceEdit` (document EOL preserved) and records the resulting version so the echo is not sent back.
-- **Host → webview** (Source edit, git checkout, formatter, undo): `changes { version, changes }`, applied as a remote transaction that is not added to CM6's undo history.
-- **Version mismatch:** if the host changed since `baseVersion`, it drops the webview edit and sends a full `reset { text, version }`. At most a few keystrokes are lost, and only when two writers race.
-- **Webview reload / crash:** the webview requests state and the host replies with full text. No local persistence.
+- **Line endings:** the webview mirrors the text with LF line endings (CM6 normalises them). Offsets it sends are LF offsets; the host converts them to line/character positions against the LF form of its text and writes inserted text with the document's EOL. This lives in `syncState.js` (pure, unit-tested) together with the version bookkeeping.
+- **Webview → host:** `edit { baseVersion, changes: [{from, to, insert}] }` in original-document coordinates. Local changes are debounced (~300 ms) and composed, so a typing burst is one `WorkspaceEdit` and one undo step, and only one edit is in flight at a time. The host applies it, then replies `ack { version }`.
+- **Host → webview** (Source edit, git checkout, formatter, undo, rejected edit): `doc { text, version }` with the full LF text. The webview diffs it against its current text and applies the single changed span, so the selection is preserved; it is not echoed back.
+- **Version mismatch:** if the host changed since `baseVersion`, or the edit is malformed, it drops the edit and sends `doc`. Anything the webview had pending loses the race (host wins); at most a few keystrokes, and only when two writers race.
+- **Save:** Ctrl+S in the webview waits for pending edits to be acked, then asks the host to save; otherwise the workbench would save before the last edit lands and the file would stay dirty.
+- **Webview reload / crash:** the webview sends `ready` and the host replies with `doc`. No local persistence.
 
 ### Undo/redo (open risk, spike first)
 
-How Ctrl+Z behaves inside a `CustomTextEditor` webview is unverified: it may reach CM6's history or the workbench's document undo. Plan task 1 settles which one is the single undo stack so the two never fight. The design commits to one stack, whichever the spike shows is workable.
+How Ctrl+Z behaves inside a `CustomTextEditor` webview is unverified: it may reach CM6's history, the workbench's document undo, or both (the webview forwards undo/redo keydowns to the workbench even when the editor handled them). The design commits to one stack: the workbench's document undo, with no CM6 history, because the host `TextDocument` is the source of truth and every undo then arrives as a normal `doc` message. Plan task 2 verifies this in the running app before anything else is built on it; if it does not hold, the spec is revisited. Known ceiling: an undo pressed within one debounce window of typing can undo the previous step instead of the one still in flight.
 
 ## Live-preview rendering
 
@@ -75,7 +77,7 @@ How Ctrl+Z behaves inside a `CustomTextEditor` webview is unverified: it may rea
 
 - `Markdown: Open Editor` → `vscode.openWith(uri, 'null-markdown.editor')`.
 - `Markdown: Open Source` → `vscode.openWith(uri, 'default')`.
-- `Markdown: Open Preview` → `vscode.openWith(uri, 'null-markdown.previewEditor')` (in-tab, read-only). The side-by-side panel stays on `null-markdown.openPreview`.
+- `Markdown: Open Markdown Preview in Tab` (`null-markdown.openPreviewTab`) → `vscode.openWith(uri, 'null-markdown.previewEditor')` (in-tab, read-only). The side-by-side panel stays on `null-markdown.openPreview`.
 - `editor/title`: "Open Editor" icon on Source tabs for `.md`; "Open Source" icon when `activeCustomEditorId` is either null-markdown view.
 
 ## Errors and edge cases
@@ -106,6 +108,8 @@ Dirty state, save, external file changes, Reopen With and tab replacement come f
 
 - No per-cell table editing (a table is raw while the caret is in it).
 - No syntax highlighting inside code fences in the Editor.
-- `:emoji:` and footnotes stay plain text.
+- `:emoji:`, footnotes and inline `$math$` stay plain text (`$$` blocks render).
+- Relative images resolve against the document's folder; images outside the workspace folders or that folder do not load.
+- Export to PDF and Slides still need the Source tab to be active.
 - Rendered diffs from Source Control: custom editors cannot be used in the diff editor.
 - No Editor↔Source scroll sync (Editor is its own tab).
