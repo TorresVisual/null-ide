@@ -21,7 +21,7 @@ Pieces 2–5 depend only on the `NullActivityApi` and the interval format define
 ## Decisions
 
 - **Home:** new extension `extensions/null-activity/` (TypeScript, `out/` tracked), following `null-music`'s conventions: pure classes, wiring in `extension.ts`, API returned from `activate`, data under `globalStorageUri`. No dependency on other Null extensions.
-- **Active definition (lenient):** any interaction counts while the Null IDE window is focused — edits, cursor moves, scrolling, switching files, saves, terminal input, debug sessions. A gap longer than `null-activity.idleTimeout` (default 900 s, matching WakaTime's 15 min timeout, issue #123) is idle. Closes without a heartbeat (focus loss, pause, shutdown) end at the last heartbeat, never at the closing time, so the long timeout does not credit trailing silence.
+- **Active definition (lenient):** any interaction counts, focused or not — edits, cursor moves, scrolling, switching files, saves, terminal input, debug sessions. A gap longer than `null-activity.idleTimeout` (default 900 s, matching WakaTime's 15 min timeout, issue #123) is idle. Closes without a heartbeat (pause, shutdown) end at the last heartbeat, never at the closing time, so the long timeout does not credit trailing silence.
 - **Storage:** an append-only interval log; every statistic is derived from it. No SQLite, no native module.
 - **Project identity:** git remote URL, falling back to the folder path. Display name = folder name, so renaming a folder does not split history.
 - **Language:** the document's `languageId`.
@@ -42,7 +42,7 @@ interface Interval {
 }
 ```
 
-Persisted as one JSON object per line in `intervals-YYYY-MM-<windowId>.jsonl` (month of `start`; an interval that crosses midnight at month end is split). One file per window id avoids concurrent-write clobbering between multiple Null IDE windows.
+Persisted as one JSON object per line in `intervals-YYYY-MM-<windowId>.jsonl`, `<windowId>` a random id per window (month of `start`; an interval that crosses midnight at month end is split). One file per window id avoids concurrent-write clobbering between multiple Null IDE windows.
 
 **Sessions** are derived: consecutive intervals with gaps ≤ `null-activity.sessionGap` (default 15 min) form one session. Session = start, end, duration (sum of interval time), projects, languages, files.
 
@@ -52,11 +52,11 @@ All pure except the wiring layer; none imports `vscode` except `heartbeatSource.
 
 | File | Responsibility |
 |---|---|
-| `heartbeatSource.ts` | Subscribes to VS Code events (text edits, selection, visible ranges, active editor, saves, terminal data, debug sessions, window focus) and emits `Heartbeat { ts, file, language, workspace, isWrite, linesAdded, linesRemoved }`. Lines come from edit-event change counts. |
-| `tracker.ts` | State machine over heartbeats with an injected clock. Maintains one open interval. Closes it at the last heartbeat when the gap exceeds `idleTimeout`, on window focus loss, or when project/language/file changes; then opens a new one. A timer-driven `tick()` closes stale intervals even with no new heartbeat. |
+| `heartbeatSource.ts` | Subscribes to VS Code events (text edits, selection, visible ranges, active editor, saves, terminal data, debug sessions) and emits `Heartbeat { ts, file, language, workspace, isWrite, linesAdded, linesRemoved }`. Lines come from edit-event change counts. |
+| `tracker.ts` | State machine over heartbeats with an injected clock. Maintains one open interval. Closes it at the last heartbeat when the gap exceeds `idleTimeout`, or when project/language/file changes; then opens a new one. A timer-driven `tick()` closes stale intervals even with no new heartbeat. |
 | `intervalStore.ts` | Appends closed intervals (buffered; flushed on a timer and in `dispose`), reads ranges, deletes ranges/all. Skips a torn last line. Memory buffer is capped; write failures log and never throw into the editor. |
 | `projectIdentity.ts` | `resolveProject(folderUri) → { key, name, branch? }` — reads `.git/config` remote (falls back to path) and `.git/HEAD` for the branch. Called when the tracker opens an interval, not per heartbeat. |
-| `stats.ts` | Pure functions: merge intervals from all windows, clip overlaps (so two open windows do not double-count), derive sessions, aggregate by day/week/month/project/language. Week starts Monday; day boundaries use local time. |
+| `stats.ts` | Pure functions: merge intervals from all windows, clip overlaps (so the headline total of two open windows does not double-count; per-project/language stats sum windows, the headline total is the union), derive sessions, aggregate by day/week/month/project/language. Week starts Monday; day boundaries use local time. |
 | `activityService.ts` | The public API (below). Owns tracker + store; fires `onDidChange` when an interval closes or data is deleted. |
 | `privacy.ts` | Master switch handling and deletion helpers. |
 | `statusBar.ts` | Right-aligned item `$(clock) 4h 32m` for today; updates on `onDidChange` and a 60 s timer. Click runs `null-activity.showTrackedData` until the dashboard exists. |
