@@ -24,10 +24,13 @@ All in `extensions/null-activity/src/`. Only `importCommand.ts` imports `vscode`
 
 | File | Responsibility |
 |---|---|
-| `wakatimeImport.ts` | Pure. `convertExport(data, resolve, now?) → { intervals: Interval[]; summary: ImportSummary }`. Heartbeats → intervals. |
-| `languageMap.ts` | Pure table: WakaTime display name → VS Code `languageId` (`C++` → `cpp`, `Markdown` → `markdown`, …). Unknown names fall back to the lowercased name; empty stays `''`. |
-| `importCommand.ts` | `null-activity.importWakaTime`: file picker, replace confirmation, `withProgress`, summary. Builds the project resolver from the local filesystem via the engine's `projectIdentity`. |
-| `activityService.ts` | New internal `replaceImported(intervals: Interval[]): void`: rewrites the `import-wakatime` files through a second `IntervalStore` (window id `import-wakatime`), invalidates the stats index, fires `onDidChange`. |
+| `wakatimeImport.ts` | Pure. `convertExport(data, resolve) → { intervals: Interval[]; summary: ImportSummary }` (heartbeats → intervals) and `formatSummary(summary)`. Exports `WAKATIME_WINDOW_ID = 'import-wakatime'`. |
+| `languageMap.ts` | Pure table: WakaTime display name → VS Code `languageId` (`C++` → `cpp`, `Bash` → `shellscript`, …). Other names fall back to a lowercase slug; empty stays `''`. |
+| `wakatimeProjects.ts` | `diskProjectResolver`: matches a WakaTime project to a git repo that still exists on this machine, through the engine's `projectIdentity`. No `vscode`. |
+| `importCommand.ts` | `null-activity.importWakaTime`: file picker, replace confirmation, `withProgress`, summary. Takes an optional file URI argument that skips the dialogs (used by the integration spec). |
+| `intervalStore.ts` | New `replaceWindow(windowId, intervals)` (atomically swaps one window's files, bypassing the in-memory buffer cap) and `hasWindow(windowId)`. |
+| `activityService.ts` | New internal `replaceImported(intervals)` and `hasImport()`: use `replaceWindow(WAKATIME_WINDOW_ID, …)`, invalidate the stats cache, fire `onDidChange`. |
+| `projectIdentity.ts` | New export `repoRoot(start)`: the folder containing the `.git` found at or above `start`. |
 | `package.json`, `extension.ts` | Command contribution and registration. |
 
 ```ts
@@ -43,7 +46,7 @@ interface ImportSummary {
 }
 ```
 
-`convertExport` takes `resolve(projectName, entityDirs) → { key, name, root? } | undefined`; the command supplies the real one, tests supply a stub.
+`convertExport` takes `resolve(projectName, dir) → { key, name, root? } | undefined`, where `dir` is the project's most common heartbeat directory (forward slashes); `diskProjectResolver` is the real one, tests supply stubs.
 
 ## Conversion rules
 
