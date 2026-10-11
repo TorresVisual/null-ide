@@ -11,7 +11,7 @@ function normalizeSettings(raw) {
     const num = (v, fallback, min, max) => typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : fallback;
     return {
         enabled: raw.enabled !== false,
-        idleTimeoutMs: num(raw.idleTimeout, 120, 10, 3_600) * 1_000,
+        idleTimeoutMs: num(raw.idleTimeout, 900, 10, 3_600) * 1_000,
         sessionGapMs: num(raw.sessionGap, 15, 1, 1_440) * 60_000,
     };
 }

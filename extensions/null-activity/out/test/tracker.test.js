@@ -6,7 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const node_assert_1 = __importDefault(require("node:assert"));
 const node_test_1 = require("node:test");
 const tracker_1 = require("../tracker");
-const IDLE = 120_000;
+const IDLE = 900_000;
 function setup() {
     let now = 0;
     let resolved = 0;
@@ -78,7 +78,7 @@ function hb(ts, over = {}) {
         node_assert_1.default.strictEqual(out.length, 1, JSON.stringify(change));
         node_assert_1.default.deepStrictEqual([out[0].start, out[0].end], [0, 30_000]);
         node_assert_1.default.strictEqual(resolveCount(), 2);
-        at(40_000);
+        tracker.heartbeat(hb(40_000, change));
         tracker.closeOpen();
         node_assert_1.default.deepStrictEqual([out[1].start, out[1].end, out[1].linesAdded], [30_000, 40_000, 4]);
     }
@@ -89,14 +89,14 @@ function hb(ts, over = {}) {
     tracker.heartbeat(hb(10_000));
     at(40_000);
     tracker.setFocused(false);
-    node_assert_1.default.deepStrictEqual(out.map((i) => [i.start, i.end]), [[0, 40_000]]);
+    node_assert_1.default.deepStrictEqual(out.map((i) => [i.start, i.end]), [[0, 10_000]], 'ends at the last heartbeat, not at the loss');
     tracker.heartbeat(hb(50_000));
     tracker.setFocused(true);
     tracker.heartbeat(hb(60_000));
     tracker.heartbeat(hb(70_000));
     at(70_000);
     tracker.closeOpen();
-    node_assert_1.default.deepStrictEqual(out.map((i) => [i.start, i.end]), [[0, 40_000], [60_000, 70_000]]);
+    node_assert_1.default.deepStrictEqual(out.map((i) => [i.start, i.end]), [[0, 10_000], [60_000, 70_000]]);
 });
 (0, node_test_1.test)('focus loss after a long silence ends at the last heartbeat, not at the loss', () => {
     const { tracker, out, at } = setup();
@@ -130,14 +130,14 @@ function hb(ts, over = {}) {
     tracker.heartbeat(hb(10_000));
     at(20_000);
     tracker.setActive(false);
-    node_assert_1.default.deepStrictEqual(out.map((i) => [i.start, i.end]), [[0, 20_000]]);
+    node_assert_1.default.deepStrictEqual(out.map((i) => [i.start, i.end]), [[0, 10_000]]);
     tracker.heartbeat(hb(30_000));
     tracker.setActive(true);
     tracker.heartbeat(hb(40_000));
     tracker.heartbeat(hb(50_000));
     at(50_000);
     tracker.closeOpen();
-    node_assert_1.default.deepStrictEqual(out.map((i) => [i.start, i.end]), [[0, 20_000], [40_000, 50_000]]);
+    node_assert_1.default.deepStrictEqual(out.map((i) => [i.start, i.end]), [[0, 10_000], [40_000, 50_000]]);
 });
 (0, node_test_1.test)('peek() reports the open interval up to the last heartbeat without closing it', () => {
     const { tracker, out } = setup();

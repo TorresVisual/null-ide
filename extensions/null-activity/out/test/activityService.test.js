@@ -98,7 +98,7 @@ const day = (0, stats_1.dayRange)(at(8, 12));
     settings.enabled = false;
     service.refresh();
     node_assert_1.default.strictEqual(service.enabled, false);
-    node_assert_1.default.deepStrictEqual(service.getIntervals(day).map((i) => [i.start, i.end]), [[at(8, 9), at(8, 9, 2)]]);
+    node_assert_1.default.deepStrictEqual(service.getIntervals(day).map((i) => [i.start, i.end]), [[at(8, 9), at(8, 9, 1)]]);
     service.recordActivity(hb(at(8, 9, 3)));
     service.startSession(); // no-op while disabled
     service.recordActivity(hb(at(8, 9, 4)));
@@ -113,6 +113,7 @@ const day = (0, stats_1.dayRange)(at(8, 12));
 (0, node_test_1.test)('pauseSession stops counting until startSession', () => {
     const { service, at: setNow } = setup();
     service.recordActivity(hb(at(8, 9)));
+    service.recordActivity(hb(at(8, 9, 0, 30)));
     setNow(at(8, 9, 1));
     service.pauseSession();
     service.recordActivity(hb(at(8, 9, 2)));
@@ -137,13 +138,13 @@ const day = (0, stats_1.dayRange)(at(8, 12));
     node_assert_1.default.deepStrictEqual(service.getIntervals(day), []);
 });
 (0, node_test_1.test)('normalizeSettings clamps nonsense to sane values', () => {
-    const d = { enabled: true, idleTimeoutMs: 120_000, sessionGapMs: 15 * MIN };
+    const d = { enabled: true, idleTimeoutMs: 900_000, sessionGapMs: 15 * MIN };
     node_assert_1.default.deepStrictEqual((0, activityService_1.normalizeSettings)({}), d);
     node_assert_1.default.deepStrictEqual((0, activityService_1.normalizeSettings)({ enabled: false }), { ...d, enabled: false });
     node_assert_1.default.strictEqual((0, activityService_1.normalizeSettings)({ idleTimeout: 0 }).idleTimeoutMs, 10_000);
     node_assert_1.default.strictEqual((0, activityService_1.normalizeSettings)({ idleTimeout: -5 }).idleTimeoutMs, 10_000);
-    node_assert_1.default.strictEqual((0, activityService_1.normalizeSettings)({ idleTimeout: Number.NaN }).idleTimeoutMs, 120_000);
-    node_assert_1.default.strictEqual((0, activityService_1.normalizeSettings)({ idleTimeout: 'abc' }).idleTimeoutMs, 120_000);
+    node_assert_1.default.strictEqual((0, activityService_1.normalizeSettings)({ idleTimeout: Number.NaN }).idleTimeoutMs, 900_000);
+    node_assert_1.default.strictEqual((0, activityService_1.normalizeSettings)({ idleTimeout: 'abc' }).idleTimeoutMs, 900_000);
     node_assert_1.default.strictEqual((0, activityService_1.normalizeSettings)({ idleTimeout: 1e9 }).idleTimeoutMs, 3_600_000);
     node_assert_1.default.strictEqual((0, activityService_1.normalizeSettings)({ sessionGap: 0 }).sessionGapMs, MIN);
     node_assert_1.default.strictEqual((0, activityService_1.normalizeSettings)({ sessionGap: 1e9 }).sessionGapMs, 1_440 * MIN);
