@@ -44,17 +44,22 @@ export class IntervalStore {
   constructor(private readonly opts: IntervalStoreOptions) {}
 
   /** Splits at local month boundaries; lines stay on the first piece. */
-  append(interval: Interval): void {
+  private split(interval: Interval): Interval[] {
+    const out: Interval[] = [];
     let piece = interval;
     for (;;) {
       const boundary = nextPeriodStart(piece.start, 'month');
       if (piece.end <= boundary) {
-        this.push(piece);
-        return;
+        out.push(piece);
+        return out;
       }
-      this.push({ ...piece, end: boundary });
+      out.push({ ...piece, end: boundary });
       piece = { ...piece, start: boundary, linesAdded: 0, linesRemoved: 0 };
     }
+  }
+
+  append(interval: Interval): void {
+    for (const piece of this.split(interval)) this.push(piece);
   }
 
   /**
@@ -113,6 +118,36 @@ export class IntervalStore {
     for (const name of this.listFiles(EVERYTHING)) fs.rmSync(path.join(this.opts.dir, name), { force: true });
   }
 
+  /**
+   * Replaces every file of `windowId` with `intervals` (used by imports). Writes straight to disk, so the
+   * buffer cap does not apply; throws on write failure, leaving files that were not yet replaced intact.
+   */
+  replaceWindow(windowId: string, intervals: Interval[]): void {
+    const byMonth = new Map<string, Interval[]>();
+    for (const i of intervals) {
+      for (const piece of this.split(i)) {
+        const month = monthKey(piece.start);
+        const list = byMonth.get(month);
+        if (list) list.push(piece);
+        else byMonth.set(month, [piece]);
+      }
+    }
+    fs.mkdirSync(this.opts.dir, { recursive: true });
+    const fresh = new Set<string>();
+    for (const [month, items] of byMonth) {
+      const file = this.fileFor(month, windowId);
+      this.rewrite(file, items);
+      fresh.add(path.basename(file));
+    }
+    for (const name of this.windowFiles(windowId)) {
+      if (!fresh.has(name)) fs.rmSync(path.join(this.opts.dir, name), { force: true });
+    }
+  }
+
+  hasWindow(windowId: string): boolean {
+    return this.windowFiles(windowId).length > 0;
+  }
+
   private push(i: Interval): void {
     this.buffer.push(i);
     const max = this.opts.maxBuffered ?? DEFAULT_MAX_BUFFERED;
@@ -122,8 +157,18 @@ export class IntervalStore {
     }
   }
 
-  private fileFor(month: string): string {
-    return path.join(this.opts.dir, `intervals-${month}-${this.opts.windowId}.jsonl`);
+  private fileFor(month: string, windowId = this.opts.windowId): string {
+    return path.join(this.opts.dir, `intervals-${month}-${windowId}.jsonl`);
+  }
+
+  private windowFiles(windowId: string): string[] {
+    let names: string[];
+    try {
+      names = fs.readdirSync(this.opts.dir);
+    } catch {
+      return [];
+    }
+    return names.filter((name) => name.replace(/^intervals-\d{4}-\d{2}-/, '') === `${windowId}.jsonl`);
   }
 
   private listFiles(range: DateRange): string[] {

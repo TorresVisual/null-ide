@@ -127,3 +127,36 @@ test('the in-memory buffer is capped, dropping the oldest', () => {
   const got = store.read(dayRange(at(8, 12))).sort(byStart);
   assert.deepStrictEqual(got.map((i) => i.start), [at(8, 12), at(8, 14)]);
 });
+
+test('replaceWindow swaps one window\'s files, splits months, can be repeated and can empty the window', () => {
+  const dir = tmpDir();
+  const native = new IntervalStore({ dir, windowId: 'w1' });
+  native.append(iv(at(8, 9), at(8, 10)));
+  native.flush();
+  const store = new IntervalStore({ dir, windowId: 'w2' });
+  assert.strictEqual(store.hasWindow('import-wakatime'), false);
+
+  store.replaceWindow('import-wakatime', [iv(at(8, 10), at(8, 11)), iv(at(30, 23, 0, 8), at(1, 1, 0, 9))]);
+  assert.deepStrictEqual(fs.readdirSync(dir).sort(), [
+    'intervals-2026-09-import-wakatime.jsonl',
+    'intervals-2026-10-import-wakatime.jsonl',
+    'intervals-2026-10-w1.jsonl',
+  ]);
+  assert.strictEqual(store.hasWindow('import-wakatime'), true);
+
+  store.replaceWindow('import-wakatime', [iv(at(8, 12), at(8, 13))]);
+  assert.deepStrictEqual(fs.readdirSync(dir).sort(), ['intervals-2026-10-import-wakatime.jsonl', 'intervals-2026-10-w1.jsonl']);
+  const all = { from: -Infinity, to: Infinity };
+  assert.deepStrictEqual(store.read(all).sort(byStart).map((i) => i.start), [at(8, 9), at(8, 12)]);
+
+  store.replaceWindow('import-wakatime', []);
+  assert.strictEqual(store.hasWindow('import-wakatime'), false);
+  assert.deepStrictEqual(fs.readdirSync(dir), ['intervals-2026-10-w1.jsonl']);
+});
+
+test('replaceWindow keeps every interval even beyond maxBuffered', () => {
+  const store = new IntervalStore({ dir: tmpDir(), windowId: 'w1', maxBuffered: 10 });
+  const many = Array.from({ length: 2_000 }, (_, n) => iv(at(8, 0) + n * 120_000, at(8, 0) + n * 120_000 + 60_000));
+  store.replaceWindow('import-wakatime', many);
+  assert.strictEqual(store.read({ from: -Infinity, to: Infinity }).length, 2_000);
+});
