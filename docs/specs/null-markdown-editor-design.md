@@ -4,72 +4,108 @@ Issue: #114. Extension: `extensions/null-markdown/`.
 
 ## Goal
 
-A third view for `.md` files, **Markdown Editor**: the document is shown rendered and edited in place, and edits land in the same file. It sits next to the existing **Source** (plain text) and **Preview** views. All three are views of one `TextDocument`; switching never copies a document.
+A third view for `.md` files, **Markdown Editor**: the document is shown rendered and edited in place, Typora/Obsidian-style. Syntax markers are hidden except around the caret, and edits land in the same file. It sits next to the existing **Source** (plain text) and **Preview** views. All three are views of one `TextDocument`; switching never copies a document.
+
+VS Code's own hybrid Markdown editor is still Agents-window-only and experimental (1.141), so there is nothing to backport (`docs/vscode-tracking.md`, rows 1.131 / 1.132). This is the Null-built equivalent.
 
 ## Constraints
 
-- Reuse the existing markdown-it pipeline (`createMd()` + `processAlerts()`); no second parser or renderer, no HTML→Markdown converter.
+- The file is never rewritten or normalised: the editor holds the raw Markdown text and only decorates it. No HTML→Markdown or tree→Markdown serialisation.
+- Block widgets (table, Mermaid, math, alert, image, HTML) render through the existing `createMd()` + `processAlerts()`, so they look identical to Preview.
 - Preview keeps working independently.
-- Not a full WYSIWYG editor.
-- `null-markdown` is plain JS with no build step; keep it that way.
+- Plain JS, matching the extension. The webview is bundled by esbuild into a tracked `lib/` (same convention as `null-music` / `null-activity` webviews). This replaces the earlier "no build step" constraint for `null-markdown`.
 
 ## Views of one file
 
 ```text
 example.md
     ├── Markdown Source    (built-in text editor, listed by VS Code as "Text Editor")
-    ├── Markdown Editor    (null-markdown.editor — rendered, editable)
+    ├── Markdown Editor    (null-markdown.editor — live preview, editable)
     └── Markdown Preview   (null-markdown.previewEditor — rendered, read-only, same tab)
 ```
 
-All three appear in **Reopen Editor With… / Open With…** and switch in place on the same `TextDocument`. The existing `null-markdown.openPreview` side-by-side panel is unchanged and remains the quick "preview beside source" path.
+All three appear in **Reopen Editor With… / Open With…** (`priority: option`; Source stays the default, "default for .md" is the standard `workbench.editorAssociations`) and switch in place on the same `TextDocument`. The existing side-by-side `null-markdown.openPreview` panel (Ctrl+Shift+V) is unchanged and also works when the active tab is the Editor.
 
-## Editing model: block-level source reveal
-
-Granularity is the **top-level block** (paragraph, whole list, table, fence, html block, heading).
-
-1. All blocks render normally. Clicking a block asks the host for its source lines `[start, end)`; the webview swaps that block for a `<textarea>` holding the raw Markdown.
-2. Esc or blur commits. The webview posts `replaceBlock { start, end, original, text }`. The host replaces only lines `[start, end)` in one `WorkspaceEdit` (document EOL preserved, blank lines between blocks untouched). One commit = one undo step.
-3. Clicking the empty area below the last block appends a new block (textarea at end of file; empty commit adds nothing).
-4. The block re-renders through the same pipeline via the normal `onDidChangeTextDocument` → `update` path.
-
-### Concurrent changes
-
-- While a textarea is open, `editor.js` swallows incoming `update` messages (it is loaded before `preview.js` and calls `stopImmediatePropagation`), keeps the latest html, and applies it after the block closes.
-- On commit the host checks that lines `[start, end)` still equal `original`. If not (Source edit, external change, formatter), it rejects the edit, tells the webview to keep the textarea, and shows a warning. Nothing is silently overwritten.
-
-## Components
+## Architecture
 
 | Piece | Responsibility |
 |---|---|
-| `extension.js` (modified) | `data-line-end` attribute in the source-map rule; shared `buildPage(webview, ctx, html, extraScripts)` used by Preview, Slides' shell stays as is; `openPreview` falls back to the Editor's document; checkbox toggle edits the document instead of requiring a visible text editor; registers the provider and the new commands. |
-| `editor.js` (new, host) | `NullMarkdownEditorProvider` (`CustomTextEditorProvider`), constructed twice with `{ readOnly }`: renders, posts `update`, handles `wikiLink`/`checkboxToggle` (same as Preview), ignores `scroll`. When not read-only it also answers `blockSource` and applies `replaceBlock`, and loads `preview/editor.js`. |
-| `blockEdit.js` (new, pure) | `getBlockLines(text, start, end)` and `replaceBlockLines(text, start, end, original, newText)` → new text or `null` on mismatch. Handles `\n`/`\r\n`. Unit-tested. |
-| `preview/editor.js` (new, webview) | Click-to-edit layer: finds the top-level `[data-line]` child of `#content`, textarea lifecycle, update queueing, conflict handling. Reuses `preview.js` for KaTeX, Mermaid, wiki links, checkboxes. |
-| `preview/null-markdown.css` (modified) | Textarea styling (monospace, matches block width, themed). |
-| `package.json` (modified) | two `customEditors` entries (`null-markdown.editor` "Markdown Editor", `null-markdown.previewEditor` "Markdown Preview"; `filenamePattern: *.md`, `priority: option`), commands, `editor/title` menu items, `test` script. |
+| `editorProvider.js` (host, new) | `CustomTextEditorProvider`, constructed twice with `{ readOnly }` (Editor and in-tab Preview). A thin relay: sends full text + version on open, applies webview edits as one `WorkspaceEdit`, forwards `onDidChangeTextDocument` changes, answers `renderBlock`, handles `wikiLink` / `checkboxToggle` like Preview. |
+| `syncState.js` (host, pure) | Version bookkeeping and echo suppression: records the version produced by its own edit, decides forward / drop / reset. Unit-tested. |
+| `webview/editor/*.js` (new) | CM6 setup: Markdown language (GFM), live-preview decorations, block widgets, formatting keymaps. Plain ES modules. |
+| `webview/editor/reveal.js` (pure) | Reveal rule: (syntax node, selection) → hidden or shown. Unit-tested with no CM6 import. |
+| `lib/editor.js` (tracked, generated) | esbuild output. Never hand-edited. |
+| `lib/editor.css` (tracked, hand-written) | Theme-variable styling shared with `null-markdown.css` fonts and colours. |
+| `extension.js` (modified) | Registers the provider and commands; checkbox toggle edits the document instead of needing a visible text editor; `openPreview` falls back to the Editor's document. |
+| `package.json` (modified) | Two `customEditors` entries, commands, `editor/title` items, `build` script (esbuild), `test` script, CodeMirror/lezer deps, `esbuild` devDependency. |
+| `scripts/sync-local.ps1`, `build.yml` (modified) | Copy `lib/`; run `npm ci && npm run build` for `null-markdown`. |
+
+Dependencies: `@codemirror/{state,view,commands,language,lang-markdown}`, `@lezer/markdown`; roughly 300–400 KB bundled.
+
+## Sync protocol
+
+The `TextDocument` is the source of truth; the CM6 doc is a mirror.
+
+- **Webview → host:** `edit { baseVersion, changes: [{from, to, insert}] }`. The host applies it as one `WorkspaceEdit` (document EOL preserved) and records the resulting version so the echo is not sent back.
+- **Host → webview** (Source edit, git checkout, formatter, undo): `changes { version, changes }`, applied as a remote transaction that is not added to CM6's undo history.
+- **Version mismatch:** if the host changed since `baseVersion`, it drops the webview edit and sends a full `reset { text, version }`. At most a few keystrokes are lost, and only when two writers race.
+- **Webview reload / crash:** the webview requests state and the host replies with full text. No local persistence.
+
+### Undo/redo (open risk, spike first)
+
+How Ctrl+Z behaves inside a `CustomTextEditor` webview is unverified: it may reach CM6's history or the workbench's document undo. Plan task 1 settles which one is the single undo stack so the two never fight. The design commits to one stack, whichever the spike shows is workable.
+
+## Live-preview rendering
+
+**Reveal rule:** a syntax marker is hidden unless the selection touches the node that owns it. Inline marks (`**`, `` ` ``, `[](url)`) reveal when the caret is inside their span; block marks (`#`, `>`, list bullets) reveal when the caret is on their line.
+
+**Decorated in place:**
+- Headings: `#` hidden, line takes heading size.
+- Bold, italic, strikethrough, inline code lose their markers. Links show only their text; Ctrl+click opens. `[[wiki]]` links styled the same way.
+- Blockquote left bar; bullets drawn as glyphs, ordered numbers stay text; horizontal rules render as lines.
+- Task lists: `[ ]` becomes a checkbox; a click is a one-character change.
+- Fenced code: fence lines dimmed, code always editable in monospace, no syntax highlighting in v1.
+- Front matter: dimmed raw text.
+
+**Block widgets** (whole ranges: table, Mermaid fence, `$$` math, GitHub alert, image, HTML block): the webview sends `renderBlock { text }`, the host returns HTML from `createMd()` + `processAlerts()`, and the webview runs the same KaTeX / Mermaid scripts Preview loads. Results are cached by source text. When the caret enters the range, or on click, the widget swaps back to raw source; arrow keys enter it naturally.
+
+**Editing helpers:** from `@codemirror/lang-markdown`: Enter continues lists and quotes, Tab indents list items, GFM tables and strikethrough parse. Custom keymaps: Ctrl+B, Ctrl+I, Ctrl+K (bold, italic, link) only.
 
 ## Commands and toolbar
 
 - `Markdown: Open Editor` → `vscode.openWith(uri, 'null-markdown.editor')`.
 - `Markdown: Open Source` → `vscode.openWith(uri, 'default')`.
-- `Markdown: Open Preview` → `vscode.openWith(uri, 'null-markdown.previewEditor')` (in-tab, read-only). The side-by-side panel stays on `null-markdown.openPreview` (Ctrl+Shift+V, `markdown.showPreview*` intercepts), which also works when the active tab is the Editor or in-tab Preview.
+- `Markdown: Open Preview` → `vscode.openWith(uri, 'null-markdown.previewEditor')` (in-tab, read-only). The side-by-side panel stays on `null-markdown.openPreview`.
 - `editor/title`: "Open Editor" icon on Source tabs for `.md`; "Open Source" icon when `activeCustomEditorId` is either null-markdown view.
-- Reopen With lists all three views: Source (built-in), Editor and Preview (both `customEditors`, `priority: option`).
+
+## Errors and edge cases
+
+- Files above ~1 MB (constant in `editorProvider.js`): the Editor shows a notice and offers to reopen as Source; widget round-trips to the host do not scale.
+- The webview is local-only with the same CSP as Preview; no untrusted-workspace special handling.
 
 ## Behaviour owned by the platform
 
-Dirty state, save, external file changes, undo/redo, Reopen With and tab replacement come from the shared `TextDocument` + `CustomTextEditorProvider`. Source edits reach the Editor via `onDidChangeTextDocument`.
+Dirty state, save, external file changes, Reopen With and tab replacement come from the shared `TextDocument` + `CustomTextEditorProvider`. Source edits reach the Editor via `onDidChangeTextDocument`.
 
 ## Testing
 
-- `node --test` for `blockEdit.js` (LF/CRLF, first/last block, mismatch → `null`, empty new text, append at EOF). New `test` script in `package.json`.
-- Manual checklist (plan): Reopen With shows Source / Editor / Preview and each switch keeps one tab and one document; open from Explorer, search and Source Control; untitled `.md`; undo/redo after block commit, including from the webview (verify that Ctrl+Z in the webview reaches the document); dirty/save; external file change with and without an open textarea; Source ↔ Editor ↔ Preview side by side; checkbox toggle in Preview next to an Editor tab; KaTeX/Mermaid/alerts/wiki links identical to Preview.
-- `null-markdown` has no integration specs today, so `/verify-local` does not apply; confirm `sync-local.ps1` copies the new files.
+- `node --test`: `syncState.js` (echo suppression, mismatch → reset, remote change forwarding) and `reveal.js` (node + selection → hidden / shown). New `test` script in `package.json`, listing the files explicitly.
+- Manual checklist (in the plan): Reopen With shows Source / Editor / Preview and each switch keeps one tab and one document; open from Explorer, search and Source Control; untitled `.md`; dirty / save; external file change; Source ↔ Editor edits both ways; undo/redo per the spike; each widget type (table, Mermaid, math, alert, image); checkbox toggle; IME input.
+- `null-markdown` has no integration specs, so `/verify-local` does not apply; confirm `sync-local.ps1` copies `lib/`.
+
+## Delivery order
+
+1. Spike: undo/redo ownership; the bundle loads in a CustomTextEditor webview.
+2. Sync protocol and a plain CM6 editor (opens, edits, saves).
+3. Live-preview decorations.
+4. Block widgets.
+5. Commands, toolbar and Preview as a custom editor.
+6. Build / CI wiring and docs (`CLAUDE.md`, tracking row → Adapt with Null issue #114, comment on the issue).
 
 ## Out of scope / known ceilings
 
-- No live inline rendering inside the block being edited; no per-cell table editing; nested items edit with their whole top-level block.
+- No per-cell table editing (a table is raw while the caret is in it).
+- No syntax highlighting inside code fences in the Editor.
+- `:emoji:` and footnotes stay plain text.
+- Rendered diffs from Source Control: custom editors cannot be used in the diff editor.
 - No Editor↔Source scroll sync (Editor is its own tab).
-- Front matter is not handled (same as Preview today).
-- Mermaid and KaTeX blocks edit as source.
