@@ -23,10 +23,9 @@ activation, overriding a user's explicit opt-in; Clone Repo + `runOn:
 folderOpen` tasks run untrusted code on open.
 
 ### Package managers / updater
-Status: winget/scoop/choco issues exist (#13–#15). Updater itself (#12) is
-likely already fixed by the native-EXE rewrite — see ARCHITECTURE.md
-"Updater" section; commented on #12 2026-09-25, not closed pending a
-real-install smoke test.
+Status: winget/scoop/choco issues exist (#13–#15). Updater: #12 + #120 (the
+maintainer now reports it as broken). Root-cause leads commented on #120
+2026-10-11: startup-only check, silent failure. Linux build #119.
 
 ## Core IDE
 
@@ -39,7 +38,11 @@ Status: issue exists (#85)
 ## Developer Workflow
 
 ### Pull requests in GitHub panel (list, checkout, review diff, comment)
-Status: issue created (#92)
+Status: issue created (#92); maintainer filed umbrella #117 (cross-linked
+2026-10-11).
+Candidate (not filed): GitLab issues/merge requests in the panel. null-accounts
+already authenticates GitLab, but nothing consumes it for issues/MRs. File only
+if the maintainer wants GitLab parity (decide inside #117 first).
 
 ### Test explorer for non-C++ (cargo test, npm test)
 Status: issue created (#93); CTest itself is #82.
@@ -66,8 +69,8 @@ Why: Commit → Push → CI loop leaves the IDE.
 ## Advanced
 
 ### Editor-first Claude Code integration
-Status: issues exist (#98 command-center button, #99 follow edits live,
-#100 line provenance hover), filed by the maintainer 2026-09-26.
+Status: #98, #99, #100 implemented and closed (patch 005, followAlong,
+whyIsThisHere). Remaining: #111 continue button.
 Why: replaces the removed AI Agents panel / #41. Don't propose a native
 agent UI or panel again; new AI items should sit on top of the extension
 (transcripts, URI handler `vscode://anthropic.claude-code/open?session=`).
@@ -80,3 +83,12 @@ Status: issues exist
 ### Floating terminal #11
 Status: issue exists (#10 distraction-free and #29 explorer redesign closed
 by the maintainer 2026-09-25)
+
+## Shipped since 2026-09-26 (not roadmap anymore)
+null-accounts (#102), null-activity (#113), null-music (#112), worktree
+manager (#88), Issues panel v2, dashboard launcher redesign (#118), settings
+TOC (#108), extension registry (#110).
+
+## Process
+#115 (track VS Code features) and #122 (wiki) are maintainer-owned process/docs
+items; no further issues needed.

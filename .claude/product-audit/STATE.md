@@ -1,51 +1,43 @@
 # Audit State
 
 Last audit:
-2026-09-26 (incremental — AI subsystem only)
+2026-10-11 (incremental — 354 commits since e3301b1, mostly new extensions)
 
 Repository state:
-main @ e3301b1 (only app change since 289f023: AI Agents panel removal)
+main @ ccb9544
 
 Last inspected areas:
-- 2026-09-26: e3301b1 diff stat, null-tools src/ + package.json commands/
-  views, stale-reference grep (ollama/agents/claude-code) across repo,
-  product.json extensionRecommendations
-- 2026-09-25 (still valid, unchanged since): all 8 extensions, product.json
-  overlay, installer settings seeding, patches/, docs/ROADMAP.md + specs,
-  null-cpp dependency handling, updater/
+- 2026-10-11: commit log e3301b1..HEAD, extensions/ + archive/ + patches/
+  listings, product.json trust settings, null-tools updater trigger code,
+  null-activity trust guard, new open issues #111 #114 #115 #117 #119-#122.
+  Not deep-inspected: null-music / null-activity / null-accounts internals
+  (CLAUDE.md documents them in detail; trusted as accurate).
+- 2026-09-25/26 (unchanged areas): null-cpp, null-format, null-actions,
+  installer/shell-ext, updater/ native EXE.
 
 Last GitHub issue audit:
-2026-09-26 (#1–#100 via `gh issue list --state all`; 10 closures, 3 new
-maintainer-filed issues #98–#100)
+2026-10-11 (#1-#123 via `gh issue list --state all`)
 
-Architecture confidence:
-high
-
-Feature inventory confidence:
-medium (built from package.json + file listings, not every source file)
+Architecture confidence: high
+Feature inventory confidence: medium (new extensions taken from CLAUDE.md)
 
 Known areas requiring re-audit:
-- performance (#19–#22, #30 not runtime-inspected; needs a live install)
-- when #98–#100 land: re-check the AI section of ARCHITECTURE/FEATURES
+- performance (#19-#22, #30) needs a live install
+- #12/#120 updater: a real-install smoke test would settle it
+- null-cpp / null-actions not re-read since 2026-09-25 (few commits touched them)
 
 Corrections this run:
-- AI architecture: panel/Ollama/sound/history/"Fix with AI" gone; Claude Code
-  extension is the only AI path; native agent UI not planned (#41).
-- CLAUDE.md now lists patches/ (815ac3c) — removed that stale-doc note.
+- Extensions: 3 new built-ins (accounts, activity, music); wooting archived.
+- Patches 005-007 exist; #98-#100 and #88 are implemented, not open.
+- Updater is Partial, not Implemented (startup-only check, silent failure).
+- Trust guards are inert (#97 impact grew).
 
 Corrections to project docs noticed (outside this skill's scope):
-- docs/index.html (public homepage) still has an "Ollama" feature card
-  (~line 577) though Ollama was removed in e3301b1.
-- PRODUCT.md lines ~19/32 still describe the AI Agents panel, agent
-  terminals (claude/agy/codex/ollama), session history, Ollama chat, and
-  node-pty/setup.ps1.
-- docs/ROADMAP.md Phase 4 says null-cpp declares extensionDependencies —
-  removed in 1f7c00b.
-- CLAUDE.md doesn't mention `updater/` (native updater EXE) or its CI step.
-- docs/plans/* and docs/specs/* reference agentsPanel/null-agents — historical
-  plans, fine to leave.
+- docs/index.html and PRODUCT.md still mention Ollama (2 hits each) though
+  it was removed in e3301b1.
+- docs/ROADMAP.md Phase 4 still says null-cpp declares extensionDependencies.
 
 Last created issues:
-- #94–#97 — 2026-09-26 (none this run; #98–#100 were filed by the maintainer)
-
-Note: repo has no `security` label; #97 filed as `enhancement` only.
+- None this run. Existing issues updated: comments on #120, #117, #92, #97.
+  The backlog (~50 open) is already comprehensive; no unrepresented gap met
+  the quality bar. GitLab issues/MRs is a recorded candidate in ROADMAP.md.

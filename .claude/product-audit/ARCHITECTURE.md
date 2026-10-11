@@ -6,11 +6,18 @@ VSCodium fork, Windows-only (win32-x64). Built entirely in GitHub Actions
 ## Workbench
 - Upstream VS Code workbench. Customised by injection, not source edits:
   `workbench/custom.css` + `workbench/splash.js` injected into `workbench.html`.
-- Core patches (CLAUDE.md lists them since 815ac3c):
-  `001-jumplist-recent-projects`, `002-fix-claude-copilotapi-types`,
-  `003-null-dashboard-startup`, `004-null-dashboard-help-welcome`.
+- Core patches (listed in CLAUDE.md and `patches/README.md`): `001` jumplist,
+  `002` copilotApi types, `003`/`004` dashboard startup + Help > Welcome,
+  `005` Claude Code command-center split button (#98), `006` Settings TOC
+  splits Extensions into Null / Installed / Built-in (#108), `007` Accounts
+  menu lists null-accounts accounts + avatar on the activity-bar button.
+- Upstream: root `VSCODIUM_TAG` file (1.135.06055 as of 2026-10-11);
+  `.github/workflows/upstream-check.yml` opens a bump PR weekly and dry-runs
+  the patches (#115 asks for a process on top of this: feature parity review).
 - Native project dashboard (`null.dashboard` custom editor in null-tools)
-  replaces the Welcome page on startup and for Help > Welcome.
+  replaces the Welcome page on startup and for Help > Welcome. Redesigned
+  2026-10 (d2d516c) as a keyboard-first project launcher with Start/Home rail,
+  search/grouping of recent projects, per-card null-accounts account.
 - `product.json` overlay deep-merged: branding, VS Marketplace gallery,
   `configurationDefaults` (Null Dark, null-icons, telemetry off, update.mode none,
   **workspace trust fully disabled**, formatter defaults → null-format).
@@ -29,13 +36,28 @@ VSCodium fork, Windows-only (win32-x64). Built entirely in GitHub Actions
 ## Source Control
 - Inherited Git SCM. null-tools adds: commit-message generation via
   `claude --print`, issue reference insertion, "closes via unpushed commit".
-- GitHub Issues panel (webview, null-tools/src/issuesPanel.ts,
-  issueDetailPanel.ts): list/filter/create/edit/comment, templates, offline
-  cache, unread badges. GitHub.com only. **No pull request support.**
+- GitHub Issues panel v2 (null-tools: `issuesPanel.ts`, `issueDetailPanel.ts`,
+  `issuesListController.ts`, `github/`): github.com-style list/search, detail
+  tab, composer, New-issue form with templates, image upload to an orphan
+  `null-issue-assets` branch, branch→issue prompt. GitHub.com only (token via
+  null-accounts); **no pull request support, no GitLab issues/MRs** (#92/#117).
+- Git worktree manager (null-tools `worktrees*.ts`, #88) for parallel agent
+  sessions.
 
 ## Extensions (built-in, `extensions/`)
-- null-theme, null-icons, null-markdown, null-format, null-tools,
-  null-cpp, null-actions, wooting-analog (+ cspell).
+- Ten built-ins + cspell: null-theme, null-icons, null-markdown, null-format,
+  null-tools, null-cpp, null-actions, null-accounts, null-activity,
+  null-music. `wooting-analog` moved to `archive/` (ee50b16), not built.
+- null-accounts (#102): GitHub (wraps VS Code's session) + GitLab (device-flow
+  OAuth or PAT) + SSH-only accounts; folder→account binding wired into git
+  (user.name/email, credential store, core.sshCommand), SSH key
+  generate/upload/sign-commits, default account, Accounts menu (patch 007).
+  null-tools' Issues panel depends on it for tokens. API exported for others.
+- null-activity (#113): local-only WakaTime replacement — append-only JSONL
+  interval log per window, dashboard webview, git stats, gist badges,
+  WakaTime import. No network except opt-in badge publishing.
+- null-music (#112): local-file player (own tag reader, library cache,
+  queue, `<audio>` in a sidebar webview). Streaming providers were dropped.
 - null-cpp: full CMake/Make layer (toolchain registry MSVC/clang/WSL,
   presets, File API codemodel, build diagnostics, run, debug config synth,
   scaffolding). Phases 1–6 of docs/ROADMAP.md complete.
@@ -53,15 +75,20 @@ The official Claude Code extension (`anthropic.claude-code`), used in the
 editor, is the only AI workflow. Decided 2026-09-26: no native agent UI (#41
 closed not-planned), AI Agents panel deleted (#84, e3301b1).
 - Only in-repo AI code left: `null-tools/src/commitMessage.ts` → `claude --print`.
-- Planned integration is editor-first and reads the extension's session
-  transcripts (`~/.claude/projects/<encoded-workspace>/<sessionId>.jsonl`)
-  instead of installing hooks: #99 follow-along, #100 line provenance hover.
-  #98 command-center button needs a core patch (`MenuId.CommandCenter` isn't
-  an extension menu point).
+- Editor-first integration now shipped on top of the extension, reading its
+  session transcripts (`~/.claude/projects/<encoded-workspace>/<sessionId>.jsonl`)
+  instead of hooks: `followAlong.ts` (#99), `whyIsThisHere.ts` (#100),
+  `claudeTabIntegration.ts`, and patch 005 (#98 command-center button).
+- Still open: #111 "Continue" button outside the extension.
 - Blocked by the extension: submitting prompts programmatically and
   surfacing its permission prompts (per #41 closing comment).
 - Claude Code is neither bundled nor in `extensionRecommendations` (scope
   added to #89).
+
+## Security posture
+Workspace trust is force-disabled (product.json + `disableRestrictedMode()` in
+null-tools, #97). Consequence found 2026-10-11: any `vscode.workspace.isTrusted`
+guard is inert — null-activity's git-stats gate is the only one.
 
 ## Important Entry Points
 - `extensions/*/src/extension.ts` (activate), mostly `onStartupFinished`.
@@ -76,7 +103,9 @@ closed not-planned), AI Agents panel deleted (#84, e3301b1).
 - Toolchain discovery: `null-cpp/src/toolchainRegistry.ts`,
   `null-format/src/toolchainDiscovery.ts`.
 - Updater: two-part, native EXE + TS orchestration (corrected 2026-09-25 —
-  previously undocumented). See "Updater" section below.
+  previously undocumented). See "Updater" section below. The update check
+  runs **once at startup only** and swallows errors silently (found
+  2026-10-11, commented on #120).
 
 ## Updater (native EXE + TS orchestration)
 Previously undocumented — a full rewrite (`docs/specs/native-updater-design.md`,
