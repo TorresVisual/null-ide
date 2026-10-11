@@ -148,4 +148,32 @@ const byStart = (a, b) => a.start - b.start;
     const got = store.read((0, stats_1.dayRange)(at(8, 12))).sort(byStart);
     node_assert_1.default.deepStrictEqual(got.map((i) => i.start), [at(8, 12), at(8, 14)]);
 });
+(0, node_test_1.test)('replaceWindow swaps one window\'s files, splits months, can be repeated and can empty the window', () => {
+    const dir = tmpDir();
+    const native = new intervalStore_1.IntervalStore({ dir, windowId: 'w1' });
+    native.append(iv(at(8, 9), at(8, 10)));
+    native.flush();
+    const store = new intervalStore_1.IntervalStore({ dir, windowId: 'w2' });
+    node_assert_1.default.strictEqual(store.hasWindow('import-wakatime'), false);
+    store.replaceWindow('import-wakatime', [iv(at(8, 10), at(8, 11)), iv(at(30, 23, 0, 8), at(1, 1, 0, 9))]);
+    node_assert_1.default.deepStrictEqual(fs.readdirSync(dir).sort(), [
+        'intervals-2026-09-import-wakatime.jsonl',
+        'intervals-2026-10-import-wakatime.jsonl',
+        'intervals-2026-10-w1.jsonl',
+    ]);
+    node_assert_1.default.strictEqual(store.hasWindow('import-wakatime'), true);
+    store.replaceWindow('import-wakatime', [iv(at(8, 12), at(8, 13))]);
+    node_assert_1.default.deepStrictEqual(fs.readdirSync(dir).sort(), ['intervals-2026-10-import-wakatime.jsonl', 'intervals-2026-10-w1.jsonl']);
+    const all = { from: -Infinity, to: Infinity };
+    node_assert_1.default.deepStrictEqual(store.read(all).sort(byStart).map((i) => i.start), [at(8, 9), at(8, 12)]);
+    store.replaceWindow('import-wakatime', []);
+    node_assert_1.default.strictEqual(store.hasWindow('import-wakatime'), false);
+    node_assert_1.default.deepStrictEqual(fs.readdirSync(dir), ['intervals-2026-10-w1.jsonl']);
+});
+(0, node_test_1.test)('replaceWindow keeps every interval even beyond maxBuffered', () => {
+    const store = new intervalStore_1.IntervalStore({ dir: tmpDir(), windowId: 'w1', maxBuffered: 10 });
+    const many = Array.from({ length: 2_000 }, (_, n) => iv(at(8, 0) + n * 120_000, at(8, 0) + n * 120_000 + 60_000));
+    store.replaceWindow('import-wakatime', many);
+    node_assert_1.default.strictEqual(store.read({ from: -Infinity, to: Infinity }).length, 2_000);
+});
 //# sourceMappingURL=intervalStore.test.js.map

@@ -35,6 +35,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.NO_FOLDER = void 0;
 exports.normalizeRemote = normalizeRemote;
+exports.repoRoot = repoRoot;
 exports.resolveProject = resolveProject;
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
@@ -74,18 +75,22 @@ function findGitDirs(start) {
             stat = undefined;
         }
         if (stat?.isDirectory())
-            return { gitDir: dotGit, commonDir: dotGit };
+            return { gitDir: dotGit, commonDir: dotGit, root: dir };
         if (stat?.isFile()) {
             const m = /^gitdir:\s*(.+)$/m.exec(readText(dotGit) ?? '');
             if (m) {
                 const gitDir = path.resolve(dir, m[1].trim());
                 const common = readText(path.join(gitDir, 'commondir'))?.trim();
-                return { gitDir, commonDir: common ? path.resolve(gitDir, common) : gitDir };
+                return { gitDir, commonDir: common ? path.resolve(gitDir, common) : gitDir, root: dir };
             }
         }
         if (path.dirname(dir) === dir)
             return undefined;
     }
+}
+/** The folder that contains the `.git` found at or above `start`, if any. */
+function repoRoot(start) {
+    return findGitDirs(start)?.root;
 }
 function remoteUrl(config) {
     const urls = new Map();

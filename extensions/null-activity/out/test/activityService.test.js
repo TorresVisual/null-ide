@@ -148,4 +148,26 @@ const day = (0, stats_1.dayRange)(at(8, 12));
     node_assert_1.default.strictEqual((0, activityService_1.normalizeSettings)({ sessionGap: 0 }).sessionGapMs, MIN);
     node_assert_1.default.strictEqual((0, activityService_1.normalizeSettings)({ sessionGap: 1e9 }).sessionGapMs, 1_440 * MIN);
 });
+(0, node_test_1.test)('replaceImported replaces the previous import, fires onDidChange, counts overlap with native time once, and is cleared by deleteAll', () => {
+    const { service } = setup();
+    let changes = 0;
+    service.onDidChange(() => changes++);
+    const imported = (start, end) => ({
+        start, end, project: { key: 'old', name: 'old' }, language: 'cpp', linesAdded: 0, linesRemoved: 0,
+    });
+    node_assert_1.default.strictEqual(service.hasImport(), false);
+    service.replaceImported([imported(at(8, 9), at(8, 10))]);
+    service.replaceImported([imported(at(8, 11), at(8, 12))]);
+    node_assert_1.default.strictEqual(changes, 2);
+    node_assert_1.default.strictEqual(service.hasImport(), true);
+    node_assert_1.default.deepStrictEqual(service.getIntervals(day).map((i) => [i.start, i.end]), [[at(8, 11), at(8, 12)]]);
+    // Native tracking 11:59–12:01 overlaps the end of the imported hour: 61 minutes in total, not 62.
+    service.recordActivity(hb(at(8, 11, 59)));
+    service.recordActivity(hb(at(8, 12, 1)));
+    const total = service.getIntervals(day).reduce((sum, i) => sum + i.end - i.start, 0);
+    node_assert_1.default.strictEqual(total, 61 * MIN);
+    service.deleteAll();
+    node_assert_1.default.strictEqual(service.hasImport(), false);
+    node_assert_1.default.deepStrictEqual(service.getIntervals(day), []);
+});
 //# sourceMappingURL=activityService.test.js.map

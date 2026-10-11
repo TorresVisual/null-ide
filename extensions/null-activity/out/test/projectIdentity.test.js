@@ -122,4 +122,14 @@ function repo(root, remotes, head = 'ref: refs/heads/main\n') {
     fs.writeFileSync(path.join(wt, '.git'), `gitdir: ${wtGit}\n`);
     node_assert_1.default.deepStrictEqual((0, projectIdentity_1.resolveProject)(wt), { key: 'github.com/o/r', name: 'wt', branch: 'issue-1-x' });
 });
+(0, node_test_1.test)('repoRoot finds the folder containing .git from a nested folder, and undefined without git', () => {
+    const root = tmpDir();
+    repo(root, { origin: 'git@github.com:o/r.git' });
+    const nested = path.join(root, 'a', 'b');
+    fs.mkdirSync(nested, { recursive: true });
+    node_assert_1.default.strictEqual((0, projectIdentity_1.repoRoot)(nested), root);
+    const plain = path.join(tmpDir(), 'plain');
+    fs.mkdirSync(plain);
+    node_assert_1.default.strictEqual((0, projectIdentity_1.repoRoot)(plain), undefined);
+});
 //# sourceMappingURL=projectIdentity.test.js.map

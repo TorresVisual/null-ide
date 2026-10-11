@@ -42,6 +42,7 @@ const badgeCommands_1 = require("./badgeCommands");
 const commands_1 = require("./commands");
 const dashboardPanel_1 = require("./dashboardPanel");
 const heartbeatSource_1 = require("./heartbeatSource");
+const importCommand_1 = require("./importCommand");
 const intervalStore_1 = require("./intervalStore");
 const projectIdentity_1 = require("./projectIdentity");
 const statusBar_1 = require("./statusBar");
@@ -67,6 +68,7 @@ function activate(context) {
     }), { dispose: () => timers.forEach(clearInterval) });
     (0, commands_1.registerCommands)(context, service, storageDir, dashboard);
     (0, badgeCommands_1.registerBadges)(context, service, (message) => output.appendLine(message));
+    (0, importCommand_1.registerImport)(context, service, (message) => output.appendLine(message));
     // Expose the read/session API only; deletion stays behind the user-confirmed commands.
     return {
         startSession: () => service.startSession(),

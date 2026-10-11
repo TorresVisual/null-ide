@@ -5,6 +5,7 @@ exports.normalizeSettings = normalizeSettings;
 const emitter_1 = require("./emitter");
 const stats_1 = require("./stats");
 const tracker_1 = require("./tracker");
+const wakatimeImport_1 = require("./wakatimeImport");
 const CACHE_TTL_MS = 15_000;
 function normalizeSettings(raw) {
     const num = (v, fallback, min, max) => typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : fallback;
@@ -106,6 +107,14 @@ class ActivityService {
         this.tracker.closeOpen();
         this.opts.store.deleteAll();
         this.dataChanged();
+    }
+    /** Swaps the previous WakaTime import for `intervals`. Internal: deliberately not on `NullActivityApi`. */
+    replaceImported(intervals) {
+        this.opts.store.replaceWindow(wakatimeImport_1.WAKATIME_WINDOW_ID, intervals);
+        this.dataChanged();
+    }
+    hasImport() {
+        return this.opts.store.hasWindow(wakatimeImport_1.WAKATIME_WINDOW_ID);
     }
     dispose() {
         this.endSession();
