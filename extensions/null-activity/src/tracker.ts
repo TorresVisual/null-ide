@@ -22,13 +22,12 @@ interface OpenInterval {
 
 export class Tracker {
   private open: OpenInterval | undefined;
-  private focused = true;
   private active = true;
 
   constructor(private readonly opts: TrackerOptions) {}
 
   heartbeat(h: Heartbeat): void {
-    if (!this.active || !this.focused) return;
+    if (!this.active) return;
     const o = this.open;
     const sameContext = !!o && o.workspace === h.workspace && o.language === h.language && o.file === h.file;
     if (o && sameContext && h.ts >= o.last && h.ts - o.last <= this.opts.idleTimeoutMs()) {
@@ -48,11 +47,6 @@ export class Tracker {
       linesAdded: h.linesAdded,
       linesRemoved: h.linesRemoved,
     };
-  }
-
-  setFocused(focused: boolean): void {
-    if (!focused) this.closeAtLast();
-    this.focused = focused;
   }
 
   setActive(active: boolean): void {

@@ -90,29 +90,13 @@ test('switching file, language or project closes at the switch and re-resolves t
   }
 });
 
-test('focus loss closes the interval; heartbeats while unfocused are ignored', () => {
-  const { tracker, out, at } = setup();
-  tracker.heartbeat(hb(0));
-  tracker.heartbeat(hb(10_000));
-  at(40_000);
-  tracker.setFocused(false);
-  assert.deepStrictEqual(out.map((i) => [i.start, i.end]), [[0, 10_000]], 'ends at the last heartbeat, not at the loss');
-  tracker.heartbeat(hb(50_000));
-  tracker.setFocused(true);
-  tracker.heartbeat(hb(60_000));
-  tracker.heartbeat(hb(70_000));
-  at(70_000);
-  tracker.closeOpen();
-  assert.deepStrictEqual(out.map((i) => [i.start, i.end]), [[0, 10_000], [60_000, 70_000]]);
-});
-
-test('focus loss after a long silence ends at the last heartbeat, not at the loss', () => {
+test('a window that is never focused still accrues time, and a long silence is not credited', () => {
   const { tracker, out, at } = setup();
   tracker.heartbeat(hb(0));
   tracker.heartbeat(hb(10_000));
   at(10_000 + IDLE + 5_000);
-  tracker.setFocused(false);
-  assert.deepStrictEqual(out.map((i) => [i.start, i.end]), [[0, 10_000]]);
+  tracker.closeOpen();
+  assert.deepStrictEqual(out.map((i) => [i.start, i.end]), [[0, 10_000]], 'ends at the last heartbeat, not at the closing time');
 });
 
 test('a clock that jumps backwards never yields negative or inflated time', () => {

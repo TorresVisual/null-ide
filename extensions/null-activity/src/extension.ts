@@ -25,7 +25,6 @@ export function activate(context: vscode.ExtensionContext): NullActivityApi {
 
   const store = new IntervalStore({ dir: storageDir, windowId, log: (message) => output.appendLine(message) });
   const service = new ActivityService({ store, resolveProject, settings: readSettings });
-  service.setFocused(vscode.window.state.focused);
   const statusBar = new StatusBar(service);
   const dashboard = new DashboardPanel(context, service, (message) => output.appendLine(message));
 

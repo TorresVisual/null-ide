@@ -88,10 +88,6 @@ export class ActivityService implements NullActivityApi {
     this.tracker.heartbeat(h);
   }
 
-  setFocused(focused: boolean): void {
-    this.tracker.setFocused(focused);
-  }
-
   tick(): void {
     this.tracker.tick();
   }

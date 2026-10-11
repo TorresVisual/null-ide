@@ -57,6 +57,5 @@ export function startHeartbeatSource(service: ActivityService): vscode.Disposabl
     vscode.window.onDidEndTerminalShellExecution(() => send(undefined)),
     vscode.debug.onDidStartDebugSession(() => send(active())),
     vscode.debug.onDidTerminateDebugSession(() => send(active())),
-    vscode.window.onDidChangeWindowState((state) => service.setFocused(state.focused)),
   );
 }
