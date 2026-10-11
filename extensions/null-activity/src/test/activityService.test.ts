@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import { ActivityService, ActivitySettings, normalizeSettings } from '../activityService';
 import { IntervalStore } from '../intervalStore';
 import { dayRange } from '../stats';
-import { Heartbeat } from '../types';
+import { Heartbeat, Interval } from '../types';
 
 const MIN = 60_000;
 const at = (day: number, h: number, m = 0, s = 0) => new Date(2026, 9, day, h, m, s).getTime();
@@ -121,4 +121,30 @@ test('normalizeSettings clamps nonsense to sane values', () => {
   assert.strictEqual(normalizeSettings({ idleTimeout: 1e9 }).idleTimeoutMs, 3_600_000);
   assert.strictEqual(normalizeSettings({ sessionGap: 0 }).sessionGapMs, MIN);
   assert.strictEqual(normalizeSettings({ sessionGap: 1e9 }).sessionGapMs, 1_440 * MIN);
+});
+
+test('replaceImported replaces the previous import, fires onDidChange, counts overlap with native time once, and is cleared by deleteAll', () => {
+  const { service } = setup();
+  let changes = 0;
+  service.onDidChange(() => changes++);
+  const imported = (start: number, end: number): Interval => ({
+    start, end, project: { key: 'old', name: 'old' }, language: 'cpp', linesAdded: 0, linesRemoved: 0,
+  });
+  assert.strictEqual(service.hasImport(), false);
+
+  service.replaceImported([imported(at(8, 9), at(8, 10))]);
+  service.replaceImported([imported(at(8, 11), at(8, 12))]);
+  assert.strictEqual(changes, 2);
+  assert.strictEqual(service.hasImport(), true);
+  assert.deepStrictEqual(service.getIntervals(day).map((i) => [i.start, i.end]), [[at(8, 11), at(8, 12)]]);
+
+  // Native tracking 11:59–12:01 overlaps the end of the imported hour: 61 minutes in total, not 62.
+  service.recordActivity(hb(at(8, 11, 59)));
+  service.recordActivity(hb(at(8, 12, 1)));
+  const total = service.getIntervals(day).reduce((sum, i) => sum + i.end - i.start, 0);
+  assert.strictEqual(total, 61 * MIN);
+
+  service.deleteAll();
+  assert.strictEqual(service.hasImport(), false);
+  assert.deepStrictEqual(service.getIntervals(day), []);
 });

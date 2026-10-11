@@ -4,6 +4,7 @@ import { Emitter, Event } from './emitter';
 import { IntervalStore } from './intervalStore';
 import { ALL_TIME, languageStats, normalizeIntervals, periodStats, projectStats, sessions } from './stats';
 import { Tracker } from './tracker';
+import { WAKATIME_WINDOW_ID } from './wakatimeImport';
 import {
   DailyStat, DateRange, Heartbeat, Interval, LanguageStat, NullActivityApi, ProjectStat, ResolvedProject, Session,
 } from './types';
@@ -142,6 +143,16 @@ export class ActivityService implements NullActivityApi {
     this.tracker.closeOpen();
     this.opts.store.deleteAll();
     this.dataChanged();
+  }
+
+  /** Swaps the previous WakaTime import for `intervals`. Internal: deliberately not on `NullActivityApi`. */
+  replaceImported(intervals: Interval[]): void {
+    this.opts.store.replaceWindow(WAKATIME_WINDOW_ID, intervals);
+    this.dataChanged();
+  }
+
+  hasImport(): boolean {
+    return this.opts.store.hasWindow(WAKATIME_WINDOW_ID);
   }
 
   dispose(): void {
