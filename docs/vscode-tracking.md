@@ -4,7 +4,7 @@ Null IDE builds on VSCodium, which trails VS Code by several releases. This list
 catches VS Code features early so we can backport or adapt them now instead of
 waiting for the VSCodium bump (#115).
 
-**Last reviewed: 1.135**
+**Last reviewed: 1.136**
 
 The `upstream-check` workflow opens a *Review VS Code 1.x release notes* issue for
 every stable release after the version above; `/vscode-watch` works through them
@@ -27,3 +27,7 @@ against the real upstream feature, then tick **Reconciled**.
 
 | Feature | VS Code | Status | Null issue | Reconciled |
 |---|---:|---|---|---|
+| Compact layout density (`window.density.layout`, needs experimental `workbench.experimental.modernUI`) | 1.136 | Wait | — | |
+| Word wrap accounts for injected text width (color decorators, inlay hints, breakpoint placeholders) | 1.136 | Wait | — | |
+| Terminal: no 5 s delay when extensions run commands once shell integration is ready (helps `null-actions` buttons) | 1.136 | Wait | — | |
+| N/A: agent merge, multi-root agent sessions, session/chat hierarchy, chat backgrounds, agent notifications, agent host, dictation policies, Agents-window accessibility badge, integrated-browser spell check | 1.136 | N/A | — | |
