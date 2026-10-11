@@ -13,7 +13,9 @@
       { "command": "null-activity.openDashboard", "title": "Null Activity: Open Dashboard" },
       { "command": "null-activity.showTrackedData", "title": "Null Activity: Show Tracked Data" },
       { "command": "null-activity.deleteRange", "title": "Null Activity: Delete Tracked Data for a Range…" },
-      { "command": "null-activity.deleteAll", "title": "Null Activity: Delete All Tracked Data…" }
+      { "command": "null-activity.deleteAll", "title": "Null Activity: Delete All Tracked Data…" },
+      { "command": "null-activity.publishBadges", "title": "Null Activity: Publish Badges to a Gist…" },
+      { "command": "null-activity.saveBadges", "title": "Null Activity: Save Badges as SVG…" }
     ],
     "configuration": {
       "title": "Null Activity",
@@ -36,6 +38,11 @@
           "minimum": 1,
           "maximum": 1440,
           "description": "Minutes of inactivity that end a session."
+        },
+        "null-activity.badge.autoPublish": {
+          "type": "boolean",
+          "default": false,
+          "description": "Refresh the published badge Gist about once an hour while Null IDE is open. Only updates a Gist you already published with \"Publish Badges to a Gist\"; sends your total coding time, daily average and top language to GitHub."
         }
       }
     }

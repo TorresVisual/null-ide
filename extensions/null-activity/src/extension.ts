@@ -3,6 +3,7 @@
 import * as crypto from 'crypto';
 import * as vscode from 'vscode';
 import { ActivityService, ActivitySettings, normalizeSettings } from './activityService';
+import { registerBadges } from './badgeCommands';
 import { registerCommands } from './commands';
 import { DashboardPanel } from './dashboardPanel';
 import { startHeartbeatSource } from './heartbeatSource';
@@ -44,6 +45,7 @@ export function activate(context: vscode.ExtensionContext): NullActivityApi {
     { dispose: () => timers.forEach(clearInterval) },
   );
   registerCommands(context, service, storageDir, dashboard);
+  registerBadges(context, service, (message) => output.appendLine(message));
 
   // Expose the read/session API only; deletion stays behind the user-confirmed commands.
   return {
