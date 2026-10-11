@@ -2,7 +2,7 @@
 
 import * as vscode from 'vscode';
 import { ActivityService } from './activityService';
-import { dayRange, formatDuration } from './stats';
+import { dayRange, formatClock } from './stats';
 
 export class StatusBar implements vscode.Disposable {
   private readonly item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 50);
@@ -12,7 +12,7 @@ export class StatusBar implements vscode.Disposable {
   constructor(private readonly service: ActivityService) {
     this.item.command = 'null-activity.openDashboard';
     this.subscription = service.onDidChange(() => this.update());
-    this.timer = setInterval(() => this.update(), 60_000);
+    this.timer = setInterval(() => this.update(), 1_000);
     this.update();
     this.item.show();
   }
@@ -24,7 +24,7 @@ export class StatusBar implements vscode.Disposable {
       return;
     }
     const ms = this.service.getDailyStats(dayRange(Date.now())).reduce((n, d) => n + d.ms, 0);
-    this.item.text = `$(clock) ${formatDuration(ms)}`;
+    this.item.text = `$(clock) ${formatClock(ms)}`;
     this.item.tooltip = 'Null Activity: time tracked today. Click to open the dashboard.';
   }
 

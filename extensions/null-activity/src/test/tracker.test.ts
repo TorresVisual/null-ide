@@ -135,13 +135,20 @@ test('setActive(false) closes the open interval and ignores heartbeats until re-
   assert.deepStrictEqual(out.map((i) => [i.start, i.end]), [[0, 10_000], [40_000, 50_000]]);
 });
 
-test('peek() reports the open interval up to the last heartbeat without closing it', () => {
-  const { tracker, out } = setup();
+test('peek() runs the open interval up to now while within the idle timeout, without closing it', () => {
+  const { tracker, out, at } = setup();
   assert.strictEqual(tracker.peek(), undefined);
   tracker.heartbeat(hb(0));
   assert.strictEqual(tracker.peek(), undefined, 'a single heartbeat has no duration yet');
   tracker.heartbeat(hb(5_000));
+  at(5_000);
   assert.deepStrictEqual([tracker.peek()?.start, tracker.peek()?.end], [0, 5_000]);
+  at(8_000);
+  assert.strictEqual(tracker.peek()?.end, 8_000);
+  at(5_000 + IDLE);
+  assert.strictEqual(tracker.peek()?.end, 5_000 + IDLE);
+  at(5_000 + IDLE + 1);
+  assert.strictEqual(tracker.peek()?.end, 5_000, 'idle past the timeout: back to the last heartbeat');
   assert.strictEqual(out.length, 0);
 });
 

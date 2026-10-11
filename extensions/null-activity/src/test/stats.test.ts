@@ -3,7 +3,7 @@
 import assert from 'node:assert';
 import { test } from 'node:test';
 import {
-  attributedIntervals, dayKey, dayRange, formatDuration, languageStats, lastDaysRange, mergeClip, monthRange, nextPeriodStart,
+  attributedIntervals, dayKey, dayRange, formatClock, formatDuration, languageStats, lastDaysRange, mergeClip, monthRange, nextPeriodStart,
   normalizeIntervals, periodStart, periodStats, projectStats, sessions,
 } from '../stats';
 import { Interval } from '../types';
@@ -126,6 +126,13 @@ test('formatDuration', () => {
   assert.strictEqual(formatDuration(59_000), '0m');
   assert.strictEqual(formatDuration(12 * MIN), '12m');
   assert.strictEqual(formatDuration((4 * 60 + 32) * MIN), '4h 32m');
+});
+
+test('formatClock', () => {
+  assert.strictEqual(formatClock(0), '0m 0s');
+  assert.strictEqual(formatClock(59_999), '0m 59s');
+  assert.strictEqual(formatClock(12 * MIN + 5_000), '12m 5s');
+  assert.strictEqual(formatClock((4 * 60 + 32) * MIN + 41_000), '4h 32m 41s');
 });
 
 const proj = (key: string) => ({ key, name: key.toUpperCase() });

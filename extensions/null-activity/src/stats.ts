@@ -184,6 +184,13 @@ export function sessions(intervals: readonly Interval[], range: DateRange, gapMs
   return groups.map((g) => ({ ...g.session, projects: [...g.projects.values()], languages: [...g.languages], files: [...g.files] }));
 }
 
+/** Like formatDuration with seconds, for the ticking status bar readout. */
+export function formatClock(ms: number): string {
+  const s = Math.floor(ms / 1000) % 60;
+  const minutes = Math.floor(ms / 60_000);
+  return minutes >= 60 ? `${Math.floor(minutes / 60)}h ${minutes % 60}m ${s}s` : `${minutes}m ${s}s`;
+}
+
 export function formatDuration(ms: number): string {
   const minutes = Math.floor(ms / 60_000);
   return minutes >= 60 ? `${Math.floor(minutes / 60)}h ${minutes % 60}m` : `${minutes}m`;
