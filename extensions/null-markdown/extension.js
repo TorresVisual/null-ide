@@ -3,6 +3,9 @@
 const vscode = require('vscode');
 const path   = require('path');
 const crypto = require('crypto');
+const { buildPreviewPage } = require('./pages');
+const { applyCheckboxToggle, openWikiLink } = require('./docActions');
+const { NullMarkdownEditorProvider } = require('./editorProvider');
 
 // ── markdown-it setup ─────────────────────────────────────────────────────────
 
@@ -210,9 +213,9 @@ class NullMarkdownPreview {
 
 	async _onMessage(msg) {
 		if (msg.type === 'checkboxToggle') {
-			await this._applyCheckboxToggle(msg.line, msg.checked);
+			await applyCheckboxToggle(this._doc, msg.line, msg.checked);
 		} else if (msg.type === 'wikiLink') {
-			await this._openWikiLink(msg.target);
+			await openWikiLink(msg.target);
 		} else if (msg.type === 'scroll') {
 			// Webview scrolled → sync editor; suppress the echo it would fire back
 			this._suppressEditorScroll = true;
@@ -228,36 +231,6 @@ class NullMarkdownPreview {
 				);
 			}
 		}
-	}
-
-	async _openWikiLink(target) {
-		const name = target.replace(/\.md$/i, '');
-		const files = await vscode.workspace.findFiles(`**/${name}.md`, '**/node_modules/**', 10);
-		if (files.length === 0) {
-			vscode.window.showWarningMessage(`Wiki page not found: ${target}`);
-			return;
-		}
-		let uri = files[0];
-		if (files.length > 1) {
-			const picks = files.map(f => ({ label: vscode.workspace.asRelativePath(f), uri: f }));
-			const pick  = await vscode.window.showQuickPick(picks, { placeHolder: `Multiple matches for "${target}"` });
-			if (!pick) return;
-			uri = pick.uri;
-		}
-		await vscode.window.showTextDocument(uri, { preview: false });
-	}
-
-	async _applyCheckboxToggle(line, checked) {
-		const editor = this._findEditor();
-		if (!editor) return;
-		const lineObj = editor.document.lineAt(line);
-		const updated = checked
-			? lineObj.text.replace(/^(\s*(?:[-*+]|\d+[.)]) )\[ \]/, '$1[x]')
-			: lineObj.text.replace(/^(\s*(?:[-*+]|\d+[.)]) )\[[xX]\]/, '$1[ ]');
-		if (updated === lineObj.text) return;
-		const edit = new vscode.WorkspaceEdit();
-		edit.replace(editor.document.uri, lineObj.range, updated);
-		await vscode.workspace.applyEdit(edit);
 	}
 
 	_scheduleRender() {
@@ -277,37 +250,7 @@ class NullMarkdownPreview {
 	}
 
 	_buildPage(contentHtml) {
-		const wv  = this.panel.webview;
-		const ext = vscode.Uri.file(this._ctx.extensionPath);
-		const u   = (...p) => wv.asWebviewUri(vscode.Uri.joinPath(ext, ...p));
-
-		const cssUri        = u('preview', 'null-markdown.css');
-		const katexCssUri   = u('node_modules', 'katex', 'dist', 'katex.min.css');
-		const katexJsUri    = u('node_modules', 'katex', 'dist', 'katex.min.js');
-		const autoRenderUri = u('node_modules', 'katex', 'dist', 'contrib', 'auto-render.min.js');
-		const hlCssUri      = u('node_modules', 'highlight.js', 'styles', 'vs2015.min.css');
-		const mermaidUri    = u('node_modules', 'mermaid', 'dist', 'mermaid.min.js');
-		const previewJsUri  = u('preview', 'preview.js');
-		const nonce         = crypto.randomBytes(16).toString('hex');
-
-		return /* html */`<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${wv.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}' ${wv.cspSource}; img-src ${wv.cspSource} https: data:; font-src ${wv.cspSource};">
-<link rel="stylesheet" href="${katexCssUri}">
-<link rel="stylesheet" href="${hlCssUri}">
-<link rel="stylesheet" href="${cssUri}">
-</head>
-<body>
-<div id="content">${contentHtml}</div>
-<script nonce="${nonce}" src="${katexJsUri}"></script>
-<script nonce="${nonce}" src="${autoRenderUri}"></script>
-<script nonce="${nonce}" src="${mermaidUri}"></script>
-<script nonce="${nonce}" src="${previewJsUri}"></script>
-</body>
-</html>`;
+		return buildPreviewPage(this.panel.webview, this._ctx.extensionPath, contentHtml);
 	}
 }
 
@@ -583,6 +526,14 @@ img{max-width:100%;border-radius:4px}
 		const slides = new NullMarkdownSlides(editor.document, context, md);
 		openSlides.set(key, slides);
 	}
+
+	const editorProvider = new NullMarkdownEditorProvider(context, { md, processAlerts, readOnly: false });
+	context.subscriptions.push(
+		vscode.window.registerCustomEditorProvider('null-markdown.editor', editorProvider, {
+			webviewOptions: { retainContextWhenHidden: true },
+			supportsMultipleEditorsPerDocument: true
+		})
+	);
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand('null-markdown.openPreview', openPreview),

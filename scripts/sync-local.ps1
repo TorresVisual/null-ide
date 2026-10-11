@@ -217,7 +217,13 @@ $Extensions = [ordered]@{
         Copy    = @(
             "package.json",
             "extension.js",
-            "preview"
+            "editorProvider.js",
+            "pages.js",
+            "docActions.js",
+            "syncState.js",
+            "imageSrc.js",
+            "preview",
+            "lib"
         )
     }
 
