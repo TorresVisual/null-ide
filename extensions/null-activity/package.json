@@ -15,7 +15,8 @@
       { "command": "null-activity.deleteRange", "title": "Null Activity: Delete Tracked Data for a Range…" },
       { "command": "null-activity.deleteAll", "title": "Null Activity: Delete All Tracked Data…" },
       { "command": "null-activity.publishBadges", "title": "Null Activity: Publish Badges to a Gist…" },
-      { "command": "null-activity.saveBadges", "title": "Null Activity: Save Badges as SVG…" }
+      { "command": "null-activity.saveBadges", "title": "Null Activity: Save Badges as SVG…" },
+      { "command": "null-activity.importWakaTime", "title": "Null Activity: Import WakaTime History…" }
     ],
     "configuration": {
       "title": "Null Activity",

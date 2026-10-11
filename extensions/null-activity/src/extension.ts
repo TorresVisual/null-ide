@@ -7,6 +7,7 @@ import { registerBadges } from './badgeCommands';
 import { registerCommands } from './commands';
 import { DashboardPanel } from './dashboardPanel';
 import { startHeartbeatSource } from './heartbeatSource';
+import { registerImport } from './importCommand';
 import { IntervalStore } from './intervalStore';
 import { resolveProject } from './projectIdentity';
 import { StatusBar } from './statusBar';
@@ -46,6 +47,7 @@ export function activate(context: vscode.ExtensionContext): NullActivityApi {
   );
   registerCommands(context, service, storageDir, dashboard);
   registerBadges(context, service, (message) => output.appendLine(message));
+  registerImport(context, service, (message) => output.appendLine(message));
 
   // Expose the read/session API only; deletion stays behind the user-confirmed commands.
   return {
