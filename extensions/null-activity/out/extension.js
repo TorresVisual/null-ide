@@ -38,6 +38,7 @@ exports.deactivate = deactivate;
 const crypto = __importStar(require("crypto"));
 const vscode = __importStar(require("vscode"));
 const activityService_1 = require("./activityService");
+const badgeCommands_1 = require("./badgeCommands");
 const commands_1 = require("./commands");
 const dashboardPanel_1 = require("./dashboardPanel");
 const heartbeatSource_1 = require("./heartbeatSource");
@@ -65,6 +66,7 @@ function activate(context) {
         }
     }), { dispose: () => timers.forEach(clearInterval) });
     (0, commands_1.registerCommands)(context, service, storageDir, dashboard);
+    (0, badgeCommands_1.registerBadges)(context, service, (message) => output.appendLine(message));
     // Expose the read/session API only; deletion stays behind the user-confirmed commands.
     return {
         startSession: () => service.startSession(),
