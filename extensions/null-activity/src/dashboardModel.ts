@@ -157,7 +157,9 @@ export function buildDashboardModel(
 ): DashboardModel {
   const r = rangeFor(range, now);
   const projects = api.getProjectStats(r);
-  const totalMs = projects.reduce((n, p) => n + p.ms, 0);
+  // Projects sum each window's time (parallel windows can exceed wall-clock time); the headline is the union.
+  const attributedMs = projects.reduce((n, p) => n + p.ms, 0);
+  const totalMs = api.getDailyStats(r).reduce((n, d) => n + d.ms, 0);
 
   let bars: DashboardBar[];
   let barUnit: DashboardModel['barUnit'];
@@ -179,8 +181,8 @@ export function buildDashboardModel(
     totalMs,
     bars,
     barUnit,
-    projects: toShares(projects.map((p) => ({ name: p.project.name, ms: p.ms, key: p.project.key })), totalMs),
-    languages: toShares(api.getLanguageStats(r).map((l) => ({ name: l.language || TERMINAL_LABEL, ms: l.ms })), totalMs),
+    projects: toShares(projects.map((p) => ({ name: p.project.name, ms: p.ms, key: p.project.key })), attributedMs),
+    languages: toShares(api.getLanguageStats(r).map((l) => ({ name: l.language || TERMINAL_LABEL, ms: l.ms })), attributedMs),
     sessions: api
       .getSessions(r)
       .slice(-MAX_SESSIONS)

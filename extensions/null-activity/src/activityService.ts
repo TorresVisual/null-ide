@@ -96,8 +96,8 @@ export class ActivityService implements NullActivityApi {
     this.opts.store.flush();
   }
 
-  /** Merged across windows, clipped to the range, including the in-progress interval. */
-  getIntervals(range: DateRange): Interval[] {
+  /** Un-merged intervals of every window, tagged with their window, plus this window's open interval. */
+  private raw(range: DateRange): Interval[] {
     const key = `${range.from}:${range.to}`;
     let hit = this.cache.get(key);
     if (!hit || this.clock() - hit.at >= CACHE_TTL_MS) {
@@ -105,27 +105,32 @@ export class ActivityService implements NullActivityApi {
       this.cache.set(key, hit);
     }
     const open = this.tracker.peek();
-    return normalizeIntervals(open ? [...hit.intervals, open] : hit.intervals, range);
+    return open ? [...hit.intervals, { ...open, window: this.opts.store.windowId }] : hit.intervals;
+  }
+
+  /** Union of every window, clipped to the range, including the in-progress interval. */
+  getIntervals(range: DateRange): Interval[] {
+    return normalizeIntervals(this.raw(range), range);
   }
 
   getProjectStats(range: DateRange): ProjectStat[] {
-    return projectStats(this.getIntervals(range), range);
+    return projectStats(this.raw(range), range);
   }
 
   getLanguageStats(range: DateRange): LanguageStat[] {
-    return languageStats(this.getIntervals(range), range);
+    return languageStats(this.raw(range), range);
   }
 
   getDailyStats(range: DateRange): DailyStat[] {
-    return periodStats(this.getIntervals(range), range, 'day');
+    return periodStats(this.raw(range), range, 'day');
   }
 
   getSessions(range: DateRange): Session[] {
-    return sessions(this.getIntervals(range), range, this.cfg.sessionGapMs);
+    return sessions(this.raw(range), range, this.cfg.sessionGapMs);
   }
 
   getMonthlyTotals(): DailyStat[] {
-    return periodStats(this.getIntervals(ALL_TIME), ALL_TIME, 'month');
+    return periodStats(this.raw(ALL_TIME), ALL_TIME, 'month');
   }
 
   /** Closes the open interval first so it is deleted with the rest instead of reappearing. */

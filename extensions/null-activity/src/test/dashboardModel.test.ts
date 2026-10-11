@@ -213,3 +213,12 @@ test('git is passed through; only project rows carry a key, never "Other"', () =
 test('without git data the model has no git field', () => {
   assert.ok(!('git' in build([iv(at(8, 10), at(8, 11))], 'today')));
 });
+
+test('parallel windows: the total is the union, the shares are relative to the summed project time', () => {
+  const data = ['a', 'b', 'c'].map((w) => iv(at(8, 10), at(8, 10, 10), { window: w, project: { key: w, name: w } }));
+  const model = build(data, 'today');
+  assert.strictEqual(model.totalMs, 10 * MIN);
+  assert.strictEqual(sum(model.bars), 10 * MIN);
+  assert.deepStrictEqual(model.projects.map((p) => [p.ms, p.percent]), [[10 * MIN, 33], [10 * MIN, 33], [10 * MIN, 33]]);
+  assert.deepStrictEqual(model.sessions.map((s) => [s.ms, s.projects]), [[10 * MIN, ['a', 'b', 'c']]]);
+});
