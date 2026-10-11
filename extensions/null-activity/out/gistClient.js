@@ -7,14 +7,16 @@ const DESCRIPTION = 'Null Activity badges';
 const gistRawUrl = (owner, id, file) => `https://gist.githubusercontent.com/${owner}/${id}/raw/${file}`;
 exports.gistRawUrl = gistRawUrl;
 function serverSays(body) {
-    const message = typeof body === 'string' ? body : body?.message;
-    return typeof message === 'string' ? message.slice(0, 200) : '';
+    // Only a JSON `message`; a non-JSON body (an HTML error page from an outage or proxy) is never echoed.
+    const message = typeof body === 'object' && body ? body.message : undefined;
+    return typeof message === 'string' ? message.replace(/\s+/g, ' ').slice(0, 200) : '';
 }
 /**
- * Creates the secret gist, or updates `existingId` in place (creating a new one if it was deleted).
+ * Creates the secret gist, or updates `existingId` in place. If that gist was deleted, `recreate` decides
+ * whether a new one is created or the call fails (a background refresh must not undo an unpublish).
  * Never throws; the token only ever goes in the Authorization header.
  */
-async function publishGist(http, token, existingId, files) {
+async function publishGist(http, token, existingId, files, recreate = true) {
     const content = Object.fromEntries(files.map((f) => [f.name, { content: f.content }]));
     const headers = { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' };
     const create = () => http('POST', API, headers, { description: DESCRIPTION, public: false, files: content });
@@ -23,8 +25,11 @@ async function publishGist(http, token, existingId, files) {
         reply = existingId
             ? await http('PATCH', `${API}/${encodeURIComponent(existingId)}`, headers, { description: DESCRIPTION, files: content })
             : await create();
-        if (existingId && reply.status === 404)
+        if (existingId && reply.status === 404) {
+            if (!recreate)
+                return { ok: false, message: 'The published Gist no longer exists; run "Publish Badges to a Gist" to create a new one.' };
             reply = await create();
+        }
     }
     catch (err) {
         return { ok: false, message: `Could not reach GitHub (${err instanceof Error ? err.message : String(err)}).` };

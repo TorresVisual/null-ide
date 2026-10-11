@@ -17,6 +17,7 @@ interface Options {
   state?: PublishedState;
   choose?: BadgeAccount;
   gate?: Promise<void>;
+  gone?: boolean;
 }
 
 function setup(over: Options = {}) {
@@ -28,6 +29,7 @@ function setup(over: Options = {}) {
   const http: HttpJson = async (method, url, _headers, body) => {
     calls.push({ method, url, body });
     if (over.gate && calls.length === 1) await over.gate;
+    if (over.gone && method === 'PATCH') return { status: 404, body: { message: 'Not Found' } };
     return { status: method === 'POST' ? 201 : 200, body: { id: 'g1', owner: { login: 'alice' } } };
   };
   const publisher = new BadgePublisher({
@@ -132,6 +134,18 @@ test('the remembered account is used without asking; a removed account starts ov
   await removed.publisher.publish({ interactive: true });
   assert.strictEqual(removed.calls[0].method, 'POST');
   assert.strictEqual(removed.getState()?.accountId, 'a1');
+});
+
+test('auto-refresh never re-creates a gist the user deleted; a manual publish does', async () => {
+  const state = { gistId: 'g1', accountId: 'a1', owner: 'alice', hash: 'old' };
+  const auto = setup({ gone: true, state });
+  const out = await auto.publisher.publish({ interactive: false });
+  assert.strictEqual(out.ok, false);
+  assert.deepStrictEqual(auto.calls.map((c) => c.method), ['PATCH']);
+
+  const manual = setup({ gone: true, state });
+  assert.strictEqual((await manual.publisher.publish({ interactive: true })).ok, true);
+  assert.deepStrictEqual(manual.calls.map((c) => c.method), ['PATCH', 'POST']);
 });
 
 test('publishes are serialised: a second call waits for the first', async () => {

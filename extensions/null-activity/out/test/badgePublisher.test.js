@@ -19,6 +19,8 @@ function setup(over = {}) {
         calls.push({ method, url, body });
         if (over.gate && calls.length === 1)
             await over.gate;
+        if (over.gone && method === 'PATCH')
+            return { status: 404, body: { message: 'Not Found' } };
         return { status: method === 'POST' ? 201 : 200, body: { id: 'g1', owner: { login: 'alice' } } };
     };
     const publisher = new badgePublisher_1.BadgePublisher({
@@ -113,6 +115,16 @@ function setup(over = {}) {
     await removed.publisher.publish({ interactive: true });
     node_assert_1.default.strictEqual(removed.calls[0].method, 'POST');
     node_assert_1.default.strictEqual(removed.getState()?.accountId, 'a1');
+});
+(0, node_test_1.test)('auto-refresh never re-creates a gist the user deleted; a manual publish does', async () => {
+    const state = { gistId: 'g1', accountId: 'a1', owner: 'alice', hash: 'old' };
+    const auto = setup({ gone: true, state });
+    const out = await auto.publisher.publish({ interactive: false });
+    node_assert_1.default.strictEqual(out.ok, false);
+    node_assert_1.default.deepStrictEqual(auto.calls.map((c) => c.method), ['PATCH']);
+    const manual = setup({ gone: true, state });
+    node_assert_1.default.strictEqual((await manual.publisher.publish({ interactive: true })).ok, true);
+    node_assert_1.default.deepStrictEqual(manual.calls.map((c) => c.method), ['PATCH', 'POST']);
 });
 (0, node_test_1.test)('publishes are serialised: a second call waits for the first', async () => {
     let release;

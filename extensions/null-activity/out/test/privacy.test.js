@@ -31,7 +31,7 @@ const at = (day, h = 0, month = 9) => new Date(2026, month, day, h).getTime();
         enabled: true,
         months: [{ day: '2026-09-01', ms: 125 * 60_000 }, { day: '2026-10-01', ms: 5 * 60_000 }],
     });
-    for (const needle of ['C:\\store', 'on', 'git branch', 'Never recorded', 'no network', '2026-09  2h 5m', '2026-10  5m']) {
+    for (const needle of ['C:\\store', 'on', 'git branch', 'Never recorded', 'unless you publish badges', '2026-09  2h 5m', '2026-10  5m']) {
         node_assert_1.default.ok(text.includes(needle), needle);
     }
     node_assert_1.default.ok((0, privacy_1.trackedDataReport)({ storageDir: 'x', enabled: false, months: [] }).includes('(no data yet)'));

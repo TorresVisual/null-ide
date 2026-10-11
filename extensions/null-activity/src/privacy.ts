@@ -41,7 +41,7 @@ export function trackedDataReport(info: { storageDir: string; enabled: boolean; 
     '  lines added and removed.',
     '',
     'Never recorded: file contents, diffs, or source text.',
-    'Nothing leaves this machine: Null Activity has no network code.',
+    'Nothing leaves this machine unless you publish badges (only total time, daily average and top language, to a secret GitHub Gist).',
     '',
     `Storage: ${info.storageDir}`,
     `Tracking: ${info.enabled ? 'on' : 'off'} (setting null-activity.enabled)`,

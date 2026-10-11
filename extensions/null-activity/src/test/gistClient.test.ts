@@ -43,6 +43,20 @@ test('404 on update means the gist was deleted: create a new one', async () => {
   assert.deepStrictEqual(calls.map((c) => c.method), ['PATCH', 'POST']);
 });
 
+test('with recreate off, a 404 on update is a failure and nothing is created', async () => {
+  const { http, calls } = fake([{ status: 404, body: { message: 'Not Found' } }]);
+  const result = await publishGist(http, 'tok', 'g1', files, false);
+  assert.strictEqual(result.ok, false);
+  assert.match((result as { message: string }).message, /no longer exists/);
+  assert.deepStrictEqual(calls.map((c) => c.method), ['PATCH']);
+});
+
+test('an HTML error page is not echoed into the message', async () => {
+  const html = ['<html>', '<body>Bad gateway</body></html>'].join('\n');
+  const result = await publishGist(fake([{ status: 502, body: html }]).http, 't', undefined, files);
+  assert.deepStrictEqual(result, { ok: false, message: 'GitHub answered HTTP 502.' });
+});
+
 test('401/403 explain the missing scope and never echo the token', async () => {
   for (const status of [401, 403]) {
     const result = await publishGist(fake([{ status, body: { message: 'Bad credentials' } }]).http, 'secret-token', undefined, files);

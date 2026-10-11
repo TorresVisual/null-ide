@@ -27,12 +27,14 @@ export const gistRawUrl = (owner: string, id: string, file: string): string =>
   `https://gist.githubusercontent.com/${owner}/${id}/raw/${file}`;
 
 function serverSays(body: unknown): string {
-  const message = typeof body === 'string' ? body : (body as { message?: unknown } | undefined)?.message;
-  return typeof message === 'string' ? message.slice(0, 200) : '';
+  // Only a JSON `message`; a non-JSON body (an HTML error page from an outage or proxy) is never echoed.
+  const message = typeof body === 'object' && body ? (body as { message?: unknown }).message : undefined;
+  return typeof message === 'string' ? message.replace(/\s+/g, ' ').slice(0, 200) : '';
 }
 
 /**
- * Creates the secret gist, or updates `existingId` in place (creating a new one if it was deleted).
+ * Creates the secret gist, or updates `existingId` in place. If that gist was deleted, `recreate` decides
+ * whether a new one is created or the call fails (a background refresh must not undo an unpublish).
  * Never throws; the token only ever goes in the Authorization header.
  */
 export async function publishGist(
@@ -40,6 +42,7 @@ export async function publishGist(
   token: string,
   existingId: string | undefined,
   files: GistFile[],
+  recreate = true,
 ): Promise<PublishResult> {
   const content = Object.fromEntries(files.map((f) => [f.name, { content: f.content }]));
   const headers = { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' };
@@ -50,7 +53,10 @@ export async function publishGist(
     reply = existingId
       ? await http('PATCH', `${API}/${encodeURIComponent(existingId)}`, headers, { description: DESCRIPTION, files: content })
       : await create();
-    if (existingId && reply.status === 404) reply = await create();
+    if (existingId && reply.status === 404) {
+      if (!recreate) return { ok: false, message: 'The published Gist no longer exists; run "Publish Badges to a Gist" to create a new one.' };
+      reply = await create();
+    }
   } catch (err) {
     return { ok: false, message: `Could not reach GitHub (${err instanceof Error ? err.message : String(err)}).` };
   }

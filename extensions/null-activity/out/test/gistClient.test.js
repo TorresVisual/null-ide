@@ -41,6 +41,18 @@ function fake(replies) {
     node_assert_1.default.deepStrictEqual(await (0, gistClient_1.publishGist)(http, 'tok', 'g1', files), { ok: true, id: 'g2', owner: 'alice' });
     node_assert_1.default.deepStrictEqual(calls.map((c) => c.method), ['PATCH', 'POST']);
 });
+(0, node_test_1.test)('with recreate off, a 404 on update is a failure and nothing is created', async () => {
+    const { http, calls } = fake([{ status: 404, body: { message: 'Not Found' } }]);
+    const result = await (0, gistClient_1.publishGist)(http, 'tok', 'g1', files, false);
+    node_assert_1.default.strictEqual(result.ok, false);
+    node_assert_1.default.match(result.message, /no longer exists/);
+    node_assert_1.default.deepStrictEqual(calls.map((c) => c.method), ['PATCH']);
+});
+(0, node_test_1.test)('an HTML error page is not echoed into the message', async () => {
+    const html = ['<html>', '<body>Bad gateway</body></html>'].join('\n');
+    const result = await (0, gistClient_1.publishGist)(fake([{ status: 502, body: html }]).http, 't', undefined, files);
+    node_assert_1.default.deepStrictEqual(result, { ok: false, message: 'GitHub answered HTTP 502.' });
+});
 (0, node_test_1.test)('401/403 explain the missing scope and never echo the token', async () => {
     for (const status of [401, 403]) {
         const result = await (0, gistClient_1.publishGist)(fake([{ status, body: { message: 'Bad credentials' } }]).http, 'secret-token', undefined, files);

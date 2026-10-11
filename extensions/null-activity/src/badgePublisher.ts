@@ -79,7 +79,7 @@ export class BadgePublisher {
       if (!token) {
         return fail(interactive ? 'GitHub did not provide a token with the gist scope.' : 'No GitHub token is available without signing in.');
       }
-      const result = await publishGist(deps.http, token, existing?.gistId, files);
+      const result = await publishGist(deps.http, token, existing?.gistId, files, interactive);
       if (!result.ok) return result;
       deps.state.set({ gistId: result.id, accountId: account.id, owner: result.owner, hash });
       return { ok: true, changed: true, markdown: markdownFor(badges, result.owner, result.id) };
