@@ -22,8 +22,9 @@ function contextOf(doc: vscode.TextDocument | undefined): { file?: string; langu
 
 /**
  * Turns VS Code events into heartbeats. The stable API exposes no terminal keystrokes, so terminal
- * activity is shell-integration command start/end plus active-terminal changes. Only edits to the
- * active editor's document count, so background refactors do not switch the tracked file.
+ * activity is shell-integration command start/end plus active-terminal changes. Edits to any open
+ * file count, not just the active editor's, so AI-agent edits to background files are tracked
+ * (attributed to the edited file; a multi-file refactor makes one heartbeat per file).
  */
 export function startHeartbeatSource(service: ActivityService): vscode.Disposable {
   const send = (
@@ -35,7 +36,7 @@ export function startHeartbeatSource(service: ActivityService): vscode.Disposabl
 
   return vscode.Disposable.from(
     vscode.workspace.onDidChangeTextDocument((e) => {
-      if (e.contentChanges.length > 0 && e.document === active() && isTracked(e.document)) {
+      if (e.contentChanges.length > 0 && isTracked(e.document)) {
         send(e.document, lineDelta(e.contentChanges));
       }
     }),
