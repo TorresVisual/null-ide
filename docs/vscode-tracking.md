@@ -4,7 +4,7 @@ Null IDE builds on VSCodium, which trails VS Code by several releases. This list
 catches VS Code features early so we can backport or adapt them now instead of
 waiting for the VSCodium bump (#115).
 
-**Last reviewed: 1.141**
+**Last reviewed: 1.141** (backfilled 1.129–1.135, already in the 1.135 build, so those rows are ticked as reconciled)
 
 The `upstream-check` workflow opens a *Review VS Code 1.x release notes* issue for
 every stable release after the version above; `/vscode-watch` works through them
@@ -46,3 +46,11 @@ against the real upstream feature, then tick **Reconciled**.
 | Word wrap accounts for injected text width (color decorators, inlay hints, breakpoint placeholders) | 1.136 | Wait | — | |
 | Terminal: no 5 s delay when extensions run commands once shell integration is ready (helps `null-actions` buttons) | 1.136 | Wait | — | |
 | N/A: agent merge, multi-root agent sessions, session/chat hierarchy, chat backgrounds, agent notifications, agent host, dictation policies, Agents-window accessibility badge, integrated-browser spell check | 1.136 | N/A | — | |
+| Auto-reload HTML files in the integrated browser (`workbench.browser.autoReloadOnFileChange`); open HTML in the integrated browser by default via `workbench.editorAssociations` | 1.133 / 1.134 | Wait | — | ✓ |
+| Hold Alt on an editor tab's close button to **Close Other Editors** | 1.134 | Wait | — | ✓ |
+| Hybrid Markdown editor (Agents window only, experimental; Markdown diffs from 1.132): rendered, editable, with agent comments. Overlaps `null-markdown` (#114); revisit once it leaves experimental | 1.131 / 1.132 | Wait | — | ✓ |
+| Built-in dictation in editors, chat and terminal (`dictation.enabled`, experimental; shell-aware terminal cleanup from 1.132) | 1.131 | Wait | — | ✓ |
+| Terminal: `terminal.integrated.resizeDimensionsOverlay.enabled`, `accessibleViewPreserveCursorPosition: always`, clickable file links for `diff.mnemonicPrefix` paths | 1.130 / 1.131 | Wait | — | ✓ |
+| Modern UI preview (`workbench.experimental.modernUI`); **Reopen Editor With** submenu in the editor toolbar | 1.129 | Wait | — | ✓ |
+| `customEditors.priority` per editor mode (text vs. diff) proposed API; relevant if `null-markdown` ever registers a custom editor | 1.129 / 1.132 | Wait | — | ✓ |
+| N/A: agent host and Agents window changes, side chats, grid / side-pane layouts, prompt timeline, find and sticky scroll in chat, Rubber Duck, Agent Plugins, Claude/Copilot model mixing, external agent session handoff, chat turn usage, local harness sandboxing, Copilot BYOK / prompt-to-skill migration / `!` commands / timestamps / credit usage, GitHub Enterprise in the agent host, VS Code pet, subagent info, commenting on elements in the integrated browser | 1.129–1.135 | N/A | — | |
