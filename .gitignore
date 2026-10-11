@@ -17,6 +17,7 @@ archive/wooting-analog/native/*.node
 
 # Build outputs
 VSCode-*/
+!.claude/skills/vscode-watch/
 *.zip
 *.zip.sha256
 *.tar.gz

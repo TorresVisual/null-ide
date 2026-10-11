@@ -63,8 +63,41 @@ jobs:
           git push --force origin "$BRANCH"  # bot-owned branch; overwrites a leftover from a failed run
           gh pr create $DRAFT \
             --title "Update VSCodium upstream to ${LATEST}" \
-            --body "Automated upstream version bump (${PINNED} → ${LATEST}). ${RESULT}" \
+            --body "Automated upstream version bump (${PINNED} → ${LATEST}). ${RESULT} Before merging, reconcile docs/vscode-tracking.md rows up to VS Code ${MS_TAG} (/vscode-watch)." \
             --head "$BRANCH" \
             --base main
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # VSCodium trails VS Code by several releases; review VS Code's own release notes
+  # as they ship so features can be backported or adapted early (#115).
+  vscode-releases:
+    name: Open review issues for new VS Code releases
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Open one review issue per unreviewed VS Code release
+        run: |
+          LATEST=$(gh api repos/microsoft/vscode/releases/latest --jq .tag_name | cut -d. -f2)
+          LAST=$(grep -oP 'Last reviewed: 1\.\K[0-9]+' docs/vscode-tracking.md)
+          echo "Latest VS Code: 1.$LATEST   Last reviewed: 1.$LAST"
+          for ((m = LAST + 1; m <= LATEST; m++)); do
+            TITLE="Review VS Code 1.$m release notes"
+            # Any issue with this exact title, open or closed, means it's handled.
+            if [ "$(gh issue list --state all --search "$TITLE in:title" --json title \
+                     --jq "map(select(.title == \"$TITLE\")) | length")" != "0" ]; then
+              echo "Issue for 1.$m already exists."
+              continue
+            fi
+            gh issue create --title "$TITLE" --body "VS Code 1.$m is out: https://code.visualstudio.com/updates/v1_$m
+
+          Run /vscode-watch to triage its features for Null IDE (Backport / Adapt / Wait / N/A), file issues for the ones to build now, and record them in [docs/vscode-tracking.md]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/blob/main/docs/vscode-tracking.md).
+
+          Part of #115."
+          done
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

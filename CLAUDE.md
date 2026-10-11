@@ -167,6 +167,8 @@ Patches apply **after** VSCodium's own patches, against the VS Code commit at `M
 2. To bump manually: edit the root `VSCODIUM_TAG` file (or pass `vscodium_tag` when dispatching `build.yml`).
 3. Verify any patches in `patches/` still apply cleanly against the new MS tag.
 
+VSCodium trails VS Code by several releases, so the same workflow's `vscode-releases` job also opens a *Review VS Code 1.x release notes* issue for each VS Code stable release after `Last reviewed` in `docs/vscode-tracking.md` (#115). `/vscode-watch` triages those (Backport / Adapt / Wait / N/A) into that tracker; a bump PR asks you to reconcile rows up to its `MS_TAG`.
+
 ## Key Build Variables (`build.yml`)
 
 | Variable | Purpose |
