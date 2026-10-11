@@ -50,8 +50,6 @@ suite('null-activity', () => {
     });
     test('editing a file records an interval that the tracked-data report reflects', async function () {
         this.timeout(30_000);
-        if (!vscode.window.state.focused)
-            this.skip(); // heartbeats only count while the window is focused
         const api = await vscode.extensions.getExtension('null.null-activity').activate();
         const file = path.join(vscode.workspace.workspaceFolders[0].uri.fsPath, 'activity-spec.txt');
         fs.writeFileSync(file, '');

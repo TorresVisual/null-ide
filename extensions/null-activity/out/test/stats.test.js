@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const node_assert_1 = __importDefault(require("node:assert"));
 const node_test_1 = require("node:test");
 const stats_1 = require("../stats");
+const wakatimeImport_1 = require("../wakatimeImport");
 const MIN = 60_000;
 /** Local time; month is zero-based and defaults to October 2026 (Thu 8 Oct 2026). */
 const at = (day, h, m = 0, month = 9) => new Date(2026, month, day, h, m).getTime();
@@ -103,5 +104,42 @@ const iv = (start, end, over = {}) => ({
     node_assert_1.default.strictEqual((0, stats_1.formatDuration)(59_000), '0m');
     node_assert_1.default.strictEqual((0, stats_1.formatDuration)(12 * MIN), '12m');
     node_assert_1.default.strictEqual((0, stats_1.formatDuration)((4 * 60 + 32) * MIN), '4h 32m');
+});
+const proj = (key) => ({ key, name: key.toUpperCase() });
+(0, node_test_1.test)('three parallel windows: projects and languages sum, the daily total and session duration stay the union', () => {
+    const day = (0, stats_1.dayRange)(at(8, 12));
+    const data = ['a', 'b', 'c'].map((w) => iv(at(8, 10), at(8, 10, 10), { window: w, project: proj(w) }));
+    node_assert_1.default.deepStrictEqual((0, stats_1.projectStats)(data, day).map((p) => p.ms), [10 * MIN, 10 * MIN, 10 * MIN]);
+    node_assert_1.default.strictEqual((0, stats_1.languageStats)(data, day)[0].ms, 30 * MIN);
+    node_assert_1.default.deepStrictEqual((0, stats_1.periodStats)(data, day, 'day'), [{ day: '2026-10-08', ms: 10 * MIN }]);
+    const [session] = (0, stats_1.sessions)(data, day, 15 * MIN);
+    node_assert_1.default.strictEqual(session.durationMs, 10 * MIN);
+    node_assert_1.default.deepStrictEqual(session.projects.map((p) => p.name), ['A', 'B', 'C']);
+});
+(0, node_test_1.test)('intervals without a window behave as one window: overlaps are still clipped', () => {
+    const day = (0, stats_1.dayRange)(at(8, 12));
+    const data = [iv(at(8, 10), at(8, 10, 10)), iv(at(8, 10, 5), at(8, 10, 15), { project: proj('k2') })];
+    node_assert_1.default.deepStrictEqual((0, stats_1.projectStats)(data, day).map((p) => [p.project.key, p.ms]), [['k', 10 * MIN], ['k2', 5 * MIN]]);
+});
+(0, node_test_1.test)('a WakaTime import only fills the gaps live windows left', () => {
+    const day = (0, stats_1.dayRange)(at(8, 12));
+    const live = iv(at(8, 10, 5), at(8, 10, 10), { window: 'w1', project: proj('live'), linesAdded: 7 });
+    const imported = iv(at(8, 10), at(8, 10, 20), { window: wakatimeImport_1.WAKATIME_WINDOW_ID, project: proj('imp') });
+    const by = Object.fromEntries((0, stats_1.projectStats)([live, imported], day).map((p) => [p.project.key, p]));
+    node_assert_1.default.strictEqual(by.live.ms, 5 * MIN);
+    node_assert_1.default.strictEqual(by.live.linesAdded, 7);
+    node_assert_1.default.strictEqual(by.imp.ms, 15 * MIN, '10:00-10:05 and 10:10-10:20');
+    node_assert_1.default.deepStrictEqual((0, stats_1.attributedIntervals)([live, imported], day).map((i) => [i.project.key, i.start, i.end]), [
+        ['imp', at(8, 10), at(8, 10, 5)],
+        ['live', at(8, 10, 5), at(8, 10, 10)],
+        ['imp', at(8, 10, 10), at(8, 10, 20)],
+    ]);
+    node_assert_1.default.deepStrictEqual((0, stats_1.periodStats)([live, imported], day, 'day'), [{ day: '2026-10-08', ms: 20 * MIN }]);
+});
+(0, node_test_1.test)('an import completely covered by live windows contributes nothing', () => {
+    const day = (0, stats_1.dayRange)(at(8, 12));
+    const live = iv(at(8, 10), at(8, 11), { window: 'w1', project: proj('live') });
+    const imported = iv(at(8, 10, 10), at(8, 10, 40), { window: wakatimeImport_1.WAKATIME_WINDOW_ID, project: proj('imp') });
+    node_assert_1.default.deepStrictEqual((0, stats_1.projectStats)([live, imported], day).map((p) => p.project.key), ['live']);
 });
 //# sourceMappingURL=stats.test.js.map

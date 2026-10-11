@@ -5,13 +5,12 @@ exports.lineDelta = lineDelta;
 class Tracker {
     opts;
     open;
-    focused = true;
     active = true;
     constructor(opts) {
         this.opts = opts;
     }
     heartbeat(h) {
-        if (!this.active || !this.focused)
+        if (!this.active)
             return;
         const o = this.open;
         const sameContext = !!o && o.workspace === h.workspace && o.language === h.language && o.file === h.file;
@@ -32,11 +31,6 @@ class Tracker {
             linesAdded: h.linesAdded,
             linesRemoved: h.linesRemoved,
         };
-    }
-    setFocused(focused) {
-        if (!focused)
-            this.closeAtLast();
-        this.focused = focused;
     }
     setActive(active) {
         if (!active)

@@ -35,7 +35,6 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.activate = activate;
 exports.deactivate = deactivate;
-const crypto = __importStar(require("crypto"));
 const vscode = __importStar(require("vscode"));
 const activityService_1 = require("./activityService");
 const badgeCommands_1 = require("./badgeCommands");
@@ -53,10 +52,9 @@ function readSettings() {
 function activate(context) {
     const output = vscode.window.createOutputChannel('Null Activity');
     const storageDir = context.globalStorageUri.fsPath;
-    const windowId = crypto.createHash('sha1').update(vscode.env.sessionId).digest('hex').slice(0, 10);
+    const windowId = (0, intervalStore_1.newWindowId)();
     const store = new intervalStore_1.IntervalStore({ dir: storageDir, windowId, log: (message) => output.appendLine(message) });
     const service = new activityService_1.ActivityService({ store, resolveProject: projectIdentity_1.resolveProject, settings: readSettings });
-    service.setFocused(vscode.window.state.focused);
     const statusBar = new statusBar_1.StatusBar(service);
     const dashboard = new dashboardPanel_1.DashboardPanel(context, service, (message) => output.appendLine(message));
     const timers = [setInterval(() => service.tick(), 15_000), setInterval(() => service.flush(), 30_000)];

@@ -62,17 +62,14 @@ class ActivityService {
     recordActivity(h) {
         this.tracker.heartbeat(h);
     }
-    setFocused(focused) {
-        this.tracker.setFocused(focused);
-    }
     tick() {
         this.tracker.tick();
     }
     flush() {
         this.opts.store.flush();
     }
-    /** Merged across windows, clipped to the range, including the in-progress interval. */
-    getIntervals(range) {
+    /** Un-merged intervals of every window, tagged with their window, plus this window's open interval. */
+    raw(range) {
         const key = `${range.from}:${range.to}`;
         let hit = this.cache.get(key);
         if (!hit || this.clock() - hit.at >= CACHE_TTL_MS) {
@@ -80,22 +77,26 @@ class ActivityService {
             this.cache.set(key, hit);
         }
         const open = this.tracker.peek();
-        return (0, stats_1.normalizeIntervals)(open ? [...hit.intervals, open] : hit.intervals, range);
+        return open ? [...hit.intervals, { ...open, window: this.opts.store.windowId }] : hit.intervals;
+    }
+    /** Union of every window, clipped to the range, including the in-progress interval. */
+    getIntervals(range) {
+        return (0, stats_1.normalizeIntervals)(this.raw(range), range);
     }
     getProjectStats(range) {
-        return (0, stats_1.projectStats)(this.getIntervals(range), range);
+        return (0, stats_1.projectStats)(this.raw(range), range);
     }
     getLanguageStats(range) {
-        return (0, stats_1.languageStats)(this.getIntervals(range), range);
+        return (0, stats_1.languageStats)(this.raw(range), range);
     }
     getDailyStats(range) {
-        return (0, stats_1.periodStats)(this.getIntervals(range), range, 'day');
+        return (0, stats_1.periodStats)(this.raw(range), range, 'day');
     }
     getSessions(range) {
-        return (0, stats_1.sessions)(this.getIntervals(range), range, this.cfg.sessionGapMs);
+        return (0, stats_1.sessions)(this.raw(range), range, this.cfg.sessionGapMs);
     }
     getMonthlyTotals() {
-        return (0, stats_1.periodStats)(this.getIntervals(stats_1.ALL_TIME), stats_1.ALL_TIME, 'month');
+        return (0, stats_1.periodStats)(this.raw(stats_1.ALL_TIME), stats_1.ALL_TIME, 'month');
     }
     /** Closes the open interval first so it is deleted with the rest instead of reappearing. */
     deleteRange(range) {

@@ -171,4 +171,28 @@ const day = (0, stats_1.dayRange)(at(8, 12));
     node_assert_1.default.strictEqual(service.hasImport(), false);
     node_assert_1.default.deepStrictEqual(service.getIntervals(day), []);
 });
+(0, node_test_1.test)('another window\'s time is summed per project but shares one headline total', () => {
+    const { service, dir, settings } = setup();
+    settings.idleTimeoutMs = 20 * MIN;
+    service.refresh();
+    const other = new intervalStore_1.IntervalStore({ dir, windowId: 'w2' });
+    other.append({ start: at(8, 9), end: at(8, 9, 10), project: { key: '/x', name: 'x' }, language: 'rust', file: 'b.rs', linesAdded: 0, linesRemoved: 0 });
+    other.flush();
+    service.recordActivity(hb(at(8, 9)));
+    service.recordActivity(hb(at(8, 9, 10)));
+    service.endSession();
+    node_assert_1.default.deepStrictEqual(service.getProjectStats(day).map((p) => p.ms), [10 * MIN, 10 * MIN]);
+    node_assert_1.default.deepStrictEqual(service.getLanguageStats(day).map((l) => l.language).sort(), ['rust', 'typescript']);
+    node_assert_1.default.deepStrictEqual(service.getDailyStats(day), [{ day: '2026-10-08', ms: 10 * MIN }]);
+    node_assert_1.default.deepStrictEqual(service.getIntervals(day).map((i) => [i.start, i.end]), [[at(8, 9), at(8, 9, 10)]]);
+});
+(0, node_test_1.test)('the open interval of this window is summed with other windows too', () => {
+    const { service, dir } = setup();
+    const other = new intervalStore_1.IntervalStore({ dir, windowId: 'w2' });
+    other.append({ start: at(8, 9), end: at(8, 9, 1), project: { key: '/x', name: 'x' }, language: 'rust', linesAdded: 0, linesRemoved: 0 });
+    other.flush();
+    service.recordActivity(hb(at(8, 9)));
+    service.recordActivity(hb(at(8, 9, 1)));
+    node_assert_1.default.deepStrictEqual(service.getProjectStats(day).map((p) => p.ms), [MIN, MIN]);
+});
 //# sourceMappingURL=activityService.test.js.map

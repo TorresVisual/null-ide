@@ -10,11 +10,13 @@ exports.monthRange = monthRange;
 exports.mergeClip = mergeClip;
 exports.sliceInterval = sliceInterval;
 exports.normalizeIntervals = normalizeIntervals;
+exports.attributedIntervals = attributedIntervals;
 exports.periodStats = periodStats;
 exports.projectStats = projectStats;
 exports.languageStats = languageStats;
 exports.sessions = sessions;
 exports.formatDuration = formatDuration;
+const wakatimeImport_1 = require("./wakatimeImport");
 exports.ALL_TIME = { from: 0, to: Number.MAX_SAFE_INTEGER };
 function periodStart(ts, p) {
     const d = new Date(ts);
@@ -75,6 +77,50 @@ function sliceInterval(i, from, to) {
 function normalizeIntervals(intervals, range) {
     return mergeClip(intervals).flatMap((i) => sliceInterval(i, range.from, range.to) ?? []);
 }
+/** The parts of `imported` (merged, sorted) that no interval of `cover` (merged, sorted) touches. */
+function fillGaps(imported, cover) {
+    const out = [];
+    let c = 0;
+    for (const i of imported) {
+        while (c < cover.length && cover[c].end <= i.start)
+            c++;
+        let from = i.start;
+        for (let j = c; j < cover.length && cover[j].start < i.end; j++) {
+            if (cover[j].start > from)
+                out.push(sliceInterval(i, from, cover[j].start));
+            from = Math.max(from, cover[j].end);
+        }
+        if (from < i.end)
+            out.push(sliceInterval(i, from, i.end));
+    }
+    return out;
+}
+/**
+ * The per-project / per-language view: overlaps are removed only inside one window, so three parallel
+ * windows with 10 min each give 30 min (the union view, `normalizeIntervals`, gives 10). A WakaTime import
+ * records the same activity Null IDE saw itself, so it only fills the gaps the live windows left.
+ */
+function attributedIntervals(intervals, range) {
+    const byWindow = new Map();
+    const imported = [];
+    for (const i of intervals) {
+        if (i.window === wakatimeImport_1.WAKATIME_WINDOW_ID) {
+            imported.push(i);
+            continue;
+        }
+        const key = i.window ?? '';
+        const list = byWindow.get(key);
+        if (list)
+            list.push(i);
+        else
+            byWindow.set(key, [i]);
+    }
+    const live = [...byWindow.values()].flatMap(mergeClip);
+    const all = [...live, ...fillGaps(mergeClip(imported), mergeClip(live))];
+    return all
+        .flatMap((i) => sliceInterval(i, range.from, range.to) ?? [])
+        .sort((a, b) => a.start - b.start || a.end - b.end);
+}
 function* pieces(i, p) {
     for (let from = i.start; from < i.end;) {
         const to = nextPeriodStart(from, p);
@@ -97,7 +143,7 @@ function periodStats(intervals, range, period) {
 }
 function projectStats(intervals, range) {
     const by = new Map();
-    for (const i of normalizeIntervals(intervals, range)) {
+    for (const i of attributedIntervals(intervals, range)) {
         let s = by.get(i.project.key);
         if (!s)
             by.set(i.project.key, (s = { project: i.project, ms: 0, files: new Set(), linesAdded: 0, linesRemoved: 0 }));
@@ -114,11 +160,11 @@ function projectStats(intervals, range) {
 }
 function languageStats(intervals, range) {
     const by = new Map();
-    for (const i of normalizeIntervals(intervals, range))
+    for (const i of attributedIntervals(intervals, range))
         by.set(i.language, (by.get(i.language) ?? 0) + i.end - i.start);
     return [...by].map(([language, ms]) => ({ language, ms })).sort((a, b) => b.ms - a.ms);
 }
-/** Consecutive intervals with gaps <= gapMs form one session; duration is the sum of interval time. */
+/** Consecutive intervals with gaps <= gapMs form one session; duration is the union time, contents list every window's projects. */
 function sessions(intervals, range, gapMs) {
     const groups = [];
     for (const i of normalizeIntervals(intervals, range)) {
@@ -134,6 +180,14 @@ function sessions(intervals, range, gapMs) {
         }
         g.session.end = i.end;
         g.session.durationMs += i.end - i.start;
+    }
+    let at = 0;
+    for (const i of attributedIntervals(intervals, range)) {
+        while (at < groups.length && groups[at].session.end <= i.start)
+            at++;
+        const g = groups[at];
+        if (!g)
+            break;
         g.projects.set(i.project.key, i.project);
         if (i.language)
             g.languages.add(i.language);

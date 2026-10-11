@@ -176,4 +176,34 @@ const byStart = (a, b) => a.start - b.start;
     store.replaceWindow('import-wakatime', many);
     node_assert_1.default.strictEqual(store.read({ from: -Infinity, to: Infinity }).length, 2_000);
 });
+(0, node_test_1.test)('read tags every interval with its window: files by file name, the unflushed buffer with its own id', () => {
+    const dir = tmpDir();
+    const a = new intervalStore_1.IntervalStore({ dir, windowId: 'w1' });
+    const b = new intervalStore_1.IntervalStore({ dir, windowId: 'w2' });
+    a.append(iv(at(8, 10), at(8, 11)));
+    a.flush();
+    b.append(iv(at(8, 12), at(8, 13)));
+    fs.writeFileSync(path.join(dir, 'intervals-2026-10-import-wakatime.jsonl'), JSON.stringify(iv(at(8, 14), at(8, 15))) + '\n');
+    const got = a.read((0, stats_1.dayRange)(at(8, 12))).sort(byStart);
+    node_assert_1.default.deepStrictEqual(got.map((i) => i.window), ['w1', 'import-wakatime'], 'a does not see the unflushed buffer of b');
+    const own = b.read((0, stats_1.dayRange)(at(8, 12))).sort(byStart);
+    node_assert_1.default.deepStrictEqual(own.map((i) => i.window), ['w1', 'w2', 'import-wakatime']);
+    node_assert_1.default.strictEqual(b.windowId, 'w2');
+});
+(0, node_test_1.test)('the window tag is never written to disk, not even by deleteRange', () => {
+    const dir = tmpDir();
+    const store = new intervalStore_1.IntervalStore({ dir, windowId: 'w1' });
+    store.append(iv(at(8, 10), at(8, 11)));
+    store.append(iv(at(9, 10), at(9, 11)));
+    store.flush();
+    store.deleteRange((0, stats_1.dayRange)(at(9, 12)));
+    const text = fs.readFileSync(path.join(dir, 'intervals-2026-10-w1.jsonl'), 'utf8');
+    node_assert_1.default.ok(!text.includes('"window"'), text);
+    node_assert_1.default.strictEqual(store.read({ from: at(1, 0), to: at(30, 0) }).length, 1);
+});
+(0, node_test_1.test)('newWindowId yields a fresh filename-safe id on every call', () => {
+    const ids = new Set(Array.from({ length: 50 }, () => (0, intervalStore_1.newWindowId)()));
+    node_assert_1.default.strictEqual(ids.size, 50);
+    node_assert_1.default.ok([...ids].every((id) => /^[0-9a-f]{10}$/.test(id)));
+});
 //# sourceMappingURL=intervalStore.test.js.map

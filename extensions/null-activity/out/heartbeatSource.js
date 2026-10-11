@@ -74,6 +74,6 @@ function startHeartbeatSource(service) {
     }), vscode.workspace.onDidSaveTextDocument((doc) => {
         if (isTracked(doc))
             send(doc, { isWrite: true });
-    }), vscode.window.onDidChangeActiveTerminal(() => send(undefined)), vscode.window.onDidStartTerminalShellExecution(() => send(undefined)), vscode.window.onDidEndTerminalShellExecution(() => send(undefined)), vscode.debug.onDidStartDebugSession(() => send(active())), vscode.debug.onDidTerminateDebugSession(() => send(active())), vscode.window.onDidChangeWindowState((state) => service.setFocused(state.focused)));
+    }), vscode.window.onDidChangeActiveTerminal(() => send(undefined)), vscode.window.onDidStartTerminalShellExecution(() => send(undefined)), vscode.window.onDidEndTerminalShellExecution(() => send(undefined)), vscode.debug.onDidStartDebugSession(() => send(active())), vscode.debug.onDidTerminateDebugSession(() => send(active())));
 }
 //# sourceMappingURL=heartbeatSource.js.map

@@ -191,4 +191,12 @@ const sum = (bars) => bars.reduce((n, b) => n + b.ms, 0);
 (0, node_test_1.test)('without git data the model has no git field', () => {
     node_assert_1.default.ok(!('git' in build([iv(at(8, 10), at(8, 11))], 'today')));
 });
+(0, node_test_1.test)('parallel windows: the total is the union, the shares are relative to the summed project time', () => {
+    const data = ['a', 'b', 'c'].map((w) => iv(at(8, 10), at(8, 10, 10), { window: w, project: { key: w, name: w } }));
+    const model = build(data, 'today');
+    node_assert_1.default.strictEqual(model.totalMs, 10 * MIN);
+    node_assert_1.default.strictEqual(sum(model.bars), 10 * MIN);
+    node_assert_1.default.deepStrictEqual(model.projects.map((p) => [p.ms, p.percent]), [[10 * MIN, 33], [10 * MIN, 33], [10 * MIN, 33]]);
+    node_assert_1.default.deepStrictEqual(model.sessions.map((s) => [s.ms, s.projects]), [[10 * MIN, ['a', 'b', 'c']]]);
+});
 //# sourceMappingURL=dashboardModel.test.js.map

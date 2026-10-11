@@ -83,28 +83,13 @@ function hb(ts, over = {}) {
         node_assert_1.default.deepStrictEqual([out[1].start, out[1].end, out[1].linesAdded], [30_000, 40_000, 4]);
     }
 });
-(0, node_test_1.test)('focus loss closes the interval; heartbeats while unfocused are ignored', () => {
-    const { tracker, out, at } = setup();
-    tracker.heartbeat(hb(0));
-    tracker.heartbeat(hb(10_000));
-    at(40_000);
-    tracker.setFocused(false);
-    node_assert_1.default.deepStrictEqual(out.map((i) => [i.start, i.end]), [[0, 10_000]], 'ends at the last heartbeat, not at the loss');
-    tracker.heartbeat(hb(50_000));
-    tracker.setFocused(true);
-    tracker.heartbeat(hb(60_000));
-    tracker.heartbeat(hb(70_000));
-    at(70_000);
-    tracker.closeOpen();
-    node_assert_1.default.deepStrictEqual(out.map((i) => [i.start, i.end]), [[0, 10_000], [60_000, 70_000]]);
-});
-(0, node_test_1.test)('focus loss after a long silence ends at the last heartbeat, not at the loss', () => {
+(0, node_test_1.test)('a window that is never focused still accrues time, and a long silence is not credited', () => {
     const { tracker, out, at } = setup();
     tracker.heartbeat(hb(0));
     tracker.heartbeat(hb(10_000));
     at(10_000 + IDLE + 5_000);
-    tracker.setFocused(false);
-    node_assert_1.default.deepStrictEqual(out.map((i) => [i.start, i.end]), [[0, 10_000]]);
+    tracker.closeOpen();
+    node_assert_1.default.deepStrictEqual(out.map((i) => [i.start, i.end]), [[0, 10_000]], 'ends at the last heartbeat, not at the closing time');
 });
 (0, node_test_1.test)('a clock that jumps backwards never yields negative or inflated time', () => {
     const { tracker, out, at } = setup();
