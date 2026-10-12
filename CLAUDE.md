@@ -122,7 +122,7 @@ Constraints for `splash.js`:
 ### `scripts/install-null-ide.ps1`
 - Installs from a GitHub Release (latest by default) or a local ZIP (`-ZipPath`)
 - Per-user install to `%LOCALAPPDATA%\Programs\Null IDE` — no administrator elevation required
-- Creates desktop and Start Menu shortcuts
+- Creates desktop and Start Menu shortcuts, plus a Start Menu shortcut `Null IDE (Safe Mode)` (`--safe-mode`)
 - Registers "Open in Null" and "Open Folder in Null" context menu entries in `HKCU`
 - Adds the install directory to the user's `PATH` (so `null .` works in new terminals)
 - Seeds default settings into `%APPDATA%\Null\User\settings.json`
@@ -153,6 +153,7 @@ Workbench chrome customisations (CSS/JS injection, icon swaps) are handled by di
 - `006-settings-toc-split-extensions.patch` — splits the Settings editor's Extensions node into Null / Installed Extensions / Built-in Extensions sections
 - `007-accounts-menu-null-accounts.patch` — the Accounts menu lists null-accounts' accounts (read from the `null.accounts.menu` context key, each row with its round `data:` picture or provider glyph, the host dimmed after the name, and a "Project: <folder>" heading) and drops VS Code's provider-session and Settings Sync / Copilot / Edit Sessions / tunnel rows; the activity-bar Accounts button shows the picture under `null.accounts.avatar`
 - `008-git-commit-message-check.patch` — `smartCommit` calls `null.commitMessage.check` (null-tools) and aborts with its reason; no-op when null-tools is absent
+- `009-safe-mode.patch` — `--safe-mode`: the enablement check disables user extensions and Null-owned built-ins (`isDisabledInSafeMode`); core status bar item, `[Safe Mode]` title suffix and Restart in Safe Mode / Restart Normally commands; `reload({ safeMode })`; main-process failed-start counter (`safe-mode-state.json`, offers safe mode after 3 failed starts). Pure parts have `node --test patches/test/*.test.mjs`. Design `docs/specs/safe-mode-design.md`
 
 To add a patch against the VS Code source:
 ```bash

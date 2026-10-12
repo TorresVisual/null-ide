@@ -91,9 +91,12 @@ powershell -ExecutionPolicy Bypass -File scripts\update-null-ide.ps1
 null .                      # open the current folder
 null C:\path\to\project     # open a specific folder
 null README.md              # open a file
+null --safe-mode            # start with all extensions disabled (also: Start Menu > Null IDE (Safe Mode))
 ```
 
 Open a new terminal after installing so the `PATH` change takes effect. In Explorer, right-click a file or folder (or a folder's background) and choose **Open in Null**.
+
+Safe Mode disables installed extensions and Null IDE's built-in extensions without changing them; use **Restart Normally** (status bar, notification or Help menu) to come back. Null IDE also offers Safe Mode on its own after three failed starts in a row.
 
 ### Extensions
 

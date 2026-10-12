@@ -220,7 +220,8 @@ function New-Shortcut {
     param(
         [string]$ShortcutPath,
         [string]$TargetPath,
-        [string]$WorkingDirectory
+        [string]$WorkingDirectory,
+        [string]$Arguments = ""
     )
 
     $parent = Split-Path -Parent $ShortcutPath
@@ -232,6 +233,7 @@ function New-Shortcut {
     $shortcut = $shell.CreateShortcut($ShortcutPath)
     $shortcut.TargetPath = $TargetPath
     $shortcut.WorkingDirectory = $WorkingDirectory
+    if ($Arguments) { $shortcut.Arguments = $Arguments }
     $shortcut.IconLocation = "$TargetPath,0"
     $shortcut.Save()
 }
@@ -827,6 +829,8 @@ function Install-Zip {
             Write-Step "Creating Start Menu shortcut"
             New-Shortcut -ShortcutPath (Join-Path ([Environment]::GetFolderPath("Programs")) "Null IDE\Null IDE.lnk") `
                          -TargetPath $target -WorkingDirectory $destinationFullPath
+            New-Shortcut -ShortcutPath (Join-Path ([Environment]::GetFolderPath("Programs")) "Null IDE\Null IDE (Safe Mode).lnk") `
+                         -TargetPath $target -WorkingDirectory $destinationFullPath -Arguments "--safe-mode"
         }
 
         if (-not $NoContextMenu) {
