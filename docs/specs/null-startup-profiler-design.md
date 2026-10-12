@@ -57,7 +57,7 @@ Activated on `onStartupFinished`. Only `snapshotSource.ts`, `reportPanel.ts`, `c
 
 - **Summary:** headline `workspaceRestored`, the other milestones, the 3 slowest phases and the 3 slowest extensions.
 - **Phases table:** sortable by duration or wall-clock impact; start and impact are columns (raw marks are not stored, which keeps reports small and path-free).
-- **Extensions table:** sortable; startup and deferred separated. Columns: load, call, resolve, total, activation event, reason. *Slow* flag when above `null-startup.slowExtensionMs` (default 100 ms); labelled "slow", never "problem".
+- **Extensions table:** sortable; startup and deferred separated. Columns: load, call, resolve, total, activation event, reason. *Slow* flag when at or above `null-startup.slowExtensionMs` (default 100 ms); labelled "slow", never "problem".
 - **Timeline:** Gantt strip with milestone markers and one lane per overlapping activation.
 - **Compare:** launch picker against the previous launch or the history median; per-phase and per-extension deltas, regressions flagged.
 
