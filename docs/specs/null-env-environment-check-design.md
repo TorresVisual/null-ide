@@ -28,10 +28,10 @@ Detection and tool lookup exist three times and cannot be imported across extens
 
 Pure (unit-tested with `node --test`; no `vscode` import):
 
-- `detect.ts` — one manifest → language table: cpp (`CMakeLists.txt`, `compile_commands.json`, `.clangd`), rust (`Cargo.toml`), node (`package.json`), dotnet (`*.csproj`). `detectLanguages(folderPath, deps)` with injected fs. Replaces `DETECTORS` manifests in `null-actions`.
+- `detect.ts` — one manifest → language table: cpp (`CMakeLists.txt`, `compile_commands.json`, `.clangd`), rust (`Cargo.toml`), node (`package.json`), dotnet (`*.csproj`). `detectProjects(folderPath, listDir?)` returns one `{ language, manifest }` per matched manifest (null-actions maps manifests to buttons); `detectLanguages` is its unique-language projection. `listDir` is injectable for tests. Replaces `DETECTORS` manifests in `null-actions`.
 - `probe.ts` — `findExecutable(names, extraDirs)`: PATH lookup plus the known locations moved from `null-format` (`~/.cargo/bin`, LLVM install dirs, scoop, bundled `bin/`). `findRustfmtPath` / `findClangFormatPath` move here.
 - `rules.ts` — data only. Each requirement: `{ id, label, languages | 'all', kind: 'extension' | 'tool', anyOf: string[], severity: 'required' | 'recommended', fix }`, where `fix` is `{ install: extensionId }` or `{ url }`.
-  - cpp (all `required` except clang-format): extensions clangd, cpptools, CodeLLDB; tools cmake, clangd, gdb-or-lldb; clang-format `recommended`.
+  - cpp (`required`: extensions clangd, cpptools, CodeLLDB; tool cmake. `recommended`: tools clangd, gdb-or-lldb, clang-format — clangd's extension can download clangd itself; MSVC presets debug through CodeLLDB and need no gdb).
   - rust (`required`): extension rust-analyzer; tools cargo, rustfmt.
   - node (`required`): tool node.
   - all: extension `anthropic.claude-code`, tool `claude` (both `recommended`).
@@ -42,7 +42,7 @@ Pure (unit-tested with `node --test`; no `vscode` import):
 ## Surfaces
 
 - **`Null: Check Environment`** (`null.env.check`): QuickPick of findings. An extension finding runs `workbench.extensions.installExtension`; a tool finding calls `vscode.env.openExternal(url)`; an "Install all missing extensions" row batches the former.
-- **Status bar warning**: present only while there are `required` findings; `recommended` ones appear in the QuickPick and dashboard only (so a missing Claude Code never nags as an error). Re-checks on `onDidChangeWorkspaceFolders` and `extensions.onDidChange`. Dismissing snoozes per workspace (`workspaceState`).
+- **Status bar warning**: present only while there are `required` findings; `recommended` ones appear in the QuickPick and dashboard only (so a missing Claude Code never nags as an error). Re-checks on `onDidChangeWorkspaceFolders` and `extensions.onDidChange`. Dismissing snoozes per workspace (`workspaceState`). The QuickPick also offers *Hide this warning for this workspace*, which stores the set of missing required ids; the item reappears when that set changes.
 - **Dashboard card** (`null-tools`): reads `null.env.getFindings` (returns plain JSON, no `vscode` types); hidden when empty.
 - **Failure paths**:
   - `null-cpp.debug.start` maps the synthesized config's `type` to its extension (`lldb` → `vadimcn.vscode-lldb`, `cppdbg` → `ms-vscode.cpptools`). If missing, show "needs <name>" with *Install* and *Check Environment* buttons instead of calling `startDebugging`. This check lives in `null-cpp`'s `cmakeToolbar.ts`; null-env exports `isExtensionInstalled` / the requirement label.
@@ -55,9 +55,9 @@ Commands: `null.env.check`, `null.env.getFindings`.
 
 ## Migration
 
-- `null-format`: `toolchainDiscovery.ts` becomes a thin wrapper that delegates to null-env (keeps its configured-path and bundled-binary precedence); its duplicated finder is deleted. Existing `toolchainDiscovery.test.ts` cases move to null-env.
+- `null-format`: `toolchainDiscovery.ts` is deleted; the providers call null-env's `findRustfmtPath` / `findClangFormatPath`, which keep the configured-path → bundled-binary → known-locations → PATH precedence. Existing `toolchainDiscovery.test.ts` cases move to null-env.
 - `null-actions`: `projectDetector.ts` uses `detectLanguages` for the manifest check and keeps only the language → suggested-button mapping.
-- `null-cpp`: `toolchainRegistry.findOnPath` delegates to null-env; MSVC/WSL probing stays (C++-specific). `projectDetection*.ts` stays; it answers "is this an enabled C++ project" (with the user override), not "what languages exist".
+- `null-cpp`: `toolchainRegistry.findOnPath` calls an injected finder that `extension.ts` points at null-env's `findExecutable` (keeps `toolchainRegistry.ts` free of `vscode` so its tests run in plain Node); MSVC/WSL probing stays (C++-specific). `projectDetection*.ts` stays; it answers "is this an enabled C++ project" (with the user override), not "what languages exist".
 
 ## Shipped alongside
 

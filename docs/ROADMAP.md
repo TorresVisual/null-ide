@@ -56,8 +56,8 @@ analysis.
 | Debugger (plain Clang/GCC, native or WSL) | `cppdbg` (`ms-vscode.cpptools`) with `MIMode: gdb` preferred (plain `lldb.exe` from the LLVM Windows installer doesn't speak the MI protocol at all); WSL via `pipeTransport` (`pipeProgram: wsl.exe`) | Standard, documented cpptools pattern for LLDB/GDB, including through WSL — unaffected by the license check since MIEngine is open source |
 | UI | VS Code status bar items + `QuickPick`; `TreeView` (CMake sidebar, phase 3) | Matches `null-actions`' existing status-bar-button conventions |
 
-**Key decision — new dependencies**: Phase 4 (Debugging) requires two new
-`extensionDependencies`: `ms-vscode.cpptools` (WSL/native Clang/GCC
+**Key decision — new dependencies**: Phase 4 (Debugging) uses two companion extensions, no longer declared as
+`extensionDependencies` (dropped in 1f7c00b so null-cpp activates standalone; the Null Env check, #89, reports them when missing): `ms-vscode.cpptools` (WSL/native Clang/GCC
 debugging via `cppdbg`) and `vadimcn.vscode-lldb` (MSVC/clang-cl debugging
 via CodeLLDB, since `cppvsdbg` is license-blocked on this fork — see the
 Phase 4 section for the full story). cpptools' IntelliSense engine must be
@@ -283,7 +283,7 @@ Ninja generator doesn't inherit those the way the Visual Studio generator does.
 **Real-world finding (2026-09-03):** Microsoft's cpptools 1.24.5+ added a binary-level check to `cppvsdbg` (its proprietary `vsdbg.exe` wrapper) that refuses to run on any non-Microsoft-branded VS Code build — confirmed live against Null IDE ("C/C++ Debugging is supported only in Microsoft versions of VS Code"). No code-side fix exists; `cppdbg` (MIEngine, open source) is unaffected. Since MSVC and clang-cl both emit PDB debug info that only `cppvsdbg`-class engines can read, both now route through **CodeLLDB** (`vadimcn.vscode-lldb`, `type: "lldb"`) instead — its bundled LLDB has grown functional (if less polished than vsdbg) Windows PDB support and isn't license-gated.
 
 ### Task Checklist
-- [x] Add `ms-vscode.cpptools` (WSL/native Clang/GCC via `cppdbg`) and `vadimcn.vscode-lldb` (MSVC/clang-cl via `type: "lldb"`) to `extensionDependencies`; set `C_Cpp.intelliSenseEngine: "disabled"` in `product.json`'s `configurationDefaults`
+- [x] Add `ms-vscode.cpptools` (WSL/native Clang/GCC via `cppdbg`) and `vadimcn.vscode-lldb` (MSVC/clang-cl via `type: "lldb"`) as companions (originally `extensionDependencies`, dropped in 1f7c00b; the Null Env check, #89, reports them when missing); set `C_Cpp.intelliSenseEngine: "disabled"` in `product.json`'s `configurationDefaults`
 - [x] `debugConfigSynth.ts`: build a debug config from the active toolchain + resolved `CMakeTarget`:
   - MSVC or clang-cl (PDB debug info, told apart from plain clang by compiler basename) → `type: "lldb"` (CodeLLDB), `program: artifactPath`
   - Plain native Clang/GCC (DWARF) → `type: "cppdbg"`, `MIMode`/`miDebuggerPath` resolved from PATH — **gdb preferred over lldb**: plain `lldb.exe` from the LLVM Windows installer doesn't implement the MI protocol at all (confirmed live — a real "nothing happens" hang), only the deprecated `lldb-mi.exe` did
