@@ -1,0 +1,76 @@
+diff --git a/src/vs/code/electron-main/safeModeState.ts b/src/vs/code/electron-main/safeModeState.ts
+new file mode 100644
+index 00000000..b01f1202
+--- /dev/null
++++ b/src/vs/code/electron-main/safeModeState.ts
+@@ -0,0 +1,44 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++import { promises } from 'fs';
++
++/** Earlier launches that ended without a clean quit or HEALTHY_UPTIME_MS of uptime before safe mode is offered. */
++export const MAX_FAILED_STARTS = 3;
++export const HEALTHY_UPTIME_MS = 60_000;
++
++export function shouldOfferSafeMode(attempts: number, safeMode: boolean): boolean {
++	return !safeMode && attempts >= MAX_FAILED_STARTS;
++}
++
++/** The counter value to store at launch, after the user (if asked) chose how to proceed. */
++export function nextAttempts(attempts: number, safeMode: boolean, choice: 'safe' | 'normal' | undefined): number {
++	if (safeMode) {
++		return attempts; // safe-mode launches never count
++	}
++	if (choice === 'safe') {
++		return 0;
++	}
++	if (choice === 'normal') {
++		return 1; // this start counts
++	}
++	return attempts + 1;
++}
++
++/** Missing, unreadable or malformed state is 0: recovery must never block startup. */
++export async function readAttempts(file: string): Promise<number> {
++	try {
++		const value = JSON.parse(await promises.readFile(file, 'utf8'))?.startupAttempts;
++		return Number.isInteger(value) && value >= 0 ? value : 0;
++	} catch {
++		return 0;
++	}
++}
++
++export async function writeAttempts(file: string, attempts: number): Promise<void> {
++	const tmp = `${file}.tmp`;
++	await promises.writeFile(tmp, JSON.stringify({ startupAttempts: attempts }));
++	await promises.rename(tmp, file);
++}
+diff --git a/src/vs/platform/environment/common/safeMode.ts b/src/vs/platform/environment/common/safeMode.ts
+new file mode 100644
+index 00000000..172539fb
+--- /dev/null
++++ b/src/vs/platform/environment/common/safeMode.ts
+@@ -0,0 +1,20 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++const NULL_PUBLISHER = 'null';
++const NULL_BUNDLED_EXTENSION_IDS = ['streetsidesoftware.code-spell-checker'];
++
++/**
++ * Safe mode disables every extension except VS Code's own built-ins:
++ * user-installed extensions, Null IDE's built-ins (publisher `null`) and
++ * the bundled Code Spell Checker.
++ */
++export function isDisabledInSafeMode(extension: { isBuiltin: boolean; identifier: { id: string }; manifest: { publisher?: string } }): boolean {
++	if (!extension.isBuiltin) {
++		return true;
++	}
++	return extension.manifest.publisher?.toLowerCase() === NULL_PUBLISHER
++		|| NULL_BUNDLED_EXTENSION_IDS.includes(extension.identifier.id.toLowerCase());
++}
