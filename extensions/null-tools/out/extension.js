@@ -48,6 +48,7 @@ const discordPresenceIntegration_1 = require("./discordPresenceIntegration");
 const issuesPanelIntegration_1 = require("./issuesPanelIntegration");
 const commitMessage_1 = require("./commitMessage");
 const updaterIntegration_1 = require("./updaterIntegration");
+const commitValidationIntegration_1 = require("./commitValidationIntegration");
 const nullNotes_1 = require("./nullNotes");
 const welcomePage_1 = require("./welcomePage");
 const dashboardIntegration_1 = require("./dashboardIntegration");
@@ -101,6 +102,7 @@ function activate(context) {
     (0, scratchNotesIntegration_1.registerScratchAndNotesFeature)(context);
     (0, autoGitignore_1.registerAutoGitignoreFeature)(context);
     (0, updaterIntegration_1.registerUpdaterFeature)(context);
+    (0, commitValidationIntegration_1.registerCommitValidationFeature)(context);
     context.subscriptions.push(vscode.commands.registerCommand('null.generateCommitMessage', async () => {
         const folders = vscode.workspace.workspaceFolders;
         if (!folders?.length) {
