@@ -310,6 +310,15 @@ $Extensions = [ordered]@{
         )
     }
 
+    "null-env" = @{
+        Compile       = $true
+        CompileScript = "compile"
+        Copy          = @(
+            "package.json",
+            "out"
+        )
+    }
+
 }
 
 # ============================================================

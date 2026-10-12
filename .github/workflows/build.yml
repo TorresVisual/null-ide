@@ -178,6 +178,13 @@ jobs:
           npm ci --ignore-scripts
           npm run compile
 
+      - name: Compile null-env TypeScript
+        shell: pwsh
+        run: |
+          Set-Location ide-overlay/extensions/null-env
+          npm ci --ignore-scripts
+          npm run compile
+
       - name: Copy built-in extensions
         shell: pwsh
         run: |
@@ -192,6 +199,7 @@ jobs:
           Copy-Item -Recurse -Force ide-overlay/extensions/null-music      vscode-src/extensions/
           Copy-Item -Recurse -Force ide-overlay/extensions/null-activity   vscode-src/extensions/
           Copy-Item -Recurse -Force ide-overlay/extensions/null-startup    vscode-src/extensions/
+          Copy-Item -Recurse -Force ide-overlay/extensions/null-env        vscode-src/extensions/
 
       - name: Bundle Code Spell Checker as built-in extension
         shell: pwsh
@@ -438,7 +446,7 @@ jobs:
           $tag = '${{ steps.tag.outputs.tag }}'
           $stage = 'reh-stage/extensions'
           New-Item -ItemType Directory $stage -Force | Out-Null
-          foreach ($e in 'null-cpp', 'null-format', 'null-actions', 'null-markdown', 'code-spell-checker') {
+          foreach ($e in 'null-env', 'null-cpp', 'null-format', 'null-actions', 'null-markdown', 'code-spell-checker') {
             Copy-Item -Recurse -Force "vscode-src/extensions/$e" $stage
           }
           foreach ($arch in 'x64', 'arm64') {
