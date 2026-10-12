@@ -100,8 +100,9 @@ export async function runCommand(command: string, args: string[], options: RunCo
   activeProcess?.kill();
   activeProcess = undefined;
 
+  // Opened inside WSL via a remote window the extension host is already Linux (no wsl.exe).
   const resolved =
-    options.isWsl && options.wslDistro
+    options.isWsl && options.wslDistro && process.platform === 'win32'
       ? wrapWslCommand(command, args, options.wslDistro, toWslPath(options.cwd))
       : { command, args };
 
