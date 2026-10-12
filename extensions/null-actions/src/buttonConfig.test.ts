@@ -23,6 +23,7 @@ test('parses a minimal valid button, applying defaults', () => {
     cwd: undefined,
     saveAll: false,
     focus: true,
+    onBusy: 'ask',
     priority: 0,
   });
 });
@@ -77,4 +78,13 @@ test('focus defaults to true when omitted, but an explicit false is honored', ()
   ]);
   assert.strictEqual(buttons[0].focus, true);
   assert.strictEqual(buttons[1].focus, false);
+});
+
+test('onBusy accepts the known modes and falls back to ask for anything else', () => {
+  const { buttons } = parseButtonConfigs([
+    { id: 'a', label: 'A', command: 'x', onBusy: 'restart' },
+    { id: 'b', label: 'B', command: 'x', onBusy: 'bogus' },
+  ]);
+  assert.strictEqual(buttons[0].onBusy, 'restart');
+  assert.strictEqual(buttons[1].onBusy, 'ask');
 });

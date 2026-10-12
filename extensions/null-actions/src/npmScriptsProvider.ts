@@ -42,6 +42,7 @@ export function toActionButtonConfig(script: NpmScriptButton, priority: number):
     cwd: undefined,
     saveAll: false,
     focus: true,
+    onBusy: 'ask',
     priority,
   };
 }

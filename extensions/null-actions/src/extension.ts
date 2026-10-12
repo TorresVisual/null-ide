@@ -12,7 +12,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const terminalRegistry = new TerminalRegistry(new VscodeTerminalHost());
   const statusBar = new StatusBarController();
 
-  context.subscriptions.push(statusBar);
+  context.subscriptions.push(statusBar, terminalRegistry.onDidChangeState((id, state) => statusBar.setState(id, state)));
 
   // Slightly above the default button priority (0) so this renders just
   // ahead of the user's own buttons -- not pushed to the front of the
@@ -44,6 +44,10 @@ export function activate(context: vscode.ExtensionContext): void {
       const { buttons } = readButtonConfigs();
       const button = buttons.find(b => b.id === buttonId);
       if (!button) { return; }
+      if (statusBar.showsFailure(button.id)) {
+        terminalRegistry.show(button.id);
+        return;
+      }
       await runButton(button, terminalRegistry);
     }),
   );

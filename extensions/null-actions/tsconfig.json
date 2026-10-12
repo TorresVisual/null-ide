@@ -19,6 +19,8 @@
     "src/variableResolver.test.ts",
     "src/terminalRegistry.ts",
     "src/terminalRegistry.test.ts",
+    "src/buttonState.ts",
+    "src/buttonState.test.ts",
     "src/projectDetector.ts",
     "src/projectDetector.test.ts",
     "src/npmScriptsProvider.ts",

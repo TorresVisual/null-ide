@@ -2,6 +2,7 @@
 
 export type ButtonType = 'terminal' | 'vscode-command';
 export type ButtonBackground = 'none' | 'warning' | 'error';
+export type OnBusy = 'ask' | 'restart' | 'show' | 'run';
 
 export interface ActionButtonConfig {
   id: string;
@@ -16,6 +17,7 @@ export interface ActionButtonConfig {
   cwd?: string;
   saveAll: boolean;
   focus: boolean;
+  onBusy: OnBusy;
   priority: number;
 }
 
@@ -26,6 +28,7 @@ export interface ParseResult {
 
 const VALID_TYPES: ButtonType[] = ['terminal', 'vscode-command'];
 const VALID_BACKGROUNDS: ButtonBackground[] = ['none', 'warning', 'error'];
+const VALID_ON_BUSY: OnBusy[] = ['ask', 'restart', 'show', 'run'];
 
 export function parseButtonConfigs(raw: unknown): ParseResult {
   const buttons: ActionButtonConfig[] = [];
@@ -81,6 +84,7 @@ export function parseButtonConfigs(raw: unknown): ParseResult {
       cwd: typeof e.cwd === 'string' ? e.cwd : undefined,
       saveAll: e.saveAll === true,
       focus: typeof e.focus === 'boolean' ? e.focus : true,
+      onBusy: VALID_ON_BUSY.includes(e.onBusy as OnBusy) ? (e.onBusy as OnBusy) : 'ask',
       priority: typeof e.priority === 'number' ? e.priority : 0,
     });
   }

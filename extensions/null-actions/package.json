@@ -5,18 +5,18 @@
   "version": "1.0.0",
   "publisher": "null",
   "license": "MIT",
-  "engines": { "vscode": "^1.85.0" },
+  "engines": { "vscode": "^1.93.0" },
   "main": "./out/extension.js",
   "activationEvents": ["onStartupFinished"],
   "scripts": {
     "compile": "tsc -p tsconfig.json && tsc -p tsconfig.webview.json",
-    "test": "tsc -p tsconfig.json && node --test out/buttonConfig.test.js out/variableResolver.test.js out/terminalRegistry.test.js out/projectDetector.test.js out/npmScriptsProvider.test.js",
+    "test": "tsc -p tsconfig.json && node --test out/buttonConfig.test.js out/variableResolver.test.js out/terminalRegistry.test.js out/buttonState.test.js out/projectDetector.test.js out/npmScriptsProvider.test.js",
     "pretest:integration": "tsc -p tsconfig.json",
     "test:integration": "node ./out/test/runTest.js"
   },
   "devDependencies": {
     "typescript": "^5.8.0",
-    "@types/vscode": "^1.85.0",
+    "@types/vscode": "^1.93.0",
     "@types/node": "^22.0.0",
     "@vscode/test-electron": "^3.1.0",
     "mocha": "^11.8.0",
@@ -66,6 +66,12 @@
               "cwd": { "type": "string" },
               "saveAll": { "type": "boolean", "default": false },
               "focus": { "type": "boolean", "default": true },
+              "onBusy": {
+                "type": "string",
+                "enum": ["ask", "restart", "show", "run"],
+                "default": "ask",
+                "description": "What a click does while the button's previous command is still running: ask, restart (Ctrl+C, then re-run), show the terminal, or run anyway (types into the running process). Needs terminal shell integration."
+              },
               "priority": { "type": "number", "default": 0 }
             }
           }

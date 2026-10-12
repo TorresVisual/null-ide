@@ -6,10 +6,30 @@ export interface TerminalHandle {
   show(preserveFocus?: boolean): void;
 }
 
+export interface TerminalExecution {
+  /** Resolves when the command ends; undefined if the exit code is unknown (or the terminal was closed). */
+  readonly exitCode: Promise<number | undefined>;
+}
+
 export interface TerminalHost {
   listTerminals(): TerminalHandle[];
   createTerminal(options: { name: string; cwd?: string }): TerminalHandle;
+  /**
+   * Runs `command` through shell integration so its end and exit code can be
+   * observed. Resolves undefined (nothing sent) when shell integration isn't
+   * active -- the caller then falls back to `sendText`. Optional: hosts
+   * without it behave like the old fire-and-forget dispatch.
+   */
+  execute?(terminal: TerminalHandle, command: string): Promise<TerminalExecution | undefined>;
 }
+
+export type ButtonRunState =
+  | { kind: 'running' }
+  | { kind: 'passed' | 'failed' | 'ended'; exitCode: number | undefined; durationMs: number };
+
+export type StateListener = (buttonId: string, state: ButtonRunState | undefined) => void;
+
+const CTRL_C = '';
 
 function terminalNameForLabel(label: string): string {
   return `Action: ${label}`;
@@ -17,19 +37,74 @@ function terminalNameForLabel(label: string): string {
 
 export class TerminalRegistry {
   private cache = new Map<string, TerminalHandle>();
+  private states = new Map<string, ButtonRunState>();
+  // Settles when the button's current run is over; lets restart wait for Ctrl+C to take effect.
+  private runs = new Map<string, Promise<void>>();
+  private listeners = new Set<StateListener>();
 
-  constructor(private readonly host: TerminalHost) {}
+  constructor(private readonly host: TerminalHost, private readonly now: () => number = Date.now) {}
 
-  dispatch(buttonId: string, label: string, command: string, options: { cwd?: string; focus?: boolean } = {}): void {
+  onDidChangeState(listener: StateListener): { dispose(): void } {
+    this.listeners.add(listener);
+    return { dispose: () => { this.listeners.delete(listener); } };
+  }
+
+  getState(buttonId: string): ButtonRunState | undefined {
+    return this.states.get(buttonId);
+  }
+
+  isBusy(buttonId: string): boolean {
+    return this.states.get(buttonId)?.kind === 'running';
+  }
+
+  async dispatch(buttonId: string, label: string, command: string, options: { cwd?: string; focus?: boolean } = {}): Promise<void> {
     const terminal = this.resolve(buttonId, label, options.cwd);
-    terminal.sendText(command);
+    // Mark busy before awaiting: a new terminal may wait for shell integration,
+    // and a second click in that window must not type into the starting command.
+    const startedAt = this.now();
+    this.setState(buttonId, { kind: 'running' });
+    const execution = await this.host.execute?.(terminal, command);
+    if (execution) {
+      const run = execution.exitCode.then(exitCode => {
+        if (this.runs.get(buttonId) !== run) { return; } // a newer run owns the state
+        this.runs.delete(buttonId);
+        const kind = exitCode === undefined ? 'ended' : exitCode === 0 ? 'passed' : 'failed';
+        this.setState(buttonId, { kind, exitCode, durationMs: this.now() - startedAt });
+      });
+      this.runs.set(buttonId, run);
+    } else {
+      this.setState(buttonId, undefined);
+      terminal.sendText(command);
+    }
     if (options.focus) {
       terminal.show(false);
     }
   }
 
+  /** Reveals the button's terminal if it still exists. */
+  show(buttonId: string): void {
+    this.cache.get(buttonId)?.show(false);
+  }
+
+  /** Sends Ctrl+C, then waits (up to `timeoutMs`) for the running command to end. */
+  async interrupt(buttonId: string, timeoutMs = 3000): Promise<void> {
+    this.cache.get(buttonId)?.sendText(CTRL_C, false);
+    const run = this.runs.get(buttonId);
+    if (!run) { return; }
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    await Promise.race([run, new Promise<void>(r => { timer = setTimeout(r, timeoutMs); })]);
+    clearTimeout(timer);
+  }
+
   forget(buttonId: string): void {
     this.cache.delete(buttonId);
+    this.runs.delete(buttonId);
+    this.setState(buttonId, undefined);
+  }
+
+  private setState(buttonId: string, state: ButtonRunState | undefined): void {
+    if (state) { this.states.set(buttonId, state); } else { this.states.delete(buttonId); }
+    for (const l of this.listeners) { l(buttonId, state); }
   }
 
   private resolve(buttonId: string, label: string, cwd?: string): TerminalHandle {

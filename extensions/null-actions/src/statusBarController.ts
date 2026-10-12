@@ -2,6 +2,11 @@
 
 import * as vscode from 'vscode';
 import { ActionButtonConfig } from './buttonConfig';
+import { statusText, statusTooltip } from './buttonState';
+import { ButtonRunState } from './terminalRegistry';
+
+// How long a pass/fail result stays on the button before it reverts.
+const RESULT_MS = 8000;
 
 interface TrackedItem {
   item: vscode.StatusBarItem;
@@ -10,9 +15,31 @@ interface TrackedItem {
 
 export class StatusBarController {
   private items = new Map<string, TrackedItem>();
+  private buttons = new Map<string, ActionButtonConfig>();
+  private shown = new Map<string, ButtonRunState>();
+  private expiry = new Map<string, ReturnType<typeof setTimeout>>();
+
+  /** Overlays a button's run state; a finished result reverts on its own. */
+  setState(id: string, state: ButtonRunState | undefined): void {
+    clearTimeout(this.expiry.get(id));
+    this.expiry.delete(id);
+    if (state) { this.shown.set(id, state); } else { this.shown.delete(id); }
+    if (state && state.kind !== 'running') {
+      this.expiry.set(id, setTimeout(() => this.setState(id, undefined), RESULT_MS));
+    }
+    const item = this.items.get(id)?.item;
+    const button = this.buttons.get(id);
+    if (item && button) { this.applyButton(item, button); }
+  }
+
+  /** True while the button shows a failed result (a click then reveals the terminal). */
+  showsFailure(id: string): boolean {
+    return this.shown.get(id)?.kind === 'failed';
+  }
 
   update(buttons: ActionButtonConfig[]): void {
     const nextIds = new Set(buttons.map(b => b.id));
+    this.buttons = new Map(buttons.map(b => [b.id, b]));
 
     for (const [id, tracked] of this.items) {
       if (!nextIds.has(id)) {
@@ -37,6 +64,8 @@ export class StatusBarController {
   }
 
   dispose(): void {
+    this.expiry.forEach(clearTimeout);
+    this.expiry.clear();
     for (const tracked of this.items.values()) {
       tracked.item.dispose();
     }
@@ -49,8 +78,9 @@ export class StatusBarController {
   }
 
   private applyButton(item: vscode.StatusBarItem, button: ActionButtonConfig): void {
-    item.text = button.icon ? `$(${button.icon}) ${button.label}` : button.label;
-    item.tooltip = button.tooltip;
+    const state = this.shown.get(button.id);
+    item.text = statusText(button.label, button.icon, state);
+    item.tooltip = statusTooltip(button.tooltip, state);
     item.color = button.color;
     item.backgroundColor = button.background !== 'none'
       ? new vscode.ThemeColor(`statusBarItem.${button.background}Background`)
