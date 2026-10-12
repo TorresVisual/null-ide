@@ -300,6 +300,16 @@ $Extensions = [ordered]@{
         )
     }
 
+    "null-startup" = @{
+        Compile       = $true
+        CompileScript = "compile"
+        Copy          = @(
+            "package.json",
+            "out",
+            "lib"
+        )
+    }
+
 }
 
 # ============================================================

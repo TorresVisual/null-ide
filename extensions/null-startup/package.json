@@ -1,0 +1,57 @@
+{
+  "name": "null-startup",
+  "displayName": "Null Startup",
+  "description": "Startup profiler for Null IDE — startup phases, extension activation times, launch history and comparison",
+  "version": "1.0.0",
+  "publisher": "null",
+  "license": "MIT",
+  "engines": { "vscode": "^1.93.0" },
+  "main": "./out/extension.js",
+  "activationEvents": ["onStartupFinished"],
+  "contributes": {
+    "commands": [
+      { "command": "null-startup.openReport", "title": "Null Startup: Open Startup Report" },
+      { "command": "null-startup.copyReport", "title": "Null Startup: Copy Startup Report" },
+      { "command": "null-startup.exportReport", "title": "Null Startup: Export Startup Report as JSON…" },
+      { "command": "null-startup.clearHistory", "title": "Null Startup: Clear Startup History…" }
+    ],
+    "configuration": {
+      "title": "Null Startup",
+      "properties": {
+        "null-startup.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Record a startup report on every launch. Takes effect on the next start."
+        },
+        "null-startup.retention": {
+          "type": "number",
+          "default": 20,
+          "minimum": 1,
+          "maximum": 200,
+          "description": "How many startup reports to keep for comparison. Older reports are deleted."
+        },
+        "null-startup.slowExtensionMs": {
+          "type": "number",
+          "default": 100,
+          "minimum": 0,
+          "description": "Extensions whose activation takes at least this long are flagged 'slow' in the report. A slow activation is not necessarily a problem."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p tsconfig.json",
+    "test": "tsc -p tsconfig.json && node --test out/test/snapshot.test.js out/test/settings.test.js",
+    "pretest:integration": "tsc -p tsconfig.json",
+    "test:integration": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0",
+    "@types/vscode": "^1.93.0",
+    "@types/node": "^22.0.0",
+    "@vscode/test-electron": "^3.1.0",
+    "mocha": "^11.8.0",
+    "@types/mocha": "^10.0.10",
+    "glob": "^13.0.6"
+  }
+}
