@@ -41,7 +41,7 @@
   },
   "scripts": {
     "compile": "tsc -p tsconfig.json",
-    "test": "tsc -p tsconfig.json && node --test out/test/snapshot.test.js out/test/settings.test.js out/test/intervals.test.js out/test/sanitize.test.js out/test/buildReport.test.js out/test/reportStore.test.js out/test/capture.test.js out/test/compare.test.js",
+    "test": "tsc -p tsconfig.json && node --test out/test/snapshot.test.js out/test/settings.test.js out/test/intervals.test.js out/test/sanitize.test.js out/test/buildReport.test.js out/test/reportStore.test.js out/test/capture.test.js out/test/compare.test.js out/test/exportReport.test.js",
     "pretest:integration": "tsc -p tsconfig.json",
     "test:integration": "node ./out/test/runTest.js"
   },
