@@ -1,3 +1,65 @@
+diff --git a/src/vs/code/electron-main/main.ts b/src/vs/code/electron-main/main.ts
+index df40f720..93e121b7 100644
+--- a/src/vs/code/electron-main/main.ts
++++ b/src/vs/code/electron-main/main.ts
+@@ -26,6 +26,7 @@ import { ProxyChannel } from '../../base/parts/ipc/common/ipc.js';
+ import { Client as NodeIPCClient } from '../../base/parts/ipc/common/ipc.net.js';
+ import { connect as nodeIPCConnect, serve as nodeIPCServe, Server as NodeIPCServer, XDG_RUNTIME_DIR } from '../../base/parts/ipc/node/ipc.net.js';
+ import { CodeApplication } from './app.js';
++import { HEALTHY_UPTIME_MS, MAX_FAILED_STARTS, nextAttempts, readAttempts, shouldOfferSafeMode, writeAttempts } from './safeModeState.js';
+ import { localize } from '../../nls.js';
+ import { IConfigurationService } from '../../platform/configuration/common/configuration.js';
+ import { ConfigurationService } from '../../platform/configuration/common/configurationService.js';
+@@ -141,12 +142,14 @@ class CodeMain {
+ 
+ 				// Delay creation of spdlog for perf reasons (https://github.com/microsoft/vscode/issues/72906)
+ 				bufferLogger.logger = loggerService.createLogger('main', { name: localize('mainLog', "Main") });
++				const safeModeStateFile = join(environmentMainService.userDataPath, 'safe-mode-state.json');
+ 
+ 				// Lifecycle
+ 				Event.once(lifecycleMainService.onWillShutdown)(evt => {
+ 					fileService.dispose();
+ 					configurationService.dispose();
+ 					evt.join('instanceLockfile', promises.unlink(environmentMainService.mainLockfile).catch(() => { /* ignored */ }));
++					evt.join('safeModeState', writeAttempts(safeModeStateFile, 0).catch(() => { /* ignored */ }));
+ 				});
+ 
+ 				// Check if Inno Setup is running. Briefly wait for the updating mutex to be released before refusing to launch.
+@@ -157,6 +160,34 @@ class CodeMain {
+ 					return;
+ 				}
+ 
++				// Safe mode: offer it after repeated failed starts, and count this start
++				const safeMode = !!environmentMainService.args['safe-mode'];
++				const attempts = await readAttempts(safeModeStateFile);
++				let choice: 'safe' | 'normal' | undefined;
++				if (shouldOfferSafeMode(attempts, safeMode)) {
++					await app.whenReady();
++					const dialogOptions = massageMessageBoxOptions({
++						type: 'warning',
++						buttons: [
++							localize({ key: 'startSafeMode', comment: ['&& denotes a mnemonic'] }, "Start in &&Safe Mode"),
++							localize({ key: 'startNormally', comment: ['&& denotes a mnemonic'] }, "Start &&Normally")
++						],
++						defaultId: 0,
++						cancelId: 1,
++						message: localize('startupFailed', "{0} has not started successfully {1} times.", productService.nameShort, MAX_FAILED_STARTS),
++						detail: localize('startupFailedDetail', "Safe Mode starts without extensions so you can find out whether one of them is the cause. Your extensions and settings are not changed.")
++					}, productService);
++					const { response } = await dialog.showMessageBox(dialogOptions.options);
++					choice = dialogOptions.buttonIndeces[response] === 0 ? 'safe' : 'normal';
++					if (choice === 'safe') {
++						environmentMainService.args['safe-mode'] = true;
++					}
++				}
++				await writeAttempts(safeModeStateFile, nextAttempts(attempts, safeMode, choice)).catch(() => { /* never block startup */ });
++
++				// A run that stays up long enough was a healthy start
++				setTimeout(() => writeAttempts(safeModeStateFile, 0).catch(() => { /* ignored */ }), HEALTHY_UPTIME_MS);
++
+ 				return instantiationService.createInstance(CodeApplication, mainProcessNodeIpcServer, instanceEnvironment).startup();
+ 			});
+ 		} catch (error) {
 diff --git a/src/vs/code/electron-main/safeModeState.ts b/src/vs/code/electron-main/safeModeState.ts
 new file mode 100644
 index 00000000..b01f1202
