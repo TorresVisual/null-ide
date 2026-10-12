@@ -17,8 +17,8 @@ VS Code ships **Developer: Startup Performance** (`perfview.show`, `perfviewEdit
 
 - **Architecture:** a thin core patch plus a new extension. Patch `010-startup-snapshot.patch` stamps extension activations and exposes one internal command; the new built-in extension `null-startup` owns capture, history, report UI and export. Alternatives rejected: a large core rewrite of `perfviewEditor` (breaks on every upstream bump, UI cannot be iterated with `sync-local`) and an extension-only version (cannot see other extensions or core phases).
 - **Data handoff: pull.** The extension calls `_null.startup.snapshot`. Core keeps no persistence and no schema. Scraping the perfview markdown was rejected as fragile and lacking absolute times.
-- **Headline duration:** window launched → `workspaceRestored` (editors restored, `LifecyclePhase.Restored`, upstream's own `ellapsed`). It is comparable with VS Code's own numbers.
-- **Milestones** are named, ordered and never interchanged: `windowShown` (first window visible), `uiInteractive` (workbench ready, `LifecyclePhase.Ready`), `workspaceRestored` (headline) and `extensionsSettled` (last startup-triggered activation finished).
+- **Headline duration:** launch → `workspaceRestored`, the `code/didRestoreEditors` mark (visible editors resolved). Launch is `code/didStartMain` on the first window, `code/willOpenNewWindow` on later windows, `code/timeOrigin` as a fallback. This is *later* than upstream's `startupMetrics.ellapsed`, which stops at `code/didStartWorkbench` (that is our `uiInteractive`).
+- **Milestones** are named, ordered and never interchanged: `windowCreated` (`code/didCreateCodeWindow`, the native window exists; upstream has no first-paint mark), `uiInteractive` (`code/didStartWorkbench`), `workspaceRestored` (`code/didRestoreEditors`, the headline) and `extensionsSettled` (end of the last startup-triggered activation).
 - **Startup vs deferred:** an extension whose activation ended before `workspaceRestored` is *startup*; later ones are *deferred*.
 - **Capture:** automatic on every launch (cheap, off the critical path), not opt-in.
 - **Privacy:** only extension IDs, activation event names, timings and app version are stored. Workspace paths and contents are never captured; `workspace:`-style activation events are reduced to their type.
@@ -42,7 +42,7 @@ Activated on `onStartupFinished`. Only `snapshotSource.ts`, `reportPanel.ts`, `c
 | File | Responsibility |
 |---|---|
 | `src/types.ts` | `Snapshot` (patch output), `Report`, `Milestone`, `PhaseEntry`, `ExtensionEntry`, `schemaVersion`. |
-| `src/snapshotSource.ts` | Calls `_null.startup.snapshot`; takes one snapshot when `workspaceRestored` is reached and a second ~30 s later (deferred activations), with a timeout. |
+| `src/snapshotSource.ts` | Calls `_null.startup.snapshot`; takes one snapshot as soon as it activates (`onStartupFinished` is after restore) and a second ~30 s later for deferred activations, each with a timeout. The extension status is cumulative, so the second snapshot supersedes the first and rewrites the same report file. |
 | `src/buildReport.ts` | Pure. `Snapshot[] → Report`: milestones, phases, startup/deferred split, sanitizing (`sanitize.ts`), `partial` flag. |
 | `src/intervals.ts` | Pure. Interval union and per-phase *wall-clock impact*; sum-of-durations is reported alongside, so overlap is visible and never double-counted. |
 | `src/compare.ts` | Pure. Per-phase and per-extension deltas against the previous launch or the median of the history; flags regressions above a threshold. |
@@ -83,7 +83,7 @@ Settings: `null-startup.enabled` (master switch), `null-startup.retention` (defa
 
 - `node --test` units for `buildReport`, `intervals`, `compare`, `sanitize`, `exportReport`, `reportModel`, `reportStore` (injected fs), `parseWebviewMessage`, plus the webview `model.ts`/`dom.ts` via `vm`. Every test file is listed in `package.json`'s `test` script.
 - `patches/test`: patch 010 applies cleanly against the pinned `MS_TAG`.
-- Integration spec (`npm run test:integration`, via `/verify-local null-startup`): `_null.startup.snapshot` returns the expected shape in the real build, and a report is stored after startup.
+- The snapshot builder is pure and loaded by a `patches/test` unit test. The integration runner uses vanilla VS Code (Null IDE's mutex collides with a running window), which lacks patch 010, so the integration spec asserts the degradation path (activates, commands registered, no report stored, `openReport` opens an empty panel). The real `_null.startup.snapshot` is checked once by hand in the synced Null IDE (plan, final task).
 
 ## Out of scope for v1
 
