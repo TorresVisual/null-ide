@@ -1,0 +1,38 @@
+{
+  "name": "null-env",
+  "displayName": "Null Environment",
+  "description": "Environment check for Null IDE — finds missing companion extensions and CLI tools per project and fixes them in one click",
+  "version": "1.0.0",
+  "publisher": "null",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.93.0"
+  },
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "null.env.check",
+        "title": "Null: Check Environment"
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p tsconfig.json",
+    "test": "tsc -p tsconfig.json && node --test out/detect.test.js out/probe.test.js out/rules.test.js out/check.test.js",
+    "pretest:integration": "tsc -p tsconfig.json",
+    "test:integration": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0",
+    "@types/vscode": "^1.93.0",
+    "@types/node": "^22.0.0",
+    "@vscode/test-electron": "^3.1.0",
+    "mocha": "^11.8.0",
+    "@types/mocha": "^10.0.10",
+    "glob": "^13.0.6"
+  }
+}
