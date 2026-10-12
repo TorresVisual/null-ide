@@ -48,6 +48,43 @@ index 00000000..b01f1202
 +	await promises.writeFile(tmp, JSON.stringify({ startupAttempts: attempts }));
 +	await promises.rename(tmp, file);
 +}
+diff --git a/src/vs/platform/environment/common/argv.ts b/src/vs/platform/environment/common/argv.ts
+index 00e12e78..d2573b76 100644
+--- a/src/vs/platform/environment/common/argv.ts
++++ b/src/vs/platform/environment/common/argv.ts
+@@ -95,6 +95,7 @@ export interface NativeParsedArgs {
+ 	'inspect-brk-sharedprocess'?: string;
+ 	'disable-extensions'?: boolean;
+ 	'disable-extension'?: string[]; // undefined or array of 1 or more
++	'safe-mode'?: boolean;
+ 	'list-extensions'?: boolean;
+ 	'show-versions'?: boolean;
+ 	'category'?: string;
+diff --git a/src/vs/platform/environment/common/environment.ts b/src/vs/platform/environment/common/environment.ts
+index 7c6a27ce..3eda4a88 100644
+--- a/src/vs/platform/environment/common/environment.ts
++++ b/src/vs/platform/environment/common/environment.ts
+@@ -72,6 +72,7 @@ export interface IEnvironmentService {
+ 	debugExtensionHost: IExtensionHostDebugParams;
+ 	isExtensionDevelopment: boolean;
+ 	disableExtensions: boolean | string[];
++	isSafeMode?: boolean;
+ 	skipBuiltinExtensions?: readonly string[];
+ 	enableExtensions?: readonly string[];
+ 	extensionDevelopmentLocationURI?: URI[];
+diff --git a/src/vs/platform/environment/common/environmentService.ts b/src/vs/platform/environment/common/environmentService.ts
+index 004d0614..24effcfb 100644
+--- a/src/vs/platform/environment/common/environmentService.ts
++++ b/src/vs/platform/environment/common/environmentService.ts
+@@ -197,6 +197,8 @@ export abstract class AbstractNativeEnvironmentService implements INativeEnviron
+ 		return undefined;
+ 	}
+ 
++	get isSafeMode(): boolean { return !!this.args['safe-mode']; }
++
+ 	get disableExtensions(): boolean | string[] {
+ 		if (this.args['disable-extensions']) {
+ 			return true;
 diff --git a/src/vs/platform/environment/common/safeMode.ts b/src/vs/platform/environment/common/safeMode.ts
 new file mode 100644
 index 00000000..172539fb
@@ -74,3 +111,38 @@ index 00000000..172539fb
 +	return extension.manifest.publisher?.toLowerCase() === NULL_PUBLISHER
 +		|| NULL_BUNDLED_EXTENSION_IDS.includes(extension.identifier.id.toLowerCase());
 +}
+diff --git a/src/vs/platform/environment/node/argv.ts b/src/vs/platform/environment/node/argv.ts
+index 8a36a25a..c80819eb 100644
+--- a/src/vs/platform/environment/node/argv.ts
++++ b/src/vs/platform/environment/node/argv.ts
+@@ -147,6 +147,7 @@ export const OPTIONS: OptionDescriptions<Required<NativeParsedArgs>> = {
+ 	'prof-v8-extensions': { type: 'boolean' },
+ 	'disable-extensions': { type: 'boolean', deprecates: ['disableExtensions'], cat: 't', description: localize('disableExtensions', "Disable all installed extensions. This option is not persisted and is effective only when the command opens a new window.") },
+ 	'disable-extension': { type: 'string[]', cat: 't', args: 'ext-id', description: localize('disableExtension', "Disable the provided extension. This option is not persisted and is effective only when the command opens a new window.") },
++	'safe-mode': { type: 'boolean', cat: 't', description: localize('safeMode', "Start with all installed and built-in Null IDE extensions disabled. This option is not persisted and is effective only when the command opens a new window.") },
+ 	'sync': { type: 'string', cat: 't', description: localize('turn sync', "Turn sync on or off."), args: ['on | off'] },
+ 
+ 	'inspect-extensions': { type: 'string', allowEmptyValue: true, deprecates: ['debugPluginHost'], args: 'port', cat: 't', description: localize('inspect-extensions', "Allow debugging and profiling of extensions. Check the developer tools for the connection URI.") },
+diff --git a/src/vs/workbench/services/extensionManagement/browser/extensionEnablementService.ts b/src/vs/workbench/services/extensionManagement/browser/extensionEnablementService.ts
+index 141241fd..17b26864 100644
+--- a/src/vs/workbench/services/extensionManagement/browser/extensionEnablementService.ts
++++ b/src/vs/workbench/services/extensionManagement/browser/extensionEnablementService.ts
+@@ -12,6 +12,7 @@ import { areSameExtensions, BetterMergeId, getExtensionDependencies, isMalicious
+ import { IWorkspaceContextService, WorkbenchState } from '../../../../platform/workspace/common/workspace.js';
+ import { IStorageService, StorageScope, StorageTarget } from '../../../../platform/storage/common/storage.js';
+ import { IWorkbenchEnvironmentService } from '../../environment/common/environmentService.js';
++import { isDisabledInSafeMode } from '../../../../platform/environment/common/safeMode.js';
+ import { ExtensionType, IExtension, IExtensionManifest, isAuthenticationProviderExtension, isLanguagePackExtension, isResolverExtension } from '../../../../platform/extensions/common/extensions.js';
+ import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
+ import { ChatAIDisabledSettingId } from '../../../../platform/chat/common/chatSettings.js';
+@@ -518,6 +519,10 @@ export class ExtensionEnablementService extends Disposable implements IWorkbench
+ 			return !extension.isBuiltin && !isResolverExtension(extension.manifest, this.environmentService.remoteAuthority);
+ 		}
+ 
++		if (this.environmentService.isSafeMode && isDisabledInSafeMode(extension) && !isResolverExtension(extension.manifest, this.environmentService.remoteAuthority)) {
++			return true;
++		}
++
+ 		const disabledExtensions = this.environmentService.disableExtensions;
+ 		if (Array.isArray(disabledExtensions)) {
+ 			return disabledExtensions.some(id => areSameExtensions({ id }, extension.identifier));
