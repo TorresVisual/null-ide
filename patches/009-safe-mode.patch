@@ -178,6 +178,136 @@ index 4a51cc55..c3e8b836 100644
  		configuration.accessibilitySupport = electron.app.isAccessibilitySupportEnabled();
  		configuration.isInitialStartup = false; // since this is a reload
  		configuration.policiesData = this.policyService.serialize(); // set policies data again
+diff --git a/src/vs/workbench/browser/parts/titlebar/windowTitle.ts b/src/vs/workbench/browser/parts/titlebar/windowTitle.ts
+index d2a6791f..f86dcfe0 100644
+--- a/src/vs/workbench/browser/parts/titlebar/windowTitle.ts
++++ b/src/vs/workbench/browser/parts/titlebar/windowTitle.ts
+@@ -358,7 +358,7 @@ export class WindowTitle extends Disposable {
+ 		const folderName = folder ? folder.name : '';
+ 		const folderPath = folder ? this.labelService.getUriLabel(folder.uri) : '';
+ 		const dirty = editor?.isDirty() && !editor.isSaving() ? WindowTitle.TITLE_DIRTY : '';
+-		const appName = this.productService.nameLong;
++		const appName = this.productService.nameLong + (this.environmentService.isSafeMode ? localize('safeModeTitle', " [Safe Mode]") : '');
+ 		const profileName = this.userDataProfileService.currentProfile.isDefault ? '' : this.userDataProfileService.currentProfile.name;
+ 		const focusedView: string = this.viewsService.getFocusedViewName();
+ 		const activeEditorState = editorResource ? this.decorationsService.getDecoration(editorResource, false)?.tooltip : undefined;
+diff --git a/src/vs/workbench/contrib/safeMode/electron-browser/safeMode.contribution.ts b/src/vs/workbench/contrib/safeMode/electron-browser/safeMode.contribution.ts
+new file mode 100644
+index 00000000..fc551aa4
+--- /dev/null
++++ b/src/vs/workbench/contrib/safeMode/electron-browser/safeMode.contribution.ts
+@@ -0,0 +1,97 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++import { localize, localize2 } from '../../../../nls.js';
++import { Disposable } from '../../../../base/common/lifecycle.js';
++import { Action2, MenuId, registerAction2 } from '../../../../platform/actions/common/actions.js';
++import { IContextKeyService, RawContextKey } from '../../../../platform/contextkey/common/contextkey.js';
++import { ServicesAccessor } from '../../../../platform/instantiation/common/instantiation.js';
++import { INativeHostService } from '../../../../platform/native/common/native.js';
++import { INotificationService, NotificationPriority, Severity } from '../../../../platform/notification/common/notification.js';
++import { IWorkbenchContribution, WorkbenchPhase, registerWorkbenchContribution2 } from '../../../common/contributions.js';
++import { IWorkbenchEnvironmentService } from '../../../services/environment/common/environmentService.js';
++import { ILifecycleService, LifecyclePhase } from '../../../services/lifecycle/common/lifecycle.js';
++import { IStatusbarService, StatusbarAlignment } from '../../../services/statusbar/browser/statusbar.js';
++
++const IsSafeModeContext = new RawContextKey<boolean>('isSafeMode', false);
++const RESTART_IN_SAFE_MODE = 'workbench.action.restartInSafeMode';
++const RESTART_NORMALLY = 'workbench.action.restartNormally';
++
++class SafeModeIndicator extends Disposable implements IWorkbenchContribution {
++
++	static readonly ID = 'workbench.contrib.safeModeIndicator';
++
++	constructor(
++		@IWorkbenchEnvironmentService environmentService: IWorkbenchEnvironmentService,
++		@IContextKeyService contextKeyService: IContextKeyService,
++		@IStatusbarService statusbarService: IStatusbarService,
++		@INotificationService notificationService: INotificationService,
++		@ILifecycleService lifecycleService: ILifecycleService,
++		@INativeHostService nativeHostService: INativeHostService
++	) {
++		super();
++
++		const isSafeMode = !!environmentService.isSafeMode;
++		IsSafeModeContext.bindTo(contextKeyService).set(isSafeMode);
++		if (!isSafeMode) {
++			return;
++		}
++
++		this._register(statusbarService.addEntry({
++			name: localize('safeModeStatusName', "Safe Mode"),
++			text: `$(shield) ${localize('safeModeStatus', "Safe Mode")}`,
++			ariaLabel: localize('safeModeStatusAria', "Safe Mode: extensions are disabled. Click to restart normally."),
++			tooltip: localize('safeModeStatusTooltip', "Extensions are disabled. Click to restart normally."),
++			kind: 'warning',
++			command: RESTART_NORMALLY
++		}, 'status.safeMode', StatusbarAlignment.LEFT, 1000));
++
++		lifecycleService.when(LifecyclePhase.Eventually).then(() => {
++			notificationService.prompt(
++				Severity.Warning,
++				localize('safeModeNotice', "Safe Mode: all installed extensions and Null IDE's built-in extensions are disabled. Your extensions and settings are unchanged."),
++				[{
++					label: localize('restartNormally', "Restart Normally"),
++					run: () => nativeHostService.reload({ safeMode: false })
++				}],
++				{ sticky: true, priority: NotificationPriority.URGENT }
++			);
++		});
++	}
++}
++
++registerWorkbenchContribution2(SafeModeIndicator.ID, SafeModeIndicator, WorkbenchPhase.BlockRestore);
++
++registerAction2(class extends Action2 {
++	constructor() {
++		super({
++			id: RESTART_IN_SAFE_MODE,
++			title: localize2('restartInSafeMode', "Restart in Safe Mode"),
++			category: localize2('safeModeCategory', "Null"),
++			f1: true,
++			precondition: IsSafeModeContext.negate(),
++			menu: { id: MenuId.MenubarHelpMenu, group: '5_tools', order: 2, when: IsSafeModeContext.negate() }
++		});
++	}
++	run(accessor: ServicesAccessor): Promise<void> {
++		return accessor.get(INativeHostService).reload({ safeMode: true });
++	}
++});
++
++registerAction2(class extends Action2 {
++	constructor() {
++		super({
++			id: RESTART_NORMALLY,
++			title: localize2('restartNormallyCommand', "Restart Normally"),
++			category: localize2('safeModeCategory', "Null"),
++			f1: true,
++			precondition: IsSafeModeContext,
++			menu: { id: MenuId.MenubarHelpMenu, group: '5_tools', order: 2, when: IsSafeModeContext }
++		});
++	}
++	run(accessor: ServicesAccessor): Promise<void> {
++		return accessor.get(INativeHostService).reload({ safeMode: false });
++	}
++});
+diff --git a/src/vs/workbench/contrib/welcomeGettingStarted/browser/startupPage.ts b/src/vs/workbench/contrib/welcomeGettingStarted/browser/startupPage.ts
+index 66b9576b..e3757a5c 100644
+--- a/src/vs/workbench/contrib/welcomeGettingStarted/browser/startupPage.ts
++++ b/src/vs/workbench/contrib/welcomeGettingStarted/browser/startupPage.ts
+@@ -206,7 +206,8 @@ export class StartupPageRunnerContribution extends Disposable implements IWorkbe
+ 
+ 		if (startupEditorTypeID === gettingStartedInputTypeId) {
+ 			this.editorService.openEditor({
+-				resource: URI.from({ scheme: 'null-dashboard', path: '/Dashboard' }),
++				// null-dashboard is served by null-tools, which is disabled in safe mode
++				resource: this.environmentService.isSafeMode ? GettingStartedInput.RESOURCE : URI.from({ scheme: 'null-dashboard', path: '/Dashboard' }),
+ 				options: {
+ 					index: editor ? 0 : undefined,
+ 					pinned: false,
 diff --git a/src/vs/workbench/services/extensionManagement/browser/extensionEnablementService.ts b/src/vs/workbench/services/extensionManagement/browser/extensionEnablementService.ts
 index 141241fd..17b26864 100644
 --- a/src/vs/workbench/services/extensionManagement/browser/extensionEnablementService.ts
@@ -214,3 +344,15 @@ index 86a3d521..a1b85c40 100644
  		return this.nativeHostService.reload(options);
  	}
  
+diff --git a/src/vs/workbench/workbench.desktop.main.ts b/src/vs/workbench/workbench.desktop.main.ts
+index 9bc4dbca..7482cc6f 100644
+--- a/src/vs/workbench/workbench.desktop.main.ts
++++ b/src/vs/workbench/workbench.desktop.main.ts
+@@ -132,6 +132,7 @@ import './contrib/extensions/electron-browser/devtoolsExtensionHost.contribution
+ 
+ // Issues
+ import './contrib/issue/electron-browser/issue.contribution.js';
++import './contrib/safeMode/electron-browser/safeMode.contribution.js';
+ 
+ // Surveys
+ import './contrib/surveys/browser/survey.contribution.js';
