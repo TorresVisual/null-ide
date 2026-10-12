@@ -55,6 +55,7 @@ const dashboardIntegration_1 = require("./dashboardIntegration");
 const claudeTabIntegration_1 = require("./claudeTabIntegration");
 const followAlongIntegration_1 = require("./followAlongIntegration");
 const whyIsThisHereIntegration_1 = require("./whyIsThisHereIntegration");
+const recoveryIntegration_1 = require("./recovery/recoveryIntegration");
 // ── Activation ─────────────────────────────────────────────────────────────
 async function disableRestrictedMode() {
     try {
@@ -188,6 +189,7 @@ function activate(context) {
     (0, claudeTabIntegration_1.registerClaudeTabFeature)(context);
     (0, followAlongIntegration_1.registerFollowAlongFeature)(context);
     (0, whyIsThisHereIntegration_1.registerWhyIsThisHereFeature)(context);
+    (0, recoveryIntegration_1.registerRecoveryFeature)(context);
 }
 function deactivate() { }
 //# sourceMappingURL=extension.js.map
