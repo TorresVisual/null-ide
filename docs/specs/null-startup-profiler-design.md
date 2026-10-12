@@ -56,7 +56,7 @@ Activated on `onStartupFinished`. Only `snapshotSource.ts`, `reportPanel.ts`, `c
 ## Report UI
 
 - **Summary:** headline `workspaceRestored`, the other milestones, the 3 slowest phases and the 3 slowest extensions.
-- **Phases table:** sortable by duration or wall-clock impact; a row expands to its marks.
+- **Phases table:** sortable by duration or wall-clock impact; start and impact are columns (raw marks are not stored, which keeps reports small and path-free).
 - **Extensions table:** sortable; startup and deferred separated. Columns: load, call, resolve, total, activation event, reason. *Slow* flag when above `null-startup.slowExtensionMs` (default 100 ms); labelled "slow", never "problem".
 - **Timeline:** Gantt strip with milestone markers and one lane per overlapping activation.
 - **Compare:** launch picker against the previous launch or the history median; per-phase and per-extension deltas, regressions flagged.
@@ -75,7 +75,7 @@ Settings: `null-startup.enabled` (master switch), `null-startup.retention` (defa
 ## Error handling
 
 - Command missing (patch not applied, stock VS Code): log once, disable quietly.
-- Snapshot fails or times out: save a partial report with `partial: true`.
+- Snapshot fails or times out: log it and keep the earlier report, if any. `partial: true` means no launch-start mark was found.
 - Missing marks or activation times become `undefined` and render "n/a"; nothing throws.
 - Corrupt or unknown-version report files are skipped, never deleted by the reader.
 
