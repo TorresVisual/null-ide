@@ -23,24 +23,26 @@ All new code is in `extensions/null-tools/src/recovery/`. No patches and no new 
 
 ### 1. Editors (config only)
 
-`product.json → configurationDefaults`: `files.hotExit: "onExitAndWindowClose"`, `window.restoreWindows: "all"`. Recovery never writes to project files, so newer on-disk content cannot be overwritten; a dirty restored buffer that conflicts with a newer file hits VS Code's own save-conflict flow.
+`product.json → configurationDefaults` pins `files.hotExit: "onExit"` and `window.restoreWindows: "all"` (the VS Code defaults, made explicit so they cannot drift). `"onExitAndWindowClose"` is deliberately not used: VS Code's backup tracker writes dirty-buffer backups continuously for any value except `"off"`, so it adds nothing for crash recovery and would change ordinary window-close behavior (no save prompt). Recovery never writes to project files, so newer on-disk content cannot be overwritten; a dirty restored buffer that conflicts with a newer file hits VS Code's own save-conflict flow.
 
 ### 2. Crash detection (`crashMarker.ts`, no `vscode` import)
 
-- On activation, write `recovery/<pid>.json` under `globalStorageUri`: `{ pid, startedAt, folders[] }`. A clean `deactivate` deletes it synchronously.
-- On activation, before writing its own marker, scan the others. A marker whose pid is dead (`process.kill(pid, 0)` throws, injected for tests) is a crashed run: move it into `pending` in `globalState` (`null-recovery.pending`) and delete the file, so the prompt survives a second crash.
+- On activation, write `recovery/<pid>-<startedAt>.json` under `globalStorageUri`: `{ pid, startedAt, folders[] }` (written to a temp name and renamed, so a scanning window never sees a torn marker). A clean dispose (extension deactivation) deletes it synchronously.
+- On activation, before writing its own marker, scan the others. A marker whose pid is dead (`process.kill(pid, 0)` throws `ESRCH`; injected for tests) is a crashed run. **The stale marker file is itself the pending record**: it stays on disk until Review completes or Discard, so the prompt survives a second crash and there is no cross-window `globalState` race.
+- A window only handles dead markers that share a workspace folder with it (compared case-insensitively). Markers with no folders are deleted at once (nothing to review); markers for other folders are left for a window that opens them. Markers older than 30 days are deleted.
 - A corrupt or unreadable marker is deleted and ignored; recovery must never block startup.
+- Known ceiling: if the OS reuses a dead pid for an unrelated live process, that crash is not detected. The marker is removed by the 30-day age rule.
 - `deactivate` is best-effort on quit, so a false positive is possible. The cost is one harmless notice; hot-exit restore is the real safety net.
 
 ### 3. Interrupted sessions (`interruptedSessions.ts`, pure over a directory)
 
-For each folder in a pending marker, `findProjectDir` (reused from `followAlong.ts`), then every transcript with mtime ≥ `startedAt`. Read the last parseable line (a torn final line is skipped).
+For each folder in a crashed marker that this window also has open, `findProjectDir` (reused from `followAlong.ts`), then every transcript with `crashed.startedAt ≤ mtime < thisWindow.startedAt`. The upper bound excludes sessions that other, still-running windows wrote after this window started. Only the last 64 KB (for state) and first 64 KB (for the title) of each file are read. State comes from the last parseable `user`/`assistant` entry (torn final lines, non-conversation entries, `isSidechain` and `isMeta` entries are skipped).
 
 - **interrupted**: the last entry is not an assistant `end_turn`, or is an assistant `tool_use` without a result. A "[Request interrupted by user]" entry is a deliberate stop and is not interrupted.
 - Otherwise the session is **restorable** (recent, completed).
 - Output: `{ sessionId, title (first prompt, truncated), lastActivity, interrupted }`.
 
-### 4. Prompt and cleanup (`recoveryPrompt.ts`, the only file importing `vscode`)
+### 4. Prompt and cleanup (`recoveryIntegration.ts`, the only file importing `vscode`)
 
 One notification: "Null IDE closed unexpectedly. Unsaved editors were restored by VS Code. N Claude conversations were open (M interrupted mid-turn)." Buttons: **Review**, **Later**, **Discard**.
 
