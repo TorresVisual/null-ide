@@ -436,6 +436,11 @@
           "default": "",
           "description": "Path to null-notes.exe, used by \"Open in null-notes\". Leave empty to use the default per-user install location (%LOCALAPPDATA%\\null-notes\\null-notes.exe)."
         },
+        "null.commitMessage.useClaude": {
+          "type": "boolean",
+          "default": true,
+          "description": "Generate commit messages with the Claude CLI. When off, a basic message is built from the changed files and no Claude usage is spent."
+        },
         "null.gitignore.autoUpdate": {
           "type": "boolean",
           "default": true,

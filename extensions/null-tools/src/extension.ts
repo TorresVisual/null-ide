@@ -77,7 +77,9 @@ export function activate(context: vscode.ExtensionContext): void {
     const diff = getStagedDiff(cwd);
     if (!diff.trim()) { vscode.window.showWarningMessage('No changes found (nothing staged or committed).'); return; }
     let message: string | undefined;
-    try {
+    if (!vscode.workspace.getConfiguration('null').get<boolean>('commitMessage.useClaude', true)) {
+      message = heuristicMessage(getChangedFiles(cwd));
+    } else try {
       await vscode.window.withProgress(
         { location: { viewId: 'workbench.scm' }, title: 'Generating commit message...' },
         async () => { message = await runClaude(diff, cwd); },

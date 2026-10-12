@@ -114,13 +114,17 @@ function activate(context) {
             return;
         }
         let message;
-        try {
-            await vscode.window.withProgress({ location: { viewId: 'workbench.scm' }, title: 'Generating commit message...' }, async () => { message = await (0, commitMessage_1.runClaude)(diff, cwd); });
-        }
-        catch (err) {
+        if (!vscode.workspace.getConfiguration('null').get('commitMessage.useClaude', true)) {
             message = (0, commitMessage_1.heuristicMessage)((0, commitMessage_1.getChangedFiles)(cwd));
-            vscode.window.showWarningMessage(`Null: claude failed (${err.message.split('\n')[0]}). Inserted a basic message from the changed files — edit it before committing.`);
         }
+        else
+            try {
+                await vscode.window.withProgress({ location: { viewId: 'workbench.scm' }, title: 'Generating commit message...' }, async () => { message = await (0, commitMessage_1.runClaude)(diff, cwd); });
+            }
+            catch (err) {
+                message = (0, commitMessage_1.heuristicMessage)((0, commitMessage_1.getChangedFiles)(cwd));
+                vscode.window.showWarningMessage(`Null: claude failed (${err.message.split('\n')[0]}). Inserted a basic message from the changed files — edit it before committing.`);
+            }
         const gitExt = vscode.extensions.getExtension('vscode.git');
         if (!gitExt) {
             vscode.window.showErrorMessage('Built-in git extension not found.');
