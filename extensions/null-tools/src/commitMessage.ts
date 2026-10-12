@@ -21,6 +21,30 @@ export function getStagedDiff(cwd: string): string {
   }
 }
 
+export function getChangedFiles(cwd: string): string {
+  try {
+    const staged = execSync('git diff --staged --name-status', { cwd, encoding: 'utf8', timeout: 10000 });
+    if (staged.trim()) return staged;
+    return execSync('git diff HEAD --name-status', { cwd, encoding: 'utf8', timeout: 10000 });
+  } catch {
+    return '';
+  }
+}
+
+/** Offline fallback when claude is unavailable: builds a message from `git diff --name-status` output. */
+export function heuristicMessage(nameStatus: string): string {
+  const files = nameStatus.split('\n').filter(l => l.trim()).map(l => {
+    const [status, ...paths] = l.split('\t');
+    return { status: status[0], path: paths[paths.length - 1] };
+  });
+  if (!files.length) return 'chore: update files';
+  const all = (re: RegExp) => files.every(f => re.test(f.path));
+  const type = all(/\.(md|mdx|txt)$|(^|\/)docs\//i) ? 'docs' : all(/\.(test|spec)\.|(^|\/)tests?\//i) ? 'test' : 'chore';
+  const verb = files.every(f => f.status === 'A') ? 'add' : files.every(f => f.status === 'D') ? 'remove' : 'update';
+  const names = files.map(f => f.path.split('/').pop());
+  return `${type}: ${verb} ${files.length <= 3 ? names.join(', ') : `${files.length} files`}`;
+}
+
 export function runClaude(diff: string, cwd: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = spawn('claude', ['--print'], { cwd, shell: true, windowsHide: true });

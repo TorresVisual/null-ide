@@ -118,8 +118,8 @@ function activate(context) {
             await vscode.window.withProgress({ location: { viewId: 'workbench.scm' }, title: 'Generating commit message...' }, async () => { message = await (0, commitMessage_1.runClaude)(diff, cwd); });
         }
         catch (err) {
-            vscode.window.showErrorMessage(`Null: commit message generation failed — ${err.message}`);
-            return;
+            message = (0, commitMessage_1.heuristicMessage)((0, commitMessage_1.getChangedFiles)(cwd));
+            vscode.window.showWarningMessage(`Null: claude failed (${err.message.split('\n')[0]}). Inserted a basic message from the changed files — edit it before committing.`);
         }
         const gitExt = vscode.extensions.getExtension('vscode.git');
         if (!gitExt) {

@@ -11,7 +11,7 @@ import { registerPortsFeature } from './portsIntegration';
 import { registerWorktreesFeature } from './worktreesIntegration';
 import { registerDiscordPresenceFeature } from './discordPresenceIntegration';
 import { registerIssuesPanelFeature } from './issuesPanelIntegration';
-import { getStagedDiff, runClaude } from './commitMessage';
+import { getStagedDiff, getChangedFiles, heuristicMessage, runClaude } from './commitMessage';
 import { registerUpdaterFeature } from './updaterIntegration';
 import { registerOpenInNullNotesFeature } from './nullNotes';
 import { showWelcomePage } from './welcomePage';
@@ -83,8 +83,10 @@ export function activate(context: vscode.ExtensionContext): void {
         async () => { message = await runClaude(diff, cwd); },
       );
     } catch (err) {
-      vscode.window.showErrorMessage(`Null: commit message generation failed — ${(err as Error).message}`);
-      return;
+      message = heuristicMessage(getChangedFiles(cwd));
+      vscode.window.showWarningMessage(
+        `Null: claude failed (${(err as Error).message.split('\n')[0]}). Inserted a basic message from the changed files — edit it before committing.`,
+      );
     }
     const gitExt = vscode.extensions.getExtension('vscode.git');
     if (!gitExt) { vscode.window.showErrorMessage('Built-in git extension not found.'); return; }
