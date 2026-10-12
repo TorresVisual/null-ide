@@ -20,6 +20,7 @@ import { registerDashboardFeature } from './dashboardIntegration';
 import { registerClaudeTabFeature } from './claudeTabIntegration';
 import { registerFollowAlongFeature } from './followAlongIntegration';
 import { registerWhyIsThisHereFeature } from './whyIsThisHereIntegration';
+import { registerRecoveryFeature } from './recovery/recoveryIntegration';
 
 // ── Activation ─────────────────────────────────────────────────────────────
 
@@ -149,6 +150,7 @@ export function activate(context: vscode.ExtensionContext): void {
   registerClaudeTabFeature(context);
   registerFollowAlongFeature(context);
   registerWhyIsThisHereFeature(context);
+  registerRecoveryFeature(context);
 }
 
 export function deactivate(): void {}

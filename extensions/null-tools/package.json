@@ -452,6 +452,11 @@
           "default": "warn",
           "description": "Check commit messages against the Conventional Commits format, whether typed by hand or generated."
         },
+        "null.recovery.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "After an unexpected exit, offer to reopen the Claude Code conversations that were open (and flag those interrupted mid-turn). Unsaved editor contents are restored by VS Code itself and are not affected by this setting."
+        },
         "null.gitignore.autoUpdate": {
           "type": "boolean",
           "default": true,
