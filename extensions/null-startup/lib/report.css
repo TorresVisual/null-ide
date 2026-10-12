@@ -1,0 +1,28 @@
+body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); padding: 12px 20px 32px; }
+h1 { font-size: 1.5em; font-weight: 600; margin: 0 0 12px; }
+h2 { font-size: 1.15em; margin: 24px 0 8px; }
+h3 { font-size: 1em; margin: 12px 0 4px; color: var(--vscode-descriptionForeground); }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+select, button.action { background: var(--vscode-dropdown-background); color: var(--vscode-dropdown-foreground); border: 1px solid var(--vscode-dropdown-border, transparent); padding: 3px 8px; font: inherit; }
+button.action { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); cursor: pointer; }
+.summary { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 24px; }
+.headline { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 12px; }
+.big { font-size: 2.2em; font-weight: 600; }
+.sub, .legend, .empty { color: var(--vscode-descriptionForeground); }
+.milestones { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); border-radius: 10px; padding: 1px 10px; }
+.slowest ol { margin: 0; padding-left: 20px; }
+table { border-collapse: collapse; width: 100%; }
+th, td { text-align: left; padding: 3px 8px; border-bottom: 1px solid var(--vscode-widget-border, rgba(128,128,128,.25)); }
+th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
+button.sort { all: unset; cursor: pointer; font-weight: 600; }
+button.sort:focus-visible { outline: 1px solid var(--vscode-focusBorder); }
+tr.slow td:first-child, tr.regression td:first-child { box-shadow: inset 3px 0 var(--vscode-editorWarning-foreground); }
+p.regression { color: var(--vscode-editorWarning-foreground); }
+.timeline { width: 100%; height: auto; }
+.timeline .bar { fill: var(--vscode-charts-blue); }
+.timeline .bar.ext { fill: var(--vscode-charts-green); }
+.timeline .bar.deferred { opacity: .45; }
+.timeline .bar.slow { stroke: var(--vscode-editorWarning-foreground); stroke-width: 2; }
+.timeline .milestone { stroke: var(--vscode-editorWarning-foreground); stroke-dasharray: 3 3; }
+.timeline .milestone-label { fill: var(--vscode-foreground); font-size: 10px; }

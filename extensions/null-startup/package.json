@@ -5,15 +5,31 @@
   "version": "1.0.0",
   "publisher": "null",
   "license": "MIT",
-  "engines": { "vscode": "^1.93.0" },
+  "engines": {
+    "vscode": "^1.93.0"
+  },
   "main": "./out/extension.js",
-  "activationEvents": ["onStartupFinished"],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "contributes": {
     "commands": [
-      { "command": "null-startup.openReport", "title": "Null Startup: Open Startup Report" },
-      { "command": "null-startup.copyReport", "title": "Null Startup: Copy Startup Report" },
-      { "command": "null-startup.exportReport", "title": "Null Startup: Export Startup Report as JSON…" },
-      { "command": "null-startup.clearHistory", "title": "Null Startup: Clear Startup History…" }
+      {
+        "command": "null-startup.openReport",
+        "title": "Null Startup: Open Startup Report"
+      },
+      {
+        "command": "null-startup.copyReport",
+        "title": "Null Startup: Copy Startup Report"
+      },
+      {
+        "command": "null-startup.exportReport",
+        "title": "Null Startup: Export Startup Report as JSON…"
+      },
+      {
+        "command": "null-startup.clearHistory",
+        "title": "Null Startup: Clear Startup History…"
+      }
     ],
     "configuration": {
       "title": "Null Startup",
@@ -40,8 +56,8 @@
     }
   },
   "scripts": {
-    "compile": "tsc -p tsconfig.json",
-    "test": "tsc -p tsconfig.json && node --test out/test/snapshot.test.js out/test/settings.test.js out/test/intervals.test.js out/test/sanitize.test.js out/test/buildReport.test.js out/test/reportStore.test.js out/test/capture.test.js out/test/compare.test.js out/test/exportReport.test.js out/test/reportModel.test.js",
+    "compile": "tsc -p tsconfig.json && tsc -p tsconfig.webview-report-shared.json && tsc -p tsconfig.webview-report.json",
+    "test": "tsc -p tsconfig.json && tsc -p tsconfig.webview-report-shared.json && tsc -p tsconfig.webview-report.json && node --test out/test/snapshot.test.js out/test/settings.test.js out/test/intervals.test.js out/test/sanitize.test.js out/test/buildReport.test.js out/test/reportStore.test.js out/test/capture.test.js out/test/compare.test.js out/test/exportReport.test.js out/test/reportModel.test.js out/test/reportWebviewModel.test.js out/test/reportHtml.test.js",
     "pretest:integration": "tsc -p tsconfig.json",
     "test:integration": "node ./out/test/runTest.js"
   },

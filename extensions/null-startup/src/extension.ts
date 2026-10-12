@@ -5,8 +5,10 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { Capture } from './capture';
+import { registerCommands } from './commands';
+import { ReportPanel } from './reportPanel';
 import { ReportStore } from './reportStore';
-import { normalizeRetention } from './settings';
+import { normalizeRetention, normalizeSlowMs } from './settings';
 import { takeSnapshot } from './snapshotSource';
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -26,7 +28,10 @@ export function activate(context: vscode.ExtensionContext): void {
     retention: () => normalizeRetention(config().get('retention')),
     log,
   });
-  context.subscriptions.push(output);
+  const slowMs = () => normalizeSlowMs(config().get('slowExtensionMs'));
+  const panel = new ReportPanel(context, store, slowMs);
+  context.subscriptions.push(output, panel);
+  registerCommands(context, store, panel, slowMs);
 
   if (config().get('enabled') === false) return;
 
@@ -40,7 +45,7 @@ export function activate(context: vscode.ExtensionContext): void {
       return { dispose: () => clearTimeout(t) };
     },
     log,
-    onSaved: () => {},
+    onSaved: () => panel.refresh(),
   });
   context.subscriptions.push({ dispose: () => capture.dispose() });
   void capture.run();
