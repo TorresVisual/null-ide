@@ -3,7 +3,7 @@ import * as cp from 'child_process';
 import * as path from 'path';
 import { computeMinimalEdits } from './diffUtils';
 import { resolveClangFormatStyle } from './configResolver';
-import { findClangFormatPath } from './toolchainDiscovery';
+import { getEnvApi } from './envApi';
 
 export class ClangFormatFormattingEditProvider
   implements vscode.DocumentFormattingEditProvider, vscode.DocumentRangeFormattingEditProvider
@@ -39,11 +39,14 @@ export class ClangFormatFormattingEditProvider
     }
 
     const configuredExe = config.get<string>('path');
-    const exePath = findClangFormatPath(configuredExe, this.extensionPath);
+    const exePath = getEnvApi().findClangFormatPath(configuredExe, this.extensionPath);
     if (!exePath) {
-      vscode.window.showWarningMessage(
-        'Null IDE: clang-format was not found. Please install LLVM or configure null-format.clangFormat.path.'
-      );
+      void vscode.window
+        .showWarningMessage(
+          'Null IDE: clang-format was not found. Please install LLVM or configure null-format.clangFormat.path.',
+          'Check Environment'
+        )
+        .then(choice => (choice ? vscode.commands.executeCommand('null.env.check') : undefined));
       return [];
     }
 

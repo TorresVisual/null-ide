@@ -3,7 +3,7 @@ import * as cp from 'child_process';
 import * as path from 'path';
 import { computeMinimalEdits } from './diffUtils';
 import { resolveRustfmtConfig } from './configResolver';
-import { findRustfmtPath } from './toolchainDiscovery';
+import { getEnvApi } from './envApi';
 
 export class RustfmtFormattingEditProvider implements vscode.DocumentFormattingEditProvider {
   constructor(private readonly extensionPath: string) {}
@@ -20,11 +20,14 @@ export class RustfmtFormattingEditProvider implements vscode.DocumentFormattingE
     }
 
     const configuredExe = config.get<string>('path');
-    const exePath = findRustfmtPath(configuredExe, this.extensionPath);
+    const exePath = getEnvApi().findRustfmtPath(configuredExe, this.extensionPath);
     if (!exePath) {
-      vscode.window.showWarningMessage(
-        'Null IDE: rustfmt was not found. Please install Rust (rustup component add rustfmt) or configure null-format.rustfmt.path.'
-      );
+      void vscode.window
+        .showWarningMessage(
+          'Null IDE: rustfmt was not found. Please install Rust (rustup component add rustfmt) or configure null-format.rustfmt.path.',
+          'Check Environment'
+        )
+        .then(choice => (choice ? vscode.commands.executeCommand('null.env.check') : undefined));
       return [];
     }
 

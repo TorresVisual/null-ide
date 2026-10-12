@@ -15,9 +15,12 @@
   "activationEvents": [
     "onStartupFinished"
   ],
+  "extensionDependencies": [
+    "null.null-env"
+  ],
   "scripts": {
     "compile": "tsc -p tsconfig.json",
-    "test": "tsc -p tsconfig.json && node --test out/diffUtils.test.js out/configResolver.test.js out/toolchainDiscovery.test.js out/prettier.test.js"
+    "test": "tsc -p tsconfig.json && node --test out/diffUtils.test.js out/configResolver.test.js out/prettier.test.js"
   },
   "dependencies": {
     "prettier": "^3.5.3"
