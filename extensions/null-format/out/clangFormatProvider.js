@@ -39,7 +39,7 @@ const cp = __importStar(require("child_process"));
 const path = __importStar(require("path"));
 const diffUtils_1 = require("./diffUtils");
 const configResolver_1 = require("./configResolver");
-const toolchainDiscovery_1 = require("./toolchainDiscovery");
+const envApi_1 = require("./envApi");
 class ClangFormatFormattingEditProvider {
     extensionPath;
     constructor(extensionPath) {
@@ -58,9 +58,11 @@ class ClangFormatFormattingEditProvider {
             return [];
         }
         const configuredExe = config.get('path');
-        const exePath = (0, toolchainDiscovery_1.findClangFormatPath)(configuredExe, this.extensionPath);
+        const exePath = (0, envApi_1.getEnvApi)().findClangFormatPath(configuredExe, this.extensionPath);
         if (!exePath) {
-            vscode.window.showWarningMessage('Null IDE: clang-format was not found. Please install LLVM or configure null-format.clangFormat.path.');
+            void vscode.window
+                .showWarningMessage('Null IDE: clang-format was not found. Please install LLVM or configure null-format.clangFormat.path.', 'Check Environment')
+                .then(choice => (choice ? vscode.commands.executeCommand('null.env.check') : undefined));
             return [];
         }
         const filePath = document.isUntitled ? undefined : document.fileName;

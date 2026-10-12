@@ -39,7 +39,7 @@ const cp = __importStar(require("child_process"));
 const path = __importStar(require("path"));
 const diffUtils_1 = require("./diffUtils");
 const configResolver_1 = require("./configResolver");
-const toolchainDiscovery_1 = require("./toolchainDiscovery");
+const envApi_1 = require("./envApi");
 class RustfmtFormattingEditProvider {
     extensionPath;
     constructor(extensionPath) {
@@ -52,9 +52,11 @@ class RustfmtFormattingEditProvider {
             return [];
         }
         const configuredExe = config.get('path');
-        const exePath = (0, toolchainDiscovery_1.findRustfmtPath)(configuredExe, this.extensionPath);
+        const exePath = (0, envApi_1.getEnvApi)().findRustfmtPath(configuredExe, this.extensionPath);
         if (!exePath) {
-            vscode.window.showWarningMessage('Null IDE: rustfmt was not found. Please install Rust (rustup component add rustfmt) or configure null-format.rustfmt.path.');
+            void vscode.window
+                .showWarningMessage('Null IDE: rustfmt was not found. Please install Rust (rustup component add rustfmt) or configure null-format.rustfmt.path.', 'Check Environment')
+                .then(choice => (choice ? vscode.commands.executeCommand('null.env.check') : undefined));
             return [];
         }
         const filePath = document.isUntitled ? undefined : document.fileName;
