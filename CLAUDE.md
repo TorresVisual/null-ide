@@ -91,6 +91,7 @@ Written in TypeScript (`src/`). Activated on `onStartupFinished`. Provides:
 | **Project dashboard** | Custom editor (`null.dashboard`, `viewType`); opened on startup and via Help > Welcome (see `patches/003-*` and `004-*`); recent-project cards with async git status, New Project, Clone Repo |
 | **GitHub Issues panel** | Activity-bar view (`null-issues`), a full-width tab (`null.issues.openFullView`) and one tab per issue; GraphQL search, composer with per-issue drafts, image attach (committed to an orphan `null-issue-assets` branch, thumbnails cached in `.null/issue-images/`), *Copy as prompt*, and an "open this issue?" prompt when you switch to an `issue-<n>-…` branch. Signs in through null-accounts (`githubAuth.ts` → `githubSession.ts`); `null-tools` declares `extensionDependencies: ["null.null-accounts"]`. Webview code in `src/webview/` is compiled by separate `tsconfig.webview-*.json` projects into `lib/` |
 | **Commit message generation** | `null.generateCommitMessage` (`Ctrl+Shift+Alt+G`) — runs `claude --print` with staged diff; sets SCM input box |
+| **Commit message validation** | `commitValidation.ts` (pure Conventional Commits check) + `commitValidationIntegration.ts`: squiggles on the SCM commit box (`vscode-scm` docs) and the `null.commitMessage.check` command; `null.commitMessage.validation` = `off`/`warn` (default)/`strict`. Strict blocking needs patch 008 |
 | **In-app updater** | Checks GitHub Releases on startup; shows status bar button; self-updates via PowerShell |
 | **Discord Rich Presence** | `discordRpcClient.ts` (IPC pipe / WebSocket transport), `discordPresence.ts` (activity building), `presenceOwnership.ts` (one window publishes), `discordAppInfo.ts` (Developer Portal diagnostics). Configured via `null.discord.*`; `null.discord.testConnection` reports setup problems |
 
@@ -150,6 +151,7 @@ Workbench chrome customisations (CSS/JS injection, icon swaps) are handled by di
 - `005-claude-code-command-center-button.patch` — restores the icon and chevron on the command-center Claude split button
 - `006-settings-toc-split-extensions.patch` — splits the Settings editor's Extensions node into Null / Installed Extensions / Built-in Extensions sections
 - `007-accounts-menu-null-accounts.patch` — the Accounts menu lists null-accounts' accounts (read from the `null.accounts.menu` context key, each row with its round `data:` picture or provider glyph, the host dimmed after the name, and a "Project: <folder>" heading) and drops VS Code's provider-session and Settings Sync / Copilot / Edit Sessions / tunnel rows; the activity-bar Accounts button shows the picture under `null.accounts.avatar`
+- `008-git-commit-message-check.patch` — `smartCommit` calls `null.commitMessage.check` (null-tools) and aborts with its reason; no-op when null-tools is absent
 
 To add a patch against the VS Code source:
 ```bash

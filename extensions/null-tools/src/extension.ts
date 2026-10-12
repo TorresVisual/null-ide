@@ -13,6 +13,7 @@ import { registerDiscordPresenceFeature } from './discordPresenceIntegration';
 import { registerIssuesPanelFeature } from './issuesPanelIntegration';
 import { getStagedDiff, getChangedFiles, heuristicMessage, runClaude } from './commitMessage';
 import { registerUpdaterFeature } from './updaterIntegration';
+import { registerCommitValidationFeature } from './commitValidationIntegration';
 import { registerOpenInNullNotesFeature } from './nullNotes';
 import { showWelcomePage } from './welcomePage';
 import { registerDashboardFeature } from './dashboardIntegration';
@@ -69,6 +70,7 @@ export function activate(context: vscode.ExtensionContext): void {
   registerAutoGitignoreFeature(context);
 
   registerUpdaterFeature(context);
+  registerCommitValidationFeature(context);
 
   context.subscriptions.push(vscode.commands.registerCommand('null.generateCommitMessage', async () => {
     const folders = vscode.workspace.workspaceFolders;

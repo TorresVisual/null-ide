@@ -1,0 +1,27 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: TorresVisual <junk@rohsmann.at>
+Date: Mon, 12 Oct 2026 12:00:00 +0200
+Subject: [PATCH] feat(#9): let null-tools refuse non-conventional commit messages
+
+smartCommit asks null.commitMessage.check (registered by null-tools, which
+returns a reason only when null.commitMessage.validation is "strict") before
+committing. Without null-tools the command is missing and the commit proceeds.
+---
+diff --git a/extensions/git/src/commands.ts b/extensions/git/src/commands.ts
+index 02507896..79a387ec 100644
+--- a/extensions/git/src/commands.ts
++++ b/extensions/git/src/commands.ts
+@@ -2521,6 +2521,13 @@ export class CommandCenter {
+ 			return;
+ 		}
+ 
++		// Null IDE: null-tools refuses non-conventional messages when null.commitMessage.validation is "strict"
++		const refusal = message ? await Promise.resolve(commands.executeCommand<string | undefined>('null.commitMessage.check', message)).catch(() => undefined) : undefined;
++		if (refusal) {
++			window.showErrorMessage(refusal);
++			return;
++		}
++
+ 		if (opts.all && smartCommitChanges === 'tracked') {
+ 			opts.all = 'tracked';
+ 		}
