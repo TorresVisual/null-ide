@@ -64,6 +64,14 @@
 		{
 			"extensionId": "eamodio.gitlens",
 			"reason": "Enhanced Git history and blame"
+		},
+		{
+			"extensionId": "anthropic.claude-code",
+			"reason": "Claude Code, Null IDE's AI workflow"
+		},
+		{
+			"extensionId": "rust-lang.rust-analyzer",
+			"reason": "Rust language support"
 		}
 	],
 
