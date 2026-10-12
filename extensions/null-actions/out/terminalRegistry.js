@@ -1,24 +1,88 @@
 'use strict';
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TerminalRegistry = void 0;
+const CTRL_C = '';
 function terminalNameForLabel(label) {
     return `Action: ${label}`;
 }
 class TerminalRegistry {
     host;
+    now;
     cache = new Map();
-    constructor(host) {
+    states = new Map();
+    // Settles when the button's current run is over; lets restart wait for Ctrl+C to take effect.
+    runs = new Map();
+    listeners = new Set();
+    constructor(host, now = Date.now) {
         this.host = host;
+        this.now = now;
     }
-    dispatch(buttonId, label, command, options = {}) {
+    onDidChangeState(listener) {
+        this.listeners.add(listener);
+        return { dispose: () => { this.listeners.delete(listener); } };
+    }
+    getState(buttonId) {
+        return this.states.get(buttonId);
+    }
+    isBusy(buttonId) {
+        return this.states.get(buttonId)?.kind === 'running';
+    }
+    async dispatch(buttonId, label, command, options = {}) {
         const terminal = this.resolve(buttonId, label, options.cwd);
-        terminal.sendText(command);
+        // Mark busy before awaiting: a new terminal may wait for shell integration,
+        // and a second click in that window must not type into the starting command.
+        const startedAt = this.now();
+        this.setState(buttonId, { kind: 'running' });
+        const execution = await this.host.execute?.(terminal, command);
+        if (execution) {
+            const run = execution.exitCode.then(exitCode => {
+                if (this.runs.get(buttonId) !== run) {
+                    return;
+                } // a newer run owns the state
+                this.runs.delete(buttonId);
+                const kind = exitCode === undefined ? 'ended' : exitCode === 0 ? 'passed' : 'failed';
+                this.setState(buttonId, { kind, exitCode, durationMs: this.now() - startedAt });
+            });
+            this.runs.set(buttonId, run);
+        }
+        else {
+            this.setState(buttonId, undefined);
+            terminal.sendText(command);
+        }
         if (options.focus) {
             terminal.show(false);
         }
     }
+    /** Reveals the button's terminal if it still exists. */
+    show(buttonId) {
+        this.cache.get(buttonId)?.show(false);
+    }
+    /** Sends Ctrl+C, then waits (up to `timeoutMs`) for the running command to end. */
+    async interrupt(buttonId, timeoutMs = 3000) {
+        this.cache.get(buttonId)?.sendText(CTRL_C, false);
+        const run = this.runs.get(buttonId);
+        if (!run) {
+            return;
+        }
+        let timer;
+        await Promise.race([run, new Promise(r => { timer = setTimeout(r, timeoutMs); })]);
+        clearTimeout(timer);
+    }
     forget(buttonId) {
         this.cache.delete(buttonId);
+        this.runs.delete(buttonId);
+        this.setState(buttonId, undefined);
+    }
+    setState(buttonId, state) {
+        if (state) {
+            this.states.set(buttonId, state);
+        }
+        else {
+            this.states.delete(buttonId);
+        }
+        for (const l of this.listeners) {
+            l(buttonId, state);
+        }
     }
     resolve(buttonId, label, cwd) {
         const name = terminalNameForLabel(label);

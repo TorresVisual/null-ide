@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.parseButtonConfigs = parseButtonConfigs;
 const VALID_TYPES = ['terminal', 'vscode-command'];
 const VALID_BACKGROUNDS = ['none', 'warning', 'error'];
+const VALID_ON_BUSY = ['ask', 'restart', 'show', 'run'];
 function parseButtonConfigs(raw) {
     const buttons = [];
     const errors = [];
@@ -51,6 +52,7 @@ function parseButtonConfigs(raw) {
             cwd: typeof e.cwd === 'string' ? e.cwd : undefined,
             saveAll: e.saveAll === true,
             focus: typeof e.focus === 'boolean' ? e.focus : true,
+            onBusy: VALID_ON_BUSY.includes(e.onBusy) ? e.onBusy : 'ask',
             priority: typeof e.priority === 'number' ? e.priority : 0,
         });
     }

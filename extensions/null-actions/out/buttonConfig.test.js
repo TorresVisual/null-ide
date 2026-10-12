@@ -25,6 +25,7 @@ const buttonConfig_1 = require("./buttonConfig");
         cwd: undefined,
         saveAll: false,
         focus: true,
+        onBusy: 'ask',
         priority: 0,
     });
 });
@@ -73,5 +74,13 @@ const buttonConfig_1 = require("./buttonConfig");
     ]);
     node_assert_1.default.strictEqual(buttons[0].focus, true);
     node_assert_1.default.strictEqual(buttons[1].focus, false);
+});
+(0, node_test_1.test)('onBusy accepts the known modes and falls back to ask for anything else', () => {
+    const { buttons } = (0, buttonConfig_1.parseButtonConfigs)([
+        { id: 'a', label: 'A', command: 'x', onBusy: 'restart' },
+        { id: 'b', label: 'B', command: 'x', onBusy: 'bogus' },
+    ]);
+    node_assert_1.default.strictEqual(buttons[0].onBusy, 'restart');
+    node_assert_1.default.strictEqual(buttons[1].onBusy, 'ask');
 });
 //# sourceMappingURL=buttonConfig.test.js.map

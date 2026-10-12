@@ -35,10 +35,40 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.StatusBarController = void 0;
 const vscode = __importStar(require("vscode"));
+const buttonState_1 = require("./buttonState");
+// How long a pass/fail result stays on the button before it reverts.
+const RESULT_MS = 8000;
 class StatusBarController {
     items = new Map();
+    buttons = new Map();
+    shown = new Map();
+    expiry = new Map();
+    /** Overlays a button's run state; a finished result reverts on its own. */
+    setState(id, state) {
+        clearTimeout(this.expiry.get(id));
+        this.expiry.delete(id);
+        if (state) {
+            this.shown.set(id, state);
+        }
+        else {
+            this.shown.delete(id);
+        }
+        if (state && state.kind !== 'running') {
+            this.expiry.set(id, setTimeout(() => this.setState(id, undefined), RESULT_MS));
+        }
+        const item = this.items.get(id)?.item;
+        const button = this.buttons.get(id);
+        if (item && button) {
+            this.applyButton(item, button);
+        }
+    }
+    /** True while the button shows a failed result (a click then reveals the terminal). */
+    showsFailure(id) {
+        return this.shown.get(id)?.kind === 'failed';
+    }
     update(buttons) {
         const nextIds = new Set(buttons.map(b => b.id));
+        this.buttons = new Map(buttons.map(b => [b.id, b]));
         for (const [id, tracked] of this.items) {
             if (!nextIds.has(id)) {
                 tracked.item.dispose();
@@ -59,6 +89,8 @@ class StatusBarController {
         }
     }
     dispose() {
+        this.expiry.forEach(clearTimeout);
+        this.expiry.clear();
         for (const tracked of this.items.values()) {
             tracked.item.dispose();
         }
@@ -69,8 +101,9 @@ class StatusBarController {
         return { item, priority: button.priority };
     }
     applyButton(item, button) {
-        item.text = button.icon ? `$(${button.icon}) ${button.label}` : button.label;
-        item.tooltip = button.tooltip;
+        const state = this.shown.get(button.id);
+        item.text = (0, buttonState_1.statusText)(button.label, button.icon, state);
+        item.tooltip = (0, buttonState_1.statusTooltip)(button.tooltip, state);
         item.color = button.color;
         item.backgroundColor = button.background !== 'none'
             ? new vscode.ThemeColor(`statusBarItem.${button.background}Background`)

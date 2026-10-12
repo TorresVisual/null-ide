@@ -64,6 +64,30 @@ async function runButton(button, registry) {
     }
     const cwd = button.cwd ? (0, variableResolver_1.resolveVariables)(button.cwd, ctx) : ctx.workspaceFolder;
     const command = (0, variableResolver_1.resolveVariables)(button.command, ctx);
-    registry.dispatch(button.id, button.label, command, { cwd, focus: button.focus });
+    const run = () => registry.dispatch(button.id, button.label, command, { cwd, focus: button.focus });
+    if (!registry.isBusy(button.id)) {
+        await run();
+        return;
+    }
+    // Still running: typing the command again would feed the live process's stdin.
+    const choice = button.onBusy === 'ask' ? await askWhatToDo(button.label) : button.onBusy;
+    if (choice === 'restart') {
+        await registry.interrupt(button.id);
+        await run();
+    }
+    else if (choice === 'show') {
+        registry.show(button.id);
+    }
+    else if (choice === 'run') {
+        await run();
+    }
+}
+async function askWhatToDo(label) {
+    const picked = await vscode.window.showQuickPick([
+        { label: '$(debug-restart) Restart', detail: 'Stop it with Ctrl+C, then run it again', value: 'restart' },
+        { label: '$(terminal) Show terminal', detail: 'Leave it running and look at its output', value: 'show' },
+        { label: '$(warning) Run anyway', detail: 'Type the command into the running process', value: 'run' },
+    ], { title: `"${label}" is still running` });
+    return picked?.value;
 }
 //# sourceMappingURL=runButton.js.map

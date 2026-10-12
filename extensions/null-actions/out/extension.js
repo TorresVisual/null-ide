@@ -45,7 +45,7 @@ const settingsPanel_1 = require("./settingsPanel");
 function activate(context) {
     const terminalRegistry = new terminalRegistry_1.TerminalRegistry(new terminalHostIntegration_1.VscodeTerminalHost());
     const statusBar = new statusBarController_1.StatusBarController();
-    context.subscriptions.push(statusBar);
+    context.subscriptions.push(statusBar, terminalRegistry.onDidChangeState((id, state) => statusBar.setState(id, state)));
     // Slightly above the default button priority (0) so this renders just
     // ahead of the user's own buttons -- not pushed to the front of the
     // whole status bar, just leftmost among null-actions' own items.
@@ -66,6 +66,10 @@ function activate(context) {
         const { buttons } = (0, buttonConfigIntegration_1.readButtonConfigs)();
         const button = buttons.find(b => b.id === buttonId);
         if (!button) {
+            return;
+        }
+        if (statusBar.showsFailure(button.id)) {
+            terminalRegistry.show(button.id);
             return;
         }
         await (0, runButton_1.runButton)(button, terminalRegistry);

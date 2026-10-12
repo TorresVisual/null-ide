@@ -40,6 +40,7 @@ function toActionButtonConfig(script, priority) {
         cwd: undefined,
         saveAll: false,
         focus: true,
+        onBusy: 'ask',
         priority,
     };
 }

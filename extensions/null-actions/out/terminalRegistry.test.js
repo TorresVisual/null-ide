@@ -13,7 +13,7 @@ class FakeTerminal {
     constructor(name) {
         this.name = name;
     }
-    sendText(text) { this.sentTexts.push(text); }
+    sendText(text, _addNewLine) { this.sentTexts.push(text); }
     show() { this.shown = true; }
 }
 class FakeTerminalHost {
@@ -28,82 +28,168 @@ class FakeTerminalHost {
         return t;
     }
 }
-(0, node_test_1.test)('dispatch creates exactly one terminal on first call, named after the button label', () => {
+(0, node_test_1.test)('dispatch creates exactly one terminal on first call, named after the button label', async () => {
     const host = new FakeTerminalHost();
     const registry = new terminalRegistry_1.TerminalRegistry(host);
-    registry.dispatch('build', 'Build', 'npm run build');
+    await registry.dispatch('build', 'Build', 'npm run build');
     node_assert_1.default.strictEqual(host.createCount, 1);
     node_assert_1.default.strictEqual(host.terminals[0].name, 'Action: Build');
     node_assert_1.default.deepStrictEqual(host.terminals[0].sentTexts, ['npm run build']);
 });
-(0, node_test_1.test)('repeated dispatch reuses the cached terminal instead of creating new ones', () => {
+(0, node_test_1.test)('repeated dispatch reuses the cached terminal instead of creating new ones', async () => {
     const host = new FakeTerminalHost();
     const registry = new terminalRegistry_1.TerminalRegistry(host);
-    registry.dispatch('build', 'Build', 'npm run build');
-    registry.dispatch('build', 'Build', 'npm run build');
-    registry.dispatch('build', 'Build', 'npm run build');
+    await registry.dispatch('build', 'Build', 'npm run build');
+    await registry.dispatch('build', 'Build', 'npm run build');
+    await registry.dispatch('build', 'Build', 'npm run build');
     node_assert_1.default.strictEqual(host.createCount, 1);
     node_assert_1.default.strictEqual(host.terminals[0].sentTexts.length, 3);
 });
-(0, node_test_1.test)('a terminal already present under the button label (simulated extension-host restart / restored persistent session) is adopted, never duplicated', () => {
+(0, node_test_1.test)('a terminal already present under the button label (simulated extension-host restart / restored persistent session) is adopted, never duplicated', async () => {
     const restored = new FakeTerminal('Action: Build');
     const host = new FakeTerminalHost([restored]);
     const registry = new terminalRegistry_1.TerminalRegistry(host); // fresh instance — no in-memory cache
-    registry.dispatch('build', 'Build', 'npm run build');
+    await registry.dispatch('build', 'Build', 'npm run build');
     node_assert_1.default.strictEqual(host.createCount, 0, 'must not create a duplicate when a matching terminal already exists');
     node_assert_1.default.strictEqual(host.terminals.length, 1);
     node_assert_1.default.deepStrictEqual(restored.sentTexts, ['npm run build']);
 });
-(0, node_test_1.test)('changing the button command text does not create a new terminal — identity is keyed by id, not command', () => {
+(0, node_test_1.test)('changing the button command text does not create a new terminal — identity is keyed by id, not command', async () => {
     const host = new FakeTerminalHost();
     const registry = new terminalRegistry_1.TerminalRegistry(host);
-    registry.dispatch('build', 'Build', 'npm run build');
-    registry.dispatch('build', 'Build', 'npm run build -- --watch');
+    await registry.dispatch('build', 'Build', 'npm run build');
+    await registry.dispatch('build', 'Build', 'npm run build -- --watch');
     node_assert_1.default.strictEqual(host.createCount, 1);
     node_assert_1.default.deepStrictEqual(host.terminals[0].sentTexts, ['npm run build', 'npm run build -- --watch']);
 });
-(0, node_test_1.test)('renaming the button label mid-session reuses the same terminal — no duplicate, even though the tab keeps showing the old name', () => {
+(0, node_test_1.test)('renaming the button label mid-session reuses the same terminal — no duplicate, even though the tab keeps showing the old name', async () => {
     const host = new FakeTerminalHost();
     const registry = new terminalRegistry_1.TerminalRegistry(host);
-    registry.dispatch('build', 'Build', 'npm run build');
-    registry.dispatch('build', 'Build (dev)', 'npm run build');
+    await registry.dispatch('build', 'Build', 'npm run build');
+    await registry.dispatch('build', 'Build (dev)', 'npm run build');
     node_assert_1.default.strictEqual(host.createCount, 1, 'the id-keyed cache must reuse the existing terminal despite the label change');
     node_assert_1.default.strictEqual(host.terminals[0].name, 'Action: Build', 'Terminal.name is read-only after creation — no rename API exists to keep it in sync');
     node_assert_1.default.deepStrictEqual(host.terminals[0].sentTexts, ['npm run build', 'npm run build']);
 });
-(0, node_test_1.test)('multiple stale terminals sharing the button label: adopts one (the most recent), creates no more', () => {
+(0, node_test_1.test)('multiple stale terminals sharing the button label: adopts one (the most recent), creates no more', async () => {
     const older = new FakeTerminal('Action: Build');
     const newer = new FakeTerminal('Action: Build');
     const host = new FakeTerminalHost([older, newer]);
     const registry = new terminalRegistry_1.TerminalRegistry(host);
-    registry.dispatch('build', 'Build', 'npm run build');
+    await registry.dispatch('build', 'Build', 'npm run build');
     node_assert_1.default.strictEqual(host.createCount, 0);
     node_assert_1.default.deepStrictEqual(newer.sentTexts, ['npm run build']);
     node_assert_1.default.deepStrictEqual(older.sentTexts, [], 'the other stale terminal must be left untouched, not closed or written to');
 });
-(0, node_test_1.test)('a terminal the user closed is not reused — dispatch after removal from the host creates a fresh one', () => {
+(0, node_test_1.test)('a terminal the user closed is not reused — dispatch after removal from the host creates a fresh one', async () => {
     const host = new FakeTerminalHost();
     const registry = new terminalRegistry_1.TerminalRegistry(host);
-    registry.dispatch('build', 'Build', 'npm run build');
+    await registry.dispatch('build', 'Build', 'npm run build');
     host.terminals = []; // simulate the user closing it
-    registry.dispatch('build', 'Build', 'npm run build');
+    await registry.dispatch('build', 'Build', 'npm run build');
     node_assert_1.default.strictEqual(host.createCount, 2);
 });
-(0, node_test_1.test)('different button ids get independent terminals', () => {
+(0, node_test_1.test)('different button ids get independent terminals', async () => {
     const host = new FakeTerminalHost();
     const registry = new terminalRegistry_1.TerminalRegistry(host);
-    registry.dispatch('build', 'Build', 'npm run build');
-    registry.dispatch('test', 'Test', 'npm test');
+    await registry.dispatch('build', 'Build', 'npm run build');
+    await registry.dispatch('test', 'Test', 'npm test');
     node_assert_1.default.strictEqual(host.createCount, 2);
     node_assert_1.default.strictEqual(host.terminals[0].name, 'Action: Build');
     node_assert_1.default.strictEqual(host.terminals[1].name, 'Action: Test');
 });
-(0, node_test_1.test)('focus option shows the terminal after dispatch, absent focus does not', () => {
+(0, node_test_1.test)('focus option shows the terminal after dispatch, absent focus does not', async () => {
     const host = new FakeTerminalHost();
     const registry = new terminalRegistry_1.TerminalRegistry(host);
-    registry.dispatch('build', 'Build', 'npm run build');
+    await registry.dispatch('build', 'Build', 'npm run build');
     node_assert_1.default.strictEqual(host.terminals[0].shown, false);
-    registry.dispatch('build', 'Build', 'npm run build', { focus: true });
+    await registry.dispatch('build', 'Build', 'npm run build', { focus: true });
     node_assert_1.default.strictEqual(host.terminals[0].shown, true);
+});
+// --- run state (shell integration) ---
+class IntegratedHost extends FakeTerminalHost {
+    executed = [];
+    ends = [];
+    integrated = true;
+    async execute(_t, command) {
+        if (!this.integrated) {
+            return undefined;
+        }
+        this.executed.push(command);
+        return { exitCode: new Promise(resolve => { this.ends.push(resolve); }) };
+    }
+}
+const flush = () => new Promise(r => setImmediate(r));
+(0, node_test_1.test)('with shell integration the command is executed (not sendText) and the button is busy until it ends', async () => {
+    const host = new IntegratedHost();
+    let t = 1000;
+    const registry = new terminalRegistry_1.TerminalRegistry(host, () => t);
+    const seen = [];
+    registry.onDidChangeState((_id, s) => seen.push(s));
+    await registry.dispatch('build', 'Build', 'npm run build');
+    node_assert_1.default.deepStrictEqual(host.executed, ['npm run build']);
+    node_assert_1.default.deepStrictEqual(host.terminals[0].sentTexts, []);
+    node_assert_1.default.strictEqual(registry.isBusy('build'), true);
+    t = 13_000;
+    host.ends[0](0);
+    await flush();
+    node_assert_1.default.strictEqual(registry.isBusy('build'), false);
+    node_assert_1.default.deepStrictEqual(registry.getState('build'), { kind: 'passed', exitCode: 0, durationMs: 12_000 });
+    node_assert_1.default.deepStrictEqual(seen.map(s => s?.kind), ['running', 'passed']);
+});
+(0, node_test_1.test)('a non-zero exit code is a failure; an unknown one is just "ended"', async () => {
+    const host = new IntegratedHost();
+    const registry = new terminalRegistry_1.TerminalRegistry(host);
+    await registry.dispatch('a', 'A', 'x');
+    host.ends[0](2);
+    await flush();
+    node_assert_1.default.strictEqual(registry.getState('a')?.kind, 'failed');
+    await registry.dispatch('a', 'A', 'x');
+    host.ends[1](undefined);
+    await flush();
+    node_assert_1.default.strictEqual(registry.getState('a')?.kind, 'ended');
+});
+(0, node_test_1.test)('without shell integration it falls back to sendText and never reports state', async () => {
+    const host = new IntegratedHost();
+    host.integrated = false;
+    const registry = new terminalRegistry_1.TerminalRegistry(host);
+    await registry.dispatch('build', 'Build', 'npm run build');
+    node_assert_1.default.deepStrictEqual(host.terminals[0].sentTexts, ['npm run build']);
+    node_assert_1.default.strictEqual(registry.getState('build'), undefined);
+    node_assert_1.default.strictEqual(registry.isBusy('build'), false);
+});
+(0, node_test_1.test)('interrupt sends Ctrl+C without a newline and resolves once the run ends', async () => {
+    const host = new IntegratedHost();
+    const registry = new terminalRegistry_1.TerminalRegistry(host);
+    await registry.dispatch('dev', 'Dev', 'npm run dev');
+    const sent = [];
+    host.terminals[0].sendText = (text, nl) => { sent.push([text, nl]); };
+    let done = false;
+    const p = registry.interrupt('dev').then(() => { done = true; });
+    await flush();
+    node_assert_1.default.deepStrictEqual(sent, [['\x03', false]]);
+    node_assert_1.default.strictEqual(done, false);
+    host.ends[0](130);
+    await p;
+    node_assert_1.default.strictEqual(done, true);
+});
+(0, node_test_1.test)('interrupt gives up after the timeout when the command ignores Ctrl+C', async () => {
+    const host = new IntegratedHost();
+    const registry = new terminalRegistry_1.TerminalRegistry(host);
+    await registry.dispatch('dev', 'Dev', 'npm run dev');
+    await registry.interrupt('dev', 10);
+    node_assert_1.default.strictEqual(registry.isBusy('dev'), true);
+});
+(0, node_test_1.test)('a run superseded by a newer one cannot overwrite the newer state when it finally ends', async () => {
+    const host = new IntegratedHost();
+    const registry = new terminalRegistry_1.TerminalRegistry(host);
+    await registry.dispatch('dev', 'Dev', 'npm run dev');
+    await registry.dispatch('dev', 'Dev', 'npm run dev'); // "run anyway"
+    host.ends[0](1);
+    await flush();
+    node_assert_1.default.strictEqual(registry.isBusy('dev'), true, 'the newer run is still going');
+    host.ends[1](0);
+    await flush();
+    node_assert_1.default.strictEqual(registry.getState('dev')?.kind, 'passed');
 });
 //# sourceMappingURL=terminalRegistry.test.js.map
