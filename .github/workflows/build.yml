@@ -18,6 +18,8 @@ env:
   APP_NAME: 'null'
   APP_NAME_LONG: Null IDE
   CSPELL_TAG: 'code-spell-checker-v4.5.6'   # Pinned release tag — update this to upgrade the spell checker
+  OPEN_REMOTE_WSL_VERSION: '0.0.5'          # jeanp413.open-remote-wsl on Open VSX
+  OPEN_REMOTE_SSH_VERSION: '0.4.0'          # jeanp413.open-remote-ssh on Open VSX
 
 jobs:
   # ── Build: patch → merge → build → package → upload ───────────────────────
@@ -240,6 +242,44 @@ jobs:
           # Cleanup temporary files
           Remove-Item $vsixZip, cspell-unpacked, cspell-src -Recurse -Force -ErrorAction SilentlyContinue
           Write-Host "Successfully bundled Code Spell Checker $version into $dest"
+
+      - name: Bundle open-remote (WSL + SSH) as built-in extensions
+        shell: pwsh
+        run: |
+          # Microsoft's Remote-* extensions are license-gated; jeanp413's open-remote-* work with
+          # the VSCodium server. Published on Open VSX (not the VS Marketplace).
+          $exts = @{
+            'open-remote-wsl' = '${{ env.OPEN_REMOTE_WSL_VERSION }}'
+            'open-remote-ssh' = '${{ env.OPEN_REMOTE_SSH_VERSION }}'
+          }
+          foreach ($name in $exts.Keys) {
+            $version = $exts[$name]
+            $url = "https://open-vsx.org/api/jeanp413/$name/$version/file/jeanp413.$name-$version.vsix"
+            Write-Host "Downloading $url"
+            Invoke-WebRequest $url -OutFile "$name.zip" -UseBasicParsing
+            Expand-Archive "$name.zip" -DestinationPath "$name-unpacked" -Force
+
+            $dest = "vscode-src/extensions/$name"
+            if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
+            Move-Item "$name-unpacked/extension" $dest
+
+            # Same sanitizing as Code Spell Checker: the code is bundled, and open-remote-ssh's
+            # git-URL dependency (ssh2) would make VS Code's `npm list --production` fail.
+            node -e "
+              const fs = require('fs');
+              const file = '$dest/package.json';
+              const pkg = JSON.parse(fs.readFileSync(file, 'utf8'));
+              delete pkg.workspaces;
+              delete pkg.dependencies;
+              delete pkg.devDependencies;
+              delete pkg.scripts;
+              delete pkg.private;
+              fs.writeFileSync(file, JSON.stringify(pkg, null, 2));
+            "
+
+            Remove-Item "$name.zip", "$name-unpacked" -Recurse -Force -ErrorAction SilentlyContinue
+            Write-Host "Bundled $name $version into $dest"
+          }
 
 
 

@@ -420,6 +420,46 @@ else {
 }
 
 # ============================================================
+# BUNDLE OPEN-REMOTE (WSL + SSH)
+# ============================================================
+
+Write-Step "Bundling open-remote-wsl / open-remote-ssh"
+# Keep in sync with OPEN_REMOTE_*_VERSION in .github/workflows/build.yml
+$openRemote = @{ 'open-remote-wsl' = '0.0.5'; 'open-remote-ssh' = '0.4.0' }
+
+foreach ($name in $openRemote.Keys) {
+    $dest = Join-Path $VscodeSrc "extensions/$name"
+    if (Test-Path $dest) {
+        Write-Host "$name already bundled, skipping"
+        continue
+    }
+    $version = $openRemote[$name]
+    Push-Location $WorkspaceDir
+    try {
+        Invoke-WebRequest "https://open-vsx.org/api/jeanp413/$name/$version/file/jeanp413.$name-$version.vsix" -OutFile "$name.zip" -UseBasicParsing
+        Expand-Archive "$name.zip" -DestinationPath "$name-unpacked" -Force
+        Move-Item "$name-unpacked/extension" $dest
+
+        node -e "
+            const fs = require('fs');
+            const file = '$($dest -replace '\\','/')/package.json';
+            const pkg = JSON.parse(fs.readFileSync(file, 'utf8'));
+            delete pkg.workspaces;
+            delete pkg.dependencies;
+            delete pkg.devDependencies;
+            delete pkg.scripts;
+            delete pkg.private;
+            fs.writeFileSync(file, JSON.stringify(pkg, null, 2));
+        "
+
+        Remove-Item "$name.zip", "$name-unpacked" -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    finally {
+        Pop-Location
+    }
+}
+
+# ============================================================
 # ICONS + WORKBENCH ASSETS
 # ============================================================
 

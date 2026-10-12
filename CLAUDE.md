@@ -11,6 +11,7 @@ Key characteristics:
 - Built on VSCodium, which strips Microsoft telemetry from VS Code
 - Eleven built-in extensions bundled at build time: `null-theme`, `null-icons`, `null-tools`, `null-markdown`, `null-cpp`, `null-actions`, `null-accounts`, `null-format`, `null-music`, `null-activity`, `null-startup`
 - **Code Spell Checker** (`streetsidesoftware.code-spell-checker`) bundled as a twelfth built-in extension; version pinned via `CSPELL_TAG` env var in `build.yml`
+- **Remote development** (#85): `jeanp413.open-remote-wsl` / `open-remote-ssh` bundled as built-ins (Open VSX VSIXes, versions pinned via `OPEN_REMOTE_*_VERSION` in `build.yml`, mirrored in `build-local.ps1`). They connect to VSCodium's REH server, so `serverApplicationName`/`serverDataFolderName` stay `codium-server`/`.vscodium-server` (the tarball's launcher scripts are named that). Not yet verified end to end in a CI-built package
 - CI builds on `windows-2022`; the developer authors source changes locally
 - Releases publish a portable ZIP and an Inno Setup installer to GitHub Releases
 - The in-app updater (`null-tools`) checks GitHub Releases on startup and can self-update

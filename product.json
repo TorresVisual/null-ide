@@ -69,6 +69,7 @@
 
 	"extensionAllowedProposedApi": [
 		"jeanp413.open-remote-wsl",
+		"jeanp413.open-remote-ssh",
 		"ms-vscode-remote.remote-ssh",
 		"ms-vscode-remote.remote-containers",
 		"ms-vscode.remote-server",
