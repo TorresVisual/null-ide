@@ -123,6 +123,61 @@ index 8a36a25a..c80819eb 100644
  	'sync': { type: 'string', cat: 't', description: localize('turn sync', "Turn sync on or off."), args: ['on | off'] },
  
  	'inspect-extensions': { type: 'string', allowEmptyValue: true, deprecates: ['debugPluginHost'], args: 'port', cat: 't', description: localize('inspect-extensions', "Allow debugging and profiling of extensions. Check the developer tools for the connection URI.") },
+diff --git a/src/vs/platform/native/common/native.ts b/src/vs/platform/native/common/native.ts
+index f148a678..5051b0f2 100644
+--- a/src/vs/platform/native/common/native.ts
++++ b/src/vs/platform/native/common/native.ts
+@@ -353,7 +353,7 @@ export interface ICommonNativeHostService {
+ 	// Lifecycle
+ 	notifyReady(): Promise<void>;
+ 	relaunch(options?: { addArgs?: string[]; removeArgs?: string[] }): Promise<void>;
+-	reload(options?: { disableExtensions?: boolean }): Promise<void>;
++	reload(options?: { disableExtensions?: boolean; safeMode?: boolean }): Promise<void>;
+ 	closeWindow(options?: INativeHostOptions): Promise<void>;
+ 	quit(): Promise<void>;
+ 	exit(code: number): Promise<void>;
+diff --git a/src/vs/platform/native/electron-main/nativeHostMainService.ts b/src/vs/platform/native/electron-main/nativeHostMainService.ts
+index e7a42ceb..65fcd360 100644
+--- a/src/vs/platform/native/electron-main/nativeHostMainService.ts
++++ b/src/vs/platform/native/electron-main/nativeHostMainService.ts
+@@ -1085,7 +1085,7 @@ export class NativeHostMainService extends Disposable implements INativeHostMain
+ 		return this.lifecycleMainService.relaunch(options);
+ 	}
+ 
+-	async reload(windowId: number | undefined, options?: { disableExtensions?: boolean }): Promise<void> {
++	async reload(windowId: number | undefined, options?: { disableExtensions?: boolean; safeMode?: boolean }): Promise<void> {
+ 		const window = this.codeWindowById(windowId);
+ 		if (window) {
+ 
+@@ -1104,6 +1104,12 @@ export class NativeHostMainService extends Disposable implements INativeHostMain
+ 				}
+ 			}
+ 
++			// Safe mode is sticky: remember it for windows opened later by this instance too
++			if (options?.safeMode !== undefined) {
++				this.environmentMainService.args['safe-mode'] = options.safeMode;
++				return this.lifecycleMainService.reload(window, { _: [], 'safe-mode': options.safeMode });
++			}
++
+ 			// Proceed normally to reload the window
+ 			return this.lifecycleMainService.reload(window, options?.disableExtensions !== undefined ? { _: [], 'disable-extensions': options.disableExtensions } : undefined);
+ 		}
+diff --git a/src/vs/platform/windows/electron-main/windowImpl.ts b/src/vs/platform/windows/electron-main/windowImpl.ts
+index 4a51cc55..c3e8b836 100644
+--- a/src/vs/platform/windows/electron-main/windowImpl.ts
++++ b/src/vs/platform/windows/electron-main/windowImpl.ts
+@@ -1319,6 +1319,11 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
+ 			configuration['extensions-dir'] = cli['extensions-dir'];
+ 		}
+ 
++		// Safe mode is kept on the window config (unlike disable-extensions) so a later plain reload stays in the same mode
++		if (cli?.['safe-mode'] !== undefined) {
++			configuration['safe-mode'] = cli['safe-mode'];
++		}
++
+ 		configuration.accessibilitySupport = electron.app.isAccessibilitySupportEnabled();
+ 		configuration.isInitialStartup = false; // since this is a reload
+ 		configuration.policiesData = this.policyService.serialize(); // set policies data again
 diff --git a/src/vs/workbench/services/extensionManagement/browser/extensionEnablementService.ts b/src/vs/workbench/services/extensionManagement/browser/extensionEnablementService.ts
 index 141241fd..17b26864 100644
 --- a/src/vs/workbench/services/extensionManagement/browser/extensionEnablementService.ts
@@ -146,3 +201,16 @@ index 141241fd..17b26864 100644
  		const disabledExtensions = this.environmentService.disableExtensions;
  		if (Array.isArray(disabledExtensions)) {
  			return disabledExtensions.some(id => areSameExtensions({ id }, extension.identifier));
+diff --git a/src/vs/workbench/services/host/electron-browser/nativeHostService.ts b/src/vs/workbench/services/host/electron-browser/nativeHostService.ts
+index 86a3d521..a1b85c40 100644
+--- a/src/vs/workbench/services/host/electron-browser/nativeHostService.ts
++++ b/src/vs/workbench/services/host/electron-browser/nativeHostService.ts
+@@ -206,7 +206,7 @@ class WorkbenchHostService extends Disposable implements IHostService {
+ 		return this.nativeHostService.relaunch();
+ 	}
+ 
+-	reload(options?: { disableExtensions?: boolean }): Promise<void> {
++	reload(options?: { disableExtensions?: boolean; safeMode?: boolean }): Promise<void> {
+ 		return this.nativeHostService.reload(options);
+ 	}
+ 
