@@ -27,8 +27,8 @@
 	"version": "1.116.02821",
 	"release": "1.116.02821",
 	"serverApplicationName": "codium-server",
-	"serverDataFolderName": ".vscodium-server",
-	"serverDownloadUrlTemplate": "https://github.com/VSCodium/vscodium/releases/download/${release}/vscodium-reh-${os}-${arch}-${release}.tar.gz",
+	"serverDataFolderName": ".null-server",
+	"serverDownloadUrlTemplate": "https://github.com/TorresVisual/null-ide/releases/download/${release}/null-reh-${os}-${arch}.tar.gz",
 
 	"urlProtocol": "null",
 	"tunnelApplicationName": "null-tunnel",

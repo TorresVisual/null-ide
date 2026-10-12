@@ -631,7 +631,7 @@ $p = [System.IO.File]::ReadAllText($productPath) | ConvertFrom-Json
 $p.version = $buildVersion
 $p.commit = $commit
 $p | Add-Member -MemberType NoteProperty -Name "release" -Value $buildVersion -Force
-$p.serverDownloadUrlTemplate = "https://github.com/VSCodium/vscodium/releases/download/`${release}/vscodium-reh-`${os}-`${arch}-`${release}.tar.gz"
+$p.serverDownloadUrlTemplate = "https://github.com/TorresVisual/null-ide/releases/download/`${release}/null-reh-`${os}-`${arch}.tar.gz"
 $p.webviewContentExternalBaseUrlTemplate = "https://{{uuid}}.vscode-cdn.net/stable/$commit/out/vs/workbench/contrib/webview/browser/pre/"
 $p.win32x64UserAppId   = $p.win32x64UserAppId   -replace '^\{\{', '{'
 $p.win32arm64AppId     = $p.win32arm64AppId     -replace '^\{\{', '{'

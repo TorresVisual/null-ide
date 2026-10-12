@@ -417,8 +417,10 @@ jobs:
           $commit      = '${{ steps.vscodium-commit.outputs.commit }}'
           $p.version   = $vscodiumTag
           $p.commit    = $commit
-          $p | Add-Member -MemberType NoteProperty -Name "release" -Value $vscodiumTag -Force
-          $p.serverDownloadUrlTemplate           = "https://github.com/VSCodium/vscodium/releases/download/`${release}/vscodium-reh-`${os}-`${arch}-`${release}.tar.gz"
+          # `release` only feeds serverDownloadUrlTemplate: the Null release tag whose assets hold the remote servers
+          $release     = if ('${{ github.ref_type }}' -eq 'tag') { '${{ github.ref_name }}' } else { $vscodiumTag }
+          $p | Add-Member -MemberType NoteProperty -Name "release" -Value $release -Force
+          $p.serverDownloadUrlTemplate           = "https://github.com/TorresVisual/null-ide/releases/download/`${release}/null-reh-`${os}-`${arch}.tar.gz"
           $p.webviewContentExternalBaseUrlTemplate = "https://{{uuid}}.vscode-cdn.net/stable/$commit/out/vs/workbench/contrib/webview/browser/pre/"
           # Fix double-brace template artifacts left by VSCodium source product.json
           $p.win32x64UserAppId   = $p.win32x64UserAppId   -replace '^\{\{', '{'
@@ -426,7 +428,31 @@ jobs:
           $p.win32arm64UserAppId = $p.win32arm64UserAppId -replace '^\{\{', '{'
           $json = $p | ConvertTo-Json -Depth 10
           [System.IO.File]::WriteAllText($productPath, $json, [System.Text.UTF8Encoding]::new($false))
-          Write-Host "Stamped version=$vscodiumTag, release=$vscodiumTag, commit=$commit"
+          Write-Host "Stamped version=$vscodiumTag, release=$release, commit=$commit"
+
+      - name: Build remote servers (VSCodium REH + Null built-ins)
+        shell: pwsh
+        run: |
+          # The client downloads these on first WSL/SSH connect. Workspace-side built-ins must exist
+          # on the remote, and the stock REH tarball only has VSCodium's own extensions.
+          $tag = '${{ steps.tag.outputs.tag }}'
+          $stage = 'reh-stage/extensions'
+          New-Item -ItemType Directory $stage -Force | Out-Null
+          foreach ($e in 'null-cpp', 'null-format', 'null-actions', 'null-markdown', 'code-spell-checker') {
+            Copy-Item -Recurse -Force "vscode-src/extensions/$e" $stage
+          }
+          foreach ($arch in 'x64', 'arm64') {
+            $orig = "vscodium-reh-linux-$arch.tar.gz"
+            Invoke-WebRequest "https://github.com/VSCodium/vscodium/releases/download/$tag/vscodium-reh-linux-$arch-$tag.tar.gz" -OutFile $orig -UseBasicParsing
+            # `@archive` copies the original entries verbatim (extracting on Windows would drop the
+            # exec bit of bin/codium-server); the `./` prefix keeps the layout the client's
+            # `tar --strip-components 1` expects.
+            $names = @(Get-ChildItem $stage -Directory | ForEach-Object { "./extensions/$($_.Name)" })
+            tar -czf "null-reh-linux-$arch.tar.gz" "@$orig" -C reh-stage @names
+            if ($LASTEXITCODE -ne 0) { throw "tar failed for $arch" }
+            Remove-Item $orig
+          }
+          Remove-Item reh-stage -Recurse -Force
 
       - name: Fix icons and VisualElementsManifest in build output
         shell: pwsh
@@ -694,6 +720,7 @@ jobs:
             null-ide-win32-x64.zip
             null-ide-win32-x64.zip.sha256
             NullIDESetup-*.exe
+            null-reh-linux-*.tar.gz
             ide-overlay/scripts/install-null-ide.ps1
           fail_on_unmatched_files: true
 
@@ -705,6 +732,7 @@ jobs:
             null-ide-win32-x64.zip
             null-ide-win32-x64.zip.sha256
             NullIDESetup-*.exe
+            null-reh-linux-*.tar.gz
             ide-overlay/scripts/install-null-ide.ps1
           if-no-files-found: error
           retention-days: 30
