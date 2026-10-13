@@ -4,12 +4,18 @@ import { defaultKeymap, indentWithTab } from '@codemirror/commands';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { createSync, diffChange } from './sync.mjs';
 import { livePreview } from './decorations.mjs';
+import { createRenderer } from './renderer.mjs';
 
 const vscode = acquireVsCodeApi();
 const post = m => vscode.postMessage(m);
 
 const fromHost = Annotation.define(); // marks transactions that apply a host `doc`, so they are not echoed back
 const sync = createSync({ post });
+const renderer = createRenderer(post, () => view.requestMeasure());
+
+if (typeof mermaid !== 'undefined') {
+	mermaid.initialize({ startOnLoad: false, theme: 'dark', securityLevel: 'loose', fontFamily: 'inherit' });
+}
 
 const view = new EditorView({
 	parent: document.getElementById('editor'),
@@ -20,7 +26,7 @@ const view = new EditorView({
 			markdown({ base: markdownLanguage }),
 			// No CodeMirror history: undo/redo belongs to the workbench (see the spec's undo section).
 			keymap.of([...defaultKeymap, indentWithTab]),
-			livePreview(null), // block widgets get their renderer in a later task
+			livePreview(renderer),
 			EditorView.updateListener.of(u => {
 				if (u.docChanged && !u.transactions.some(t => t.annotation(fromHost))) sync.local(u.changes);
 			})
@@ -47,6 +53,8 @@ window.addEventListener('message', e => {
 		if (change) view.dispatch({ changes: change, annotations: fromHost.of(true) });
 	} else if (msg.type === 'ack') {
 		sync.ack(msg.version);
+	} else if (msg.type === 'rendered') {
+		renderer.onRendered(msg.id, msg.html);
 	}
 });
 

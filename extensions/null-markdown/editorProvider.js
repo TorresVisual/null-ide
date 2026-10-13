@@ -65,6 +65,11 @@ class NullMarkdownEditorProvider {
 				case 'ready': sendDoc(); break;
 				case 'edit': await this._applyEdit(document, sync, msg, sendDoc, post); break;
 				case 'save': await document.save(); break;
+				case 'renderBlock':
+					if (typeof msg.text === 'string' && Number.isInteger(msg.id)) {
+						post({ type: 'rendered', id: msg.id, html: this._html(document, wv, msg.text) });
+					}
+					break;
 				case 'wikiLink': if (typeof msg.target === 'string') await openWikiLink(msg.target); break;
 				case 'checkboxToggle': await applyCheckboxToggle(document, msg.line, msg.checked); break;
 			}
