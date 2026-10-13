@@ -83,4 +83,9 @@ const toolchainRegistry_1 = require("./toolchainRegistry");
     const raw = 'PATH=C:\\a\r\n\r\nnot a var line\r\n=leading-equals-ignored\r\n';
     assert.deepEqual((0, toolchainRegistry_1.parseSetOutput)(raw), { PATH: 'C:\\a' });
 });
+(0, node_test_1.test)('findOnPath delegates to the installed finder and maps a miss to undefined', async () => {
+    (0, toolchainRegistry_1.setExecutableFinder)(name => (name === 'clang++.exe' ? 'C:\\llvm\\bin\\clang++.exe' : null));
+    assert.equal(await (0, toolchainRegistry_1.findOnPath)('clang++.exe'), 'C:\\llvm\\bin\\clang++.exe');
+    assert.equal(await (0, toolchainRegistry_1.findOnPath)('nope.exe'), undefined);
+});
 //# sourceMappingURL=toolchainRegistry.test.js.map

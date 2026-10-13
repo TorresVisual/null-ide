@@ -45,12 +45,15 @@ const projectDetection_1 = require("./projectDetection");
 const cmakeToolbar_1 = require("./cmakeToolbar");
 const makeToolbar_1 = require("./makeToolbar");
 const singleFileCompile_1 = require("./singleFileCompile");
+const envApi_1 = require("./envApi");
+const toolchainRegistry_1 = require("./toolchainRegistry");
 async function syncCppProjectContext() {
     const enabled = await (0, projectDetection_1.refreshProjectDetection)();
     await vscode.commands.executeCommand('setContext', 'null-cpp.isCppProject', enabled);
     return enabled;
 }
 async function activate(context) {
+    (0, toolchainRegistry_1.setExecutableFinder)(name => (0, envApi_1.getEnvApi)().findExecutable(name));
     await (0, projectDetection_1.initializeProjectDetection)();
     await syncCppProjectContext();
     context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(() => {

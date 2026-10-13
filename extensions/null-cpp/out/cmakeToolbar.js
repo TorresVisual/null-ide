@@ -45,6 +45,7 @@ const debugConfigSynth_1 = require("./debugConfigSynth");
 const clangdCompileDb_1 = require("./clangdCompileDb");
 const cppConfigState = __importStar(require("./cppConfigState"));
 const projectDetection_1 = require("./projectDetection");
+const envApi_1 = require("./envApi");
 const uiState = { presets: [], targets: [] };
 let cmakeRootUri;
 async function fileExists(uri) {
@@ -341,6 +342,10 @@ async function cmdDebug(context) {
         wslDistro: toolchain.wslDistro,
         nativeDebugger,
     });
+    // A missing debugger extension otherwise surfaces as VS Code's generic "unknown debug type".
+    if (!(await (0, envApi_1.getEnvApi)().ensureDebugType(config.type))) {
+        return;
+    }
     await vscode.debug.startDebugging(vscode.workspace.workspaceFolders?.[0], config);
 }
 async function cmdBuildAndDebug(context) {
