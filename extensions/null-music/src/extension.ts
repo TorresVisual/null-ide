@@ -17,7 +17,7 @@ export interface NullMusicApi {
 
 /** Sound lives in the sidebar webview, so commands that need it open the view, then give focus back. */
 async function revealView(): Promise<void> {
-  await vscode.commands.executeCommand('workbench.view.extension.null-music');
+  await vscode.commands.executeCommand('null.musicView.focus');
   await vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup');
 }
 

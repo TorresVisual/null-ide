@@ -13,21 +13,13 @@
     "onView:null.musicView"
   ],
   "contributes": {
-    "viewsContainers": {
-      "activitybar": [
-        {
-          "id": "null-music",
-          "title": "Music",
-          "icon": "media/music.svg"
-        }
-      ]
-    },
     "views": {
-      "null-music": [
+      "null-workspace": [
         {
           "type": "webview",
           "id": "null.musicView",
-          "name": "Music Player"
+          "name": "Music",
+          "visibility": "collapsed"
         }
       ]
     },
