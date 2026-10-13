@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import * as assert from 'node:assert/strict';
-import { describeStatus } from './statusText';
+import { describeStatus, reportOf } from './statusText';
 import { SyncState, SyncStatus } from './types';
 
 const status = (state: SyncState, lastSyncedAt?: number): SyncStatus => ({
@@ -30,5 +30,26 @@ describe('describeStatus', () => {
 
   it('says so when it has never synced', () => {
     assert.equal(describeStatus(status('idle'), NOW), 'Up to date (never synced)');
+  });
+});
+
+describe('reportOf', () => {
+  it('reports success only when the run really finished', () => {
+    assert.deepEqual(reportOf(status('idle'), 'up to date.'), { level: 'info', text: 'up to date.' });
+  });
+
+  it('a message wins over an idle state, so a skipped run is not reported as done', () => {
+    const skipped = { ...status('idle'), message: 'Another window is syncing. Try again in a moment.' };
+    assert.deepEqual(reportOf(skipped, 'restored.'), { level: 'warn', text: skipped.message });
+  });
+
+  it('points at the status list when items need attention', () => {
+    assert.equal(reportOf(status('needsAttention'), 'x')?.level, 'info');
+    assert.match(reportOf(status('needsAttention'), 'x')!.text, /Show Sync Status/);
+  });
+
+  it('says nothing while syncing or when sync is off', () => {
+    assert.equal(reportOf(status('syncing'), 'x'), undefined);
+    assert.equal(reportOf(status('disabled'), 'x'), undefined);
   });
 });

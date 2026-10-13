@@ -31,3 +31,11 @@ export function describeStatus(status: SyncStatus, now: number): string {
       return `Needs attention (${last})`;
   }
 }
+
+/** What to tell the user after an interactive command. A message wins over `idle`: a run that was skipped (another window holds the lock) is not a success. */
+export function reportOf(status: SyncStatus, done: string): { level: 'info' | 'warn'; text: string } | undefined {
+  if (status.message) return { level: 'warn', text: status.message };
+  if (status.state === 'idle') return { level: 'info', text: done };
+  if (status.state === 'needsAttention') return { level: 'info', text: 'some items need attention. Run "Null: Show Sync Status".' };
+  return undefined;
+}

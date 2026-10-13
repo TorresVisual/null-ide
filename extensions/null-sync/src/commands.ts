@@ -4,19 +4,16 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { CANCELLED, EnableDeps, enable } from './enable';
 import * as prompts from './prompts';
-import { describeStatus } from './statusText';
+import { describeStatus, reportOf } from './statusText';
 import { SyncEngine } from './syncEngine';
 import { CATEGORIES } from './types';
 
 const config = () => vscode.workspace.getConfiguration('null-sync');
 
 function report(engine: SyncEngine, done: string): void {
-  const s = engine.getStatus();
-  if (s.state === 'idle') void vscode.window.showInformationMessage(`Null Sync: ${done}`);
-  else if (s.message) void vscode.window.showWarningMessage(`Null Sync: ${s.message}`);
-  else if (s.state === 'needsAttention') {
-    void vscode.window.showInformationMessage('Null Sync: some items need attention. Run "Null: Show Sync Status".');
-  }
+  const r = reportOf(engine.getStatus(), done);
+  if (!r) return;
+  void (r.level === 'warn' ? vscode.window.showWarningMessage : vscode.window.showInformationMessage)(`Null Sync: ${r.text}`);
 }
 
 async function showDiff(engine: SyncEngine, userDir: string, file: string): Promise<void> {

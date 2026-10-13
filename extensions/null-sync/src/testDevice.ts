@@ -39,6 +39,8 @@ export class Device {
   readonly failing = new Set<string>();
   /** The on-disk extension list cannot be read. */
   manifestBroken = false;
+  /** While set, an uninstall waits for it (a slow `workbench.extensions.uninstallExtension`). */
+  uninstallGate: Promise<void> | undefined;
   readonly account = { id: 'acc', username: 'me' };
   private clock = 1;
 
@@ -73,7 +75,10 @@ export class Device {
           this.installed.add(id);
           return true;
         },
-        uninstall: async (id) => this.installed.delete(id),
+        uninstall: async (id) => {
+          await this.uninstallGate;
+          return this.installed.delete(id);
+        },
       },
     });
   }
