@@ -7,6 +7,10 @@ on:
         description: 'VSCodium tag to build against (overrides pinned VSCODIUM_TAG)'
         required: false
         default: ''
+      use_esbuild:
+        description: 'Bundle with esbuild (fast, ~minutes) instead of VSCodium''s tsc path (~35+ min, >7 GB heap)'
+        type: boolean
+        default: true
   push:
     tags: ['v*']
 
@@ -32,6 +36,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           path: ide-overlay
+
+      - name: Disable Windows Defender real-time scanning
+        # Scanning every file npm/gulp writes is a large share of install and build time.
+        shell: pwsh
+        continue-on-error: true
+        run: Set-MpPreference -DisableRealtimeMonitoring $true
 
       - name: Resolve VSCodium tag
         id: tag
@@ -76,12 +86,28 @@ jobs:
         with:
           targets: x86_64-pc-windows-msvc
 
+      # `npm ci` at the VS Code root runs build/npm/postinstall.ts, which installs ~60 more
+      # node_modules trees (build/, extensions/*, remote/, ...). All of them must be cached
+      # together, or a cache hit leaves gulp without its own dependencies. VSCodium's patches
+      # change package.json/lockfile, so the VSCodium tag is part of the key. Saved right after
+      # install (not in the job's post step) so a later failure still keeps the cache.
       - name: Restore VS Code node_modules cache
         id: vscode-node-modules-cache
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
-          path: vscode-src/node_modules
-          key: ${{ runner.os }}-vscode-node-modules-${{ steps.ms-tag.outputs.ms_tag }}-${{ hashFiles('vscode-src/package-lock.json') }}
+          path: |
+            vscode-src/node_modules
+            vscode-src/build/node_modules
+            vscode-src/build/*/node_modules
+            vscode-src/extensions/node_modules
+            vscode-src/extensions/*/node_modules
+            vscode-src/extensions/*/server/node_modules
+            vscode-src/remote/node_modules
+            vscode-src/remote/web/node_modules
+            vscode-src/test/*/node_modules
+            vscode-src/test/integration/browser/node_modules
+            vscode-src/.vscode/extensions/*/node_modules
+          key: ${{ runner.os }}-vscode-node-modules-v2-${{ steps.tag.outputs.tag }}-${{ steps.ms-tag.outputs.ms_tag }}-${{ hashFiles('vscode-src/package-lock.json') }}
 
       - name: Enable long paths
         run: git config --system core.longpaths true
@@ -90,8 +116,13 @@ jobs:
         shell: pwsh
         working-directory: vscode-src
         run: |
+          # VSCodium forces tsc transpilation (useEsbuildTranspile = false), which takes 35+ min and
+          # needs more heap than a standard runner has. Skipping that patch keeps upstream's esbuild path.
+          $skip = @()
+          if ('${{ github.event.inputs.use_esbuild }}' -ne 'false') { $skip += '00-build-disable-esbuild.patch' }
           foreach ($dir in @('../vscodium-src/patches', '../vscodium-src/patches/windows')) {
             Get-ChildItem $dir -Filter *.patch -ErrorAction SilentlyContinue |
+              Where-Object { $skip -notcontains $_.Name } |
               Sort-Object Name |
               ForEach-Object {
                 Write-Host "Applying: $($_.Name)"
@@ -334,7 +365,29 @@ jobs:
       - name: Install dependencies
         if: steps.vscode-node-modules-cache.outputs.cache-hit != 'true'
         working-directory: vscode-src
+        env:
+          # @vscode/ripgrep downloads its binary from GitHub Releases; unauthenticated
+          # requests from shared runner IPs get 403 (rate limit).
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm ci --prefer-offline --no-audit --fund=false
+
+      - name: Save VS Code node_modules cache
+        if: steps.vscode-node-modules-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            vscode-src/node_modules
+            vscode-src/build/node_modules
+            vscode-src/build/*/node_modules
+            vscode-src/extensions/node_modules
+            vscode-src/extensions/*/node_modules
+            vscode-src/extensions/*/server/node_modules
+            vscode-src/remote/node_modules
+            vscode-src/remote/web/node_modules
+            vscode-src/test/*/node_modules
+            vscode-src/test/integration/browser/node_modules
+            vscode-src/.vscode/extensions/*/node_modules
+          key: ${{ steps.vscode-node-modules-cache.outputs.cache-primary-key }}
 
       - name: Verify dependencies
         shell: pwsh
