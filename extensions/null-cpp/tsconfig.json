@@ -13,6 +13,7 @@
   },
   "include": [
     "src/extension.ts",
+    "src/envApi.ts",
     "src/symbolTree.ts",
     "src/symbolTree.test.ts",
     "src/pairRegistry.ts",

@@ -6,6 +6,8 @@ import {
   parseClangVersion,
   parseWslDistroList,
   parseSetOutput,
+  findOnPath,
+  setExecutableFinder,
 } from './toolchainRegistry';
 
 test('parseVswhereInstallPaths splits one path per line and drops blanks', () => {
@@ -64,4 +66,10 @@ test('parseSetOutput parses KEY=VALUE lines from `set` output', () => {
 test('parseSetOutput skips blank lines and lines without an "="', () => {
   const raw = 'PATH=C:\\a\r\n\r\nnot a var line\r\n=leading-equals-ignored\r\n';
   assert.deepEqual(parseSetOutput(raw), { PATH: 'C:\\a' });
+});
+
+test('findOnPath delegates to the installed finder and maps a miss to undefined', async () => {
+  setExecutableFinder(name => (name === 'clang++.exe' ? 'C:\\llvm\\bin\\clang++.exe' : null));
+  assert.equal(await findOnPath('clang++.exe'), 'C:\\llvm\\bin\\clang++.exe');
+  assert.equal(await findOnPath('nope.exe'), undefined);
 });

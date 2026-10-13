@@ -8,6 +8,8 @@ import { initializeProjectDetection, refreshProjectDetection } from './projectDe
 import { registerCmakeToolbar } from './cmakeToolbar';
 import { registerMakeToolbar } from './makeToolbar';
 import { registerSingleFileCompile } from './singleFileCompile';
+import { getEnvApi } from './envApi';
+import { setExecutableFinder } from './toolchainRegistry';
 
 async function syncCppProjectContext(): Promise<boolean> {
   const enabled = await refreshProjectDetection();
@@ -16,6 +18,7 @@ async function syncCppProjectContext(): Promise<boolean> {
 }
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
+  setExecutableFinder(name => getEnvApi().findExecutable(name));
   await initializeProjectDetection();
   await syncCppProjectContext();
 

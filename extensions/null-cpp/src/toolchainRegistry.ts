@@ -141,18 +141,15 @@ export function parseClangVersion(output: string): string | undefined {
   return /clang version ([\d.]+)/i.exec(output)?.[1];
 }
 
-function pathDirs(): string[] {
-  return (process.env.PATH ?? process.env.Path ?? '').split(path.delimiter).filter(Boolean);
+let executableFinder: (name: string) => string | null = () => null;
+
+/** Points executable lookup at null-env's `findExecutable`. Injected so this module stays free of `vscode` and its tests run in plain Node. */
+export function setExecutableFinder(finder: (name: string) => string | null): void {
+  executableFinder = finder;
 }
 
 export async function findOnPath(exeName: string): Promise<string | undefined> {
-  for (const dir of pathDirs()) {
-    const candidate = path.join(dir, exeName);
-    if (await pathExists(candidate)) {
-      return candidate;
-    }
-  }
-  return undefined;
+  return executableFinder(exeName) ?? undefined;
 }
 
 async function detectClangAt(

@@ -8,6 +8,7 @@ import { synthDebugConfig, resolveNativeDebugger, usesPdbDebugInfo } from './deb
 import { writeClangdConfig } from './clangdCompileDb';
 import * as cppConfigState from './cppConfigState';
 import { isEnabled } from './projectDetection';
+import { getEnvApi } from './envApi';
 
 interface UiState {
   presets: CMakePreset[];
@@ -344,6 +345,10 @@ async function cmdDebug(context: vscode.ExtensionContext): Promise<void> {
     wslDistro: toolchain.wslDistro,
     nativeDebugger,
   });
+  // A missing debugger extension otherwise surfaces as VS Code's generic "unknown debug type".
+  if (!(await getEnvApi().ensureDebugType(config.type))) {
+    return;
+  }
   await vscode.debug.startDebugging(vscode.workspace.workspaceFolders?.[0], config);
 }
 
