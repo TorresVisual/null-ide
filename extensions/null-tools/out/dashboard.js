@@ -46,6 +46,15 @@ const githubAuth_1 = require("./github/githubAuth");
 const updater_1 = require("./updater");
 const dashboardHome_1 = require("./dashboardHome");
 const HOME_REFRESH_MS = 30_000;
+/** Required findings from null-env. A command, not exports: null-env runs in the workspace host, this extension in the UI host. */
+async function fetchEnvMissing() {
+    try {
+        return (0, dashboardHome_1.envMissing)(await vscode.commands.executeCommand('null.env.getFindings'));
+    }
+    catch {
+        return undefined;
+    }
+}
 class DashboardEditorProvider {
     extensionUri;
     context;
@@ -150,6 +159,9 @@ class DashboardEditorProvider {
             case 'openAccounts':
                 void vscode.commands.executeCommand('null-accounts.open');
                 break;
+            case 'openEnv':
+                void vscode.commands.executeCommand('null.env.check');
+                break;
         }
     }
     _currentProject(requestedPath) {
@@ -173,7 +185,7 @@ class DashboardEditorProvider {
         const state = this.context.globalState;
         const update = (0, dashboardHome_1.homeUpdate)(state.get('null.availableUpdate'), state.get('null.stagedUpdate'));
         const send = (activity) => {
-            void webview.postMessage({ type: 'home', update, todayMs: (0, dashboardHome_1.todayMs)(activity) });
+            void fetchEnvMissing().then(missing => webview.postMessage({ type: 'home', update, todayMs: (0, dashboardHome_1.todayMs)(activity), envMissing: missing }));
         };
         const extension = vscode.extensions.getExtension('null.null-activity');
         if (!extension)
@@ -206,6 +218,7 @@ class DashboardEditorProvider {
   <symbol id="i-copy" viewBox="0 0 16 16"><path d="M5.5 5.5h7.5V13H5.5zM3 10.5V3h7.5"/></symbol>
   <symbol id="i-x" viewBox="0 0 16 16"><path d="m4 4 8 8M12 4l-8 8"/></symbol>
   <symbol id="i-branch" viewBox="0 0 16 16"><circle cx="5" cy="3.5" r="1.5"/><circle cx="5" cy="12.5" r="1.5"/><circle cx="11" cy="6" r="1.5"/><path d="M5 5v6M11 7.5c0 2.5-6 1.5-6 4"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 16 16"><path d="M8 2.5 14 13H2zM8 6.5v3M8 11.25v.01"/></symbol>
   <symbol id="i-clock" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><path d="M8 5v3.25l2 1.25"/></symbol>
   <symbol id="i-issue" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><circle cx="8" cy="8" r="1" fill="currentColor"/></symbol>
   <symbol id="i-user" viewBox="0 0 16 16"><circle cx="8" cy="5.5" r="2.5"/><path d="M3 13.5c0-3 2.25-4.5 5-4.5s5 1.5 5 4.5"/></symbol>
@@ -227,6 +240,7 @@ class DashboardEditorProvider {
       <div class="group-title">Home</div>
       <button class="rail-item update" id="update" hidden></button>
       <div class="rail-item" id="today" hidden><svg class="i"><use href="#i-clock"/></svg><span class="label">Today</span><span class="value" id="today-value"></span></div>
+      <button class="rail-item" id="env" hidden><svg class="i"><use href="#i-warn"/></svg><span class="label">Environment</span><span class="value" id="env-value"></span></button>
       <button class="rail-item" id="open-issues"><svg class="i"><use href="#i-issue"/></svg><span class="label">Issues</span></button>
       <button class="rail-item" id="open-accounts"><svg class="i"><use href="#i-user"/></svg><span class="label">Accounts</span></button>
     </div>

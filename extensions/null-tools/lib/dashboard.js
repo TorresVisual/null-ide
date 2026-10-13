@@ -146,6 +146,9 @@
         byId('today').hidden = message.todayMs === undefined;
         if (message.todayMs !== undefined)
             byId('today-value').textContent = formatDuration(message.todayMs);
+        byId('env').hidden = message.envMissing === undefined;
+        if (message.envMissing !== undefined)
+            byId('env-value').textContent = `${message.envMissing} missing`;
     }
     window.addEventListener('message', (event) => {
         const message = event.data;
@@ -207,7 +210,7 @@
     });
     window.addEventListener('focus', () => { if (document.activeElement === document.body)
         search.focus(); });
-    const clicks = { refresh: 'refresh', 'open-folder': 'openFolder', 'new-project': 'newProject', 'clone-repo': 'cloneRepo', 'open-issues': 'openIssues', 'open-accounts': 'openAccounts' };
+    const clicks = { refresh: 'refresh', 'open-folder': 'openFolder', 'new-project': 'newProject', 'clone-repo': 'cloneRepo', 'open-issues': 'openIssues', 'open-accounts': 'openAccounts', env: 'openEnv' };
     for (const [id, type] of Object.entries(clicks))
         byId(id).addEventListener('click', () => send(type));
     byId('update').addEventListener('click', () => { if (byId('update').getAttribute('aria-disabled') !== 'true')
