@@ -326,6 +326,10 @@ jobs:
       - name: Install dependencies
         if: steps.vscode-node-modules-cache.outputs.cache-hit != 'true'
         working-directory: vscode-src
+        env:
+          # @vscode/ripgrep downloads its binary from GitHub Releases; unauthenticated
+          # requests from shared runner IPs get 403 (rate limit).
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm ci --prefer-offline --no-audit --fund=false
 
       - name: Verify dependencies
