@@ -18,6 +18,7 @@ This spec covers the **engine, its API and its commands**. It deliberately has *
 - **Machine-specific settings are filtered by key** (the only key-level logic, see below).
 - **No UI.** No status bar, no panel, no unsolicited notifications. State is observable through `NullSyncApi.getStatus()` / `onDidChangeStatus` and, on demand, the `null.sync.showStatus` quick pick.
 - **Off by default.** `null-sync.enabled` is `false`; enabling runs a setup flow with a consent modal naming exactly what leaves the device.
+- **Account picker.** All github.com accounts from null-accounts are listed; the default account is not pre-selected because null-accounts keeps it private (`globalState`) and its public API does not expose it.
 
 ## Synced data
 
@@ -68,7 +69,7 @@ All under `extensions/null-sync/src/`; only the starred files import `vscode`.
 | `lock.ts` | Cross-window run lock (below). |
 | `api.ts` | `NullSyncApi` type. |
 | `extensionHost.ts` ★ | Installed extension IDs (on-disk manifest); `installExtension` / `uninstallExtension` via the `workbench.extensions.*` commands; `isDirty` for `localFiles`. |
-| `prompts.ts` ★ | Account pick (pre-selects the null-accounts default account when it is a github.com one), consent modal, passphrase input, first-sync choice, conflict choice, diff, revision pick, status quick pick. |
+| `prompts.ts` ★ | Account pick, consent modal, passphrase input, first-sync choice, conflict choice, diff, revision pick, status quick pick. |
 | `commands.ts` ★, `watcher.ts` ★, `extension.ts` ★ | Command registration, file watching and timers, activation (returns `NullSyncApi`). |
 
 ## Sync algorithm

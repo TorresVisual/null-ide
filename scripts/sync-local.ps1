@@ -319,6 +319,16 @@ $Extensions = [ordered]@{
         )
     }
 
+    "null-sync" = @{
+        Compile       = $true
+        CompileScript = "compile"
+        Copy          = @(
+            "package.json",
+            "out",
+            "node_modules/jsonc-parser"
+        )
+    }
+
 }
 
 # ============================================================
