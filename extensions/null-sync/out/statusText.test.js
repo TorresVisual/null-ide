@@ -62,4 +62,21 @@ const MINUTE = 60_000;
         assert.equal((0, statusText_1.describeStatus)(status('idle'), NOW), 'Up to date (never synced)');
     });
 });
+(0, node_test_1.describe)('reportOf', () => {
+    (0, node_test_1.it)('reports success only when the run really finished', () => {
+        assert.deepEqual((0, statusText_1.reportOf)(status('idle'), 'up to date.'), { level: 'info', text: 'up to date.' });
+    });
+    (0, node_test_1.it)('a message wins over an idle state, so a skipped run is not reported as done', () => {
+        const skipped = { ...status('idle'), message: 'Another window is syncing. Try again in a moment.' };
+        assert.deepEqual((0, statusText_1.reportOf)(skipped, 'restored.'), { level: 'warn', text: skipped.message });
+    });
+    (0, node_test_1.it)('points at the status list when items need attention', () => {
+        assert.equal((0, statusText_1.reportOf)(status('needsAttention'), 'x')?.level, 'info');
+        assert.match((0, statusText_1.reportOf)(status('needsAttention'), 'x').text, /Show Sync Status/);
+    });
+    (0, node_test_1.it)('says nothing while syncing or when sync is off', () => {
+        assert.equal((0, statusText_1.reportOf)(status('syncing'), 'x'), undefined);
+        assert.equal((0, statusText_1.reportOf)(status('disabled'), 'x'), undefined);
+    });
+});
 //# sourceMappingURL=statusText.test.js.map

@@ -204,21 +204,28 @@ class SyncEngine {
     }
     /** Forgets this device (state and passphrase); optionally deletes the cloud copy first. Local files are never touched. */
     async stop(deleteGist) {
-        await this.tail;
-        const st = this.d.state.get();
-        if (deleteGist && st) {
-            const account = (await this.d.accounts()).find((a) => a.id === st.accountId);
-            const token = account && (await this.d.token(account.id, true));
-            if (!token)
-                return { ok: false, message: 'Could not get a GitHub token to delete the Gist.' };
-            const removed = await (0, gistStore_1.createGistStore)(this.d.io, token).remove(st.gistId);
-            if (!removed.ok && removed.kind !== 'notFound')
-                return { ok: false, message: removed.message };
-        }
-        await this.d.setState(undefined);
-        await this.d.clearPassphrase();
-        this.set({ ...CLEARED, state: 'disabled' });
-        return { ok: true };
+        let result = { ok: false, message: 'Another window is syncing. Try again in a moment.' };
+        await this.serialized(async () => {
+            const st = this.d.state.get();
+            if (deleteGist && st) {
+                const account = (await this.d.accounts()).find((a) => a.id === st.accountId);
+                const token = account && (await this.d.token(account.id, true));
+                if (!token) {
+                    result = { ok: false, message: 'Could not get a GitHub token to delete the Gist.' };
+                    return;
+                }
+                const removed = await (0, gistStore_1.createGistStore)(this.d.io, token).remove(st.gistId);
+                if (!removed.ok && removed.kind !== 'notFound') {
+                    result = { ok: false, message: removed.message };
+                    return;
+                }
+            }
+            await this.d.setState(undefined);
+            await this.d.clearPassphrase();
+            this.set({ ...CLEARED, state: 'disabled' });
+            result = { ok: true };
+        }, true);
+        return result;
     }
     /** One task at a time, under the cross-window lock. Never rejects. */
     serialized(task, quiet) {
@@ -295,7 +302,7 @@ class SyncEngine {
         if (encrypted !== undefined) {
             const opened = (0, cryptoBox_1.open)(c.key, name, encrypted);
             if (opened === undefined)
-                return `Could not decrypt ${name}; it was left alone.`;
+                return `Could not decrypt ${name}; it was left alone. To start that file over, delete ${name} from the sync Gist on gist.github.com.`;
             plain = opened;
         }
         return { file, name, raw, content, plain, lv: hash(content), rv: hash(plain) };
@@ -444,19 +451,20 @@ class SyncEngine {
         return { pendingInstalls: merge.install, pendingRemovals: merge.notifyRemoved, push: merge.push, nextBase: merge.nextBase };
     }
     /** Uninstalls an extension that was removed on another device, and stops reporting it. */
-    async uninstallRemoved(id) {
-        await this.tail;
-        const host = this.d.extensions;
-        const st = this.d.state.get();
-        if (!host || !st || !this.status.pendingRemovals.includes(id))
-            return;
-        if (!(await host.uninstall(id))) {
-            this.set({ state: 'error', message: `Could not uninstall ${id}.` });
-            return;
-        }
-        await this.d.setState({ ...st, extensionsBase: (st.extensionsBase ?? []).filter((x) => x !== id) });
-        this.set({ pendingRemovals: this.status.pendingRemovals.filter((x) => x !== id) });
-        this.settle();
+    uninstallRemoved(id) {
+        return this.serialized(async () => {
+            const host = this.d.extensions;
+            const st = this.d.state.get();
+            if (!host || !st || !this.status.pendingRemovals.includes(id))
+                return;
+            if (!(await host.uninstall(id))) {
+                this.set({ state: 'error', message: `Could not uninstall ${id}.` });
+                return;
+            }
+            await this.d.setState({ ...st, extensionsBase: (st.extensionsBase ?? []).filter((x) => x !== id) });
+            this.set({ pendingRemovals: this.status.pendingRemovals.filter((x) => x !== id) });
+            this.settle();
+        }, false);
     }
 }
 exports.SyncEngine = SyncEngine;

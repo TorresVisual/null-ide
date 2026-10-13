@@ -72,8 +72,11 @@ class LocalFiles {
                 if (text !== null)
                     found[file] = text;
             }
-            catch {
-                /* unreadable (for example a folder named x.json): not a synced file */
+            catch (err) {
+                // A folder named x.json is not a synced file. Any other failure (locked, access denied) must not look like
+                // "deleted", or the next push would delete the file on every device: let it fail the whole run instead.
+                if (err.code !== 'EISDIR')
+                    throw err;
             }
         };
         for (const file of layout_1.CORE_FILES) {
@@ -85,8 +88,9 @@ class LocalFiles {
             try {
                 names = await fs.promises.readdir(path.join(this.options.userDir, 'snippets'));
             }
-            catch {
-                /* no snippets folder */
+            catch (err) {
+                if (err.code !== 'ENOENT')
+                    throw err;
             }
             for (const name of names) {
                 if ((0, layout_1.isSyncableFile)(`snippets/${name}`))

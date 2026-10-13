@@ -532,4 +532,62 @@ async function synced(files) {
         assert.equal(gist.revisionCount(id), before);
     });
 });
+(0, node_test_1.describe)('review fixes', () => {
+    (0, node_test_1.it)('an unreadable snippets folder never deletes the synced snippets', async () => {
+        const { gist, a, b, id } = await synced({ 'snippets/a.json': '{"a":1}\n' });
+        const before = gist.revisionCount(id);
+        const original = fs.promises.readdir;
+        node_test_1.mock.method(fs.promises, 'readdir', async (...args) => {
+            if (String(args[0]).endsWith('snippets'))
+                throw Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' });
+            return original(...args);
+        });
+        try {
+            await a.run();
+        }
+        finally {
+            node_test_1.mock.restoreAll();
+        }
+        assert.equal(a.status.state, 'error');
+        assert.equal(gist.revisionCount(id), before, 'nothing is pushed or deleted remotely');
+        await b.run();
+        assert.equal(b.read('snippets/a.json'), '{"a":1}\n');
+    });
+    (0, node_test_1.it)('a corrupt remote file says how to start it over', async () => {
+        const { gist, a, id } = await synced({ 'keybindings.json': '[]\n' });
+        gist.tamper(id, 'keybindings.json.enc', '{"v":1,"iv":"AAAA","tag":"AAAA","data":"AAAA"}');
+        await a.run();
+        assert.match(a.status.message, /delete keybindings\.json\.enc from the sync Gist/);
+    });
+    (0, node_test_1.it)('uninstalling a removed extension waits for a running sync instead of overwriting its state', async () => {
+        const { a, b } = await synced({});
+        a.installed.add('pub.y');
+        await a.syncNow();
+        await b.syncNow();
+        a.installed.delete('pub.y');
+        await a.syncNow();
+        await b.run();
+        assert.deepEqual(b.status.pendingRemovals, ['pub.y']);
+        let release;
+        b.uninstallGate = new Promise((resolve) => { release = resolve; });
+        const uninstall = b.engine.uninstallRemoved('pub.y');
+        b.write('keybindings.json', '[7]\n');
+        const run = b.run();
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        release();
+        await Promise.all([uninstall, run]);
+        assert.equal(b.installed.has('pub.y'), false);
+        assert.equal(b.state.lastSyncedAt, b.status.lastSyncedAt, 'the later sync result was not overwritten by a stale copy');
+        assert.equal(b.status.state, 'idle');
+    });
+    (0, node_test_1.it)('stop waits for the cross-window lock like any other change of state', async () => {
+        const { a } = await synced({ 'keybindings.json': '[1]\n' });
+        a.locked = true;
+        const result = await a.engine.stop(false);
+        assert.equal(result.ok, false);
+        assert.match(!result.ok ? result.message : '', /Another window/);
+        assert.notEqual(a.state, undefined);
+        assert.notEqual(a.passphrase, undefined);
+    });
+});
 //# sourceMappingURL=syncEngine.test.js.map

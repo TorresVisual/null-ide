@@ -41,6 +41,7 @@ const path = __importStar(require("path"));
 const localFiles_1 = require("./localFiles");
 const made = [];
 (0, node_test_1.afterEach)(() => {
+    node_test_1.mock.restoreAll();
     for (const dir of made.splice(0))
         fs.rmSync(dir, { recursive: true, force: true });
 });
@@ -122,6 +123,22 @@ function setup(dirty = []) {
         const files = new localFiles_1.LocalFiles({ userDir, backupsDir: '', isDirty: (p) => p === dirtyPath, now: () => 0 });
         assert.equal(files.isDirty('settings.json'), true);
         assert.equal(files.isDirty('keybindings.json'), false);
+    });
+});
+(0, node_test_1.describe)('read errors', () => {
+    const denied = () => {
+        throw Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' });
+    };
+    (0, node_test_1.it)('an unreadable snippets folder fails the listing instead of looking like deleted snippets', async () => {
+        const { files } = setup();
+        node_test_1.mock.method(fs.promises, 'readdir', async () => denied());
+        await assert.rejects(files.list(['snippets']), /EACCES/);
+    });
+    (0, node_test_1.it)('a snippet file that cannot be read fails the listing instead of looking deleted', async () => {
+        const { userDir, files } = setup();
+        fs.writeFileSync(path.join(userDir, 'snippets', 'a.json'), 'A');
+        node_test_1.mock.method(fs.promises, 'readFile', async () => denied());
+        await assert.rejects(files.list(['snippets']), /EACCES/);
     });
 });
 //# sourceMappingURL=localFiles.test.js.map

@@ -42,14 +42,10 @@ const statusText_1 = require("./statusText");
 const types_1 = require("./types");
 const config = () => vscode.workspace.getConfiguration('null-sync');
 function report(engine, done) {
-    const s = engine.getStatus();
-    if (s.state === 'idle')
-        void vscode.window.showInformationMessage(`Null Sync: ${done}`);
-    else if (s.message)
-        void vscode.window.showWarningMessage(`Null Sync: ${s.message}`);
-    else if (s.state === 'needsAttention') {
-        void vscode.window.showInformationMessage('Null Sync: some items need attention. Run "Null: Show Sync Status".');
-    }
+    const r = (0, statusText_1.reportOf)(engine.getStatus(), done);
+    if (!r)
+        return;
+    void (r.level === 'warn' ? vscode.window.showWarningMessage : vscode.window.showInformationMessage)(`Null Sync: ${r.text}`);
 }
 async function showDiff(engine, userDir, file) {
     const remote = await engine.previewRemote(file);

@@ -1,6 +1,7 @@
 'use strict';
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.describeStatus = describeStatus;
+exports.reportOf = reportOf;
 function ago(ms) {
     const minutes = Math.floor(ms / 60_000);
     if (minutes < 1)
@@ -31,5 +32,15 @@ function describeStatus(status, now) {
         case 'needsAttention':
             return `Needs attention (${last})`;
     }
+}
+/** What to tell the user after an interactive command. A message wins over `idle`: a run that was skipped (another window holds the lock) is not a success. */
+function reportOf(status, done) {
+    if (status.message)
+        return { level: 'warn', text: status.message };
+    if (status.state === 'idle')
+        return { level: 'info', text: done };
+    if (status.state === 'needsAttention')
+        return { level: 'info', text: 'some items need attention. Run "Null: Show Sync Status".' };
+    return undefined;
 }
 //# sourceMappingURL=statusText.js.map

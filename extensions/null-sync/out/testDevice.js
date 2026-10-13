@@ -72,6 +72,8 @@ class Device {
     failing = new Set();
     /** The on-disk extension list cannot be read. */
     manifestBroken = false;
+    /** While set, an uninstall waits for it (a slow `workbench.extensions.uninstallExtension`). */
+    uninstallGate;
     account = { id: 'acc', username: 'me' };
     clock = 1;
     constructor(gist) {
@@ -107,7 +109,10 @@ class Device {
                     this.installed.add(id);
                     return true;
                 },
-                uninstall: async (id) => this.installed.delete(id),
+                uninstall: async (id) => {
+                    await this.uninstallGate;
+                    return this.installed.delete(id);
+                },
             },
         });
     }
