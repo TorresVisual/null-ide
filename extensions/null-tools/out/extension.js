@@ -169,6 +169,7 @@ function activate(context) {
             vscode.commands.executeCommand('workbench.action.reloadWindow');
     }));
     context.subscriptions.push(vscode.commands.registerCommand('null.showWelcome', () => (0, welcomePage_1.showWelcomePage)(context)));
+    context.subscriptions.push(vscode.commands.registerCommand('null.openDashboard', dashboardIntegration_1.openDashboard));
     if (!context.globalState.get('null.welcomeShown')) {
         context.globalState.update('null.welcomeShown', true);
         (0, welcomePage_1.showWelcomePage)(context);

@@ -70,7 +70,7 @@ function activate(context) {
         context.subscriptions.push(vscode.languages.registerDocumentFormattingEditProvider(lang, clangFormatProvider), vscode.languages.registerDocumentRangeFormattingEditProvider(lang, clangFormatProvider));
     }
     // 4. Register Commands
-    context.subscriptions.push(vscode.commands.registerCommand('null-format.openSettings', () => vscode.commands.executeCommand('workbench.action.openSettings', '@ext:null null-format')), vscode.commands.registerCommand('null-format.createPrettierConfig', () => createConfigFile('.prettierrc.json', extensionPath, 'defaults/.prettierrc.json')), vscode.commands.registerCommand('null-format.createClangFormatConfig', () => createConfigFile('.clang-format', extensionPath, 'defaults/.clang-format')), vscode.commands.registerCommand('null-format.createRustfmtConfig', () => createConfigFile('rustfmt.toml', extensionPath, 'defaults/rustfmt.toml')));
+    context.subscriptions.push(vscode.commands.registerCommand('null-format.openSettings', () => vscode.commands.executeCommand('workbench.action.openSettings', '@ext:null.null-format')), vscode.commands.registerCommand('null-format.createPrettierConfig', () => createConfigFile('.prettierrc.json', extensionPath, 'defaults/.prettierrc.json')), vscode.commands.registerCommand('null-format.createClangFormatConfig', () => createConfigFile('.clang-format', extensionPath, 'defaults/.clang-format')), vscode.commands.registerCommand('null-format.createRustfmtConfig', () => createConfigFile('rustfmt.toml', extensionPath, 'defaults/rustfmt.toml')));
 }
 async function createConfigFile(fileName, extensionPath, relativeDefaultPath) {
     const folders = vscode.workspace.workspaceFolders;
