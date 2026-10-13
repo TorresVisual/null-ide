@@ -99,7 +99,7 @@
 	},
 	"scripts": {
 		"build": "esbuild webview/editor/main.mjs --bundle --minify --format=iife --target=es2020 --outfile=lib/editor.js",
-		"test": "node --test test/syncState.test.js test/imageSrc.test.js test/sync.test.mjs test/specs.test.mjs"
+		"test": "node --test test/syncState.test.js test/imageSrc.test.js test/sync.test.mjs test/specs.test.mjs test/format.test.mjs"
 	},
 	"dependencies": {
 		"highlight.js": "^11.0.0",

@@ -4,7 +4,7 @@ const vscode = require('vscode');
 const { buildEditorPage } = require('./pages');
 const { toLf, isValidChanges, toTextEdits, SyncState } = require('./syncState');
 const { rewriteImageSrc } = require('./imageSrc');
-const { applyCheckboxToggle, openWikiLink } = require('./docActions');
+const { applyCheckboxToggle, openWikiLink, openLink } = require('./docActions');
 
 // Above this many characters the Editor hands the file back to the plain text editor: widget
 // round-trips and whole-document decoration rebuilds do not scale to huge files.
@@ -70,6 +70,7 @@ class NullMarkdownEditorProvider {
 						post({ type: 'rendered', id: msg.id, html: this._html(document, wv, msg.text) });
 					}
 					break;
+				case 'openLink': if (typeof msg.href === 'string') await openLink(document, msg.href); break;
 				case 'wikiLink': if (typeof msg.target === 'string') await openWikiLink(msg.target); break;
 				case 'checkboxToggle': await applyCheckboxToggle(document, msg.line, msg.checked); break;
 			}

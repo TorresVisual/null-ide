@@ -5,6 +5,7 @@ import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { createSync, diffChange } from './sync.mjs';
 import { livePreview } from './decorations.mjs';
 import { createRenderer } from './renderer.mjs';
+import { formatKeymap } from './format.mjs';
 
 const vscode = acquireVsCodeApi();
 const post = m => vscode.postMessage(m);
@@ -25,10 +26,20 @@ const view = new EditorView({
 			EditorView.lineWrapping,
 			markdown({ base: markdownLanguage }),
 			// No CodeMirror history: undo/redo belongs to the workbench (see the spec's undo section).
-			keymap.of([...defaultKeymap, indentWithTab]),
+			keymap.of([...formatKeymap, ...defaultKeymap, indentWithTab]),
 			livePreview(renderer),
 			EditorView.updateListener.of(u => {
 				if (u.docChanged && !u.transactions.some(t => t.annotation(fromHost))) sync.local(u.changes);
+			}),
+			EditorView.domEventHandlers({
+				click(e) {
+					if (!(e.ctrlKey || e.metaKey)) return false;
+					const el = e.target.closest?.('[data-wiki], [data-href]');
+					if (!el) return false;
+					e.preventDefault();
+					post(el.dataset.wiki ? { type: 'wikiLink', target: el.dataset.wiki } : { type: 'openLink', href: el.dataset.href });
+					return true;
+				}
 			})
 		]
 	})

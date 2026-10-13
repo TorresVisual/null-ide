@@ -32,4 +32,18 @@ async function openWikiLink(target) {
 	await vscode.window.showTextDocument(uri, { preview: false });
 }
 
-module.exports = { applyCheckboxToggle, openWikiLink };
+// Open a Markdown link: web and other schemes externally, relative/absolute paths in the editor.
+async function openLink(document, href) {
+	if (/^[a-z][a-z0-9+.-]+:/i.test(href)) {
+		await vscode.env.openExternal(vscode.Uri.parse(href));
+		return;
+	}
+	const [rawPath] = href.split('#');
+	if (!rawPath) return;
+	let clean = rawPath;
+	try { clean = decodeURIComponent(rawPath); } catch { /* keep the raw path */ }
+	const target = /^(?:[a-z]:)?[\\/]/i.test(clean) ? vscode.Uri.file(clean) : vscode.Uri.joinPath(document.uri, '..', clean);
+	await vscode.commands.executeCommand('vscode.open', target);
+}
+
+module.exports = { applyCheckboxToggle, openWikiLink, openLink };
