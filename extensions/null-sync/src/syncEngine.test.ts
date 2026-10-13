@@ -1,5 +1,7 @@
 import { after, describe, it } from 'node:test';
 import * as assert from 'node:assert/strict';
+import * as fs from 'fs';
+import * as path from 'path';
 import { parse } from 'jsonc-parser';
 import { FakeGist } from './fakeGist';
 import { Device, cleanup } from './testDevice';
@@ -331,5 +333,119 @@ describe('categories', () => {
     await b.run();
     assert.equal(b.read('snippets/a.json'), '{}\n', 'a never uploaded the snippet');
     assert.equal(b.read('keybindings.json'), '[]\n', 'b does not apply keybindings');
+  });
+});
+
+describe('resolving conflicts', () => {
+  async function conflicted() {
+    const s = await synced({ 'keybindings.json': '[]\n' });
+    s.a.write('keybindings.json', '[1]\n');
+    s.b.write('keybindings.json', '[2]\n');
+    await s.a.run();
+    await s.b.run();
+    assert.equal(s.b.status.conflicts.length, 1);
+    return s;
+  }
+
+  it('shows the remote text for a diff, and nothing for a file that is not there', async () => {
+    const { b } = await conflicted();
+    assert.equal(await b.engine.previewRemote('keybindings.json'), '[1]\n');
+    assert.equal(await b.engine.previewRemote('snippets/none.json'), undefined);
+  });
+
+  it('taking theirs applies the remote file and keeps this device\'s version as a backup', async () => {
+    const { b } = await conflicted();
+    await b.engine.resolve('keybindings.json', 'theirs');
+    assert.equal(b.read('keybindings.json'), '[1]\n');
+    const backups = b.backups('keybindings.json.');
+    assert.equal(backups.length, 1);
+    assert.equal(fs.readFileSync(path.join(b.backupsDir, backups[0]), 'utf8'), '[2]\n');
+    assert.equal(b.status.state, 'idle');
+    assert.deepEqual(b.status.conflicts, []);
+    await b.run();
+    assert.equal(b.read('keybindings.json'), '[1]\n');
+  });
+
+  it('keeping mine uploads this device\'s file so the other device receives it', async () => {
+    const { a, b } = await conflicted();
+    await b.engine.resolve('keybindings.json', 'mine');
+    assert.equal(b.status.state, 'idle');
+    await a.run();
+    assert.equal(a.read('keybindings.json'), '[2]\n');
+  });
+
+  it('resolving one conflict leaves the others', async () => {
+    const { a, b } = await synced({ 'keybindings.json': '[]\n', 'snippets/a.json': '{}\n' });
+    a.write('keybindings.json', '[1]\n');
+    a.write('snippets/a.json', '{"a":1}\n');
+    b.write('keybindings.json', '[2]\n');
+    b.write('snippets/a.json', '{"b":1}\n');
+    await a.run();
+    await b.run();
+    assert.equal(b.status.conflicts.length, 2);
+    await b.engine.resolve('keybindings.json', 'theirs');
+    assert.deepEqual(b.status.conflicts, [{ file: 'snippets/a.json', category: 'snippets' }]);
+    assert.equal(b.status.state, 'needsAttention');
+  });
+});
+
+describe('restore', () => {
+  it('lists revisions newest first and rolls this device and the cloud back', async () => {
+    const { a, b } = await synced({ 'keybindings.json': '[1]\n' });
+    a.write('keybindings.json', '[2]\n');
+    await a.run();
+    await b.run();
+    assert.equal(b.read('keybindings.json'), '[2]\n');
+
+    const revisions = await a.engine.revisions();
+    assert.equal(revisions?.length, 3, 'manifest, first upload, edit');
+    await a.engine.restore(revisions![1].sha);
+    assert.equal(a.read('keybindings.json'), '[1]\n');
+    assert.equal(a.backups('keybindings.json.').length, 1);
+    assert.equal(a.status.state, 'idle');
+
+    await b.run();
+    assert.equal(b.read('keybindings.json'), '[1]\n');
+    assert.equal(b.status.state, 'idle');
+  });
+
+  it('reports an unknown revision instead of changing anything', async () => {
+    const { a } = await synced({ 'keybindings.json': '[1]\n' });
+    await a.engine.restore('v99');
+    assert.equal(a.read('keybindings.json'), '[1]\n');
+    assert.equal(a.status.state, 'error');
+    assert.match(a.status.message!, /revision/);
+  });
+});
+
+describe('stop', () => {
+  it('forgets this device but leaves its files and, by default, the cloud copy', async () => {
+    const { gist, a, id } = await synced({ 'keybindings.json': '[1]\n' });
+    assert.deepEqual(await a.engine.stop(false), { ok: true });
+    assert.equal(a.state, undefined);
+    assert.equal(a.passphrase, undefined);
+    assert.equal(a.read('keybindings.json'), '[1]\n');
+    assert.equal(gist.has(id), true);
+    assert.equal(a.status.state, 'disabled');
+    await a.run();
+    assert.equal(a.status.state, 'signedOut', 'running again asks to set up');
+  });
+
+  it('can also delete the cloud copy, and other devices then ask to set up again', async () => {
+    const { gist, a, b, id } = await synced({ 'keybindings.json': '[1]\n' });
+    assert.deepEqual(await a.engine.stop(true), { ok: true });
+    assert.equal(gist.has(id), false);
+    await b.run();
+    assert.equal(b.status.state, 'signedOut');
+    assert.match(b.status.message!, /no longer exists/);
+  });
+
+  it('keeps everything if the cloud copy cannot be deleted', async () => {
+    const { gist, a } = await synced({ 'keybindings.json': '[1]\n' });
+    gist.offline = true;
+    const result = await a.engine.stop(true);
+    assert.equal(result.ok, false);
+    assert.notEqual(a.state, undefined);
+    assert.notEqual(a.passphrase, undefined);
   });
 });

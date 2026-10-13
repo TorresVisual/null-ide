@@ -2,7 +2,7 @@
 
 import * as crypto from 'crypto';
 import { open, seal, unlock } from './cryptoBox';
-import { Failure, GistIo, GistStore, createGistStore } from './gistStore';
+import { Failure, GistIo, GistStore, Revision, createGistStore } from './gistStore';
 import { CORE_FILES, MANIFEST, SETTINGS, categoryOf, fileOfRemoteName, isDeletable, remoteNameOf } from './layout';
 import { reapplyExcluded, stripExcluded } from './settingsFilter';
 import { planFile } from './syncPlan';
@@ -114,6 +114,132 @@ export class SyncEngine {
       const conn = await this.connect(options.interactive);
       if (conn) await this.sync(conn, options);
     }, !options.interactive);
+  }
+
+  /** `idle` or `needsAttention`, from what is still outstanding. */
+  private settle(): void {
+    const s = this.status;
+    const outstanding = s.conflicts.length + s.pending.length + s.pendingInstalls.length + s.pendingRemovals.length;
+    this.set({ state: outstanding > 0 ? 'needsAttention' : 'idle', message: undefined });
+  }
+
+  /** `mine` uploads this device's file; `theirs` backs it up and applies the remote one. */
+  resolve(file: string, side: 'mine' | 'theirs'): Promise<void> {
+    return this.serialized(async () => {
+      const c = await this.connect(true);
+      if (!c) return;
+      const i = this.inspect(c, file, await this.d.files.read(file));
+      if (typeof i === 'string') {
+        this.set({ state: 'error', message: i });
+        return;
+      }
+      const base = { ...c.st.base };
+      if (side === 'mine') {
+        if (tooLarge(i.content)) {
+          this.set({ state: 'error', message: `${file} is too large to sync.` });
+          return;
+        }
+        const updated = await c.store.update(c.st.gistId, { [i.name]: i.content === null ? null : seal(c.key, i.name, i.content) });
+        if (!updated.ok) {
+          this.failed(updated);
+          return;
+        }
+        base[file] = { local: i.lv, remote: i.lv };
+      } else {
+        const applied = await this.applyPull(i);
+        if (typeof applied === 'string') {
+          this.set({ state: 'error', message: applied });
+          return;
+        }
+        base[file] = applied.base;
+      }
+      await this.d.setState({ ...c.st, base });
+      this.set({ conflicts: this.status.conflicts.filter((x) => x.file !== file) });
+      this.settle();
+    }, false);
+  }
+
+  /** The decrypted remote text of a file, for a diff; `undefined` if there is none. */
+  async previewRemote(file: string): Promise<string | undefined> {
+    await this.tail;
+    const c = await this.connect(true);
+    const i = c && this.inspect(c, file, null);
+    return typeof i === 'object' ? (i.plain ?? undefined) : undefined;
+  }
+
+  /** The Gist's revisions, newest first; `undefined` (with the status set) if they cannot be read. */
+  async revisions(): Promise<Revision[] | undefined> {
+    await this.tail;
+    const c = await this.connect(true);
+    if (!c) return undefined;
+    const revisions = await c.store.revisions(c.st.gistId);
+    return revisions.ok ? revisions.value : this.failed(revisions);
+  }
+
+  /** Applies an earlier revision locally and uploads it as a new revision, so every other device rolls back too. */
+  restore(revision: string): Promise<void> {
+    return this.serialized(async () => {
+      const c = await this.connect(true);
+      if (!c) return;
+      const snapshot = await c.store.readRevision(c.st.gistId, revision);
+      if (!snapshot.ok) {
+        if (snapshot.kind === 'notFound') this.set({ state: 'error', message: 'That revision no longer exists.' });
+        else this.failed(snapshot);
+        return;
+      }
+      const categories = enabledCategories(this.d.categories());
+      const problems: string[] = [];
+      const base = { ...c.st.base };
+      const changes: Record<string, string | null> = {};
+      const pushed: Record<string, Base> = {};
+      for (const [name, encrypted] of Object.entries(snapshot.value.files)) {
+        const file = fileOfRemoteName(name);
+        if (file === undefined || !categories.includes(categoryOf(file))) continue;
+        const plain = open(c.key, name, encrypted);
+        if (plain === undefined) {
+          problems.push(`Could not decrypt ${name} in that revision.`);
+          continue;
+        }
+        const raw = await this.d.files.read(file);
+        const applied = await this.applyPull({ file, name, raw, content: plain, plain, lv: hash(plain), rv: hash(plain) });
+        if (typeof applied === 'string') {
+          problems.push(applied);
+          continue;
+        }
+        const uploaded = applied.uploaded ?? plain;
+        changes[name] = seal(c.key, name, uploaded);
+        pushed[file] = { local: hash(uploaded), remote: hash(uploaded) };
+      }
+      if (Object.keys(changes).length > 0) {
+        const updated = await c.store.update(c.st.gistId, changes);
+        if (!updated.ok) {
+          this.failed(updated);
+          return;
+        }
+        Object.assign(base, pushed);
+      }
+      await this.d.setState({ ...c.st, base });
+      this.set({ conflicts: this.status.conflicts.filter((x) => !(x.file in pushed)) });
+      if (problems.length > 0) this.set({ state: 'error', message: problems.join(' ') });
+      else this.settle();
+    }, false);
+  }
+
+  /** Forgets this device (state and passphrase); optionally deletes the cloud copy first. Local files are never touched. */
+  async stop(deleteGist: boolean): Promise<{ ok: true } | { ok: false; message: string }> {
+    await this.tail;
+    const st = this.d.state.get();
+    if (deleteGist && st) {
+      const account = (await this.d.accounts()).find((a) => a.id === st.accountId);
+      const token = account && (await this.d.token(account.id, true));
+      if (!token) return { ok: false, message: 'Could not get a GitHub token to delete the Gist.' };
+      const removed = await createGistStore(this.d.io, token).remove(st.gistId);
+      if (!removed.ok && removed.kind !== 'notFound') return { ok: false, message: removed.message };
+    }
+    await this.d.setState(undefined);
+    await this.d.clearPassphrase();
+    this.set({ ...CLEARED, state: 'disabled' });
+    return { ok: true };
   }
 
   /** One task at a time, under the cross-window lock. Never rejects. */
