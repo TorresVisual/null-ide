@@ -115,7 +115,10 @@ class IssueDetailPanel {
             // The cache folder too: images the host downloaded are shown through asWebviewUri, which only serves these roots.
             localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'lib'), ...cacheRoots],
         });
-        this.panel.iconPath = vscode.Uri.joinPath(extensionUri, 'media', 'github-issues.svg');
+        this.panel.iconPath = {
+            light: vscode.Uri.joinPath(extensionUri, 'media', 'github-issues.svg'),
+            dark: vscode.Uri.joinPath(extensionUri, 'media', 'github-issues-dark.svg'),
+        };
         this.panel.webview.html = this._buildHtml();
         this.panel.webview.onDidReceiveMessage((msg) => void this._handleMessage(msg));
         this.panel.onDidChangeViewState(e => {
