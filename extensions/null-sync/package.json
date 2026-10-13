@@ -12,6 +12,12 @@
   "extensionDependencies": ["null.null-accounts"],
   "main": "./out/extension.js",
   "activationEvents": ["onStartupFinished"],
+  "nullWorkspace": {
+    "features": [
+      { "id": "sync", "label": "Sync Status", "category": "account", "icon": "sync",
+        "command": "null.sync.showStatus", "description": "Settings across devices", "order": 20 }
+    ]
+  },
   "contributes": {
     "commands": [
       { "command": "null.sync.enable", "title": "Null: Enable Settings Sync" },

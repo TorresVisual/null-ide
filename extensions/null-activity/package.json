@@ -9,6 +9,12 @@
   "main": "./out/extension.js",
   "extensionKind": ["ui"],
   "activationEvents": ["onStartupFinished"],
+  "nullWorkspace": {
+    "features": [
+      { "id": "activity", "label": "Activity Dashboard", "category": "insights", "icon": "graph",
+        "command": "null-activity.openDashboard", "description": "Coding time & git stats", "order": 10 }
+    ]
+  },
   "contributes": {
     "commands": [
       { "command": "null-activity.openDashboard", "title": "Null Activity: Open Dashboard" },

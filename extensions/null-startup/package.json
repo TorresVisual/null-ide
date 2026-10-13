@@ -13,6 +13,12 @@
   "activationEvents": [
     "onStartupFinished"
   ],
+  "nullWorkspace": {
+    "features": [
+      { "id": "startup", "label": "Startup Report", "category": "insights", "icon": "pulse",
+        "command": "null-startup.openReport", "description": "What slows startup", "order": 20 }
+    ]
+  },
   "contributes": {
     "commands": [
       {

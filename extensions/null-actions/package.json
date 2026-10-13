@@ -24,6 +24,12 @@
     "@types/mocha": "^10.0.10",
     "glob": "^13.0.6"
   },
+  "nullWorkspace": {
+    "features": [
+      { "id": "actions", "label": "Actions Settings", "category": "setup", "icon": "play-circle",
+        "command": "null-actions.openSettings", "description": "Status bar buttons", "order": 20 }
+    ]
+  },
   "contributes": {
     "commands": [
       {

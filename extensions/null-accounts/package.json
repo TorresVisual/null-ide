@@ -9,6 +9,12 @@
   "main": "./out/extension.js",
   "extensionKind": ["ui"],
   "activationEvents": ["onStartupFinished"],
+  "nullWorkspace": {
+    "features": [
+      { "id": "accounts", "label": "Accounts", "category": "account", "icon": "account",
+        "command": "null-accounts.open", "description": "GitHub & GitLab", "order": 10 }
+    ]
+  },
   "contributes": {
     "configuration": {
       "title": "Null Accounts",

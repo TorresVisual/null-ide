@@ -12,6 +12,12 @@
   "activationEvents": [
     "onStartupFinished"
   ],
+  "nullWorkspace": {
+    "features": [
+      { "id": "env", "label": "Environment Check", "category": "setup", "icon": "checklist",
+        "command": "null.env.check", "description": "Missing tools & extensions", "order": 10 }
+    ]
+  },
   "contributes": {
     "commands": [
       {

@@ -30,6 +30,12 @@
     "@types/vscode": "^1.85.0",
     "typescript": "^5.8.0"
   },
+  "nullWorkspace": {
+    "features": [
+      { "id": "format", "label": "Formatting Settings", "category": "setup", "icon": "wand",
+        "command": "null-format.openSettings", "description": "Prettier, rustfmt, clang-format", "order": 30 }
+    ]
+  },
   "contributes": {
     "commands": [
       {
