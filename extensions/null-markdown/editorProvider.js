@@ -1,22 +1,22 @@
 'use strict';
 
 const vscode = require('vscode');
-const { buildEditorPage, buildPreviewPage } = require('./pages');
+const { buildEditorPage } = require('./pages');
 const { toLf, isValidChanges, toTextEdits, SyncState } = require('./syncState');
 const { rewriteImageSrc } = require('./imageSrc');
 const { applyCheckboxToggle, openWikiLink } = require('./docActions');
 
-// CustomTextEditorProvider for the live-preview Editor (readOnly: false) and the in-tab Preview
-// (readOnly: true). A thin relay: the TextDocument stays the source of truth.
-let logChannel;
-const getLog = () => (logChannel ??= vscode.window.createOutputChannel('Null Markdown')); // TEMP diagnostic
+// Above this many characters the Editor hands the file back to the plain text editor: widget
+// round-trips and whole-document decoration rebuilds do not scale to huge files.
+const MAX_EDITOR_CHARS = 1_000_000;
 
+// CustomTextEditorProvider for the live-preview Markdown Editor. A thin relay: the TextDocument
+// stays the source of truth.
 class NullMarkdownEditorProvider {
-	constructor(context, { md, processAlerts, readOnly }) {
+	constructor(context, { md, processAlerts }) {
 		this._ctx = context;
 		this._md = md;
 		this._processAlerts = processAlerts;
-		this._readOnly = readOnly;
 	}
 
 	// Markdown -> HTML through the same pipeline as Preview, with relative images pointed at webview URIs.
@@ -29,6 +29,13 @@ class NullMarkdownEditorProvider {
 	}
 
 	async resolveCustomTextEditor(document, panel) {
+		if (document.getText().length > MAX_EDITOR_CHARS) {
+			vscode.window.showInformationMessage('This file is too large for the Markdown Editor; opened as source instead.');
+			await vscode.commands.executeCommand('vscode.openWith', document.uri, 'default');
+			panel.dispose();
+			return;
+		}
+
 		const wv = panel.webview;
 		const key = document.uri.toString();
 		wv.options = {
@@ -43,36 +50,27 @@ class NullMarkdownEditorProvider {
 		const post = m => wv.postMessage(m);
 		const sync = new SyncState();
 		const subs = [];
-		let timer;
 
 		const sendDoc = () => post({ type: 'doc', text: toLf(document.getText()), version: document.version });
-		const sendPreview = () => post({ type: 'update', html: this._html(document, wv, document.getText()) });
 
-		wv.html = this._readOnly
-			? buildPreviewPage(wv, this._ctx.extensionPath, this._html(document, wv, document.getText()))
-			: buildEditorPage(wv, this._ctx.extensionPath);
+		wv.html = buildEditorPage(wv, this._ctx.extensionPath);
 
 		subs.push(vscode.workspace.onDidChangeTextDocument(e => {
 			if (e.document.uri.toString() !== key || !e.contentChanges.length) return;
-			if (this._readOnly) { clearTimeout(timer); timer = setTimeout(sendPreview, 200); }
-			else if (sync.shouldForward()) sendDoc();
+			if (sync.shouldForward()) sendDoc();
 		}));
 
 		subs.push(wv.onDidReceiveMessage(async msg => {
 			switch (msg?.type) {
-				case 'log': getLog().appendLine(String(msg.text)); break; // TEMP diagnostic
-				case 'ready': if (!this._readOnly) sendDoc(); break;
-				case 'edit': if (!this._readOnly) await this._applyEdit(document, sync, msg, sendDoc, post); break;
-				case 'save': if (!this._readOnly) await document.save(); break;
+				case 'ready': sendDoc(); break;
+				case 'edit': await this._applyEdit(document, sync, msg, sendDoc, post); break;
+				case 'save': await document.save(); break;
 				case 'wikiLink': if (typeof msg.target === 'string') await openWikiLink(msg.target); break;
 				case 'checkboxToggle': await applyCheckboxToggle(document, msg.line, msg.checked); break;
 			}
 		}));
 
-		panel.onDidDispose(() => {
-			clearTimeout(timer);
-			subs.forEach(d => d.dispose());
-		});
+		panel.onDidDispose(() => subs.forEach(d => d.dispose()));
 	}
 
 	// Apply a webview edit as one WorkspaceEdit (one undo step), then ack; on any doubt send the full text.

@@ -5,7 +5,7 @@ import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { createSync, diffChange } from './sync.mjs';
 import { livePreview } from './decorations.mjs';
 
-const vscode = window.__nullVs ?? acquireVsCodeApi();
+const vscode = acquireVsCodeApi();
 const post = m => vscode.postMessage(m);
 
 const fromHost = Annotation.define(); // marks transactions that apply a host `doc`, so they are not echoed back
@@ -50,5 +50,4 @@ window.addEventListener('message', e => {
 	}
 });
 
-post({ type: 'log', text: 'editor.js started' });
 post({ type: 'ready' });

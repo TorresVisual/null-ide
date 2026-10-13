@@ -3,10 +3,7 @@
 const vscode = require('vscode');
 const crypto = require('crypto');
 
-// TEMP diagnostic (editor tab blank): forwards webview errors to the host Output channel.
-const diag = nonce => `<script nonce="${nonce}">(function(){const v=acquireVsCodeApi();window.__nullVs=v;const l=t=>v.postMessage({type:'log',text:t});l('page script ran');window.addEventListener('error',e=>l('ERROR '+e.message+' @'+(e.filename||'')+':'+e.lineno));window.addEventListener('unhandledrejection',e=>l('REJECTION '+(e.reason&&e.reason.stack||e.reason)));window.addEventListener('securitypolicyviolation',e=>l('CSP '+e.violatedDirective+' '+e.blockedURI));})();</script>`;
-
-// Shared webview shell for the side-by-side Preview, the in-tab Preview and the Editor.
+// Shared webview shell for the side-by-side Preview and the Editor.
 function page(wv, extensionPath, { body, extraCss = [], scripts }) {
 	const ext = vscode.Uri.file(extensionPath);
 	const u = (...p) => wv.asWebviewUri(vscode.Uri.joinPath(ext, ...p));
@@ -34,7 +31,6 @@ ${links}
 </head>
 <body>
 ${body}
-${diag(nonce)}
 ${scriptTags}
 </body>
 </html>`;

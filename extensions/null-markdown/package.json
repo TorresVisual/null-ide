@@ -18,9 +18,9 @@
 		"customEditors": [
 			{
 				"viewType": "null-markdown.editor",
-				"displayName": "Null Markdown",
+				"displayName": "Markdown Editor",
 				"selector": [{ "filenamePattern": "*.md" }],
-				"priority": "option"
+				"priority": "default"
 			}
 		],
 		"commands": [
@@ -32,9 +32,9 @@
 			},
 			{
 				"command": "null-markdown.openEditor",
-				"title": "Open Null Markdown",
+				"title": "Open Markdown Editor",
 				"category": "Markdown",
-				"icon": "$(edit)"
+				"icon": "$(open-preview)"
 			},
 			{
 				"command": "null-markdown.openSource",
@@ -74,6 +74,11 @@
 				"command": "null-markdown.openPreview",
 				"key": "ctrl+shift+v",
 				"when": "editorLangId == markdown"
+			},
+			{
+				"command": "null-markdown.openPreview",
+				"key": "ctrl+shift+v",
+				"when": "activeCustomEditorId == null-markdown.editor"
 			},
 			{
 				"command": "null-markdown.openPreview",

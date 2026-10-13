@@ -414,18 +414,23 @@ body { max-width: none; display: flex; flex-direction: column; align-items: stre
 function activate(context) {
 	const md = createMd();
 
-	function openPreview() {
+	// The file a command should act on: an explicit URI (menus), the active Markdown Editor tab, or the active text editor.
+	function activeMarkdownUri(arg) {
+		if (arg instanceof vscode.Uri) return arg;
+		const input = vscode.window.tabGroups.activeTabGroup.activeTab?.input;
+		if (input instanceof vscode.TabInputCustom && input.viewType === 'null-markdown.editor') return input.uri;
 		const editor = vscode.window.activeTextEditor;
-		if (!editor || editor.document.languageId !== 'markdown') {
-			vscode.window.showWarningMessage('Open a Markdown file first.');
-			return;
-		}
-		const key = editor.document.uri.toString();
-		if (openPanels.has(key)) {
-			openPanels.get(key).reveal();
-			return;
-		}
-		const preview = new NullMarkdownPreview(editor.document, context, md);
+		return editor?.document.languageId === 'markdown' ? editor.document.uri : undefined;
+	}
+
+	async function openPreview(arg) {
+		const uri = activeMarkdownUri(arg);
+		if (!uri) { vscode.window.showWarningMessage('Open a Markdown file first.'); return; }
+		const key = uri.toString();
+		if (openPanels.has(key)) { openPanels.get(key).reveal(); return; }
+		const doc = await vscode.workspace.openTextDocument(uri);
+		if (doc.languageId !== 'markdown') { vscode.window.showWarningMessage('Open a Markdown file first.'); return; }
+		const preview = new NullMarkdownPreview(doc, context, md);
 		openPanels.set(key, preview);
 		preview.onDispose(() => openPanels.delete(key));
 	}
@@ -527,7 +532,7 @@ img{max-width:100%;border-radius:4px}
 		openSlides.set(key, slides);
 	}
 
-	const editorProvider = new NullMarkdownEditorProvider(context, { md, processAlerts, readOnly: false });
+	const editorProvider = new NullMarkdownEditorProvider(context, { md, processAlerts });
 	context.subscriptions.push(
 		vscode.window.registerCustomEditorProvider('null-markdown.editor', editorProvider, {
 			webviewOptions: { retainContextWhenHidden: true },
@@ -535,10 +540,9 @@ img{max-width:100%;border-radius:4px}
 		})
 	);
 
-	// Menus pass the file URI; from the palette fall back to the active tab (text or Null Markdown).
+	// Menus pass the file URI; from the palette fall back to the active tab (Source or Markdown Editor).
 	const openWith = viewType => arg => {
-		const input = vscode.window.tabGroups.activeTabGroup.activeTab?.input;
-		const uri = arg instanceof vscode.Uri ? arg : input?.uri;
+		const uri = activeMarkdownUri(arg) ?? vscode.window.tabGroups.activeTabGroup.activeTab?.input?.uri;
 		if (!uri) { vscode.window.showWarningMessage('Open a Markdown file first.'); return; }
 		return vscode.commands.executeCommand('vscode.openWith', uri, viewType);
 	};
