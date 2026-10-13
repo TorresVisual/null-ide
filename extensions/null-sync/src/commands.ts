@@ -115,6 +115,20 @@ export function registerCommands(context: vscode.ExtensionContext, engine: SyncE
       for (const file of s.pending) {
         items.push({ label: `$(clock) Waiting for unsaved changes: ${file}`, description: 'applied once it is saved or closed' });
       }
+      if (s.pendingInstalls.length > 0) {
+        items.push({
+          label: `$(cloud-download) Install ${s.pendingInstalls.length} extension(s) added on other devices`,
+          description: s.pendingInstalls.join(', '),
+          run: () => vscode.commands.executeCommand('null.sync.syncNow'),
+        });
+      }
+      for (const id of s.pendingRemovals) {
+        items.push({
+          label: `$(trash) Uninstall ${id}`,
+          description: 'removed on another device',
+          run: () => engine.uninstallRemoved(id),
+        });
+      }
       items.push(
         { label: '$(sync) Sync now', run: () => vscode.commands.executeCommand('null.sync.syncNow') },
         { label: '$(history) Restore an earlier version…', run: restore },

@@ -5,6 +5,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { registerCommands } from './commands';
 import { EnableDeps } from './enable';
+import { extensionHost } from './extensionHost';
 import { fetchJson, fetchText } from './gistHttp';
 import { LocalFiles } from './localFiles';
 import { acquire } from './lock';
@@ -77,6 +78,7 @@ export function activate(context: vscode.ExtensionContext): NullSyncApi {
     setState: async (state) => { await context.globalState.update(STATE_KEY, state); },
     lock: () => acquire(path.join(storage, 'lock')),
     now: Date.now,
+    extensions: extensionHost,
     confirmOverwrite: async (file) =>
       (await vscode.window.showWarningMessage(`${file} has unsaved changes. Overwrite it with the synced version?`, { modal: true }, 'Overwrite')) === 'Overwrite',
   });

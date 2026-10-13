@@ -27,7 +27,7 @@ This spec covers the **engine, its API and its commands**. It deliberately has *
 | `settings` | `<User>/settings.json` (filtered) | `settings.json.enc` |
 | `keybindings` | `<User>/keybindings.json` | `keybindings.json.enc` |
 | `snippets` | each `<User>/snippets/*.json` / `*.code-snippets` | `snippets__<file>.enc` (Gist names cannot contain `/`) |
-| `extensions` | installed, non-built-in extension IDs, **including disabled ones** (read from the extensions manifest on disk; `vscode.extensions.all` lists enabled extensions only, so it is a fallback only if that path cannot be derived) | `extensions.json.enc` (sorted, lowercased `publisher.name` array) |
+| `extensions` | installed, non-built-in extension IDs, **including disabled ones** (read from the extensions manifest on disk; `vscode.extensions.all` lists enabled extensions only, so it is not used; if the manifest cannot be read the extension sync is skipped with a message) | `extensions.json.enc` (sorted, lowercased `publisher.name` array) |
 
 `<User>` is the grandparent of `context.globalStorageUri.fsPath` (`…/User/globalStorage/<id>`); the plan verifies this on a real install. Categories are switched in `null-sync.categories`; a disabled category is neither read, uploaded nor applied.
 
@@ -208,7 +208,8 @@ One plan, two phases, each ending in a working committed state.
 ## To verify in the plan
 
 1. `<User>` resolves from `globalStorageUri` as stated, including in a portable install.
-2. `workbench.extensions.installExtension` / `uninstallExtension` work from a `ui` extension host and report failure in a way the engine can catch; the on-disk extensions manifest path can be derived (Phase 2).
+2. `workbench.extensions.installExtension` / `uninstallExtension` work from a `ui` extension host and report failure in a way the engine can catch.
+   Verified 2026-10-13 on a real install: `%USERPROFILE%\Null\extensions\extensions.json` exists (`dataFolderName` is `Null`), lists user extensions with `identifier.id` and `metadata.isBuiltin`, and `%APPDATA%\Null\User` holds `settings.json`, `snippets/` and `globalStorage/` (this machine has no `keybindings.json`). The install/uninstall commands themselves are not yet exercised on a real install.
 3. `jsonc-parser` `modify` keeps comments and formatting on the real default `settings.json`.
 4. Whether `globalState` writes in one window reach other windows' extension hosts. `base` lives there; if they do not, move `state` to a JSON file under `globalStorage/null-sync/` (the lock already makes runs mutually exclusive).
 
