@@ -8,9 +8,57 @@
   "engines": {
     "vscode": "^1.93.0"
   },
+  "extensionKind": ["ui"],
+  "extensionDependencies": ["null.null-accounts"],
+  "main": "./out/extension.js",
+  "activationEvents": ["onStartupFinished"],
+  "contributes": {
+    "commands": [
+      { "command": "null.sync.enable", "title": "Null: Enable Settings Sync" },
+      { "command": "null.sync.syncNow", "title": "Null: Sync Settings Now" },
+      { "command": "null.sync.resolveConflicts", "title": "Null: Resolve Sync Conflicts" },
+      { "command": "null.sync.restore", "title": "Null: Restore Synced Settings…" },
+      { "command": "null.sync.stop", "title": "Null: Stop Settings Sync" },
+      { "command": "null.sync.setCategories", "title": "Null: Choose What to Sync" },
+      { "command": "null.sync.showStatus", "title": "Null: Show Sync Status" }
+    ],
+    "configuration": {
+      "title": "Null Sync",
+      "properties": {
+        "null-sync.enabled": {
+          "type": "boolean",
+          "default": false,
+          "scope": "application",
+          "markdownDescription": "Sync settings, keybindings, snippets and the extension list across your devices. Set it up with **Null: Enable Settings Sync**. Turning this off pauses syncing without forgetting this device."
+        },
+        "null-sync.categories": {
+          "type": "object",
+          "scope": "application",
+          "default": { "settings": true, "keybindings": true, "snippets": true },
+          "properties": {
+            "settings": { "type": "boolean" },
+            "keybindings": { "type": "boolean" },
+            "snippets": { "type": "boolean" }
+          },
+          "additionalProperties": false,
+          "markdownDescription": "What to sync on this device. Change it with **Null: Choose What to Sync**."
+        },
+        "null-sync.excludedSettings": {
+          "type": "array",
+          "items": { "type": "string" },
+          "scope": "application",
+          "default": [
+            "*.path", "*Path", "terminal.integrated.defaultProfile.*", "terminal.integrated.profiles.*", "http.proxy",
+            "null-sync.*", "*token*", "*secret*", "*password*", "*apiKey*", "*credential*"
+          ],
+          "markdownDescription": "Settings that stay on this device. `*` matches any run of characters; matching is case-insensitive. Machine-specific paths and anything that looks like a secret are excluded by default."
+        }
+      }
+    }
+  },
   "scripts": {
     "compile": "tsc -p tsconfig.json",
-    "test": "tsc -p tsconfig.json && node --test out/layout.test.js out/cryptoBox.test.js out/syncPlan.test.js out/settingsFilter.test.js out/gistStore.test.js out/localFiles.test.js out/lock.test.js out/enable.test.js out/syncEngine.test.js out/statusText.test.js",
+    "test": "tsc -p tsconfig.json && node --test out/layout.test.js out/cryptoBox.test.js out/syncPlan.test.js out/settingsFilter.test.js out/gistStore.test.js out/localFiles.test.js out/lock.test.js out/enable.test.js out/syncEngine.test.js out/statusText.test.js out/manifest.test.js",
     "pretest:integration": "tsc -p tsconfig.json",
     "test:integration": "node ./out/test/runTest.js"
   },
