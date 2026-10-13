@@ -3,6 +3,7 @@ import { EditorView, keymap } from '@codemirror/view';
 import { defaultKeymap, indentWithTab } from '@codemirror/commands';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { createSync, diffChange } from './sync.mjs';
+import { livePreview } from './decorations.mjs';
 
 const vscode = window.__nullVs ?? acquireVsCodeApi();
 const post = m => vscode.postMessage(m);
@@ -19,6 +20,7 @@ const view = new EditorView({
 			markdown({ base: markdownLanguage }),
 			// No CodeMirror history: undo/redo belongs to the workbench (see the spec's undo section).
 			keymap.of([...defaultKeymap, indentWithTab]),
+			livePreview(null), // block widgets get their renderer in a later task
 			EditorView.updateListener.of(u => {
 				if (u.docChanged && !u.transactions.some(t => t.annotation(fromHost))) sync.local(u.changes);
 			})
