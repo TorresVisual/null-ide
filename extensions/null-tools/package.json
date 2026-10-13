@@ -34,7 +34,7 @@
       { "id": "dashboard", "label": "Dashboard", "category": "develop", "icon": "home",
         "command": "null.openDashboard", "description": "Projects & recent folders", "order": 10 },
       { "id": "issues", "label": "GitHub Issues", "category": "develop", "icon": "issues",
-        "command": "null.issues.openFullView", "description": "Full-width issue list", "order": 20 }
+        "command": "null.issues.focus", "description": "Open the issues sidebar", "order": 20 }
     ]
   },
   "contributes": {
@@ -201,6 +201,10 @@
         "command": "null.issues.refresh",
         "title": "Null: Refresh GitHub Issues",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "null.issues.focus",
+        "title": "Null: Show GitHub Issues"
       },
       {
         "command": "null.issues.openFullView",
