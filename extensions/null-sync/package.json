@@ -10,7 +10,7 @@
   },
   "scripts": {
     "compile": "tsc -p tsconfig.json",
-    "test": "tsc -p tsconfig.json && node --test out/layout.test.js out/cryptoBox.test.js out/syncPlan.test.js out/settingsFilter.test.js out/gistStore.test.js",
+    "test": "tsc -p tsconfig.json && node --test out/layout.test.js out/cryptoBox.test.js out/syncPlan.test.js out/settingsFilter.test.js out/gistStore.test.js out/localFiles.test.js",
     "pretest:integration": "tsc -p tsconfig.json",
     "test:integration": "node ./out/test/runTest.js"
   },
