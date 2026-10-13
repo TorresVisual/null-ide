@@ -5,6 +5,7 @@ import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
 import { registerRecentProjectsUriHandler } from './recentProjectsIntegration';
+import { registerFeaturesView } from './featuresTreeView';
 import { registerScratchAndNotesFeature } from './scratchNotesIntegration';
 import { registerAutoGitignoreFeature } from './autoGitignore';
 import { registerPortsFeature } from './portsIntegration';
@@ -67,6 +68,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   registerDashboardFeature(context);
   registerRecentProjectsUriHandler(context);
+  registerFeaturesView(context);
   registerScratchAndNotesFeature(context);
   registerAutoGitignoreFeature(context);
 

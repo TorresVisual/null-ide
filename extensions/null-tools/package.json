@@ -29,6 +29,14 @@
     "glob": "^13.0.6"
   },
   "activationEvents": ["onStartupFinished", "onCustomEditor:null.dashboard"],
+  "nullWorkspace": {
+    "features": [
+      { "id": "dashboard", "label": "Dashboard", "category": "develop", "icon": "home",
+        "command": "null.showWelcome", "description": "Projects & recent folders", "order": 10 },
+      { "id": "issues", "label": "GitHub Issues", "category": "develop", "icon": "issues",
+        "command": "null.issues.openFullView", "description": "Full-width issue list", "order": 20 }
+    ]
+  },
   "contributes": {
     "customEditors": [
       {
@@ -228,22 +236,11 @@
     },
     "views": {
       "null-workspace": [
-        {
-          "id": "null.scratchView",
-          "name": "Scratch Files"
-        },
-        {
-          "id": "null.notesView",
-          "name": "Notes"
-        },
-        {
-          "id": "null.portsView",
-          "name": "Null Ports"
-        },
-        {
-          "id": "null.worktreesView",
-          "name": "Worktrees"
-        }
+        { "id": "null.featuresView", "name": "Features", "visibility": "visible" },
+        { "id": "null.scratchView", "name": "Scratch Files", "visibility": "collapsed" },
+        { "id": "null.notesView", "name": "Notes", "visibility": "collapsed" },
+        { "id": "null.portsView", "name": "Null Ports", "visibility": "collapsed" },
+        { "id": "null.worktreesView", "name": "Worktrees", "visibility": "collapsed" }
       ],
       "null-issues": [
         {
