@@ -46,7 +46,7 @@ const musicViewProvider_1 = require("./ui/musicViewProvider");
 const statusBarController_1 = require("./ui/statusBarController");
 /** Sound lives in the sidebar webview, so commands that need it open the view, then give focus back. */
 async function revealView() {
-    await vscode.commands.executeCommand('workbench.view.extension.null-music');
+    await vscode.commands.executeCommand('null.musicView.focus');
     await vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup');
 }
 function activate(context) {
