@@ -18,7 +18,7 @@
 		"customEditors": [
 			{
 				"viewType": "null-markdown.editor",
-				"displayName": "Markdown Editor",
+				"displayName": "Null Markdown",
 				"selector": [{ "filenamePattern": "*.md" }],
 				"priority": "option"
 			}
@@ -29,6 +29,18 @@
 				"title": "Open Null Markdown Preview",
 				"category": "Markdown",
 				"icon": "$(open-preview)"
+			},
+			{
+				"command": "null-markdown.openEditor",
+				"title": "Open Null Markdown",
+				"category": "Markdown",
+				"icon": "$(edit)"
+			},
+			{
+				"command": "null-markdown.openSource",
+				"title": "Open Markdown Source",
+				"category": "Markdown",
+				"icon": "$(code)"
 			},
 			{
 				"command": "null-markdown.exportPdf",
@@ -43,6 +55,20 @@
 				"icon": "$(play)"
 			}
 		],
+		"menus": {
+			"editor/title": [
+				{
+					"command": "null-markdown.openEditor",
+					"when": "resourceLangId == markdown && !activeCustomEditorId",
+					"group": "navigation@1"
+				},
+				{
+					"command": "null-markdown.openSource",
+					"when": "activeCustomEditorId == null-markdown.editor",
+					"group": "navigation@1"
+				}
+			]
+		},
 		"keybindings": [
 			{
 				"command": "null-markdown.openPreview",

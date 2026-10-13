@@ -535,8 +535,18 @@ img{max-width:100%;border-radius:4px}
 		})
 	);
 
+	// Menus pass the file URI; from the palette fall back to the active tab (text or Null Markdown).
+	const openWith = viewType => arg => {
+		const input = vscode.window.tabGroups.activeTabGroup.activeTab?.input;
+		const uri = arg instanceof vscode.Uri ? arg : input?.uri;
+		if (!uri) { vscode.window.showWarningMessage('Open a Markdown file first.'); return; }
+		return vscode.commands.executeCommand('vscode.openWith', uri, viewType);
+	};
+
 	context.subscriptions.push(
 		vscode.commands.registerCommand('null-markdown.openPreview', openPreview),
+		vscode.commands.registerCommand('null-markdown.openEditor', openWith('null-markdown.editor')),
+		vscode.commands.registerCommand('null-markdown.openSource', openWith('default')),
 		vscode.commands.registerCommand('null-markdown.exportPdf', exportPdf),
 		vscode.commands.registerCommand('null-markdown.openSlides', openSlidesCmd)
 	);
