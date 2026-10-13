@@ -48,7 +48,7 @@ against the real upstream feature, then tick **Reconciled**.
 | N/A: agent merge, multi-root agent sessions, session/chat hierarchy, chat backgrounds, agent notifications, agent host, dictation policies, Agents-window accessibility badge, integrated-browser spell check | 1.136 | N/A | — | |
 | Auto-reload HTML files in the integrated browser (`workbench.browser.autoReloadOnFileChange`); open HTML in the integrated browser by default via `workbench.editorAssociations` | 1.133 / 1.134 | Wait | — | ✓ |
 | Hold Alt on an editor tab's close button to **Close Other Editors** | 1.134 | Wait | — | ✓ |
-| Hybrid Markdown editor (Agents window only, experimental; Markdown diffs from 1.132): rendered, editable, with agent comments. Overlaps `null-markdown` (#114); revisit once it leaves experimental | 1.131 / 1.132 | Wait | — | ✓ |
+| Hybrid Markdown editor (Agents window only, experimental; Markdown diffs from 1.132): rendered, editable, with agent comments. Built as the Null Markdown Editor in `null-markdown`; reconcile against the real feature once it leaves experimental | 1.131 / 1.132 | Adapt | #114 | ✓ |
 | Built-in dictation in editors, chat and terminal (`dictation.enabled`, experimental; shell-aware terminal cleanup from 1.132) | 1.131 | Wait | — | ✓ |
 | Terminal: `terminal.integrated.resizeDimensionsOverlay.enabled`, `accessibleViewPreserveCursorPosition: always`, clickable file links for `diff.mnemonicPrefix` paths | 1.130 / 1.131 | Wait | — | ✓ |
 | Modern UI preview (`workbench.experimental.modernUI`); **Reopen Editor With** submenu in the editor toolbar | 1.129 | Wait | — | ✓ |

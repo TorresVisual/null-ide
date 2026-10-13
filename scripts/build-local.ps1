@@ -357,6 +357,7 @@ Invoke-Native "merge-json.js" {
 
 Write-Step "Installing null-markdown dependencies"
 Invoke-Native "npm ci (null-markdown)" { npm ci --prefix (Join-Path $RepoRoot "extensions/null-markdown") }
+Invoke-Native "npm run build (null-markdown)" { npm run build --prefix (Join-Path $RepoRoot "extensions/null-markdown") }
 
 foreach ($ext in @("null-tools", "null-cpp", "null-actions", "null-accounts", "null-format", "null-music", "null-activity", "null-startup", "null-env", "null-sync")) {
     Write-Step "Compiling $ext"

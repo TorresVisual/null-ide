@@ -153,6 +153,10 @@ jobs:
         shell: pwsh
         run: npm ci --prefix ide-overlay/extensions/null-markdown
 
+      - name: Build null-markdown editor bundle
+        shell: pwsh
+        run: npm run build --prefix ide-overlay/extensions/null-markdown
+
       - name: Compile null-tools TypeScript
         shell: pwsh
         run: |

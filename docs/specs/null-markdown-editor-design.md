@@ -33,15 +33,15 @@ There is no read-only in-tab Preview: the Editor already renders in place, so a 
 |---|---|
 | `editorProvider.js` (host, new) | `CustomTextEditorProvider` for the Editor. A thin relay: sends full text + version on open, applies webview edits as one `WorkspaceEdit`, forwards `onDidChangeTextDocument` changes, answers `renderBlock`, handles `wikiLink` / `checkboxToggle` like Preview. |
 | `syncState.js` (host, pure) | Version bookkeeping and echo suppression: records the version produced by its own edit, decides forward / drop / reset. Unit-tested. |
-| `webview/editor/*.js` (new) | CM6 setup: Markdown language (GFM), live-preview decorations, block widgets, formatting keymaps. Plain ES modules. |
-| `webview/editor/reveal.js` (pure) | Reveal rule: (syntax node, selection) → hidden or shown. Unit-tested with no CM6 import. |
+| `webview/editor/*.mjs` (new) | CM6 setup: Markdown language (GFM), live-preview decorations, block widgets, formatting keymaps. Plain ES modules. |
+| `webview/editor/reveal.mjs` (pure), `specs.mjs` (pure decoration plan) | Reveal rule: (syntax node, selection) → hidden or shown. Unit-tested with no CM6 import. |
 | `lib/editor.js` (tracked, generated) | esbuild output. Never hand-edited. |
 | `lib/editor.css` (tracked, hand-written) | Theme-variable styling shared with `null-markdown.css` fonts and colours. |
 | `extension.js` (modified) | Registers the provider and commands; checkbox toggle edits the document instead of needing a visible text editor; `openPreview` falls back to the Editor's document. |
 | `package.json` (modified) | One `customEditors` entry (`priority: default`), commands, `editor/title` items, `build` script (esbuild), `test` script, CodeMirror/lezer deps, `esbuild` devDependency. |
 | `scripts/sync-local.ps1`, `build.yml` (modified) | Copy `lib/`; run `npm ci && npm run build` for `null-markdown`. |
 
-Dependencies (dev only; bundled into `lib/editor.js`, about 500 KB minified): `@codemirror/{state,view,commands,language,lang-markdown}`, `@lezer/markdown`, `esbuild`. The decoration plan, sync client and formatting commands are plain `.mjs` modules so `node --test` can import them directly; host files stay CommonJS `.js`.
+Dependencies (dev only; bundled into `lib/editor.js`, about 500 KB minified): `@codemirror/{state,view,commands,language,lang-markdown}`, `@lezer/markdown`, `esbuild`. The bundle is about 490 KB minified. The decoration plan, sync client and formatting commands are plain `.mjs` modules so `node --test` can import them directly; host files stay CommonJS `.js`.
 
 ## Sync protocol
 
@@ -54,9 +54,9 @@ The `TextDocument` is the source of truth; the CM6 doc is a mirror.
 - **Save:** Ctrl+S in the webview waits for pending edits to be acked, then asks the host to save; otherwise the workbench would save before the last edit lands and the file would stay dirty.
 - **Webview reload / crash:** the webview sends `ready` and the host replies with `doc`. No local persistence.
 
-### Undo/redo (open risk, spike first)
+### Undo/redo (single workbench stack; confirm in the app)
 
-How Ctrl+Z behaves inside a `CustomTextEditor` webview is unverified: it may reach CM6's history, the workbench's document undo, or both (the webview forwards undo/redo keydowns to the workbench even when the editor handled them). The design commits to one stack: the workbench's document undo, with no CM6 history, because the host `TextDocument` is the source of truth and every undo then arrives as a normal `doc` message. Plan task 2 verifies this in the running app before anything else is built on it; if it does not hold, the spec is revisited. Known ceiling: an undo pressed within one debounce window of typing can undo the previous step instead of the one still in flight.
+How Ctrl+Z behaves inside a `CustomTextEditor` webview is unverified: it may reach CM6's history, the workbench's document undo, or both (the webview forwards undo/redo keydowns to the workbench even when the editor handled them). The design commits to one stack: the workbench's document undo, with no CM6 history, because the host `TextDocument` is the source of truth and every undo then arrives as a normal `doc` message. Plan task 2's manual undo gate checks this in the running app; if it does not hold, the spec is revisited. (Not yet recorded as passed; run the gate in a synced build.) Known ceiling: an undo pressed within one debounce window of typing can undo the previous step instead of the one still in flight.
 
 ## Live-preview rendering
 
@@ -97,7 +97,7 @@ Dirty state, save, external file changes, Reopen With and tab replacement come f
 ## Testing
 
 - `node --test`: `syncState.js` (echo suppression, mismatch → reset, remote change forwarding) and `reveal.js` (node + selection → hidden / shown). New `test` script in `package.json`, listing the files explicitly.
-- Manual checklist (in the plan): a `.md` opens in the Editor by default; the title button flips Editor ↔ Source in the same tab; Reopen With shows Editor and Source and each switch keeps one tab and one document; open from Explorer, search and Source Control; untitled `.md`; dirty / save; external file change; Source ↔ Editor edits both ways; undo/redo per the spike; each widget type (table, Mermaid, math, alert, image); checkbox toggle; IME input.
+- Manual checklist (in the plan): a `.md` opens in the Editor by default; the title button flips Editor ↔ Source in the same tab; Reopen With shows Editor and Source and each switch keeps one tab and one document; open from Explorer, search and Source Control; untitled `.md`; dirty / save; external file change; Source ↔ Editor edits both ways; undo/redo per the undo gate; each widget type (table, Mermaid, math, alert, image); checkbox toggle; IME input.
 - `null-markdown` has no integration specs, so `/verify-local` does not apply; confirm `sync-local.ps1` copies `lib/`.
 
 ## Delivery order

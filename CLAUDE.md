@@ -51,7 +51,7 @@ The entire build runs in GitHub Actions on a `windows-2022` runner — do **not*
 1. Clone VSCodium at `VSCODIUM_TAG` and VS Code at the matching `MS_TAG`.
 2. Apply VSCodium's own patches, then every `patches/*.patch` in name order (`git apply --ignore-whitespace`).
 3. Deep-merge `product.json` overlay into `vscode-src/product.json`.
-4. `npm ci --prefix extensions/null-markdown`; `npm ci && npm run compile` in each other TS extension (`null-tools`, `null-cpp`, `null-actions`, `null-accounts`, `null-format`, `null-music`, `null-activity`, `null-startup`, `null-env`, `null-sync`).
+4. `npm ci --prefix extensions/null-markdown` and `npm run build` in it (esbuild bundles the Markdown Editor webview); `npm ci && npm run compile` in each other TS extension (`null-tools`, `null-cpp`, `null-actions`, `null-accounts`, `null-format`, `null-music`, `null-activity`, `null-startup`, `null-env`, `null-sync`).
 5. Copy all thirteen built-in extensions into `vscode-src/extensions/`; bundle Code Spell Checker from `CSPELL_TAG`.
 6. Replace upstream icons with files from `icons/`.
 7. Copy `workbench/custom.css` → `null-custom.css` and `workbench/splash.js` → `null-splash.js` into the source tree; inject `<link>` / `<script>` tags into `workbench.html`.
@@ -73,7 +73,7 @@ Default color theme (Null Dark) via `product.json → defaultColorTheme`. Fonts:
 Built-in file icon theme. Set as the default via `product.json → defaultIconTheme`. Contains SVG icons for a wide range of file types and folder types.
 
 ### null-markdown (`extensions/null-markdown/`)
-Enhanced markdown preview (GFM, Mermaid, KaTeX, GitHub alerts) on `onLanguage:markdown`. Its `node_modules` come from `npm ci --prefix` in CI and are not synced by `sync-local.ps1`.
+Enhanced markdown preview (GFM, Mermaid, KaTeX, GitHub alerts) on `onLanguage:markdown`, plus the **Markdown Editor** (issue #114): a live-preview `CustomTextEditorProvider` (`null-markdown.editor`; syntax markers hide except around the caret) that is the default view of `.md` files, with a single title-bar button toggling to the plain text editor (Source). `editorProvider.js` is a thin relay over the `TextDocument` (source of truth): the webview mirrors LF text, sends debounced edits with a `baseVersion` that the host applies as one `WorkspaceEdit` and acks, and any host change returns as a full `doc` that the webview diffs in; `syncState.js` (pure) holds the offset/EOL mapping and version rules. Undo/redo is the workbench's (no CodeMirror history). The webview is `webview/editor/*.mjs` (CodeMirror 6 + `@lezer/markdown`, dev dependencies) bundled by `npm run build` (esbuild) into the tracked `lib/editor.js`; `lib/editor.css` is hand-written. `specs.mjs` is the pure decoration plan (tree + selection in, specs out); tables, Mermaid, `$$` math, alerts, HTML and images render as widgets through the host's `createMd()` + `processAlerts()` (`renderBlock`/`rendered` messages). `node_modules` (markdown-it, KaTeX, Mermaid, highlight.js) come from `npm ci --prefix` in CI and are not synced by `sync-local.ps1`; it copies `lib/` and the host files. Design: `docs/specs/null-markdown-editor-design.md`; plan: `docs/plans/null-markdown-editor.md`.
 
 ### null-format (`extensions/null-format/`)
 Prettier (in-process), rustfmt and clang-format formatting providers. Editable fallback configs are `null-format.{prettier,rustfmt,clangFormat}.defaultConfig`; a project's own `.prettierrc` / `rustfmt.toml` / `.clang-format` always wins.
