@@ -72,7 +72,7 @@ export function findBundledBinary(extensionPath: string, binaryName: string): st
   return isFile(candidate) ? candidate : null;
 }
 
-function findConfiguredOrBundled(name: string, configuredPath?: string, extensionPath?: string): string | null {
+function findConfiguredOrBundled(name: string, configuredPath?: string, extensionPath?: string, dirs?: readonly string[]): string | null {
   // 1. Explicit user-configured path
   if (configuredPath && configuredPath.trim().length > 0 && fs.existsSync(configuredPath)) {
     return configuredPath;
@@ -84,14 +84,15 @@ function findConfiguredOrBundled(name: string, configuredPath?: string, extensio
       return bundled;
     }
   }
-  // 3. PATH plus the well-known install dirs (cargo bin, LLVM)
-  return findExecutable(name);
+  // 3. PATH plus the well-known install dirs (cargo bin, LLVM). Callers spawn the result without a shell, so on Windows
+  //    only a real .exe qualifies, never a .cmd/.bat shim.
+  return findExecutable(process.platform === 'win32' ? `${name}.exe` : name, dirs);
 }
 
-export function findClangFormatPath(configuredPath?: string, extensionPath?: string): string | null {
-  return findConfiguredOrBundled('clang-format', configuredPath, extensionPath);
+export function findClangFormatPath(configuredPath?: string, extensionPath?: string, dirs?: readonly string[]): string | null {
+  return findConfiguredOrBundled('clang-format', configuredPath, extensionPath, dirs);
 }
 
-export function findRustfmtPath(configuredPath?: string, extensionPath?: string): string | null {
-  return findConfiguredOrBundled('rustfmt', configuredPath, extensionPath);
+export function findRustfmtPath(configuredPath?: string, extensionPath?: string, dirs?: readonly string[]): string | null {
+  return findConfiguredOrBundled('rustfmt', configuredPath, extensionPath, dirs);
 }

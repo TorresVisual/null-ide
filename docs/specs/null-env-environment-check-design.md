@@ -55,7 +55,7 @@ Commands: `null.env.check`, `null.env.getFindings`.
 
 ## Migration
 
-- `null-format`: `toolchainDiscovery.ts` is deleted; the providers call null-env's `findRustfmtPath` / `findClangFormatPath`, which keep the configured-path → bundled-binary → known-locations → PATH precedence. Existing `toolchainDiscovery.test.ts` cases move to null-env.
+- `null-format`: `toolchainDiscovery.ts` is deleted; the providers call null-env's `findRustfmtPath` / `findClangFormatPath`, which keep the configured-path → bundled-binary → PATH-then-known-locations precedence (on Windows only a real `.exe`, since the providers spawn without a shell). Existing `toolchainDiscovery.test.ts` cases move to null-env.
 - `null-actions`: `projectDetector.ts` uses `detectLanguages` for the manifest check and keeps only the language → suggested-button mapping.
 - `null-cpp`: `toolchainRegistry.findOnPath` calls an injected finder that `extension.ts` points at null-env's `findExecutable` (keeps `toolchainRegistry.ts` free of `vscode` so its tests run in plain Node); MSVC/WSL probing stays (C++-specific). `projectDetection*.ts` stays; it answers "is this an enabled C++ project" (with the user override), not "what languages exist".
 
