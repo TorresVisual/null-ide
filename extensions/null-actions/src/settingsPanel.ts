@@ -6,6 +6,7 @@ import * as path from 'path';
 import { parseButtonConfigs } from './buttonConfig';
 import { readButtonConfigs, writeButtonConfigs } from './buttonConfigIntegration';
 import { detectSuggestedButtons, SuggestedButton } from './projectDetector';
+import { getEnvApi } from './envApi';
 import { parseNpmScripts, toActionButtonConfig } from './npmScriptsProvider';
 
 function getNonce(): string {
@@ -76,7 +77,7 @@ export class ActionButtonsPanel {
   private postState(): void {
     const { buttons } = readButtonConfigs();
     const folder = vscode.workspace.workspaceFolders?.[0];
-    const suggestions: SuggestedButton[] = folder ? detectSuggestedButtons(folder.uri.fsPath) : [];
+    const suggestions: SuggestedButton[] = folder ? detectSuggestedButtons(folder.uri.fsPath, getEnvApi().detectProjects) : [];
     this.panel.webview.postMessage({ type: 'init', buttons, suggestions });
   }
 

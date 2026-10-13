@@ -1,8 +1,5 @@
 'use strict';
 
-import * as fs from 'fs';
-import * as path from 'path';
-
 export interface SuggestedButton {
   id: string;
   label: string;
@@ -10,50 +7,31 @@ export interface SuggestedButton {
   icon?: string;
 }
 
-interface ManifestDetector {
+/** One manifest found in a folder; produced by null-env's `detectProjects`. */
+export interface DetectedProject {
+  language: string;
   manifest: string;
-  suggestions: SuggestedButton[];
 }
 
-const DETECTORS: ManifestDetector[] = [
-  {
-    manifest: 'Cargo.toml',
-    suggestions: [
-      { id: 'cargo-run', label: 'cargo run', command: 'cargo run', icon: 'play' },
-      { id: 'cargo-build', label: 'cargo build', command: 'cargo build', icon: 'tools' },
-      { id: 'cargo-test', label: 'cargo test', command: 'cargo test', icon: 'beaker' },
-    ],
-  },
-  {
-    manifest: 'CMakeLists.txt',
-    suggestions: [
-      { id: 'cmake-configure', label: 'cmake configure', command: 'cmake -B build', icon: 'gear' },
-      { id: 'cmake-build', label: 'cmake build', command: 'cmake --build build', icon: 'tools' },
-    ],
-  },
-];
+export type ProjectDetector = (folderPath: string) => readonly DetectedProject[];
 
-export function detectSuggestedButtons(folderPath: string): SuggestedButton[] {
-  const suggestions: SuggestedButton[] = [];
+const SUGGESTIONS_BY_MANIFEST: Record<string, SuggestedButton[]> = {
+  'Cargo.toml': [
+    { id: 'cargo-run', label: 'cargo run', command: 'cargo run', icon: 'play' },
+    { id: 'cargo-build', label: 'cargo build', command: 'cargo build', icon: 'tools' },
+    { id: 'cargo-test', label: 'cargo test', command: 'cargo test', icon: 'beaker' },
+  ],
+  'CMakeLists.txt': [
+    { id: 'cmake-configure', label: 'cmake configure', command: 'cmake -B build', icon: 'gear' },
+    { id: 'cmake-build', label: 'cmake build', command: 'cmake --build build', icon: 'tools' },
+  ],
+  '.csproj': [
+    { id: 'dotnet-build', label: 'dotnet build', command: 'dotnet build', icon: 'tools' },
+    { id: 'dotnet-run', label: 'dotnet run', command: 'dotnet run', icon: 'play' },
+  ],
+};
 
-  for (const detector of DETECTORS) {
-    if (fs.existsSync(path.join(folderPath, detector.manifest))) {
-      suggestions.push(...detector.suggestions);
-    }
-  }
-
-  let entries: string[] = [];
-  try {
-    entries = fs.readdirSync(folderPath);
-  } catch {
-    entries = [];
-  }
-  if (entries.some(f => f.endsWith('.csproj'))) {
-    suggestions.push(
-      { id: 'dotnet-build', label: 'dotnet build', command: 'dotnet build', icon: 'tools' },
-      { id: 'dotnet-run', label: 'dotnet run', command: 'dotnet run', icon: 'play' },
-    );
-  }
-
-  return suggestions;
+/** Which manifests exist is null-env's job (`detect`); this only maps them to buttons. */
+export function detectSuggestedButtons(folderPath: string, detect: ProjectDetector): SuggestedButton[] {
+  return detect(folderPath).flatMap(project => SUGGESTIONS_BY_MANIFEST[project.manifest] ?? []);
 }

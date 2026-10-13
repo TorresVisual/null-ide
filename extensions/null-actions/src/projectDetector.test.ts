@@ -2,64 +2,63 @@
 
 import assert from 'node:assert';
 import { test } from 'node:test';
-import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
-import { detectSuggestedButtons } from './projectDetector';
+import { detectSuggestedButtons, DetectedProject } from './projectDetector';
 
-function tmpDir(): string {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'null-actions-detect-'));
-}
+const detecting = (...projects: DetectedProject[]) => () => projects;
 
-test('empty folder yields no suggestions', () => {
-  const dir = tmpDir();
-  assert.deepStrictEqual(detectSuggestedButtons(dir), []);
-  fs.rmSync(dir, { recursive: true, force: true });
+test('no detected projects yields no suggestions', () => {
+  assert.deepStrictEqual(detectSuggestedButtons('/x', detecting()), []);
 });
 
 test('Cargo.toml yields cargo suggestions', () => {
-  const dir = tmpDir();
-  fs.writeFileSync(path.join(dir, 'Cargo.toml'), '[package]\nname = "x"');
-  const suggestions = detectSuggestedButtons(dir);
+  const suggestions = detectSuggestedButtons('/x', detecting({ language: 'rust', manifest: 'Cargo.toml' }));
   assert.ok(suggestions.some(s => s.command === 'cargo run'));
   assert.ok(suggestions.some(s => s.command === 'cargo build'));
   assert.ok(suggestions.some(s => s.command === 'cargo test'));
-  fs.rmSync(dir, { recursive: true, force: true });
 });
 
 test('CMakeLists.txt yields cmake suggestions', () => {
-  const dir = tmpDir();
-  fs.writeFileSync(path.join(dir, 'CMakeLists.txt'), 'project(x)');
-  const suggestions = detectSuggestedButtons(dir);
+  const suggestions = detectSuggestedButtons('/x', detecting({ language: 'cpp', manifest: 'CMakeLists.txt' }));
   assert.ok(suggestions.some(s => s.command === 'cmake -B build'));
   assert.ok(suggestions.some(s => s.command === 'cmake --build build'));
-  fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test('a .csproj file yields dotnet suggestions', () => {
-  const dir = tmpDir();
-  fs.writeFileSync(path.join(dir, 'App.csproj'), '<Project />');
-  const suggestions = detectSuggestedButtons(dir);
+test('a .csproj yields dotnet suggestions', () => {
+  const suggestions = detectSuggestedButtons('/x', detecting({ language: 'dotnet', manifest: '.csproj' }));
   assert.ok(suggestions.some(s => s.command === 'dotnet build'));
   assert.ok(suggestions.some(s => s.command === 'dotnet run'));
-  fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test('multiple manifests present yields the union of their suggestions', () => {
-  const dir = tmpDir();
-  fs.writeFileSync(path.join(dir, 'Cargo.toml'), '[package]');
-  fs.writeFileSync(path.join(dir, 'CMakeLists.txt'), 'project(x)');
-  const suggestions = detectSuggestedButtons(dir);
+test('other C++ markers do not suggest cmake commands', () => {
+  const suggestions = detectSuggestedButtons('/x', detecting(
+    { language: 'cpp', manifest: 'compile_commands.json' },
+    { language: 'cpp', manifest: '.clangd' },
+    { language: 'node', manifest: 'package.json' },
+  ));
+  assert.deepStrictEqual(suggestions, []);
+});
+
+test('multiple manifests yield the union of their suggestions', () => {
+  const suggestions = detectSuggestedButtons('/x', detecting(
+    { language: 'rust', manifest: 'Cargo.toml' },
+    { language: 'cpp', manifest: 'CMakeLists.txt' },
+  ));
   assert.ok(suggestions.some(s => s.command === 'cargo run'));
   assert.ok(suggestions.some(s => s.command === 'cmake -B build'));
-  fs.rmSync(dir, { recursive: true, force: true });
 });
 
 test('suggestion ids are unique within one result set', () => {
-  const dir = tmpDir();
-  fs.writeFileSync(path.join(dir, 'Cargo.toml'), '[package]');
-  const suggestions = detectSuggestedButtons(dir);
+  const suggestions = detectSuggestedButtons('/x', detecting(
+    { language: 'rust', manifest: 'Cargo.toml' },
+    { language: 'cpp', manifest: 'CMakeLists.txt' },
+    { language: 'dotnet', manifest: '.csproj' },
+  ));
   const ids = suggestions.map(s => s.id);
   assert.strictEqual(new Set(ids).size, ids.length);
-  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('the folder path is passed to the detector', () => {
+  let seen = '';
+  detectSuggestedButtons('/some/folder', p => { seen = p; return []; });
+  assert.strictEqual(seen, '/some/folder');
 });

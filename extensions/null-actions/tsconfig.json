@@ -23,6 +23,7 @@
     "src/buttonState.test.ts",
     "src/projectDetector.ts",
     "src/projectDetector.test.ts",
+    "src/envApi.ts",
     "src/npmScriptsProvider.ts",
     "src/npmScriptsProvider.test.ts",
     "src/buttonConfigIntegration.ts",
