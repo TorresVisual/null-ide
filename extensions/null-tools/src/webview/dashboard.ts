@@ -7,7 +7,7 @@ type Sort = 'lastOpened' | 'name' | 'location';
 type OutboundMessage =
   | { type: 'projects'; projects: LauncherProject[] }
   | { type: 'gitStatus'; path: string; status: GitStatus | null }
-  | { type: 'home'; update?: { version: string; ready: boolean }; todayMs?: number };
+  | { type: 'home'; update?: { version: string; ready: boolean }; todayMs?: number; envMissing?: number };
 declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
 declare function projectSections(projects: LauncherProject[], query: string, sort: Sort): Array<{ title: string; projects: LauncherProject[] }>;
 declare function projectDirectory(path: string): string;
@@ -155,6 +155,8 @@ declare function formatDuration(ms: number): string;
     }
     byId('today').hidden = message.todayMs === undefined;
     if (message.todayMs !== undefined) byId('today-value').textContent = formatDuration(message.todayMs);
+    byId('env').hidden = message.envMissing === undefined;
+    if (message.envMissing !== undefined) byId('env-value').textContent = `${message.envMissing} missing`;
   }
 
   window.addEventListener('message', (event: MessageEvent<OutboundMessage>) => {
@@ -197,7 +199,7 @@ declare function formatDuration(ms: number): string;
   });
   window.addEventListener('focus', () => { if (document.activeElement === document.body) search.focus(); });
 
-  const clicks: Record<string, string> = { refresh: 'refresh', 'open-folder': 'openFolder', 'new-project': 'newProject', 'clone-repo': 'cloneRepo', 'open-issues': 'openIssues', 'open-accounts': 'openAccounts' };
+  const clicks: Record<string, string> = { refresh: 'refresh', 'open-folder': 'openFolder', 'new-project': 'newProject', 'clone-repo': 'cloneRepo', 'open-issues': 'openIssues', 'open-accounts': 'openAccounts', env: 'openEnv' };
   for (const [id, type] of Object.entries(clicks)) byId(id).addEventListener('click', () => send(type));
   byId('update').addEventListener('click', () => { if (byId('update').getAttribute('aria-disabled') !== 'true') send('installUpdate'); });
 

@@ -1,7 +1,7 @@
 'use strict';
 
 export interface HomeUpdate { version: string; ready: boolean; }
-export interface DashboardHome { update?: HomeUpdate; todayMs?: number; }
+export interface DashboardHome { update?: HomeUpdate; todayMs?: number; envMissing?: number; }
 
 interface DailyStatsSource { getDailyStats(range: { from: number; to: number }): Array<{ ms: number }>; }
 
@@ -16,4 +16,10 @@ export function todayMs(activity: DailyStatsSource | undefined, now = Date.now()
   if (!activity) return undefined;
   const from = new Date(now).setHours(0, 0, 0, 0);
   return activity.getDailyStats({ from, to: now + 1 }).reduce((sum, day) => sum + day.ms, 0);
+}
+
+/** How many required items null-env reports missing; undefined (row hidden) when none, or when null-env did not answer. */
+export function envMissing(findings: readonly { severity: string }[] | undefined): number | undefined {
+  const count = findings?.filter(f => f.severity === 'required').length ?? 0;
+  return count > 0 ? count : undefined;
 }

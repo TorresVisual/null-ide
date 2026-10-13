@@ -2,7 +2,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { homeUpdate, todayMs } from './dashboardHome';
+import { envMissing, homeUpdate, todayMs } from './dashboardHome';
 
 test('homeUpdate is absent without an available update and ready only when the staged zip is verified', () => {
   assert.equal(homeUpdate(undefined, undefined), undefined);
@@ -20,4 +20,11 @@ test('todayMs sums the buckets from local midnight and is undefined without null
   assert.equal(range.from, new Date(2026, 9, 10).getTime());
   assert.ok(range.to > now);
   assert.equal(todayMs(undefined, now), undefined);
+});
+
+test('envMissing counts required findings and hides the row when there are none or no answer', () => {
+  assert.equal(envMissing(undefined), undefined);
+  assert.equal(envMissing([]), undefined);
+  assert.equal(envMissing([{ severity: 'recommended' }]), undefined);
+  assert.equal(envMissing([{ severity: 'required' }, { severity: 'recommended' }, { severity: 'required' }]), 2);
 });
