@@ -2,13 +2,17 @@
 
 > **For agentic workers:** See Execution Options below — the checked Execution Mode box names the REQUIRED SUB-SKILL (superpowers:executing-plans or superpowers:subagent-driven-development).
 
-**Goal:** Add a third view for `.md` files, **Markdown Editor**: a Typora/Obsidian-style live preview where syntax markers hide except around the caret, edits land in the same file, and tables, Mermaid, math, alerts and images render as widgets. A read-only in-tab **Markdown Preview** joins it in Reopen With.
+**Goal:** Add the **Markdown Editor** as the default view for `.md` files: a Typora/Obsidian-style live preview where syntax markers hide except around the caret, edits land in the same file, and tables, Mermaid, math, alerts and images render as widgets. One toggle button in the tab title flips between it and the Source text editor.
 
 **Architecture:** A `CustomTextEditorProvider` relays between the host `TextDocument` (source of truth) and a CodeMirror 6 webview that holds the raw Markdown. Local edits are debounced, composed and sent with a base version; the host applies them as one `WorkspaceEdit` and acks, and any host change goes back as a full `doc` that the webview diffs in. A pure `computeSpecs` turns the Lezer syntax tree + selection into decoration specs; widgets ask the host to render a snippet through the existing `createMd()` + `processAlerts()`. The webview is bundled by esbuild into a tracked `lib/editor.js`.
 
 **Tech Stack:** Plain JS (host: CommonJS `.js`; webview: ES `.mjs`), CodeMirror 6 + `@lezer/markdown` (dev dependencies, bundled), esbuild, `node --test`. No TypeScript.
 
 **Spec:** [docs/specs/null-markdown-editor-design.md](../specs/null-markdown-editor-design.md)
+
+## Status and amendment (2026-10-14)
+
+Tasks 1 and 2 are built and committed (sync core, plain CodeMirror editor, host provider, `editorProvider.js`, `pages.js`, `docActions.js`; their checkboxes below were never ticked). The spec was amended in `60e1814`: the Editor becomes the **default** `.md` view, a single toggle button replaces the Editor/Preview dropdown flow, and the read-only in-tab Preview is dropped. Task 6 below is rewritten for that. **Execution order: 3, 6, 4, 5, 7**, so live preview and the toggle can be tried before widgets exist.
 
 ## Execution Options
 
@@ -451,7 +455,7 @@ Builds the Markdown Editor as a plain CodeMirror text view (no live preview yet)
 - Consumes: everything produced by Task 1.
 - Produces (`pages.js`): `buildPreviewPage(webview, extensionPath, contentHtml) -> string`; `buildEditorPage(webview, extensionPath) -> string`.
 - Produces (`docActions.js`): `applyCheckboxToggle(document, line, checked) -> Promise<void>`; `openWikiLink(target) -> Promise<void>`.
-- Produces (`editorProvider.js`): `class NullMarkdownEditorProvider { constructor(context, { md, processAlerts, readOnly }); resolveCustomTextEditor(document, panel) }`.
+- Produces (`editorProvider.js`): `class NullMarkdownEditorProvider { constructor(context, { md, processAlerts, readOnly }); resolveCustomTextEditor(document, panel) }`. (`readOnly` and the `update` message exist only for the in-tab Preview, which Task 6 removes.)
 - Webview → host messages: `ready`, `edit {baseVersion, changes}`, `save`, `wikiLink {target}`, `checkboxToggle {line, checked}`. Host → webview: `doc {text, version}`, `ack {version}`, `update {html}` (read-only preview only).
 
 - [ ] **Step 1: Create `pages.js`** (the page shell, moved out of `NullMarkdownPreview._buildPage` and generalised)
@@ -1322,6 +1326,8 @@ and add `livePreview(null)` to the extensions array, after the `keymap.of(...)` 
 
 Run: `npm run build && npm test`, then from the repo root `pwsh scripts/sync-local.ps1` and `pwsh scripts/reload-local.ps1`.
 
+The Editor page already loads `preview/null-markdown.css` (`pages.js`), so body width, padding and font come from the Preview. Open the same file in the Editor and in the side Preview (Ctrl+Shift+V) and compare headings, lists, quote, inline and fenced code: sizes, spacing and colours should match. Adjust `lib/editor.css` until they do; a heading line that jumps size when the caret enters it means the revealed and hidden states differ in metrics.
+
 Open `extensions/null-markdown/fixtures/preview-smoke-test.md` (or a scratch note with headings, bold/italic/code/links, a quote, bullet and task lists, a rule and a code fence) in the Markdown Editor and check:
 - With the caret elsewhere: `#`, `**`, backticks and link brackets/URLs are hidden; bullets show as `•`; `[ ]` is a checkbox; `---` is a line; fences are dimmed.
 - Moving the caret onto/into each construct reveals its markers; moving away hides them again.
@@ -1671,153 +1677,20 @@ git commit -m "chore: refresh null-markdown compiled output"
 
 ---
 
-### Task 6: Commands, toolbar, in-tab Preview and the size guard
+### Task 6: Default view, toggle button, size guard and removing the read-only Preview
 
 **Files:**
-- Modify: `extensions/null-markdown/extension.js`, `extensions/null-markdown/editorProvider.js`, `extensions/null-markdown/package.json`
+- Modify: `extensions/null-markdown/package.json`, `extensions/null-markdown/extension.js`, `extensions/null-markdown/editorProvider.js`, `extensions/null-markdown/pages.js`, `extensions/null-markdown/webview/editor/main.mjs`
 
 **Interfaces:**
-- Consumes: `NullMarkdownEditorProvider` with `readOnly: true` (already implemented in Task 2).
-- Produces: commands `null-markdown.openEditor`, `null-markdown.openSource`, `null-markdown.openPreviewTab`; custom editor `null-markdown.previewEditor`; `openPreview(arg)` that also works from the Editor and in-tab Preview.
+- Consumes: `NullMarkdownEditorProvider` (Task 2).
+- Produces: `null-markdown.editor` with `priority: "default"`; commands `null-markdown.openEditor` (`$(open-preview)`) and `null-markdown.openSource` (`$(code)`) as one mutually exclusive title-bar toggle; `openPreview(arg)` that also works while the Editor tab is active. `null-markdown.previewEditor` and `null-markdown.openPreviewTab` are not created.
 
-- [ ] **Step 1: Add the size guard to `editorProvider.js`**
+- [ ] **Step 1: Make the Editor the default and wire the toggle in `package.json`**
 
-Add above the class:
-
-```js
-// Above this many characters the Editor hands the file back to the plain text editor: widget
-// round-trips and whole-document decoration rebuilds do not scale to huge files.
-const MAX_EDITOR_CHARS = 1_000_000;
-```
-
-and at the top of `resolveCustomTextEditor`, before `const wv = panel.webview;`:
-
-```js
-		if (!this._readOnly && document.getText().length > MAX_EDITOR_CHARS) {
-			vscode.window.showInformationMessage('This file is too large for the Markdown Editor; opened as source instead.');
-			await vscode.commands.executeCommand('vscode.openWith', document.uri, 'default');
-			panel.dispose();
-			return;
-		}
-```
-
-- [ ] **Step 2: Register the in-tab Preview and the commands in `extension.js`**
-
-Replace the `editorProvider` block added in Task 2 (Step 3e) with:
-
-```js
-	const providerOptions = { webviewOptions: { retainContextWhenHidden: true }, supportsMultipleEditorsPerDocument: true };
-	context.subscriptions.push(
-		vscode.window.registerCustomEditorProvider('null-markdown.editor',
-			new NullMarkdownEditorProvider(context, { md, processAlerts, readOnly: false }), providerOptions),
-		vscode.window.registerCustomEditorProvider('null-markdown.previewEditor',
-			new NullMarkdownEditorProvider(context, { md, processAlerts, readOnly: true }), providerOptions)
-	);
-
-	// The Markdown file the user means: an explicit URI (editor/title menus pass one), the active
-	// null-markdown custom editor tab, or the active text editor.
-	function activeMarkdownUri(arg) {
-		if (arg instanceof vscode.Uri) return arg;
-		const input = vscode.window.tabGroups.activeTabGroup.activeTab?.input;
-		if (input instanceof vscode.TabInputCustom && input.viewType.startsWith('null-markdown.')) return input.uri;
-		const editor = vscode.window.activeTextEditor;
-		return editor?.document.languageId === 'markdown' ? editor.document.uri : undefined;
-	}
-
-	const openWith = viewType => arg => {
-		const uri = activeMarkdownUri(arg);
-		if (!uri) { vscode.window.showWarningMessage('Open a Markdown file first.'); return; }
-		return vscode.commands.executeCommand('vscode.openWith', uri, viewType);
-	};
-
-```
-
-Replace the existing `openPreview` function with:
-
-```js
-	async function openPreview(arg) {
-		const uri = activeMarkdownUri(arg);
-		if (!uri) {
-			vscode.window.showWarningMessage('Open a Markdown file first.');
-			return;
-		}
-		const key = uri.toString();
-		if (openPanels.has(key)) {
-			openPanels.get(key).reveal();
-			return;
-		}
-		const doc = await vscode.workspace.openTextDocument(uri);
-		if (doc.languageId !== 'markdown') {
-			vscode.window.showWarningMessage('Open a Markdown file first.');
-			return;
-		}
-		const preview = new NullMarkdownPreview(doc, context, md);
-		openPanels.set(key, preview);
-		preview.onDispose(() => openPanels.delete(key));
-	}
-```
-
-and add the three commands to the existing `context.subscriptions.push(` list:
-
-```js
-		vscode.commands.registerCommand('null-markdown.openEditor', openWith('null-markdown.editor')),
-		vscode.commands.registerCommand('null-markdown.openSource', openWith('default')),
-		vscode.commands.registerCommand('null-markdown.openPreviewTab', openWith('null-markdown.previewEditor')),
-```
-
-(`openPreview` is already registered for `markdown.showPreview*`; those pass a URI argument, which `activeMarkdownUri` accepts.)
-
-- [ ] **Step 3: Update `package.json`**
-
-Append these objects to the existing arrays (mind the commas). To `"customEditors"`:
+In `customEditors`, change the `null-markdown.editor` entry to `"priority": "default"`. In `commands`, change `null-markdown.openEditor` to title "Open Markdown Editor" with icon `$(open-preview)`; `null-markdown.openSource` keeps `$(code)`. The `editor/title` entries stay mutually exclusive:
 
 ```json
-			{
-				"viewType": "null-markdown.previewEditor",
-				"displayName": "Markdown Preview",
-				"selector": [{ "filenamePattern": "*.md" }],
-				"priority": "option"
-			}
-```
-
-To `"commands"`:
-
-```json
-			{
-				"command": "null-markdown.openEditor",
-				"title": "Open Markdown Editor",
-				"category": "Markdown",
-				"icon": "$(edit)"
-			},
-			{
-				"command": "null-markdown.openSource",
-				"title": "Open Markdown Source",
-				"category": "Markdown",
-				"icon": "$(code)"
-			},
-			{
-				"command": "null-markdown.openPreviewTab",
-				"title": "Open Markdown Preview in Tab",
-				"category": "Markdown",
-				"icon": "$(open-preview)"
-			}
-```
-
-Append one keybinding to `"keybindings"` so the side-by-side Preview opens from the custom editors too:
-
-```json
-			{
-				"command": "null-markdown.openPreview",
-				"key": "ctrl+shift+v",
-				"when": "activeCustomEditorId == null-markdown.editor || activeCustomEditorId == null-markdown.previewEditor"
-			}
-```
-
-and add a `"menus"` block inside `"contributes"`:
-
-```json
-		"menus": {
-			"editor/title": [
 				{
 					"command": "null-markdown.openEditor",
 					"when": "resourceLangId == markdown && !activeCustomEditorId",
@@ -1825,31 +1698,94 @@ and add a `"menus"` block inside `"contributes"`:
 				},
 				{
 					"command": "null-markdown.openSource",
-					"when": "activeCustomEditorId == null-markdown.editor || activeCustomEditorId == null-markdown.previewEditor",
+					"when": "activeCustomEditorId == null-markdown.editor",
 					"group": "navigation@1"
 				}
-			]
+```
+
+The Source-tab clause is already in this shape; the Editor-tab clause deliberately uses `activeCustomEditorId` only, because `resourceLangId` may be empty on a custom editor tab. Verify both by hand in Step 4. Add one keybinding so Ctrl+Shift+V works from the Editor tab:
+
+```json
+			{
+				"command": "null-markdown.openPreview",
+				"key": "ctrl+shift+v",
+				"when": "activeCustomEditorId == null-markdown.editor"
+			}
+```
+
+Check the JSON parses: `node -e "JSON.parse(require('fs').readFileSync('package.json','utf8'))"`.
+
+- [ ] **Step 2: Size guard and `openPreview` from the Editor tab**
+
+In `editorProvider.js`, above the class:
+
+```js
+// Above this many characters the Editor hands the file back to the plain text editor: widget
+// round-trips and whole-document decoration rebuilds do not scale to huge files.
+const MAX_EDITOR_CHARS = 1_000_000;
+```
+
+and at the top of `resolveCustomTextEditor`:
+
+```js
+		if (document.getText().length > MAX_EDITOR_CHARS) {
+			vscode.window.showInformationMessage('This file is too large for the Markdown Editor; opened as source instead.');
+			await vscode.commands.executeCommand('vscode.openWith', document.uri, 'default');
+			panel.dispose();
+			return;
 		}
 ```
 
-Check the JSON is valid: `node -e "JSON.parse(require('fs').readFileSync('package.json','utf8'))"`.
+In `extension.js`, replace `openPreview` so it accepts a URI argument (menus and the `markdown.showPreview*` interceptors pass one) and falls back to the active Editor tab when no text editor is active:
+
+```js
+	function activeMarkdownUri(arg) {
+		if (arg instanceof vscode.Uri) return arg;
+		const input = vscode.window.tabGroups.activeTabGroup.activeTab?.input;
+		if (input instanceof vscode.TabInputCustom && input.viewType === 'null-markdown.editor') return input.uri;
+		const editor = vscode.window.activeTextEditor;
+		return editor?.document.languageId === 'markdown' ? editor.document.uri : undefined;
+	}
+
+	async function openPreview(arg) {
+		const uri = activeMarkdownUri(arg);
+		if (!uri) { vscode.window.showWarningMessage('Open a Markdown file first.'); return; }
+		const key = uri.toString();
+		if (openPanels.has(key)) { openPanels.get(key).reveal(); return; }
+		const doc = await vscode.workspace.openTextDocument(uri);
+		if (doc.languageId !== 'markdown') { vscode.window.showWarningMessage('Open a Markdown file first.'); return; }
+		const preview = new NullMarkdownPreview(doc, context, md);
+		openPanels.set(key, preview);
+		preview.onDispose(() => openPanels.delete(key));
+	}
+```
+
+Reuse `activeMarkdownUri` in the existing `openWith` helper instead of its inline tab lookup. `exportPdf` and `openSlidesCmd` resolve the document from the active text editor and keep that limitation (spec: they need the Source tab).
+
+- [ ] **Step 3: Remove the read-only Preview and the TEMP diagnostics**
+
+- `editorProvider.js`: drop the `readOnly` constructor option and every `_readOnly` branch, `sendPreview`, the `timer` and its `clearTimeout`, the `buildPreviewPage` import, the `update` message, `logChannel` / `getLog` and the `case 'log'` branch. Set `wv.html = buildEditorPage(...)` only. Update the header comment.
+- `pages.js`: delete the `diag` helper and its `${diag(nonce)}` use. This also fixes the side Preview: the diagnostic calls `acquireVsCodeApi()` in the shared page shell, and `preview/preview.js` calls it again, which throws. `buildPreviewPage` stays (the side Preview uses it).
+- `webview/editor/main.mjs`: `const vscode = acquireVsCodeApi();` and remove the `post({ type: 'log', ... })` line.
+- `extension.js`: construct the provider with `{ md, processAlerts }` only.
+- Run `npm run build` and commit the refreshed `lib/editor.js` separately (see Global Constraints).
 
 - [ ] **Step 4: Sync and check by hand**
 
 Run `pwsh scripts/sync-local.ps1` and `pwsh scripts/reload-local.ps1` from the repo root, then in Null IDE:
-- **Reopen Editor With…** on a `.md` lists Text Editor, Markdown Editor and Markdown Preview; each switch keeps one tab and one document.
-- The editor-title bar shows an "edit" icon on a normal `.md` tab (opens the Editor) and a "code" icon on both custom views (opens the source). Open from Explorer, from search and from Source Control (diffs themselves stay source).
-- In the in-tab Preview: content renders like the side Preview; edit the file in a Text Editor split and the Preview updates; tick a task checkbox and the file changes.
-- With the Editor tab focused: Ctrl+Shift+V and the command palette "Open Null Markdown Preview" open the side Preview for that file; the "Open Markdown Preview in Tab" palette command works.
-- An untitled Markdown buffer (`Ctrl+N`, set language to Markdown, then "Open Markdown Editor") works.
-- A file over 1 MB opens the notice and falls back to the text editor (create one with `node -e "require('fs').writeFileSync('big.md','a\n'.repeat(600000))"` in a scratch folder).
-- Existing behaviour unchanged: Ctrl+Shift+V on a Source tab, Export to PDF, Open as Presentation.
+- Opening a `.md` from Explorer, quick open and search lands in the Markdown Editor with no Reopen With needed.
+- The title bar shows exactly one button: `$(code)` on the Editor tab, `$(open-preview)` on a Source tab; each click replaces the tab in place (one tab, one document, edits and dirty state carried over).
+- Reopen Editor With… still lists Text Editor and Markdown Editor.
+- Ctrl+Shift+V from the Editor tab opens the side Preview; the side Preview's checkbox toggle and wiki links work (they threw before the diagnostic was removed).
+- Source Control diffs and untitled Markdown buffers still work (diffs show source).
+- A file over 1 MB falls back to the text editor with a notice (`node -e "require('fs').writeFileSync('big.md','a\n'.repeat(600000))"` in a scratch folder).
+- Export to PDF and Open as Presentation from a Source tab are unchanged.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add extensions/null-markdown/extension.js extensions/null-markdown/editorProvider.js extensions/null-markdown/package.json
-git commit -m "feat(null-markdown): Editor/Source/Preview commands, toolbar and in-tab Preview (#114)"
+git add extensions/null-markdown/package.json extensions/null-markdown/extension.js extensions/null-markdown/editorProvider.js extensions/null-markdown/pages.js extensions/null-markdown/webview/editor/main.mjs
+git commit -m "feat(null-markdown): open .md in the Editor by default with a single Source toggle (#114)"
 ```
 
 ---
@@ -1883,7 +1819,7 @@ Replace the `null-markdown` entry under "Built-in Extensions" with:
 
 ```markdown
 ### null-markdown (`extensions/null-markdown/`)
-Enhanced markdown preview (GFM, Mermaid, KaTeX, GitHub alerts) on `onLanguage:markdown`, plus the **Markdown Editor** (issue #114): a live-preview `CustomTextEditorProvider` (`null-markdown.editor`; syntax markers hide except around the caret) and a read-only in-tab Preview (`null-markdown.previewEditor`), both listed in Reopen With next to the plain text editor. `editorProvider.js` is a thin relay over the `TextDocument` (source of truth): the webview mirrors LF text, sends debounced edits with a `baseVersion` that the host applies as one `WorkspaceEdit` and acks, and any host change returns as a full `doc` that the webview diffs in; `syncState.js` (pure) holds the offset/EOL mapping and version rules. Undo/redo is the workbench's (no CodeMirror history). The webview is `webview/editor/*.mjs` (CodeMirror 6 + `@lezer/markdown`, dev dependencies) bundled by `npm run build` (esbuild) into the tracked `lib/editor.js`; `lib/editor.css` is hand-written. `specs.mjs` is the pure decoration plan (tree + selection in, specs out); tables, Mermaid, `$$` math, alerts, HTML and images render as widgets through the host's `createMd()` + `processAlerts()` (`renderBlock`/`rendered` messages). `node_modules` (markdown-it, KaTeX, Mermaid, highlight.js) come from `npm ci --prefix` in CI and are not synced by `sync-local.ps1`; it copies `lib/` and the host files. Design: `docs/specs/null-markdown-editor-design.md`; plan: `docs/plans/null-markdown-editor.md`.
+Enhanced markdown preview (GFM, Mermaid, KaTeX, GitHub alerts) on `onLanguage:markdown`, plus the **Markdown Editor** (issue #114): a live-preview `CustomTextEditorProvider` (`null-markdown.editor`; syntax markers hide except around the caret) that is the default view of `.md` files, with a single title-bar button toggling to the plain text editor (Source). `editorProvider.js` is a thin relay over the `TextDocument` (source of truth): the webview mirrors LF text, sends debounced edits with a `baseVersion` that the host applies as one `WorkspaceEdit` and acks, and any host change returns as a full `doc` that the webview diffs in; `syncState.js` (pure) holds the offset/EOL mapping and version rules. Undo/redo is the workbench's (no CodeMirror history). The webview is `webview/editor/*.mjs` (CodeMirror 6 + `@lezer/markdown`, dev dependencies) bundled by `npm run build` (esbuild) into the tracked `lib/editor.js`; `lib/editor.css` is hand-written. `specs.mjs` is the pure decoration plan (tree + selection in, specs out); tables, Mermaid, `$$` math, alerts, HTML and images render as widgets through the host's `createMd()` + `processAlerts()` (`renderBlock`/`rendered` messages). `node_modules` (markdown-it, KaTeX, Mermaid, highlight.js) come from `npm ci --prefix` in CI and are not synced by `sync-local.ps1`; it copies `lib/` and the host files. Design: `docs/specs/null-markdown-editor-design.md`; plan: `docs/plans/null-markdown-editor.md`.
 ```
 
 and in the overview and the "How the Build Works" list add a half-sentence: step 4 becomes "`npm ci --prefix extensions/null-markdown` and `npm run build` in it; ..." (edit the existing step-4 line accordingly).
