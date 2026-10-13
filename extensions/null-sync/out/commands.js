@@ -134,6 +134,20 @@ function registerCommands(context, engine, enableDeps, userDir) {
         for (const file of s.pending) {
             items.push({ label: `$(clock) Waiting for unsaved changes: ${file}`, description: 'applied once it is saved or closed' });
         }
+        if (s.pendingInstalls.length > 0) {
+            items.push({
+                label: `$(cloud-download) Install ${s.pendingInstalls.length} extension(s) added on other devices`,
+                description: s.pendingInstalls.join(', '),
+                run: () => vscode.commands.executeCommand('null.sync.syncNow'),
+            });
+        }
+        for (const id of s.pendingRemovals) {
+            items.push({
+                label: `$(trash) Uninstall ${id}`,
+                description: 'removed on another device',
+                run: () => engine.uninstallRemoved(id),
+            });
+        }
         items.push({ label: '$(sync) Sync now', run: () => vscode.commands.executeCommand('null.sync.syncNow') }, { label: '$(history) Restore an earlier version…', run: restore }, { label: '$(debug-stop) Stop syncing…', run: stop });
         const picked = await vscode.window.showQuickPick(items, { placeHolder: 'Null Sync' });
         await picked?.run?.();

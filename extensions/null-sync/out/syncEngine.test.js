@@ -447,4 +447,89 @@ async function synced(files) {
         assert.notEqual(a.passphrase, undefined);
     });
 });
+(0, node_test_1.describe)('extension list', () => {
+    (0, node_test_1.it)('an interactive run installs what another device added; a background run only reports it', async () => {
+        const { a, b } = await synced({});
+        a.installed.add('pub.x');
+        a.installed.add('pub.y');
+        b.installed.add('pub.y');
+        await a.syncNow();
+        await b.run();
+        assert.deepEqual(b.status.pendingInstalls, ['pub.x']);
+        assert.equal(b.status.state, 'needsAttention');
+        assert.equal(b.installed.has('pub.x'), false, 'a background run never installs');
+        await b.syncNow();
+        assert.equal(b.installed.has('pub.x'), true);
+        assert.deepEqual(b.status.pendingInstalls, []);
+        assert.equal(b.status.state, 'idle');
+    });
+    (0, node_test_1.it)('a removal elsewhere is reported but never applied, and uninstallRemoved applies it without re-uploading it', async () => {
+        const { gist, a, b, id } = await synced({});
+        a.installed.add('pub.x');
+        a.installed.add('pub.y');
+        await a.syncNow();
+        await b.syncNow();
+        a.installed.delete('pub.y');
+        await a.syncNow();
+        await b.run();
+        assert.deepEqual(b.status.pendingRemovals, ['pub.y']);
+        assert.equal(b.installed.has('pub.y'), true);
+        const before = gist.revisionCount(id);
+        await b.run();
+        assert.equal(gist.revisionCount(id), before, 'reporting a removal pushes nothing');
+        await b.engine.uninstallRemoved('pub.y');
+        assert.equal(b.installed.has('pub.y'), false);
+        assert.deepEqual(b.status.pendingRemovals, []);
+        assert.equal(b.status.state, 'idle');
+        await b.run();
+        await a.run();
+        assert.equal(gist.revisionCount(id), before);
+        assert.equal(b.status.state, 'idle');
+    });
+    (0, node_test_1.it)('a failed install is reported and stays pending until it works', async () => {
+        const { a, b } = await synced({});
+        a.installed.add('pub.ok');
+        a.installed.add('pub.bad');
+        await a.syncNow();
+        b.failing.add('pub.bad');
+        await b.syncNow();
+        assert.equal(b.installed.has('pub.ok'), true);
+        assert.equal(b.status.state, 'error');
+        assert.match(b.status.message, /Could not install pub\.bad/);
+        assert.deepEqual(b.status.pendingInstalls, ['pub.bad']);
+        b.failing.clear();
+        await b.syncNow();
+        assert.equal(b.installed.has('pub.bad'), true);
+        assert.equal(b.status.state, 'idle');
+    });
+    (0, node_test_1.it)('an unreadable installed list skips the extension sync instead of removing everything', async () => {
+        const { gist, a, id } = await synced({});
+        a.installed.add('pub.x');
+        await a.syncNow();
+        const before = gist.revisionCount(id);
+        a.manifestBroken = true;
+        await a.syncNow();
+        assert.equal(a.status.state, 'error');
+        assert.match(a.status.message, /installed extensions/);
+        assert.equal(gist.revisionCount(id), before);
+    });
+    (0, node_test_1.it)('a corrupt remote extension list is reported and left alone', async () => {
+        const { gist, a, id } = await synced({});
+        a.installed.add('pub.x');
+        gist.tamper(id, 'extensions.json.enc', '{"v":1,"iv":"AAAA","tag":"AAAA","data":"AAAA"}');
+        const before = gist.revisionCount(id);
+        await a.syncNow();
+        assert.equal(a.status.state, 'error');
+        assert.match(a.status.message, /extensions\.json\.enc/);
+        assert.equal(gist.revisionCount(id), before);
+    });
+    (0, node_test_1.it)('is not synced when its category is off', async () => {
+        const { gist, a, id } = await synced({});
+        a.categories.extensions = false;
+        a.installed.add('pub.x');
+        const before = gist.revisionCount(id);
+        await a.syncNow();
+        assert.equal(gist.revisionCount(id), before);
+    });
+});
 //# sourceMappingURL=syncEngine.test.js.map

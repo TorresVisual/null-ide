@@ -39,6 +39,7 @@ const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const vscode = __importStar(require("vscode"));
 const commands_1 = require("./commands");
+const extensionHost_1 = require("./extensionHost");
 const gistHttp_1 = require("./gistHttp");
 const localFiles_1 = require("./localFiles");
 const lock_1 = require("./lock");
@@ -91,6 +92,7 @@ function activate(context) {
         setState: async (state) => { await context.globalState.update(STATE_KEY, state); },
         lock: () => (0, lock_1.acquire)(path.join(storage, 'lock')),
         now: Date.now,
+        extensions: extensionHost_1.extensionHost,
         confirmOverwrite: async (file) => (await vscode.window.showWarningMessage(`${file} has unsaved changes. Overwrite it with the synced version?`, { modal: true }, 'Overwrite')) === 'Overwrite',
     });
     const enableDeps = {
@@ -123,6 +125,7 @@ function activate(context) {
         onDidChangeStatus: changed.event,
         syncNow: () => engine.run({ interactive: true }),
         resolveConflict: (file, side) => engine.resolve(file, side),
+        uninstallRemoved: (id) => engine.uninstallRemoved(id),
     };
 }
 function deactivate() { }

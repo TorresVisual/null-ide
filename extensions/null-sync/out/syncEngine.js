@@ -36,6 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.SyncEngine = void 0;
 const crypto = __importStar(require("crypto"));
 const cryptoBox_1 = require("./cryptoBox");
+const extensionSet_1 = require("./extensionSet");
 const gistStore_1 = require("./gistStore");
 const layout_1 = require("./layout");
 const settingsFilter_1 = require("./settingsFilter");
@@ -371,27 +372,91 @@ class SyncEngine {
                 }
             }
         }
+        let extensionsBase = c.st.extensionsBase;
+        let pendingInstalls = [];
+        let pendingRemovals = [];
+        if (categories.includes('extensions') && d.extensions) {
+            const merged = await this.syncExtensions(c, d.extensions, interactive, problems);
+            if (merged) {
+                pendingInstalls = merged.pendingInstalls;
+                pendingRemovals = merged.pendingRemovals;
+                extensionsBase = merged.nextBase;
+                if (merged.push)
+                    changes[layout_1.EXTENSIONS_REMOTE] = (0, cryptoBox_1.seal)(c.key, layout_1.EXTENSIONS_REMOTE, JSON.stringify(merged.push));
+            }
+        }
         if (Object.keys(changes).length > 0) {
             const updated = await c.store.update(c.st.gistId, changes);
             if (!updated.ok) {
+                // Pulls already happened, so remember them; the extension base stays put until the upload works.
                 await d.setState({ ...c.st, base });
                 this.failed(updated);
-                this.set({ conflicts, pending });
+                this.set({ conflicts, pending, pendingInstalls, pendingRemovals });
                 return;
             }
             Object.assign(base, pushed);
         }
         const lastSyncedAt = d.now();
-        await d.setState({ ...c.st, base, lastSyncedAt });
+        await d.setState({ ...c.st, base, extensionsBase, lastSyncedAt });
+        const outstanding = conflicts.length + pending.length + pendingInstalls.length + pendingRemovals.length;
         this.set({
-            state: problems.length > 0 ? 'error' : conflicts.length > 0 || pending.length > 0 ? 'needsAttention' : 'idle',
+            state: problems.length > 0 ? 'error' : outstanding > 0 ? 'needsAttention' : 'idle',
             message: problems.length > 0 ? problems.join(' ') : undefined,
             lastSyncedAt,
             conflicts,
             pending,
-            pendingInstalls: [],
-            pendingRemovals: [],
+            pendingInstalls,
+            pendingRemovals,
         });
+    }
+    /**
+     * Merges the installed-extension list with the remote one. Only an interactive run installs; removals are only ever
+     * reported. `undefined` (with a message in `problems`) when either list cannot be read, so nothing is changed.
+     */
+    async syncExtensions(c, host, interactive, problems) {
+        let remote = null;
+        const encrypted = c.files[layout_1.EXTENSIONS_REMOTE];
+        if (encrypted !== undefined) {
+            const plain = (0, cryptoBox_1.open)(c.key, layout_1.EXTENSIONS_REMOTE, encrypted);
+            const ids = plain === undefined ? undefined : (0, extensionSet_1.parseIds)(plain);
+            if (ids === undefined) {
+                problems.push(`Could not read ${layout_1.EXTENSIONS_REMOTE}; the extension list was left alone.`);
+                return undefined;
+            }
+            remote = ids;
+        }
+        const installed = await host.installed();
+        if (installed === undefined) {
+            problems.push('Could not read the installed extensions; the extension list was not synced.');
+            return undefined;
+        }
+        let local = installed;
+        let merge = (0, extensionSet_1.mergeExtensions)(local, remote, c.st.extensionsBase);
+        if (interactive && merge.install.length > 0) {
+            for (const id of merge.install) {
+                if (await host.install(id))
+                    local = [...local, id];
+                else
+                    problems.push(`Could not install ${id}.`);
+            }
+            merge = (0, extensionSet_1.mergeExtensions)(local, remote, c.st.extensionsBase);
+        }
+        return { pendingInstalls: merge.install, pendingRemovals: merge.notifyRemoved, push: merge.push, nextBase: merge.nextBase };
+    }
+    /** Uninstalls an extension that was removed on another device, and stops reporting it. */
+    async uninstallRemoved(id) {
+        await this.tail;
+        const host = this.d.extensions;
+        const st = this.d.state.get();
+        if (!host || !st || !this.status.pendingRemovals.includes(id))
+            return;
+        if (!(await host.uninstall(id))) {
+            this.set({ state: 'error', message: `Could not uninstall ${id}.` });
+            return;
+        }
+        await this.d.setState({ ...st, extensionsBase: (st.extensionsBase ?? []).filter((x) => x !== id) });
+        this.set({ pendingRemovals: this.status.pendingRemovals.filter((x) => x !== id) });
+        this.settle();
     }
 }
 exports.SyncEngine = SyncEngine;

@@ -41,6 +41,7 @@ const path = __importStar(require("path"));
 const enable_1 = require("./enable");
 const localFiles_1 = require("./localFiles");
 const syncEngine_1 = require("./syncEngine");
+const types_1 = require("./types");
 const roots = [];
 /** Deletes every temp folder the devices created; call from `after()`. */
 function cleanup() {
@@ -63,8 +64,14 @@ class Device {
     overwrite = false;
     state;
     passphrase;
-    categories = { settings: true, keybindings: true, snippets: true };
+    categories = { settings: true, keybindings: true, snippets: true, extensions: true };
     excluded = ['*.path', '*token*'];
+    /** The extensions installed on this machine (enabled or not). */
+    installed = new Set();
+    /** Extension IDs whose install fails, like one that is not in the gallery. */
+    failing = new Set();
+    /** The on-disk extension list cannot be read. */
+    manifestBroken = false;
     account = { id: 'acc', username: 'me' };
     clock = 1;
     constructor(gist) {
@@ -92,6 +99,16 @@ class Device {
             lock: async () => (this.locked ? undefined : async () => undefined),
             now: () => this.clock++,
             confirmOverwrite: async () => this.overwrite,
+            extensions: {
+                installed: async () => (this.manifestBroken ? undefined : [...this.installed].sort()),
+                install: async (id) => {
+                    if (this.failing.has(id))
+                        return false;
+                    this.installed.add(id);
+                    return true;
+                },
+                uninstall: async (id) => this.installed.delete(id),
+            },
         });
     }
     get status() {
@@ -133,7 +150,7 @@ class Device {
             accounts: async () => [this.account],
             token: async () => 'token',
             io: this.gist.io,
-            categories: () => ['settings', 'keybindings', 'snippets'].filter((c) => this.categories[c]),
+            categories: () => types_1.CATEGORIES.filter((c) => this.categories[c]),
             savePassphrase: async (p) => { this.passphrase = p; },
             setState: async (s) => { this.state = s; },
         }, {

@@ -1,6 +1,6 @@
 'use strict';
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.remoteNameOf = exports.isDeletable = exports.MANIFEST = exports.CORE_FILES = exports.KEYBINDINGS = exports.SETTINGS = void 0;
+exports.remoteNameOf = exports.isDeletable = exports.EXTENSIONS_REMOTE = exports.MANIFEST = exports.CORE_FILES = exports.KEYBINDINGS = exports.SETTINGS = void 0;
 exports.isSyncableFile = isSyncableFile;
 exports.categoryOf = categoryOf;
 exports.fileOfRemoteName = fileOfRemoteName;
@@ -13,6 +13,8 @@ exports.KEYBINDINGS = 'keybindings.json';
 exports.CORE_FILES = [exports.SETTINGS, exports.KEYBINDINGS];
 /** The plaintext file in the Gist that holds the KDF parameters and the passphrase check. */
 exports.MANIFEST = 'manifest.json';
+/** The remote file that holds the encrypted list of installed extension IDs (not a local file). */
+exports.EXTENSIONS_REMOTE = 'extensions.json.enc';
 const SNIPPET_NAME = /^[^\\/:*?"<>|]+\.(json|code-snippets)$/i;
 /** The only names this extension reads or writes. Remote names are untrusted, so every local path goes through here. */
 function isSyncableFile(file) {
