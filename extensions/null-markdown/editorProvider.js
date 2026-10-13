@@ -8,6 +8,9 @@ const { applyCheckboxToggle, openWikiLink } = require('./docActions');
 
 // CustomTextEditorProvider for the live-preview Editor (readOnly: false) and the in-tab Preview
 // (readOnly: true). A thin relay: the TextDocument stays the source of truth.
+let logChannel;
+const getLog = () => (logChannel ??= vscode.window.createOutputChannel('Null Markdown')); // TEMP diagnostic
+
 class NullMarkdownEditorProvider {
 	constructor(context, { md, processAlerts, readOnly }) {
 		this._ctx = context;
@@ -57,6 +60,7 @@ class NullMarkdownEditorProvider {
 
 		subs.push(wv.onDidReceiveMessage(async msg => {
 			switch (msg?.type) {
+				case 'log': getLog().appendLine(String(msg.text)); break; // TEMP diagnostic
 				case 'ready': if (!this._readOnly) sendDoc(); break;
 				case 'edit': if (!this._readOnly) await this._applyEdit(document, sync, msg, sendDoc, post); break;
 				case 'save': if (!this._readOnly) await document.save(); break;
