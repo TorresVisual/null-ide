@@ -55,7 +55,10 @@ export class IssuesViewProvider implements vscode.WebviewViewProvider, IssuesLis
         localResourceRoots: [vscode.Uri.joinPath(this._extensionUri, 'lib')],
       },
     );
-    panel.iconPath = vscode.Uri.joinPath(this._extensionUri, 'media', 'github-issues.svg');
+    panel.iconPath = {
+      light: vscode.Uri.joinPath(this._extensionUri, 'media', 'github-issues.svg'),
+      dark: vscode.Uri.joinPath(this._extensionUri, 'media', 'github-issues-dark.svg'),
+    };
     panel.webview.html = buildListHtml(panel.webview, this._extensionUri);
     this._fullView = panel;
     this._attach(panel.webview, false, () => { this._fullView = undefined; }, panel);
