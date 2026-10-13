@@ -40,6 +40,7 @@ const path = __importStar(require("path"));
 const buttonConfig_1 = require("./buttonConfig");
 const buttonConfigIntegration_1 = require("./buttonConfigIntegration");
 const projectDetector_1 = require("./projectDetector");
+const envApi_1 = require("./envApi");
 const npmScriptsProvider_1 = require("./npmScriptsProvider");
 function getNonce() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -93,7 +94,7 @@ class ActionButtonsPanel {
     postState() {
         const { buttons } = (0, buttonConfigIntegration_1.readButtonConfigs)();
         const folder = vscode.workspace.workspaceFolders?.[0];
-        const suggestions = folder ? (0, projectDetector_1.detectSuggestedButtons)(folder.uri.fsPath) : [];
+        const suggestions = folder ? (0, projectDetector_1.detectSuggestedButtons)(folder.uri.fsPath, (0, envApi_1.getEnvApi)().detectProjects) : [];
         this.panel.webview.postMessage({ type: 'init', buttons, suggestions });
     }
     async handleSave(raw) {

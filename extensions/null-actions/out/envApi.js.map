@@ -1,0 +1,1 @@
+{"version":3,"file":"envApi.js","sourceRoot":"","sources":["../src/envApi.ts"],"names":[],"mappings":";;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;AASA,8BAMC;AAfD,+CAAiC;AAQjC,2GAA2G;AAC3G,SAAgB,SAAS;IACvB,MAAM,GAAG,GAAG,MAAM,CAAC,UAAU,CAAC,YAAY,CAAS,eAAe,CAAC,EAAE,OAAO,CAAC;IAC7E,IAAI,CAAC,GAAG,EAAE,CAAC;QACT,MAAM,IAAI,KAAK,CAAC,4CAA4C,CAAC,CAAC;IAChE,CAAC;IACD,OAAO,GAAG,CAAC;AACb,CAAC"}
