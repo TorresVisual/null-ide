@@ -642,8 +642,8 @@ jobs:
       - name: Build null-updater
         shell: pwsh
         run: |
-          cmake -S updater -B updater/build -G "Visual Studio 17 2022" -A x64
-          cmake --build updater/build --config Release
+          cmake -S ide-overlay/updater -B ide-overlay/updater/build -G "Visual Studio 17 2022" -A x64
+          cmake --build ide-overlay/updater/build --config Release
 
       - name: Prepare installer and updater payload
         shell: pwsh
@@ -658,7 +658,7 @@ jobs:
           New-Item -ItemType Directory -Path $updaterDir -Force | Out-Null
           Copy-Item ide-overlay/scripts/install-null-ide.ps1 $updaterDir -Force
           Copy-Item ide-overlay/scripts/update-null-ide.ps1  $updaterDir -Force
-          Copy-Item updater/build/Release/null-updater.exe   $updaterDir -Force
+          Copy-Item ide-overlay/updater/build/Release/null-updater.exe   $updaterDir -Force
 
           $metadata = [ordered]@{
             repo        = '${{ github.repository }}'
