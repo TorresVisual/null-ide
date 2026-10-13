@@ -1,0 +1,29 @@
+{
+  "name": "null-sync",
+  "displayName": "Null Sync",
+  "description": "Encrypted cross-device sync of settings, keybindings, snippets and extensions through a secret GitHub Gist",
+  "version": "1.0.0",
+  "publisher": "null",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.93.0"
+  },
+  "scripts": {
+    "compile": "tsc -p tsconfig.json",
+    "test": "tsc -p tsconfig.json && node --test out/layout.test.js",
+    "pretest:integration": "tsc -p tsconfig.json",
+    "test:integration": "node ./out/test/runTest.js"
+  },
+  "dependencies": {
+    "jsonc-parser": "^3.3.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0",
+    "@types/vscode": "^1.93.0",
+    "@types/node": "^22.0.0",
+    "@vscode/test-electron": "^3.1.0",
+    "mocha": "^11.8.0",
+    "@types/mocha": "^10.0.10",
+    "glob": "^13.0.6"
+  }
+}
