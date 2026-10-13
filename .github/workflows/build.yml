@@ -451,6 +451,9 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=8192
           VSCODE_QUALITY: stable
+          # build/lib/fetch.ts sends this as HTTP Basic (base64 of the raw value), so it
+          # must be user:token. Unauthenticated release lookups get 403 on shared runners.
+          GITHUB_TOKEN: x-access-token:${{ secrets.GITHUB_TOKEN }}
         run: npx gulp vscode-win32-x64
 
       - name: Fetch VSCodium server commit hash
