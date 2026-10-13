@@ -11,6 +11,8 @@ export const KEYBINDINGS = 'keybindings.json';
 export const CORE_FILES = [SETTINGS, KEYBINDINGS];
 /** The plaintext file in the Gist that holds the KDF parameters and the passphrase check. */
 export const MANIFEST = 'manifest.json';
+/** The remote file that holds the encrypted list of installed extension IDs (not a local file). */
+export const EXTENSIONS_REMOTE = 'extensions.json.enc';
 
 const SNIPPET_NAME = /^[^\\/:*?"<>|]+\.(json|code-snippets)$/i;
 

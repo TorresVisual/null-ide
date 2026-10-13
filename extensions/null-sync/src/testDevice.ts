@@ -7,7 +7,7 @@ import { EnableResult, enable } from './enable';
 import { FakeGist } from './fakeGist';
 import { LocalFiles } from './localFiles';
 import { SyncEngine } from './syncEngine';
-import { Category, FirstSync, StoredState, SyncStatus } from './types';
+import { CATEGORIES, Category, FirstSync, StoredState, SyncStatus } from './types';
 
 const roots: string[] = [];
 
@@ -31,8 +31,14 @@ export class Device {
   overwrite = false;
   state: StoredState | undefined;
   passphrase: string | undefined;
-  categories: Record<Category, boolean> = { settings: true, keybindings: true, snippets: true };
+  categories: Record<Category, boolean> = { settings: true, keybindings: true, snippets: true, extensions: true };
   excluded = ['*.path', '*token*'];
+  /** The extensions installed on this machine (enabled or not). */
+  readonly installed = new Set<string>();
+  /** Extension IDs whose install fails, like one that is not in the gallery. */
+  readonly failing = new Set<string>();
+  /** The on-disk extension list cannot be read. */
+  manifestBroken = false;
   readonly account = { id: 'acc', username: 'me' };
   private clock = 1;
 
@@ -60,6 +66,15 @@ export class Device {
       lock: async () => (this.locked ? undefined : async () => undefined),
       now: () => this.clock++,
       confirmOverwrite: async () => this.overwrite,
+      extensions: {
+        installed: async () => (this.manifestBroken ? undefined : [...this.installed].sort()),
+        install: async (id) => {
+          if (this.failing.has(id)) return false;
+          this.installed.add(id);
+          return true;
+        },
+        uninstall: async (id) => this.installed.delete(id),
+      },
     });
   }
 
@@ -105,7 +120,7 @@ export class Device {
         accounts: async () => [this.account],
         token: async () => 'token',
         io: this.gist.io,
-        categories: () => (['settings', 'keybindings', 'snippets'] as Category[]).filter((c) => this.categories[c]),
+        categories: () => CATEGORIES.filter((c) => this.categories[c]),
         savePassphrase: async (p) => { this.passphrase = p; },
         setState: async (s) => { this.state = s; },
       },

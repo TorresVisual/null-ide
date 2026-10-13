@@ -2,7 +2,7 @@
 
 import type * as vscode from 'vscode';
 
-export const CATEGORIES = ['settings', 'keybindings', 'snippets'] as const;
+export const CATEGORIES = ['settings', 'keybindings', 'snippets', 'extensions'] as const;
 export type Category = (typeof CATEGORIES)[number];
 
 /** A sha-256 hex digest of a file's synced content, or `null` when the file is absent. */
@@ -20,6 +20,8 @@ export interface StoredState {
   accountId: string;
   owner: string;
   base: Record<string, Base>;
+  /** The extension IDs both sides had at the last sync (see extensionSet.ts). */
+  extensionsBase?: string[];
   lastSyncedAt?: number;
 }
 
@@ -57,4 +59,6 @@ export interface NullSyncApi {
   onDidChangeStatus: vscode.Event<void>;
   syncNow(): Promise<void>;
   resolveConflict(file: string, side: 'mine' | 'theirs'): Promise<void>;
+  /** Uninstalls an extension that was removed on another device (an entry of `pendingRemovals`). */
+  uninstallRemoved(id: string): Promise<void>;
 }

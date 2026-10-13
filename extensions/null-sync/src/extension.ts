@@ -120,6 +120,7 @@ export function activate(context: vscode.ExtensionContext): NullSyncApi {
     onDidChangeStatus: changed.event,
     syncNow: () => engine.run({ interactive: true }),
     resolveConflict: (file, side) => engine.resolve(file, side),
+    uninstallRemoved: (id) => engine.uninstallRemoved(id),
   };
 }
 

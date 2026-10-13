@@ -34,11 +34,12 @@
         "null-sync.categories": {
           "type": "object",
           "scope": "application",
-          "default": { "settings": true, "keybindings": true, "snippets": true },
+          "default": { "settings": true, "keybindings": true, "snippets": true, "extensions": true },
           "properties": {
             "settings": { "type": "boolean" },
             "keybindings": { "type": "boolean" },
-            "snippets": { "type": "boolean" }
+            "snippets": { "type": "boolean" },
+            "extensions": { "type": "boolean" }
           },
           "additionalProperties": false,
           "markdownDescription": "What to sync on this device. Change it with **Null: Choose What to Sync**."
