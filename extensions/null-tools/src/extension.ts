@@ -17,7 +17,7 @@ import { registerUpdaterFeature } from './updaterIntegration';
 import { registerCommitValidationFeature } from './commitValidationIntegration';
 import { registerOpenInNullNotesFeature } from './nullNotes';
 import { showWelcomePage } from './welcomePage';
-import { registerDashboardFeature } from './dashboardIntegration';
+import { openDashboard, registerDashboardFeature } from './dashboardIntegration';
 import { registerClaudeTabFeature } from './claudeTabIntegration';
 import { registerFollowAlongFeature } from './followAlongIntegration';
 import { registerWhyIsThisHereFeature } from './whyIsThisHereIntegration';
@@ -124,6 +124,8 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand('null.showWelcome', () => showWelcomePage(context)),
   );
+
+  context.subscriptions.push(vscode.commands.registerCommand('null.openDashboard', openDashboard));
 
   if (!context.globalState.get('null.welcomeShown')) {
     context.globalState.update('null.welcomeShown', true);

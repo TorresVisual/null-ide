@@ -50,7 +50,7 @@ export function activate(context: vscode.ExtensionContext) {
   // 4. Register Commands
   context.subscriptions.push(
     vscode.commands.registerCommand('null-format.openSettings', () =>
-      vscode.commands.executeCommand('workbench.action.openSettings', '@ext:null null-format')
+      vscode.commands.executeCommand('workbench.action.openSettings', '@ext:null.null-format')
     ),
     vscode.commands.registerCommand('null-format.createPrettierConfig', () =>
       createConfigFile('.prettierrc.json', extensionPath, 'defaults/.prettierrc.json')

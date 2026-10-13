@@ -32,7 +32,7 @@
   "nullWorkspace": {
     "features": [
       { "id": "dashboard", "label": "Dashboard", "category": "develop", "icon": "home",
-        "command": "null.showWelcome", "description": "Projects & recent folders", "order": 10 },
+        "command": "null.openDashboard", "description": "Projects & recent folders", "order": 10 },
       { "id": "issues", "label": "GitHub Issues", "category": "develop", "icon": "issues",
         "command": "null.issues.openFullView", "description": "Full-width issue list", "order": 20 }
     ]
@@ -71,6 +71,10 @@
         "title": "Null: Show Welcome Page"
       },
       {
+        "command": "null.openDashboard",
+        "title": "Null: Open Dashboard"
+      },
+      {
         "command": "null.focusClaudeTab",
         "title": "Null: Go to Open Claude Chat…"
       },
@@ -91,11 +95,13 @@
       },
       {
         "command": "null.renameScratchOrNoteItem",
-        "title": "Null: Rename Item"
+        "title": "Null: Rename Item",
+        "icon": "$(edit)"
       },
       {
         "command": "null.deleteScratchOrNoteItem",
-        "title": "Null: Delete Item"
+        "title": "Null: Delete Item",
+        "icon": "$(trash)"
       },
       {
         "command": "null.runScratchFile",

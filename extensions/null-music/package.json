@@ -12,14 +12,28 @@
     "onStartupFinished",
     "onView:null.musicView"
   ],
+  "nullWorkspace": {
+    "features": [
+      { "id": "music", "label": "Music Player", "category": "develop", "icon": "music",
+        "command": "null-music.focus", "description": "Local music player", "order": 40 }
+    ]
+  },
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "null-music",
+          "title": "Music",
+          "icon": "media/music.svg"
+        }
+      ]
+    },
     "views": {
-      "null-workspace": [
+      "null-music": [
         {
           "type": "webview",
           "id": "null.musicView",
-          "name": "Music",
-          "visibility": "collapsed"
+          "name": "Music Player"
         }
       ]
     },
