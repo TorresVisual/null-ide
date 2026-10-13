@@ -40,6 +40,7 @@ const os = __importStar(require("os"));
 const path = __importStar(require("path"));
 const fs = __importStar(require("fs"));
 const recentProjectsIntegration_1 = require("./recentProjectsIntegration");
+const featuresTreeView_1 = require("./featuresTreeView");
 const scratchNotesIntegration_1 = require("./scratchNotesIntegration");
 const autoGitignore_1 = require("./autoGitignore");
 const portsIntegration_1 = require("./portsIntegration");
@@ -100,6 +101,7 @@ function activate(context) {
     context.subscriptions.push(bar);
     (0, dashboardIntegration_1.registerDashboardFeature)(context);
     (0, recentProjectsIntegration_1.registerRecentProjectsUriHandler)(context);
+    (0, featuresTreeView_1.registerFeaturesView)(context);
     (0, scratchNotesIntegration_1.registerScratchAndNotesFeature)(context);
     (0, autoGitignore_1.registerAutoGitignoreFeature)(context);
     (0, updaterIntegration_1.registerUpdaterFeature)(context);
