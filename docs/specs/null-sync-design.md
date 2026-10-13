@@ -14,9 +14,9 @@ This spec covers the **engine, its API and its commands**. It deliberately has *
 - **Secret means unlisted, not private** (anyone with the URL can read it), so everything uploaded is **client-side encrypted**: AES-256-GCM, key from a user passphrase via scrypt. The Gist holds only ciphertext plus a plaintext `manifest.json` (format version, salt, KDF parameters). Forgetting the passphrase makes the remote data unrecoverable; local files are unaffected and the user can stop syncing and start a new store.
 - **New built-in extension `null-sync`** (`extensions/null-sync/`), `extensionKind: ["ui"]` (it reads the machine's user-data folder), `extensionDependencies: ["null.null-accounts"]`, activated on `onStartupFinished`. It follows the repo's pure-modules-plus-thin-`vscode`-glue layout. The ~60 lines of Gist HTTP handling in `null-activity` are not shared (extensions only share code through exports); `null-sync` gets its own small client rather than a new cross-extension coupling.
 - **Whole-file three-way sync** for settings, keybindings and each snippet file. Each file is compared as `local` / `remote` / `base`, where `base` is the hash recorded at the last successful sync. Only one side changed → that side wins silently. Both changed to different content → **conflict**, never auto-resolved. No JSONC merging.
-- **Extension list is a set, merged by set arithmetic** — it never produces a conflict prompt.
+- **Extension list is a set, merged by set arithmetic** — it never produces a conflict prompt. Background runs never install or uninstall anything; they only report (`pendingInstalls`, `pendingRemovals`). Interactive runs (Enable, Sync Now) perform the installs; uninstalls always need an explicit action.
 - **Machine-specific settings are filtered by key** (the only key-level logic, see below).
-- **No UI.** No status bar, no panel, no unsolicited notifications. State is observable only through `NullSyncApi.getStatus()` / `onDidChangeStatus`.
+- **No UI.** No status bar, no panel, no unsolicited notifications. State is observable through `NullSyncApi.getStatus()` / `onDidChangeStatus` and, on demand, the `null.sync.showStatus` quick pick.
 - **Off by default.** `null-sync.enabled` is `false`; enabling runs a setup flow with a consent modal naming exactly what leaves the device.
 
 ## Synced data
@@ -26,7 +26,7 @@ This spec covers the **engine, its API and its commands**. It deliberately has *
 | `settings` | `<User>/settings.json` (filtered) | `settings.json.enc` |
 | `keybindings` | `<User>/keybindings.json` | `keybindings.json.enc` |
 | `snippets` | each `<User>/snippets/*.json` / `*.code-snippets` | `snippets__<file>.enc` (Gist names cannot contain `/`) |
-| `extensions` | installed, non-built-in extension IDs | `extensions.json.enc` (sorted, lowercased `publisher.name` array) |
+| `extensions` | installed, non-built-in extension IDs, **including disabled ones** (read from the extensions manifest on disk; `vscode.extensions.all` lists enabled extensions only, so it is a fallback only if that path cannot be derived) | `extensions.json.enc` (sorted, lowercased `publisher.name` array) |
 
 `<User>` is the grandparent of `context.globalStorageUri.fsPath` (`…/User/globalStorage/<id>`); the plan verifies this on a real install. Categories are switched in `null-sync.categories`; a disabled category is neither read, uploaded nor applied.
 
@@ -36,7 +36,7 @@ This spec covers the **engine, its API and its commands**. It deliberately has *
 
 `settings.json` is filtered before hashing and encrypting:
 
-- Keys matching `null-sync.excludedSettings` are removed. Defaults: `*.path`, `*Path`, `terminal.integrated.defaultProfile.*`, `terminal.integrated.profiles.*`, `http.proxy`, `null-sync.*` (so the sync switches are per device).
+- Keys matching `null-sync.excludedSettings` are removed. Defaults: `*.path`, `*Path`, `terminal.integrated.defaultProfile.*`, `terminal.integrated.profiles.*`, `http.proxy`, `null-sync.*` (so the sync switches are per device), and, case-insensitively, `*token*`, `*secret*`, `*password*`, `*apiKey*`, `*credential*`. The secret patterns are deliberately broad: wrongly excluding one setting is visible and cheap, while a key in a Gist revision history cannot be taken back.
 - On **pull**, this device's current values for the excluded keys are re-applied to the incoming text.
 - Both directions use `jsonc-parser`'s `modify`/`parse`, so comments and formatting survive. `jsonc-parser` is the only new dependency (not currently used by any Null extension; added to `null-sync/package.json` and installed by the `npm ci` step).
 
@@ -63,12 +63,12 @@ All under `extensions/null-sync/src/`; only the starred files import `vscode`.
 | `settingsFilter.ts` | `stripExcluded`, `reapplyExcluded`, key-pattern matching. Pure (uses `jsonc-parser`). |
 | `gistStore.ts` | `find`, `read`, `write` (one `PATCH` of changed files; `null` content deletes), `revisions`, `readRevision`. Gist-specific, takes an injected `HttpJson`; never throws; messages follow `null-activity/gistClient.ts` (only a JSON `message` is echoed, token only in `Authorization`). |
 | `gistHttp.ts` | The only `fetch` caller: the two allowed hosts, `redirect: 'error'`, 15 s timeout. |
-| `localFiles.ts` | Read/write/delete the synced local files, atomic write (temp + rename), backups to `globalStorage/null-sync/backups/` (last 10 per file), injected `fs`. |
+| `localFiles.ts` | Read/write/delete the synced local files, atomic write (temp + rename), backups to `globalStorage/null-sync/backups/` (last 10 per file), injected `fs` and injected `isDirty(path)` (true while the file has an open editor with unsaved edits). |
 | `syncEngine.ts` | The serialised `run({ interactive })` / `resolve(file, side)` / `restore(revision)` / `stop()`; owns `Status`. Injected: accounts, token, store, files, extension host, state, clock. Calls run one at a time, never reject (same queue idea as `BadgePublisher`). |
 | `lock.ts` | Cross-window run lock (below). |
 | `api.ts` | `NullSyncApi` type. |
-| `extensionHost.ts` ★ | Installed extension IDs; `installExtension` / `uninstallExtension` via the `workbench.extensions.*` commands. |
-| `prompts.ts` ★ | Account pick, consent modal, passphrase input, conflict choice, diff, revision pick. |
+| `extensionHost.ts` ★ | Installed extension IDs (on-disk manifest); `installExtension` / `uninstallExtension` via the `workbench.extensions.*` commands; `isDirty` for `localFiles`. |
+| `prompts.ts` ★ | Account pick (pre-selects the null-accounts default account when it is a github.com one), consent modal, passphrase input, first-sync choice, conflict choice, diff, revision pick, status quick pick. |
 | `commands.ts` ★, `watcher.ts` ★, `extension.ts` ★ | Command registration, file watching and timers, activation (returns `NullSyncApi`). |
 
 ## Sync algorithm
@@ -79,15 +79,16 @@ All under `extensions/null-sync/src/`; only the starred files import `vscode`.
 2. Resolve account and token (`interactive:false` for background runs) and the passphrase from `SecretStorage`. Missing → status `signedOut`, stop.
 3. `find`/`read` the Gist, verify the passphrase against `manifest.json`, decrypt remote files.
 4. Read local files for the enabled categories (settings filtered), hash them.
-5. `planAll(local, remote, base)`. Execute: `pull` → back up, write locally (settings re-apply excluded keys); `push` → collected into one `PATCH`; `conflict` → left alone and listed in `Status.conflicts`.
-6. Merge the extension set; install new IDs; removals are reported in `Status.pendingRemovals`, never applied silently.
-7. After a successful write, set `base` for every file resolved this run. Conflicted files keep their old `base`.
-8. Status → `needsAttention` if conflicts or pending removals remain, else `idle` with `lastSyncedAt`.
+5. `planAll(local, remote, base)`. Execute: `pull` → back up, write locally (settings re-apply excluded keys); `push` → collected into one `PATCH`; `conflict` → left alone and listed in `Status.conflicts`. A `pull` of a file with a dirty open editor is skipped and listed in `Status.pending`, to be retried by the next run; an interactive run asks *Overwrite* / *Skip* instead.
+6. Merge the extension set. IDs new on the remote are installed only by an interactive run; background runs list them in `Status.pendingInstalls`. Removals are always listed in `Status.pendingRemovals`, never applied silently.
+7. After a successful write, set `base` for every file resolved this run. Conflicted and skipped files keep their old `base`.
+8. Status → `needsAttention` if conflicts, `pending`, `pendingInstalls` or `pendingRemovals` remain, else `idle` with `lastSyncedAt`.
 
 Properties:
 
 - **Self-triggered loops are impossible by construction**: after we write a file, `local == base`, so the next plan is `none`.
-- **No base yet** (first sync on a device) and the contents differ → `conflict`, so a new device never silently overwrites, and never silently loses, anything.
+- **No base yet** (first sync on a device) and the contents differ → `conflict`, so a new device never silently overwrites, and never silently loses, anything. The Enable flow asks once how to resolve all of them (*Use cloud data* / *Use this device's data* / *Decide per file*); the first two resolve every first-sync conflict that way and back up the losing version, the third falls back to the per-file conflict flow.
+- **Deletions.** "Absent" is a value only for snippet files, so deleting or adding a snippet file propagates. A missing `settings.json`, `keybindings.json` or extension list is treated as "no local data": it never pushes a delete, and the remote copy is pulled. (Some tools save by temp file and rename, and a background run must not catch that moment and delete every device's settings.)
 - **Both sides made the same change** → `none`; `base` is updated.
 - **Failed extension installs** (VSIX-only or removed from the gallery) are recorded in `state.failedInstalls` and not retried by background runs; an interactive run retries them.
 - Network error → status `offline`; auth/decrypt/API failure → `error`; both with a short `message`. Local edits made while offline are simply local changes that the next successful run pushes.
@@ -111,7 +112,7 @@ Several windows share one user-data folder; each runs the timers. A run first cr
 
 ## Lifecycle
 
-- **Enable (`null.sync.enable`).** Pick a github.com account from `null-accounts` (`gist` scope, interactive token) → consent modal listing the enabled categories and stating that encrypted data is stored in a secret Gist → if no Gist is found, choose a passphrase (entered twice) and create it; if one exists, enter its passphrase once. Then sets `null-sync.enabled` and runs once. The account and Gist id are remembered in `globalState` (`null-sync.state`: `gistId`, `accountId`, `owner`, `base`, `extensionsBase`, `lastSyncedAt`, `failedInstalls`).
+- **Enable (`null.sync.enable`).** Pick a github.com account from `null-accounts` (`gist` scope, interactive token) → consent modal listing the enabled categories and stating that encrypted data is stored in a secret Gist → if no Gist is found, choose a passphrase (at least 12 characters, entered twice; the modal states it cannot be recovered or reset) and create it; if one exists, enter its passphrase once, then answer the first-sync question above. Then sets `null-sync.enabled` and runs once. The account and Gist id are remembered in `globalState` (`null-sync.state`: `gistId`, `accountId`, `owner`, `base`, `extensionsBase`, `lastSyncedAt`, `failedInstalls`).
 - **Disable.** Setting `null-sync.enabled` to `false` pauses everything; state and passphrase are kept.
 - **Stop Syncing (`null.sync.stop`).** Clears `state` and the passphrase; a separate confirm modal offers to also delete the Gist. Local files are never changed, and this device's `backups/` are kept.
 - **Another device.** Sign in to the same GitHub account in `null-accounts`, run Enable; the Gist is found by description and the passphrase is verified against `manifest.json`.
@@ -127,6 +128,8 @@ interface SyncStatus {
   lastSyncedAt?: number;       // ms epoch
   message?: string;            // why, for offline / error / signedOut
   conflicts: { file: string; category: Category }[];
+  pending: string[];           // files whose pull was skipped (open with unsaved edits), retried next run
+  pendingInstalls: string[];   // extension IDs added elsewhere, installed by the next interactive run
   pendingRemovals: string[];   // extension IDs removed elsewhere, not yet uninstalled here
 }
 interface NullSyncApi {
@@ -138,7 +141,7 @@ interface NullSyncApi {
 }
 ```
 
-Commands (palette-visible, and what the workspace UI calls): `null.sync.enable`, `null.sync.syncNow`, `null.sync.resolveConflicts`, `null.sync.restore`, `null.sync.stop`, `null.sync.setCategories`. Settings (all `application` scope): `null-sync.enabled` (default `false`), `null-sync.categories` (`{ settings, keybindings, snippets, extensions }`, all default `true`), `null-sync.excludedSettings`.
+Commands (palette-visible, and what the workspace UI calls): `null.sync.enable`, `null.sync.syncNow`, `null.sync.resolveConflicts`, `null.sync.restore`, `null.sync.stop`, `null.sync.setCategories`, `null.sync.showStatus`. `showStatus` opens a read-only quick pick with the state, last sync time, message, conflicts and pending items, each entry running the matching action; it is the only way to see why sync stopped until the workspace UI exists. Settings (all `application` scope): `null-sync.enabled` (default `false`), `null-sync.categories` (`{ settings, keybindings, snippets, extensions }`, all default `true`), `null-sync.excludedSettings`.
 
 This API and command set **is the contract the Null workspace UI builds against**; the UI itself is a later piece of work.
 
@@ -160,7 +163,11 @@ Pure units under `node --test` (listed in the `test` script in `package.json`):
 
 - `cryptoBox`: round trip, wrong passphrase, flipped ciphertext bit, wrong file-name AAD, unknown `v`.
 - `syncPlan`: a table over every combination of `local`/`remote`/`base` being equal, different or absent.
-- `extensionSet`: adds, removals, both-sides, empty base.
+- `extensionSet`: adds, removals, both-sides, empty base, disabled extensions counted as installed.
+- Deletion rule: a missing `settings.json` / `keybindings.json` / extension list never pushes a delete; a deleted snippet file does.
+- Dirty-editor rule: a pull of a file with `isDirty` true is skipped and listed in `pending`; the next run applies it.
+- Passphrase policy: fewer than 12 characters and mismatched confirmation are rejected.
+- Secret patterns: `apiKey`, `*Token`, `password` and similar keys are stripped in any letter case.
 - `settingsFilter`: strip and re-apply preserve comments and formatting; patterns match as specified.
 - `gistStore`: fake `HttpJson` for 401, 403, 404, network failure, truncated file, HTML error body (never echoed).
 - **`syncEngine` with two devices sharing one in-memory Gist** (the most valuable test): first sync, edit on A → B pulls, edit on both → conflict and each resolution, offline then reconnect, restore, Stop Syncing; asserts `getStatus()` transitions, since the API is the only observable surface.
@@ -179,21 +186,34 @@ Integration (`npm run test:integration`, via `/verify-local null-sync`): activat
 | Conflicts handled safely | Conflicts, no-base rule, backups |
 | Offline changes retained | Sync algorithm → network error |
 | Machine-specific / sensitive data excluded | Settings filter, Never-synced list, encryption |
+| Users can inspect synchronization status | `getStatus()`, `null.sync.showStatus` (the workspace UI is a separate issue) |
 | Failures give feedback without affecting the IDE | `Status`, Error handling |
 | Recover from conflicts / restore earlier configuration | Conflicts → backups, Restore |
 | Authentication, data protection, disconnection documented | This spec, Security and privacy, Lifecycle |
 
 ## Build wiring
 
-New built-in extension `null-sync`: `npm ci && npm run compile` in `build.yml` and `scripts/build-local.ps1`, copied with the other built-ins, listed in `scripts/sync-local.ps1`, `out/` tracked, and the built-in counts and extension list in `CLAUDE.md` updated (twelve → thirteen, plus Code Spell Checker). It is machine-local (`extensionKind: ["ui"]`) and `isDisabledInSafeMode` already covers Null-owned built-ins generically; the plan confirms that.
+New built-in extension `null-sync`: `npm ci && npm run compile` in `build.yml` and `scripts/build-local.ps1`, copied with the other built-ins, listed in `scripts/sync-local.ps1`, `out/` tracked, and the built-in counts and extension list in `CLAUDE.md` updated (twelve → thirteen, plus Code Spell Checker). It is machine-local (`extensionKind: ["ui"]`) and `isDisabledInSafeMode` (patch 009) already disables Null-owned built-ins generically, so sync is off in Safe Mode with no extra code.
+
+## Delivery
+
+One plan, two phases, each ending in a working committed state.
+
+- **Phase 1:** `cryptoBox`, `syncPlan`, `settingsFilter`, `gistStore`/`gistHttp`, `localFiles`, `lock`, `syncEngine` for `settings`, `keybindings` and `snippets`, the API, all commands including `showStatus`, build wiring and docs. Satisfies all acceptance criteria except extension-list sync.
+- **Phase 2:** the `extensions` category (`extensionSet`, `extensionHost` install/uninstall, `pendingInstalls`/`pendingRemovals`). Isolated because install behavior cannot be verified without a patched build.
+
+#23 closes when phase 2 lands; the workspace Sync screen is filed as its own issue and builds on `NullSyncApi`.
 
 ## To verify in the plan
 
 1. `<User>` resolves from `globalStorageUri` as stated, including in a portable install.
-2. `workbench.extensions.installExtension` / `uninstallExtension` work from a `ui` extension host and report failure in a way the engine can catch.
+2. `workbench.extensions.installExtension` / `uninstallExtension` work from a `ui` extension host and report failure in a way the engine can catch; the on-disk extensions manifest path can be derived (Phase 2).
 3. `jsonc-parser` `modify` keeps comments and formatting on the real default `settings.json`.
+4. Whether `globalState` writes in one window reach other windows' extension hosts. `base` lives there; if they do not, move `state` to a JSON file under `globalStorage/null-sync/` (the lock already makes runs mutually exclusive).
+
+Confirmed while specifying: patch 009's `isDisabledInSafeMode` disables built-ins with publisher `null`, so `null-sync` does not run in Safe Mode.
 
 ## Out of scope
 
-- Any UI (the Null workspace rework owns it), including a status bar item.
+- Any UI beyond the `showStatus` quick pick (the Null workspace rework owns it), including a status bar item.
 - GitLab storage; syncing view arrangement (pinned/hidden/ordered views, which needs a patch to read `state.vscdb`); workspace settings; profiles; extension versions and enabled state; changing the passphrase in place; real-time push; key-level merge of `settings.json`; optimistic locking on the Gist.
