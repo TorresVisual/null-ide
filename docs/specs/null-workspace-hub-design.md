@@ -22,6 +22,8 @@ Success: a user finds every Null feature from Null Workspace; a new feature is a
 - A webview launcher, search box, status badges or favorites. Add when the entry count makes the tree hard to scan.
 - Evaluating `when` clauses for entries (an extension cannot read context keys). Entries are always shown; the command itself handles an unavailable feature.
 - Moving or redesigning Scratch / Notes / Ports / Worktrees.
+- Entries for status-bar or context-driven features (updater, crash recovery, commit message, Markdown, `null-cpp`) and Discord presence settings. Adding one later is a JSON entry.
+- Seeding a default Activity Bar order in `product.json`.
 
 ## Registration contract
 
@@ -80,6 +82,7 @@ Each extension declares its own entry; `null-tools` does not hard-code the other
 - `src/featureRegistry.ts` — **pure, no `vscode` import.** `collectFeatures(manifests: { extensionId: string; packageJSON: unknown }[]): FeatureCategory[]`. Validates each entry, drops malformed ones, de-duplicates by global key (first wins), groups by category and sorts. Exports the `Feature` / `FeatureCategory` types.
 - `src/featuresTreeView.ts` — `vscode.TreeDataProvider` over `FeatureCategory[]`. Category nodes are expanded; feature nodes carry `command` and `ThemeIcon(icon)`. Refreshes on `vscode.extensions.onDidChange`.
 - `package.json` — view `null.featuresView` ("Features") as the first entry of `views["null-workspace"]`; a `command` is not needed (the tree item invokes the target command directly).
+- `package.json` view defaults: `null.featuresView` is `"visibility": "visible"` (expanded); `null.scratchView`, `null.notesView`, `null.portsView`, `null.worktreesView` and Music get `"visibility": "collapsed"`. VS Code applies these only the first time it sees a view id and keeps the user's own state afterwards, so existing users' layouts do not change; only fresh installs open to the launcher with five collapsed headers.
 - `src/extension.ts` — registers the provider.
 - `package.json` also declares the two `null-tools` entries (Dashboard, GitHub Issues) in `nullWorkspace.features`.
 
@@ -116,4 +119,4 @@ Each extension declares its own entry; `null-tools` does not hard-code the other
 ## Risks / open verification
 
 - **Contributing a view into another extension's container.** Verified in the VS Code source (`viewsExtensionPoint.ts`): any id resolves to `workbench.view.extension.<id>`. Still confirm the result in `/verify-local`. Fallback if it does not work: keep Music's own container and list it in the launcher (`null-tools` cannot declare the view itself, because the webview provider belongs to `null-music`).
-- **Height.** Five views in one container share the sidebar. Music is collapsed by default and the Features tree is short; if this proves cramped, the follow-up is a webview launcher, not more views.
+- **Height.** Six views in one container share the sidebar. Music is collapsed by default and the Features tree is short; if this proves cramped, the follow-up is a webview launcher, not more views.
