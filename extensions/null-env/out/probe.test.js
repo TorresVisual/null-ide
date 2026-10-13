@@ -96,6 +96,17 @@ function withTempDir(fn) {
             assert.equal((0, probe_1.findClangFormatPath)(custom, dir), custom);
         });
     });
+    // These two are spawned without a shell, so a .cmd/.bat shim earlier on PATH must not win over a real binary.
+    (0, node_test_1.it)('never returns a .cmd shim for a tool that is spawned directly', { skip: process.platform !== 'win32' }, () => {
+        withTempDir(shims => withTempDir(real => {
+            fs.writeFileSync(path.join(shims, 'rustfmt.cmd'), '');
+            fs.writeFileSync(path.join(shims, 'clang-format.cmd'), '');
+            assert.equal((0, probe_1.findRustfmtPath)(undefined, undefined, [shims]), null);
+            assert.equal((0, probe_1.findClangFormatPath)(undefined, undefined, [shims]), null);
+            fs.writeFileSync(path.join(real, 'rustfmt.exe'), '');
+            assert.equal((0, probe_1.findRustfmtPath)(undefined, undefined, [shims, real]), path.join(real, 'rustfmt.exe'));
+        }));
+    });
     (0, node_test_1.it)('prioritizes an explicitly configured rustfmt path', () => {
         withTempDir(dir => {
             const custom = path.join(dir, 'custom-rustfmt.exe');

@@ -94,7 +94,7 @@ function findBundledBinary(extensionPath, binaryName) {
     const candidate = path.join(extensionPath, 'bin', nameWithExt);
     return isFile(candidate) ? candidate : null;
 }
-function findConfiguredOrBundled(name, configuredPath, extensionPath) {
+function findConfiguredOrBundled(name, configuredPath, extensionPath, dirs) {
     // 1. Explicit user-configured path
     if (configuredPath && configuredPath.trim().length > 0 && fs.existsSync(configuredPath)) {
         return configuredPath;
@@ -106,13 +106,14 @@ function findConfiguredOrBundled(name, configuredPath, extensionPath) {
             return bundled;
         }
     }
-    // 3. PATH plus the well-known install dirs (cargo bin, LLVM)
-    return findExecutable(name);
+    // 3. PATH plus the well-known install dirs (cargo bin, LLVM). Callers spawn the result without a shell, so on Windows
+    //    only a real .exe qualifies, never a .cmd/.bat shim.
+    return findExecutable(process.platform === 'win32' ? `${name}.exe` : name, dirs);
 }
-function findClangFormatPath(configuredPath, extensionPath) {
-    return findConfiguredOrBundled('clang-format', configuredPath, extensionPath);
+function findClangFormatPath(configuredPath, extensionPath, dirs) {
+    return findConfiguredOrBundled('clang-format', configuredPath, extensionPath, dirs);
 }
-function findRustfmtPath(configuredPath, extensionPath) {
-    return findConfiguredOrBundled('rustfmt', configuredPath, extensionPath);
+function findRustfmtPath(configuredPath, extensionPath, dirs) {
+    return findConfiguredOrBundled('rustfmt', configuredPath, extensionPath, dirs);
 }
 //# sourceMappingURL=probe.js.map
