@@ -16,7 +16,7 @@ Browse and act on git history inside Null IDE: a lane-drawn commit graph in an e
 - Lives in `extensions/null-tools`. Acts on the worktree of the first workspace folder, resolved with `git rev-parse --show-toplevel` (not `resolveMainWorktreeRoot`): history is shared across worktrees, but HEAD, the dirty state and the in-progress markers belong to the worktree the user is looking at, so actions never touch a checkout that is not open.
 - Git runs through async `execFile` (see "Git execution"). The built-in `vscode.git` API is used only for `git:` diff URIs and as a repo-change trigger.
 - **Remote windows:** `null-tools` is `extensionKind: ["ui"]`. If the workspace folder's scheme is not `file`, the tab and tree show a welcome state ("Commit Graph isn't available in remote windows yet") and spawn no git. Known limit.
-- **Untrusted workspaces:** unsupported (`capabilities.untrustedWorkspaces`). A repo's `.git/config` can run code (`core.fsmonitor`, hooks), so tab and tree show a welcome state with a "Trust Workspace" button and spawn no git, as `null-activity` does.
+- **Untrusted workspaces:** checked at runtime (`workspace.isTrusted`, re-evaluated on `onDidGrantWorkspaceTrust`); the manifest capability is per extension and would disable all of `null-tools`. A repo's `.git/config` can run code (`core.fsmonitor`, hooks), so tab and tree show a welcome state with a "Trust Workspace" button and spawn no git, as `null-activity` does.
 
 ## Architecture
 
@@ -26,14 +26,20 @@ New files under `extensions/null-tools/src/graph/`:
 
 | File | Role |
 |---|---|
+| `protocol.ts` | Shared message and row types; a global script (no imports or exports) so the webview bundle can compile it |
 | `gitRun.ts` | The one `runGit(cwd, args)` wrapper (see "Git execution") and the per-repo busy flag |
-| `gitLog.ts` | Pure parser for `git log --date-order --parents -z --format=%H%x1f%P%x1f%an%x1f%ae%x1f%at%x1f%D%x1f%s` over `--branches --tags --remotes HEAD <stash SHAs>` |
+| `gitLog.ts` | Pure parser for `git log --date-order --decorate=full -z --format=%H%x1f%P%x1f%an%x1f%ae%x1f%at%x1f%D%x1f%s` over `--branches --tags --remotes HEAD <stash SHAs>` (`%P` already carries the parents; `--decorate=full` tells local branches from remotes in `%D`) |
 | `graphLayout.ts` | Pure `GraphLayouter`; `layoutPage(commits)` returns rows `{ sha, lane, laneCount, edges[{from,to,color}], refs }`; active-lane state persists across pages |
-| `gitGraphService.ts` | Injected deps (`runGit`, repo root): `loadPage(n)`, `refs()` (`for-each-ref` + `stash list`), `fingerprint()`, `commitDetail(sha)`, `commitFiles(sha)` |
+| `gitGraphService.ts` | Injected deps (`runGit`, repo root): `loadPage(n)`, `refs()` (`for-each-ref` + `stash list`), `fingerprint()` (returns `{ hash, inProgress }`), `inProgress()`, `commitDetail(sha)`, `commitFiles(sha)` |
 | `gitActions.ts` | The actions below, returning `Result<T>` like `worktrees.ts` |
 | `graphMessages.ts` | Pure typed message unions and `parseWebviewMessage` (validation, see "Validation") |
 | `commitGraphPanel.ts` | Single reused `WebviewPanel` (`null.commitGraph`), nonce CSP, `ready` handshake |
 | `graphTreeView.ts` | Activity-bar TreeView `null.graphView` |
+| `graphSession.ts` | Repo resolution, the shared service, fingerprint watching and action serialization |
+| `graphCommands.ts` | Command handlers and their prompts |
+| `graphDiff.ts` | Diff URIs and the empty document |
+| `gitApi.ts` | The slice of the built-in `vscode.git` API the graph uses |
+| `commitGraphHtml.ts` | The webview's CSP shell |
 | `graphIntegration.ts` | `registerGraphFeature(context)`, called from `extension.ts` next to the worktrees and issues features |
 
 Webview: `src/webview/commitGraph.ts` (vanilla TS, `module: none`, no imports) compiled by a new `tsconfig.webview-commit-graph.json` to the tracked `lib/commitGraph.js`; `lib/commitGraph.css` is hand-written. It reuses `src/webview/shared/dom.ts`, `time.ts` and `octicons.ts`. `package.json`'s `compile` script gains the new tsconfig.
@@ -61,10 +67,10 @@ A per-repo busy flag serializes actions: while one runs, other actions are refus
 
 ## Panel and webview
 
-- Host to webview: `rows {rows, hasMore, reset}`, `refs`, `detail {sha, …}`, `files {sha, files, truncated}`, `state {inProgress}`. Webview to host: `ready`, `loadMore`, `select(sha)`, `openDiff(sha, file)`, `refresh`. There is no `action` message (see "Actions").
+- Host to webview: `rows {rows, hasMore, reset}`, `detail {sha, …}`, `files {sha, files}` (the 500-file cap is applied in the webview), `state {inProgress}`, `focus`, `loadError`, `unavailable`. Webview to host: `ready`, `loadMore`, `select(sha)`, `goto(sha)`, `openDiff(sha, file)`, `refresh`, `banner(action)`, `manageTrust`. There is no `action` message (see "Actions").
 - Virtualized list: fixed 24 px rows, a scroll-height spacer, a render window of visible+20 rows; each row is one inline SVG lane segment plus an HTML line (ref pills, subject, author, relative date). Near the bottom the webview sends `loadMore`.
 - **Lane column** is capped at 10 lanes (about 120 px). Lanes beyond the cap are clipped with a "+N" marker; the commit's own lane is always drawn.
-- **Detail pane** below the list, loaded on `select`: `git show -s` gives the full message body, the committer if it differs from the author, and the parent SHAs (each clickable, scrolling the list to it). The file list comes from `diff-tree -z --name-status -r -M <sha>^ <sha>` (`--root` for a root commit; merge commits diff against the first parent), capped at 500 files with "N more — show all". Every response carries the sha and the webview drops any that no longer matches the selection. A click on a file sends `openDiff`; the host opens `vscode.diff` with `git:` URIs for `<sha>^` and `<sha>` (an empty document for the root commit side).
+- **Detail pane** below the list, loaded on `select`: `git show -s` gives the full message body, the committer if it differs from the author, and the parent SHAs (each clickable, scrolling the list to it). The file list comes from `diff-tree -z --name-status -r -M <sha>^ <sha>` (`--root` for a root commit; merge commits diff against the first parent), capped at 500 files with "N more — show all". Every response carries the sha and the webview drops any that no longer matches the selection. A click on a file sends `openDiff`; the host opens `vscode.diff` with `git:` URIs for `<sha>^` and `<sha>` (an empty document for the root commit side, and for the missing side of added and deleted files).
 - **In-progress banner:** when `.git/MERGE_HEAD`, `CHERRY_PICK_HEAD`, `REVERT_HEAD` or `rebase-merge/` exists (resolved through `git rev-parse --git-path`, so linked worktrees work), a persistent banner at the top of the tab names the operation and offers Continue, Skip and Abort (for rebase and merge, only what applies). The tree gets the same state through the context key below.
 - **Accessibility:** the list container is `role="listbox"` with `aria-activedescendant`; rows are `role="option"` with an `aria-label` of subject, author and date; the lane SVG is `aria-hidden`. Up/Down/PageUp/PageDown/Home/End move the selection and scroll it into view; Enter selects the first changed file and opens its diff. The selection math is pure and lives in the `vm`-tested virtualization file.
 - Commit messages and ref names are untrusted: `textContent` only, never `innerHTML`. Subjects are plain text, so marked and DOMPurify are not needed for v1.
@@ -119,7 +125,7 @@ Unit (`node --test`; every file added to the explicit list in `package.json`'s `
 - `graph/gitActions.test.ts`: real `git` in a temp repo (as `worktrees.test.ts`): cherry-pick (including a merge with `-m`), conflicting revert, empty cherry-pick then `--skip`, soft/mixed/hard reset and the unreachable-commit count, in-progress detection in a linked worktree, fingerprint change on commit and no change on a file edit.
 - Webview virtualization and keyboard-selection math in a small file compiled by a shared tsconfig and loaded via `vm`, as in `null-music`/`null-activity`.
 
-Integration (`npm run test:integration`): open the panel on a fixture repo, send `ready`, check the first `rows` message (count, HEAD marker), and that `openDiff` opens a diff editor.
+Integration (`npm run test:integration`): open the panel on a fixture repo, send `ready`, check the first `rows` message (count, HEAD marker), and that `openDiff` opens a diff editor. The spec reads and drives the tab through the internal commands `_null.graph.snapshot` and `_null.graph.dispatch`.
 
 Done means: `npm test` green, compile clean, a `CLAUDE.md` section for the feature (and a `docs/ROADMAP.md` note if the graph is listed there), and `/verify-local null-tools` shows the graph opening, paging, and a cherry-pick working in a real Null IDE build.
 
