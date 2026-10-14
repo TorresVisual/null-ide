@@ -1,9 +1,12 @@
 'use strict';
 
 import * as vscode from 'vscode';
-import { AvailableUpdate, StagedUpdate, checkForUpdate, installUpdate, onStagedUpdateChanged, promptForUpdate } from './updater';
+import { AvailableUpdate, StagedUpdate, acknowledgeUpdate, checkForUpdate, getUpdateProgress, installUpdate, onStagedUpdateChanged, promptForUpdate } from './updater';
+import { statusFor } from './updateStatus';
 
 export function registerUpdaterFeature(context: vscode.ExtensionContext): void {
+  acknowledgeUpdate(context);
+
   const updateBar = vscode.window.createStatusBarItem('null.update', vscode.StatusBarAlignment.Right, 1);
   updateBar.command = 'null.installUpdate';
   context.subscriptions.push(updateBar);
@@ -18,13 +21,9 @@ export function registerUpdaterFeature(context: vscode.ExtensionContext): void {
     const staged = context.globalState.get<StagedUpdate>('null.stagedUpdate');
     const isReady = staged?.version === update.latest && staged.verified;
 
-    if (isReady) {
-      updateBar.text    = `$(rocket) Restart to update`;
-      updateBar.tooltip  = `Null IDE ${update.latest} is downloaded and ready to install`;
-    } else {
-      updateBar.text    = `$(cloud-download) ${update.latest}`;
-      updateBar.tooltip  = `Downloading Null IDE ${update.latest}…`;
-    }
+    const view = statusFor(update.latest, getUpdateProgress(), isReady);
+    updateBar.text = view.text;
+    updateBar.tooltip = view.tooltip;
     updateBar.show();
   }
 

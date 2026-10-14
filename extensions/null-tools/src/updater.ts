@@ -3,11 +3,11 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import * as os from 'os';
 import * as https from 'https';
-import * as crypto from 'crypto';
+import * as readline from 'readline';
 import { spawn } from 'child_process';
 import { compareVersionTags } from './versionComparison';
+import { Progress, isSafeTag, parseProgressLine, shouldAcknowledge } from './updateStatus';
 
 // Electron adds resourcesPath to the Node process object; @types/node doesn't know about it.
 declare global {
@@ -25,17 +25,11 @@ interface InstallMetadata {
   repo: string;
 }
 
-interface GithubAsset {
-  name: string;
-  browser_download_url: string;
-  size: number;
-}
-
 interface GithubRelease {
   tag_name: string;
   html_url: string;
   body?: string;
-  assets: GithubAsset[];
+  assets: { name: string }[];
 }
 
 export interface AvailableUpdate {
@@ -45,19 +39,17 @@ export interface AvailableUpdate {
   url: string;
   checkedAt: string;
   releaseNotes?: string;
-  assetUrl?: string;
-  assetName?: string;
-  assetSize?: number;
-  sha256Url?: string;
 }
 
 export interface StagedUpdate {
   version: string;
-  zipPath: string;
   verified: boolean;
 }
 
 export const onStagedUpdateChanged = new vscode.EventEmitter<void>();
+
+let latestProgress: Progress | undefined;
+export function getUpdateProgress(): Progress | undefined { return latestProgress; }
 
 function getInstallDirCandidates(context: vscode.ExtensionContext): string[] {
   const candidates = [path.dirname(process.execPath)];
@@ -73,33 +65,15 @@ function getInstallDirCandidates(context: vscode.ExtensionContext): string[] {
   return [...new Set(candidates.map(c => path.resolve(c)))];
 }
 
-function getInstallDir(context: vscode.ExtensionContext): string {
-  const candidates = getInstallDirCandidates(context);
-  return candidates[0] || path.dirname(process.execPath);
-}
+interface Install { installDir: string; setupExe: string }
 
-function getUpdaterExePath(context: vscode.ExtensionContext): string | null {
+/** The install that ships `setup\null-setup.exe`; undefined when running from a dev checkout. */
+export function findInstall(context: vscode.ExtensionContext): Install | undefined {
   for (const installDir of getInstallDirCandidates(context)) {
-    const p = path.join(installDir, 'resources', 'app', 'null-updater', 'null-updater.exe');
-    if (fs.existsSync(p)) return p;
+    const setupExe = path.join(installDir, 'setup', 'null-setup.exe');
+    if (fs.existsSync(setupExe)) return { installDir, setupExe };
   }
-
-  const repoExe = path.resolve(context.extensionPath, '..', '..', 'updater', 'build', 'Release', 'null-updater.exe');
-  if (fs.existsSync(repoExe)) return repoExe;
-
-  return null;
-}
-
-function getUpdaterScriptPath(context: vscode.ExtensionContext): string | null {
-  for (const installDir of getInstallDirCandidates(context)) {
-    const p = path.join(installDir, 'resources', 'app', 'null-updater', 'update-null-ide.ps1');
-    if (fs.existsSync(p)) return p;
-  }
-
-  const repoUpdater = path.resolve(context.extensionPath, '..', '..', 'scripts', 'update-null-ide.ps1');
-  if (fs.existsSync(repoUpdater)) return repoUpdater;
-
-  return null;
+  return undefined;
 }
 
 function getInstallMetadata(context: vscode.ExtensionContext): InstallMetadata | null {
@@ -216,115 +190,57 @@ async function requestJson<T>(url: string, retries = 2): Promise<T> {
   throw lastError;
 }
 
-function requestText(url: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    https.get(url, { headers: { 'User-Agent': 'Null-IDE' } }, res => {
-      if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        requestText(res.headers.location).then(resolve, reject);
-        return;
-      }
-      if (!res.statusCode || res.statusCode < 200 || res.statusCode >= 300) {
-        reject(new Error(`Request failed: HTTP ${res.statusCode}`));
-        return;
-      }
-      let body = '';
-      res.setEncoding('utf8');
-      res.on('data', (chunk: string) => { body += chunk; });
-      res.on('end', () => resolve(body));
-    }).on('error', reject);
-  });
-}
-
-function downloadToFile(url: string, destPath: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const hash = crypto.createHash('sha256');
-    const file = fs.createWriteStream(destPath);
-
-    https.get(url, { headers: { 'User-Agent': 'Null-IDE' } }, res => {
-      if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        file.close();
-        fs.unlink(destPath, () => {
-          downloadToFile(res.headers.location as string, destPath).then(resolve, reject);
-        });
-        return;
-      }
-      if (!res.statusCode || res.statusCode < 200 || res.statusCode >= 300) {
-        file.close();
-        reject(new Error(`Download failed: HTTP ${res.statusCode}`));
-        return;
-      }
-
-      res.on('data', (chunk: Buffer) => hash.update(chunk));
-      res.on('error', reject);
-      res.pipe(file);
-      file.on('finish', () => {
-        file.close(() => resolve(hash.digest('hex')));
-      });
-    }).on('error', reject);
-  });
-}
-
 async function getLatestRelease(repo: string): Promise<GithubRelease> {
   return requestJson<GithubRelease>(`https://api.github.com/repos/${repo}/releases/latest`);
 }
 
-function findZipAsset(release: GithubRelease): GithubAsset | null {
-  const zipPattern = /^null-ide-win32-x64(-[^/\\]+)?\.zip$/i;
-  return release.assets.find(a => zipPattern.test(a.name)) || null;
-}
-
-function findSha256AssetUrl(release: GithubRelease, zipAssetName: string): string | undefined {
-  const sidecar = release.assets.find(a => a.name === `${zipAssetName}.sha256`);
-  return sidecar?.browser_download_url;
-}
-
 function hasWindowsPackage(release: GithubRelease): boolean {
   return Array.isArray(release.assets) &&
-    release.assets.some(a => /^(null-ide-win32-x64(-[^/\\]+)?\.zip|NullIDESetup.*\.exe)$/i.test(a.name));
+    release.assets.some(a => /^null-ide-win32-x64(-[^/\\]+)?\.zip$/i.test(a.name));
 }
 
-function stagingRoot(): string {
-  return path.join(os.tmpdir(), 'null-ide-update-staged');
-}
+let prefetching: string | undefined;   // version being downloaded by this window's null-setup
 
-async function stageUpdateInBackground(context: vscode.ExtensionContext, update: AvailableUpdate): Promise<void> {
-  if (!update.assetUrl || !update.assetName) return;
-
-  const existing = context.globalState.get<StagedUpdate>('null.stagedUpdate');
-  if (existing?.version === update.latest && existing.verified && fs.existsSync(existing.zipPath)) {
-    return; // already staged and verified
+/** Downloads and verifies the release in the background; installing only ever starts from the user's click. */
+function startPrefetch(context: vscode.ExtensionContext, update: AvailableUpdate): void {
+  const staged = context.globalState.get<StagedUpdate>('null.stagedUpdate');
+  if (prefetching === update.latest || (staged?.version === update.latest && staged.verified)) return;
+  if (!isSafeTag(update.latest)) {
+    output.appendLine(`Refusing to prefetch unexpected tag "${update.latest}".`);
+    return;
+  }
+  const install = findInstall(context);
+  if (!install) {
+    output.appendLine('null-setup.exe not found next to this install; skipping the background download.');
+    return;
   }
 
-  try {
-    const versionDir = path.join(stagingRoot(), update.latest);
-    fs.rmSync(stagingRoot(), { recursive: true, force: true });
-    fs.mkdirSync(versionDir, { recursive: true });
-    const zipPath = path.join(versionDir, update.assetName);
+  prefetching = update.latest;
+  latestProgress = { state: 'checking' };
+  onStagedUpdateChanged.fire();
 
-    output.appendLine(`Background-downloading ${update.assetName} to ${zipPath}`);
-    const actualSha256 = await downloadToFile(update.assetUrl, zipPath);
-
-    let verified = true;
-    if (update.sha256Url) {
-      const expected = (await requestText(update.sha256Url)).trim().split(/\s+/)[0]?.toLowerCase();
-      verified = expected === actualSha256.toLowerCase();
-      if (!verified) {
-        output.appendLine(`Checksum mismatch for ${update.assetName}: expected ${expected}, got ${actualSha256}`);
-        fs.rmSync(versionDir, { recursive: true, force: true });
-        return;
-      }
-    } else {
-      output.appendLine(`No .sha256 sidecar found for ${update.assetName}; staging without verification.`);
+  const child = spawn(
+    install.setupExe,
+    ['prefetch', '--repo', update.repo, '--version', update.latest, '--install-dir', install.installDir],
+    { stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true },
+  );
+  readline.createInterface({ input: child.stdout! }).on('line', line => {
+    const p = parseProgressLine(line);
+    if (!p) { output.appendLine(line); return; }
+    latestProgress = p;
+    if (p.state === 'ready') {
+      void context.globalState.update('null.stagedUpdate', { version: update.latest, verified: true } satisfies StagedUpdate);
     }
-
-    const staged: StagedUpdate = { version: update.latest, zipPath, verified };
-    await context.globalState.update('null.stagedUpdate', staged);
-    await vscode.commands.executeCommand('setContext', 'nullUpdateStaged', true);
+    if (p.state === 'failed') output.appendLine(`Background download failed: ${p.message}${p.log ? ` (log: ${p.log})` : ''}`);
     onStagedUpdateChanged.fire();
-    output.appendLine(`Update ${update.latest} staged and ready to install.`);
-  } catch (err) {
-    output.appendLine(`Background staging failed: ${(err as Error).message}`);
-  }
+  });
+  child.on('error', err => {
+    output.appendLine(`Could not start null-setup: ${err.message}`);
+    latestProgress = { state: 'failed', message: err.message };
+    prefetching = undefined;
+    onStagedUpdateChanged.fire();
+  });
+  child.on('close', () => { prefetching = undefined; });
 }
 
 export async function checkForUpdate(
@@ -352,7 +268,7 @@ export async function checkForUpdate(
     await context.globalState.update('null.availableUpdate', undefined);
     await context.globalState.update('null.stagedUpdate', undefined);
     await vscode.commands.executeCommand('setContext', 'nullUpdateAvailable', false);
-    await vscode.commands.executeCommand('setContext', 'nullUpdateStaged', false);
+    latestProgress = undefined;
     onStagedUpdateChanged.fire();
     if (!silent) {
       const packageNote = hasPackage ? '' : ' No Windows package was found on the latest release.';
@@ -363,24 +279,18 @@ export async function checkForUpdate(
     return null;
   }
 
-  const asset = findZipAsset(release);
-
   const update: AvailableUpdate = {
     repo, current, latest,
     url: release.html_url,
     checkedAt: new Date().toISOString(),
     releaseNotes: release.body,
-    assetUrl: asset?.browser_download_url,
-    assetName: asset?.name,
-    assetSize: asset?.size,
-    sha256Url: asset ? findSha256AssetUrl(release, asset.name) : undefined,
   };
 
   await context.globalState.update('null.availableUpdate', update);
   await vscode.commands.executeCommand('setContext', 'nullUpdateAvailable', true);
   output.appendLine(`Update available: ${current} -> ${latest}`);
 
-  void stageUpdateInBackground(context, update);
+  startPrefetch(context, update);
 
   return update;
 }
@@ -409,11 +319,13 @@ export async function installUpdate(context: vscode.ExtensionContext): Promise<v
     || await checkForUpdate(context, false);
   if (!update) return;
 
-  const updaterExe = getUpdaterExePath(context);
-  const updaterScript = getUpdaterScriptPath(context);
-
-  if (!updaterExe && !updaterScript) {
-    vscode.window.showErrorMessage('Null IDE updater was not found in this installation.');
+  const install = findInstall(context);
+  if (!install) {
+    vscode.window.showErrorMessage('Null IDE: null-setup.exe was not found in this installation, so it cannot update itself. Reinstall from the latest release.');
+    return;
+  }
+  if (!isSafeTag(update.latest)) {
+    vscode.window.showErrorMessage(`Null IDE: unexpected release tag "${update.latest}".`);
     return;
   }
 
@@ -424,52 +336,42 @@ export async function installUpdate(context: vscode.ExtensionContext): Promise<v
   );
   if (choice !== 'Restart and Update') return;
 
-  const updaterDir = path.join(
-    process.env.TEMP || process.env.TMP || getInstallDir(context),
-    `null-ide-updater-${Date.now()}`,
+  const child = spawn(
+    install.setupExe,
+    ['update', '--repo', update.repo, '--version', update.latest, '--install-dir', install.installDir, '--launch'],
+    { detached: true, stdio: 'ignore' },
   );
-  fs.mkdirSync(updaterDir, { recursive: true });
-
-  const installDir = getInstallDir(context);
-  const launcherPath = path.join(updaterDir, 'launcher.cmd');
-  const cmdQ = (s: string) => `"${s.replace(/"/g, '""')}"`;
-
-  const staged = context.globalState.get<StagedUpdate>('null.stagedUpdate');
-  const hasStagedZip = !!staged && staged.version === update.latest && staged.verified && fs.existsSync(staged.zipPath);
-
-  let launchCmd: string;
-
-  if (updaterExe) {
-    const stagedExe = path.join(updaterDir, 'null-updater.exe');
-    fs.copyFileSync(updaterExe, stagedExe);
-    const args = [
-      cmdQ(stagedExe),
-      '--repo', cmdQ(update.repo),
-      '--version', cmdQ(update.latest),
-      '--install-dir', cmdQ(installDir),
-      '--wait', '--launch',
-    ];
-    if (hasStagedZip) {
-      args.push('--zip-path', cmdQ(staged!.zipPath));
-    }
-    launchCmd = args.join(' ');
-  } else {
-    const stagedUpdater = path.join(updaterDir, 'update-null-ide.ps1');
-    const installer = path.join(path.dirname(updaterScript!), 'install-null-ide.ps1');
-    fs.copyFileSync(updaterScript!, stagedUpdater);
-    if (fs.existsSync(installer)) {
-      fs.copyFileSync(installer, path.join(updaterDir, 'install-null-ide.ps1'));
-    }
-    launchCmd = `powershell.exe -NoLogo -ExecutionPolicy Bypass -WindowStyle Normal -File ${cmdQ(stagedUpdater)} -Repo ${cmdQ(update.repo)} -InstallDir ${cmdQ(installDir)} -Force -WaitForExit -Launch`;
-  }
-
-  fs.writeFileSync(launcherPath, `@echo off\r\nstart "Null IDE Update" ${launchCmd}\r\n`, 'utf8');
-
-  const child = spawn('cmd.exe', ['/c', launcherPath], { detached: true, stdio: 'ignore' });
+  const started = await new Promise<boolean>(resolve => {
+    child.once('spawn', () => resolve(true));
+    child.once('error', err => {
+      vscode.window.showErrorMessage(`Null IDE: could not start the updater: ${err.message}`);
+      resolve(false);
+    });
+  });
+  if (!started) return;
   child.unref();
 
   await context.globalState.update('null.stagedUpdate', undefined);
+  latestProgress = undefined;
   onStagedUpdateChanged.fire();
 
+  // null-setup asks every window of this install to close; quitting here just makes that instant.
   setTimeout(() => vscode.commands.executeCommand('workbench.action.quit'), 1000);
+}
+
+/** After an update the new IDE proves it started by writing the marker; null-setup then removes the old copy. */
+export function acknowledgeUpdate(context: vscode.ExtensionContext): void {
+  const install = findInstall(context);
+  if (!install) return;
+  const journal = path.join(path.dirname(install.installDir), '.null-update-journal.json');
+  let text: string | undefined;
+  try { text = fs.readFileSync(journal, 'utf8'); } catch { return; }
+  if (!shouldAcknowledge(text)) return;   // a Started journal belongs to an update still in progress
+  try {
+    fs.writeFileSync(path.join(install.installDir, '.null-ready'), String(Date.now()));
+    spawn(install.setupExe, ['recover', '--install-dir', install.installDir], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
+    output.appendLine('Acknowledged the completed update.');
+  } catch (err) {
+    output.appendLine(`Could not acknowledge the update: ${(err as Error).message}`);
+  }
 }
