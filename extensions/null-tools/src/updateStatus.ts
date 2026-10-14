@@ -1,5 +1,7 @@
 'use strict';
 
+import { compareVersionTags } from './versionComparison';
+
 export type Progress =
   | { state: 'checking' | 'verifying' | 'preparing' | 'installing' | 'restarting' | 'upToDate' | 'ready' | 'busy' | 'needsReapproval' }
   | { state: 'downloading'; bytes: number; total: number; bytesPerSec: number }
@@ -68,4 +70,9 @@ export function isSafeTag(tag: string): boolean {
 /** Only a journal in step MovedIn means "the new install is in place"; a Started journal belongs to an update still in progress. */
 export function shouldAcknowledge(journalText: string | undefined): boolean {
   try { return JSON.parse(journalText ?? '').step === 'MovedIn'; } catch { return false; }
+}
+
+/** The remembered "update available" is stale once the running version has caught up (e.g. right after updating). */
+export function isStillAvailable(latest: string, current: string): boolean {
+  return compareVersionTags(latest, current) > 0;
 }

@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 import test from 'node:test';
-import { formatBytes, isSafeTag, parseProgressLine, shouldAcknowledge, statusFor } from './updateStatus';
+import { formatBytes, isSafeTag, isStillAvailable, parseProgressLine, shouldAcknowledge, statusFor } from './updateStatus';
 
 test('parseProgressLine reads the lines null-setup prints', () => {
   assert.deepStrictEqual(parseProgressLine('{"state":"checking"}'), { state: 'checking' });
@@ -60,4 +60,11 @@ test('shouldAcknowledge only fires once the new install is in place', () => {
   assert.ok(!shouldAcknowledge(undefined));
   assert.ok(!shouldAcknowledge('garbage'));
   assert.ok(!shouldAcknowledge('null'));
+});
+
+test('a remembered update is dropped once the running version has caught up', () => {
+  assert.ok(isStillAvailable('v1.0.18', 'v1.0.17'));
+  assert.ok(!isStillAvailable('v1.0.18', 'v1.0.18'));
+  assert.ok(!isStillAvailable('v1.0.18', 'v1.1.0'));
+  assert.ok(isStillAvailable('v1.0.18', 'local'));
 });

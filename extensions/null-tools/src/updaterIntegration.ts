@@ -1,7 +1,7 @@
 'use strict';
 
 import * as vscode from 'vscode';
-import { AvailableUpdate, StagedUpdate, acknowledgeUpdate, checkForUpdate, getUpdateProgress, installUpdate, onStagedUpdateChanged, promptForUpdate } from './updater';
+import { StagedUpdate, acknowledgeUpdate, checkForUpdate, getAvailableUpdate, getUpdateProgress, installUpdate, onStagedUpdateChanged, promptForUpdate } from './updater';
 import { statusFor } from './updateStatus';
 
 export function registerUpdaterFeature(context: vscode.ExtensionContext): void {
@@ -12,7 +12,7 @@ export function registerUpdaterFeature(context: vscode.ExtensionContext): void {
   context.subscriptions.push(updateBar);
 
   function refreshUpdateButton(): void {
-    const update = context.globalState.get<AvailableUpdate>('null.availableUpdate');
+    const update = getAvailableUpdate(context);
     if (!update?.latest) {
       updateBar.hide();
       return;

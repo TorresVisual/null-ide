@@ -4,10 +4,11 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as https from 'https';
+import * as os from 'os';
 import * as readline from 'readline';
 import { spawn } from 'child_process';
 import { compareVersionTags } from './versionComparison';
-import { Progress, isSafeTag, parseProgressLine, shouldAcknowledge } from './updateStatus';
+import { Progress, isSafeTag, isStillAvailable, parseProgressLine, shouldAcknowledge } from './updateStatus';
 
 // Electron adds resourcesPath to the Node process object; @types/node doesn't know about it.
 declare global {
@@ -199,6 +200,19 @@ function hasWindowsPackage(release: GithubRelease): boolean {
     release.assets.some(a => /^null-ide-win32-x64(-[^/\\]+)?\.zip$/i.test(a.name));
 }
 
+/** The remembered update, or undefined once the running version is already at or past it. */
+export function getAvailableUpdate(context: vscode.ExtensionContext): AvailableUpdate | undefined {
+  const update = context.globalState.get<AvailableUpdate>('null.availableUpdate');
+  if (!update?.latest) return undefined;
+  if (!isStillAvailable(update.latest, getCurrentVersion(context))) {
+    void context.globalState.update('null.availableUpdate', undefined);
+    void context.globalState.update('null.stagedUpdate', undefined);
+    void vscode.commands.executeCommand('setContext', 'nullUpdateAvailable', false);
+    return undefined;
+  }
+  return update;
+}
+
 let prefetching: string | undefined;   // version being downloaded by this window's null-setup
 
 /** Downloads and verifies the release in the background; installing only ever starts from the user's click. */
@@ -315,8 +329,7 @@ export async function promptForUpdate(update: AvailableUpdate): Promise<void> {
 }
 
 export async function installUpdate(context: vscode.ExtensionContext): Promise<void> {
-  const update = context.globalState.get<AvailableUpdate>('null.availableUpdate')
-    || await checkForUpdate(context, false);
+  const update = getAvailableUpdate(context) || await checkForUpdate(context, false);
   if (!update) return;
 
   const install = findInstall(context);
@@ -339,7 +352,8 @@ export async function installUpdate(context: vscode.ExtensionContext): Promise<v
   const child = spawn(
     install.setupExe,
     ['update', '--repo', update.repo, '--version', update.latest, '--install-dir', install.installDir, '--launch'],
-    { detached: true, stdio: 'ignore' },
+    // cwd must not be the install dir (the extension host's): a process inside it blocks renaming it.
+    { detached: true, stdio: 'ignore', cwd: os.tmpdir() },
   );
   const started = await new Promise<boolean>(resolve => {
     child.once('spawn', () => resolve(true));
@@ -352,6 +366,7 @@ export async function installUpdate(context: vscode.ExtensionContext): Promise<v
   child.unref();
 
   await context.globalState.update('null.stagedUpdate', undefined);
+  await context.globalState.update('null.availableUpdate', undefined);
   latestProgress = undefined;
   onStagedUpdateChanged.fire();
 
@@ -369,7 +384,7 @@ export function acknowledgeUpdate(context: vscode.ExtensionContext): void {
   if (!shouldAcknowledge(text)) return;   // a Started journal belongs to an update still in progress
   try {
     fs.writeFileSync(path.join(install.installDir, '.null-ready'), String(Date.now()));
-    spawn(install.setupExe, ['recover', '--install-dir', install.installDir], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
+    spawn(install.setupExe, ['recover', '--install-dir', install.installDir], { detached: true, stdio: 'ignore', windowsHide: true, cwd: os.tmpdir() }).unref();
     output.appendLine('Acknowledged the completed update.');
   } catch (err) {
     output.appendLine(`Could not acknowledge the update: ${(err as Error).message}`);
