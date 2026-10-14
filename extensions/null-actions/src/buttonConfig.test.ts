@@ -24,6 +24,7 @@ test('parses a minimal valid button, applying defaults', () => {
     saveAll: false,
     focus: true,
     onBusy: 'ask',
+    problemMatcher: undefined,
     priority: 0,
   });
 });
@@ -87,4 +88,13 @@ test('onBusy accepts the known modes and falls back to ask for anything else', (
   ]);
   assert.strictEqual(buttons[0].onBusy, 'restart');
   assert.strictEqual(buttons[1].onBusy, 'ask');
+});
+
+test('problemMatcher is kept when a non-empty string, otherwise dropped', () => {
+  const { buttons } = parseButtonConfigs([
+    { id: 'a', label: 'A', command: 'x', problemMatcher: ' $tsc ' },
+    { id: 'b', label: 'B', command: 'x', problemMatcher: '  ' },
+    { id: 'c', label: 'C', command: 'x', problemMatcher: 7 },
+  ]);
+  assert.deepStrictEqual(buttons.map(b => b.problemMatcher), ['$tsc', undefined, undefined]);
 });

@@ -6,6 +6,14 @@ export interface NpmScriptButton {
   id: string;
   label: string;
   command: string;
+  problemMatcher?: string;
+}
+
+// ponytail: keyword guess on the script body; scripts that wrap tsc/eslint in another tool get no matcher.
+function matcherFor(script: string): string | undefined {
+  if (/\btsc\b/.test(script)) { return '$tsc'; }
+  if (/\beslint\b/.test(script)) { return '$eslint-stylish'; }
+  return undefined;
 }
 
 export function parseNpmScripts(packageJsonContent: string): NpmScriptButton[] {
@@ -23,7 +31,10 @@ export function parseNpmScripts(packageJsonContent: string): NpmScriptButton[] {
   const buttons: NpmScriptButton[] = [];
   for (const [name, value] of Object.entries(scripts as Record<string, unknown>)) {
     if (typeof value !== 'string') { continue; }
-    buttons.push({ id: `npm-${name}`, label: `npm run ${name}`, command: `npm run ${name}` });
+    const button: NpmScriptButton = { id: `npm-${name}`, label: `npm run ${name}`, command: `npm run ${name}` };
+    const problemMatcher = matcherFor(value);
+    if (problemMatcher) { button.problemMatcher = problemMatcher; }
+    buttons.push(button);
   }
   return buttons;
 }
@@ -43,6 +54,7 @@ export function toActionButtonConfig(script: NpmScriptButton, priority: number):
     saveAll: false,
     focus: true,
     onBusy: 'ask',
+    problemMatcher: script.problemMatcher,
     priority,
   };
 }

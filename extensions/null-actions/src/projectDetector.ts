@@ -5,6 +5,7 @@ export interface SuggestedButton {
   label: string;
   command: string;
   icon?: string;
+  problemMatcher?: string;
 }
 
 /** One manifest found in a folder; produced by null-env's `detectProjects`. */
@@ -17,9 +18,9 @@ export type ProjectDetector = (folderPath: string) => readonly DetectedProject[]
 
 const SUGGESTIONS_BY_MANIFEST: Record<string, SuggestedButton[]> = {
   'Cargo.toml': [
-    { id: 'cargo-run', label: 'cargo run', command: 'cargo run', icon: 'play' },
-    { id: 'cargo-build', label: 'cargo build', command: 'cargo build', icon: 'tools' },
-    { id: 'cargo-test', label: 'cargo test', command: 'cargo test', icon: 'beaker' },
+    { id: 'cargo-run', label: 'cargo run', command: 'cargo run', icon: 'play', problemMatcher: '$null-rustc' },
+    { id: 'cargo-build', label: 'cargo build', command: 'cargo build', icon: 'tools', problemMatcher: '$null-rustc' },
+    { id: 'cargo-test', label: 'cargo test', command: 'cargo test', icon: 'beaker', problemMatcher: '$null-rustc' },
   ],
   'CMakeLists.txt': [
     { id: 'cmake-configure', label: 'cmake configure', command: 'cmake -B build', icon: 'gear' },

@@ -62,3 +62,8 @@ test('the folder path is passed to the detector', () => {
   detectSuggestedButtons('/some/folder', p => { seen = p; return []; });
   assert.strictEqual(seen, '/some/folder');
 });
+
+test('cargo suggestions carry the rustc problem matcher', () => {
+  const suggestions = detectSuggestedButtons('/x', detecting({ language: 'rust', manifest: 'Cargo.toml' }));
+  assert.ok(suggestions.length > 0 && suggestions.every(s => s.problemMatcher === '$null-rustc'));
+});

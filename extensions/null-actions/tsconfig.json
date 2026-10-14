@@ -33,6 +33,7 @@
     "src/settingsPanel.ts",
     "src/test/runTest.ts",
     "src/test/suite/index.ts",
-    "src/test/suite/activation.spec.ts"
+    "src/test/suite/activation.spec.ts",
+    "src/test/suite/problemMatcher.spec.ts"
   ]
 }

@@ -11,6 +11,12 @@ export interface TerminalExecution {
   readonly exitCode: Promise<number | undefined>;
 }
 
+/** A button's command running as a VS Code task, so its output feeds a problem matcher. */
+export interface TaskRun extends TerminalExecution {
+  terminate(): void;
+  show(): void;
+}
+
 export interface TerminalHost {
   listTerminals(): TerminalHandle[];
   createTerminal(options: { name: string; cwd?: string }): TerminalHandle;
@@ -21,6 +27,8 @@ export interface TerminalHost {
    * without it behave like the old fire-and-forget dispatch.
    */
   execute?(terminal: TerminalHandle, command: string): Promise<TerminalExecution | undefined>;
+  /** Runs `command` as a task whose output is scanned by `problemMatcher`. Optional like `execute`. */
+  runTask?(label: string, command: string, options: { cwd?: string; focus?: boolean; problemMatcher: string }): Promise<TaskRun>;
 }
 
 export type ButtonRunState =
@@ -40,6 +48,8 @@ export class TerminalRegistry {
   private states = new Map<string, ButtonRunState>();
   // Settles when the button's current run is over; lets restart wait for Ctrl+C to take effect.
   private runs = new Map<string, Promise<void>>();
+  // Buttons whose latest run was a task; kept after it ends so a failed result can still reveal its terminal.
+  private tasks = new Map<string, TaskRun>();
   private listeners = new Set<StateListener>();
 
   constructor(private readonly host: TerminalHost, private readonly now: () => number = Date.now) {}
@@ -57,7 +67,11 @@ export class TerminalRegistry {
     return this.states.get(buttonId)?.kind === 'running';
   }
 
-  async dispatch(buttonId: string, label: string, command: string, options: { cwd?: string; focus?: boolean } = {}): Promise<void> {
+  async dispatch(buttonId: string, label: string, command: string, options: { cwd?: string; focus?: boolean; problemMatcher?: string } = {}): Promise<void> {
+    if (options.problemMatcher && this.host.runTask) {
+      return this.dispatchTask(buttonId, label, command, { ...options, problemMatcher: options.problemMatcher });
+    }
+    this.tasks.delete(buttonId);
     const terminal = this.resolve(buttonId, label, options.cwd);
     // Mark busy before awaiting: a new terminal may wait for shell integration,
     // and a second click in that window must not type into the starting command.
@@ -65,13 +79,7 @@ export class TerminalRegistry {
     this.setState(buttonId, { kind: 'running' });
     const execution = await this.host.execute?.(terminal, command);
     if (execution) {
-      const run = execution.exitCode.then(exitCode => {
-        if (this.runs.get(buttonId) !== run) { return; } // a newer run owns the state
-        this.runs.delete(buttonId);
-        const kind = exitCode === undefined ? 'ended' : exitCode === 0 ? 'passed' : 'failed';
-        this.setState(buttonId, { kind, exitCode, durationMs: this.now() - startedAt });
-      });
-      this.runs.set(buttonId, run);
+      this.track(buttonId, execution, startedAt);
     } else {
       this.setState(buttonId, undefined);
       terminal.sendText(command);
@@ -81,14 +89,39 @@ export class TerminalRegistry {
     }
   }
 
+  private async dispatchTask(buttonId: string, label: string, command: string, options: { cwd?: string; focus?: boolean; problemMatcher: string }): Promise<void> {
+    const startedAt = this.now();
+    this.setState(buttonId, { kind: 'running' });
+    try {
+      const task = await this.host.runTask!(label, command, options);
+      this.tasks.set(buttonId, task);
+      this.track(buttonId, task, startedAt);
+    } catch (err) {
+      this.setState(buttonId, undefined);
+      throw err;
+    }
+  }
+
+  private track(buttonId: string, execution: TerminalExecution, startedAt: number): void {
+    const run = execution.exitCode.then(exitCode => {
+      if (this.runs.get(buttonId) !== run) { return; } // a newer run owns the state
+      this.runs.delete(buttonId);
+      const kind = exitCode === undefined ? 'ended' : exitCode === 0 ? 'passed' : 'failed';
+      this.setState(buttonId, { kind, exitCode, durationMs: this.now() - startedAt });
+    });
+    this.runs.set(buttonId, run);
+  }
+
   /** Reveals the button's terminal if it still exists. */
   show(buttonId: string): void {
-    this.cache.get(buttonId)?.show(false);
+    const task = this.tasks.get(buttonId);
+    if (task) { task.show(); } else { this.cache.get(buttonId)?.show(false); }
   }
 
   /** Sends Ctrl+C, then waits (up to `timeoutMs`) for the running command to end. */
   async interrupt(buttonId: string, timeoutMs = 3000): Promise<void> {
-    this.cache.get(buttonId)?.sendText(CTRL_C, false);
+    const task = this.tasks.get(buttonId);
+    if (task) { task.terminate(); } else { this.cache.get(buttonId)?.sendText(CTRL_C, false); }
     const run = this.runs.get(buttonId);
     if (!run) { return; }
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -98,6 +131,7 @@ export class TerminalRegistry {
 
   forget(buttonId: string): void {
     this.cache.delete(buttonId);
+    this.tasks.delete(buttonId);
     this.runs.delete(buttonId);
     this.setState(buttonId, undefined);
   }

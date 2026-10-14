@@ -79,11 +79,27 @@
                 "default": "ask",
                 "description": "What a click does while the button's previous command is still running: ask, restart (Ctrl+C, then re-run), show the terminal, or run anyway (types into the running process). Needs terminal shell integration."
               },
+              "problemMatcher": {
+                "type": "string",
+                "description": "Name of a problem matcher, e.g. \"$tsc\", \"$eslint-stylish\", \"$gcc\" or \"$null-rustc\". When set the button runs as a task, so errors in its output appear in the Problems panel. Leave empty to run in a plain terminal."
+              },
               "priority": { "type": "number", "default": 0 }
             }
           }
         }
       }
-    }
+    },
+    "problemMatchers": [
+      {
+        "name": "null-rustc",
+        "owner": "rustc",
+        "source": "rustc",
+        "fileLocation": ["relative", "${workspaceFolder}"],
+        "pattern": [
+          { "regexp": "^(warning|warn|error)(\\[(.*)\\])?: (.*)$", "severity": 1, "code": 3, "message": 4 },
+          { "regexp": "^[\\s->=]*(.*?):(\\d*):(\\d*)\\s*$", "file": 1, "line": 2, "column": 3 }
+        ]
+      }
+    ]
   }
 }

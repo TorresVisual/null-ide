@@ -8,7 +8,7 @@ test('parses scripts into buttons', () => {
   const content = JSON.stringify({ scripts: { build: 'tsc', test: 'node --test out' } });
   const buttons = parseNpmScripts(content);
   assert.deepStrictEqual(buttons, [
-    { id: 'npm-build', label: 'npm run build', command: 'npm run build' },
+    { id: 'npm-build', label: 'npm run build', command: 'npm run build', problemMatcher: '$tsc' },
     { id: 'npm-test', label: 'npm run test', command: 'npm run test' },
   ]);
 });
@@ -38,4 +38,13 @@ test('toActionButtonConfig fills in full ActionButtonConfig defaults', () => {
   assert.strictEqual(config.background, 'none');
   assert.strictEqual(config.saveAll, false);
   assert.strictEqual(config.focus, true);
+});
+
+test('tsc and eslint scripts get a matching problem matcher, others none', () => {
+  const content = JSON.stringify({ scripts: { build: 'tsc -p .', lint: 'eslint src', test: 'node --test' } });
+  const [build, lint, test] = parseNpmScripts(content);
+  assert.strictEqual(build.problemMatcher, '$tsc');
+  assert.strictEqual(lint.problemMatcher, '$eslint-stylish');
+  assert.strictEqual(test.problemMatcher, undefined);
+  assert.strictEqual(toActionButtonConfig(build, 0).problemMatcher, '$tsc');
 });

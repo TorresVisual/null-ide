@@ -18,6 +18,8 @@ export interface ActionButtonConfig {
   saveAll: boolean;
   focus: boolean;
   onBusy: OnBusy;
+  /** Name of a VS Code problem matcher (e.g. `$tsc`); when set the button runs as a task so its output reaches Problems. */
+  problemMatcher?: string;
   priority: number;
 }
 
@@ -85,6 +87,7 @@ export function parseButtonConfigs(raw: unknown): ParseResult {
       saveAll: e.saveAll === true,
       focus: typeof e.focus === 'boolean' ? e.focus : true,
       onBusy: VALID_ON_BUSY.includes(e.onBusy as OnBusy) ? (e.onBusy as OnBusy) : 'ask',
+      problemMatcher: typeof e.problemMatcher === 'string' && e.problemMatcher.trim() !== '' ? e.problemMatcher.trim() : undefined,
       priority: typeof e.priority === 'number' ? e.priority : 0,
     });
   }

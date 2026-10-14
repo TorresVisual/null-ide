@@ -1,7 +1,7 @@
 'use strict';
 
 import * as vscode from 'vscode';
-import { TerminalExecution, TerminalHandle, TerminalHost } from './terminalRegistry';
+import { TaskRun, TerminalExecution, TerminalHandle, TerminalHost } from './terminalRegistry';
 
 // Shell integration attaches a moment after a terminal's shell starts. Only
 // terminals we just created are worth waiting for; one that still has none
@@ -41,6 +41,42 @@ export class VscodeTerminalHost implements TerminalHost {
       }
     });
     return { exitCode };
+  }
+
+  async runTask(label: string, command: string, options: { cwd?: string; focus?: boolean; problemMatcher: string }): Promise<TaskRun> {
+    const name = `Action: ${label}`;
+    const task = new vscode.Task(
+      { type: 'shell' },
+      vscode.workspace.workspaceFolders?.[0] ?? vscode.TaskScope.Workspace,
+      name,
+      'null-actions',
+      new vscode.ShellExecution(command, { cwd: options.cwd }),
+      [options.problemMatcher],
+    );
+    task.presentationOptions = {
+      reveal: options.focus ? vscode.TaskRevealKind.Always : vscode.TaskRevealKind.Silent,
+      focus: options.focus,
+      panel: vscode.TaskPanelKind.Dedicated,
+      showReuseMessage: false,
+    };
+    const execution = await vscode.tasks.executeTask(task);
+    // onDidEndTaskProcess carries the exit code; onDidEndTask is the fallback when no process ran or it was terminated.
+    const exitCode = new Promise<number | undefined>(resolve => {
+      const subs = [
+        vscode.tasks.onDidEndTaskProcess(e => { if (e.execution === execution) { done(e.exitCode); } }),
+        vscode.tasks.onDidEndTask(e => { if (e.execution === execution) { done(undefined); } }),
+      ];
+      function done(code: number | undefined): void {
+        subs.forEach(s => s.dispose());
+        resolve(code);
+      }
+    });
+    return {
+      exitCode,
+      terminate: () => execution.terminate(),
+      // Task terminals are titled "Task - <name>"; the API exposes no handle to them.
+      show: () => vscode.window.terminals.filter(t => t.name.endsWith(name)).pop()?.show(false),
+    };
   }
 
   private waitForIntegration(terminal: vscode.Terminal): Promise<vscode.TerminalShellIntegration | undefined> {
