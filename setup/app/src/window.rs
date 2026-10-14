@@ -17,9 +17,16 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use crate::args::Args;
 
 static FINISHED: AtomicBool = AtomicBool::new(false);
+/// From "Installing" on, closing the window would leave a half-installed app; before that it just abandons the update.
+static SWAPPING: AtomicBool = AtomicBool::new(false);
 
 enum Action { Retry, ForceClose, Cancel }
 struct Channel(Mutex<mpsc::Sender<Action>>);
+struct Ready(Mutex<mpsc::Sender<()>>);
+
+/// The page has registered its event listeners; earlier events would be dropped.
+#[tauri::command]
+fn ui_ready(r: State<Ready>) { let _ = r.0.lock().unwrap().send(()); }
 
 #[tauri::command]
 fn action(name: String, ch: State<Channel>) {
@@ -47,8 +54,12 @@ impl Interact for UiInteract<'_> {
     }
 }
 
-fn worker(app: AppHandle, args: Args, log: Arc<Logger>, rx: mpsc::Receiver<Action>) {
-    let emit = |p: Progress| { let _ = app.emit("progress", &p); };
+fn worker(app: AppHandle, args: Args, log: Arc<Logger>, rx: mpsc::Receiver<Action>, ready: mpsc::Receiver<()>) {
+    let _ = ready.recv_timeout(Duration::from_secs(5));
+    let emit = |p: Progress| {
+        if p == Progress::Installing { SWAPPING.store(true, Ordering::SeqCst); }
+        let _ = app.emit("progress", &p);
+    };
     let interact = UiInteract { app: &app, rx: &rx };
     let ctx = Ctx { progress: &emit, log: &log, interact: &interact };
     let mut opts = Opts::standard(args.repo.clone(), args.tag.clone(), args.install_dir.clone());
@@ -61,23 +72,32 @@ fn worker(app: AppHandle, args: Args, log: Arc<Logger>, rx: mpsc::Receiver<Actio
             std::thread::sleep(Duration::from_secs(2));
             app.exit(0);
         }
-        Err(_) => {} // Failed was already emitted; the page offers Copy diagnostics and Close
+        Err(null_setup_core::Error::Busy) => {} // another update owns the install; leave it alone
+        Err(_) => {
+            // Failed was already emitted; the page offers Copy diagnostics and Close.
+            // The user was promised "close, update, reopen": after a rolled-back update, reopen the old version.
+            if args.launch && args.install_dir.join("null.exe").exists() {
+                let _ = update::launch_ide(&args.install_dir);
+            }
+        }
     }
 }
 
 pub fn run_update(args: Args) -> i32 {
     let (tx, rx) = mpsc::channel::<Action>();
+    let (ready_tx, ready_rx) = mpsc::channel::<()>();
+    let mut ready_slot = Some(ready_rx);
     let log = Arc::new(Logger::open(&logs_dir()));
     let worker_log = log.clone();
     let mut slot = Some((args, rx));
     tauri::Builder::default()
         .manage(Channel(Mutex::new(tx)))
+        .manage(Ready(Mutex::new(ready_tx)))
         .manage(log)
-        .invoke_handler(tauri::generate_handler![action, diagnostics, quit])
-        // Closing the window mid-swap would leave a half-installed app.
+        .invoke_handler(tauri::generate_handler![action, diagnostics, quit, ui_ready])
         .on_window_event(|_, ev| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = ev {
-                if !FINISHED.load(Ordering::SeqCst) {
+                if SWAPPING.load(Ordering::SeqCst) && !FINISHED.load(Ordering::SeqCst) {
                     api.prevent_close();
                 }
             }
@@ -87,8 +107,8 @@ pub fn run_update(args: Args) -> i32 {
             if let Some(w) = app.get_webview_window("main") {
                 let _ = w.show();
             }
-            if let Some((args, rx)) = slot.take() {
-                std::thread::spawn(move || worker(handle, args, worker_log, rx));
+            if let (Some((args, rx)), Some(ready)) = (slot.take(), ready_slot.take()) {
+                std::thread::spawn(move || worker(handle, args, worker_log, rx, ready));
             }
             Ok(())
         })

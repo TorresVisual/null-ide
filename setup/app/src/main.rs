@@ -19,6 +19,8 @@ fn main() {
         Mode::Prefetch => headless::prefetch(&args),
         Mode::Recover => headless::recover(&args),
         Mode::Update => {
+            // Never keep a handle on the install dir (inherited cwd): the swap renames it.
+            let _ = std::env::set_current_dir(null_setup_core::local_app_data());
             relocate::maybe_relocate(&args);
             window::run_update(args)
         }

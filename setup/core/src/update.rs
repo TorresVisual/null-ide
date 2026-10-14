@@ -94,12 +94,19 @@ pub fn update(o: &Opts, ctx: &Ctx) -> Result<Outcome> {
 }
 
 fn run_update(o: &Opts, ctx: &Ctx) -> Result<Outcome> {
-    swap::recover(&o.install_dir, &o.timing)?;
-    let (rel, zip) = fetch_verified(o, Duration::from_secs(600), ctx)?;
+    // One update at a time per install: a second one must not touch the first one's staging, backup or journal.
+    let _lock = swap::lock_install(&o.install_dir, Duration::ZERO)?;
+    swap::recover_unlocked(&o.install_dir, &o.timing)?;
+    // A zip that `prefetch` verified needs no network, so "Restart to update" also works offline.
+    let zip = match download::cached(&o.cache, &o.tag) {
+        Some(z) => z,
+        None => fetch_verified(o, Duration::from_secs(600), ctx)?.1,
+    };
+    let zip_size = fs::metadata(&zip).map(|m| m.len()).unwrap_or(0);
 
     let plan = swap::plan_for(&o.install_dir, &o.tag);
     let parent = o.install_dir.parent().unwrap_or(Path::new("."));
-    disk::ensure(parent, rel.zip_size * 3)?;
+    disk::ensure(parent, zip_size.saturating_mul(3))?;
     if plan.staged.exists() {
         fs::remove_dir_all(&plan.staged).ctx("remove stale staging directory")?;
     }
@@ -149,7 +156,7 @@ fn finish(o: &Opts, plan: &Plan, ctx: &Ctx) -> Result<Outcome> {
     let registration = if o.reapply { registrations::reapply(&o.install_dir, ctx) } else { Registration::Skipped };
     if o.launch {
         ctx.emit(Progress::Restarting);
-        let mut child = launch(&o.install_dir)?;
+        let mut child = launch_ide(&o.install_dir)?;
         wait_ready(&mut child, &swap::ready_marker(&o.install_dir), o.ready_timeout)?;
     }
     // A commit that cannot delete the backup (locked) is not a failed update: the journal stays and the next start retries.
@@ -162,15 +169,22 @@ fn finish(o: &Opts, plan: &Plan, ctx: &Ctx) -> Result<Outcome> {
     Ok(Outcome { registration })
 }
 
-fn launch(install: &Path) -> Result<Child> {
-    Command::new(install.join("null.exe"))
-        .current_dir(install)
-        .env_remove("NULL_SETUP_RELOCATED")
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-        .ctx("start the new Null IDE")
+/// The IDE is started from the extension host's environment, which would make `null.exe` run as plain Node
+/// (`ELECTRON_RUN_AS_NODE`) or attach to the old window's `VSCODE_*` state, so none of that is passed on.
+pub fn launch_command(install: &Path) -> Command {
+    let mut c = Command::new(install.join("null.exe"));
+    c.current_dir(install).env_remove("NULL_SETUP_RELOCATED").env_remove("ELECTRON_RUN_AS_NODE");
+    for (k, _) in std::env::vars_os() {
+        if k.to_string_lossy().to_ascii_uppercase().starts_with("VSCODE_") {
+            c.env_remove(&k);
+        }
+    }
+    c.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
+    c
+}
+
+pub fn launch_ide(install: &Path) -> Result<Child> {
+    launch_command(install).spawn().ctx("start Null IDE")
 }
 
 fn wait_ready(child: &mut Child, marker: &Path, timeout: Duration) -> Result<()> {

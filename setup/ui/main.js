@@ -9,7 +9,7 @@ const LABEL = {
   waitingForClose: 'Waiting for Null IDE to close…',
   installing: 'Installing…',
   restarting: 'Starting Null IDE…',
-  busy: 'Another download is already running.',
+  busy: 'Another update or download is already running.',
   needsReapproval: 'Updated. The Windows 11 context menu needs one-time administrator approval; run the Null IDE installer to enable it.',
 };
 const mb = (n) => (n / 1048576).toFixed(1);
@@ -49,3 +49,4 @@ $('copy').onclick = async () => {
   $('copy').textContent = 'Copied';
 };
 $('close').onclick = () => invoke('quit');
+invoke('ui_ready');

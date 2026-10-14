@@ -162,3 +162,51 @@ fn disk_check_compares_available_and_needed() {
     assert!(disk::check(10_000_000, 1_000_000).is_ok());
     assert!(matches!(disk::check(1_000_000, 10_000_000), Err(Error::Disk { .. })));
 }
+
+#[test]
+fn a_server_streaming_more_than_advertised_is_stopped_and_leaves_no_part_file() {
+    let data = body();
+    let mut too_long = data.clone();
+    too_long.extend(vec![1u8; 50_000]);
+    let srv = support::serve(move |_| (200, too_long.clone(), vec![]));
+    let tmp = tempfile::tempdir().unwrap();
+    let cache = Cache { root: tmp.path().into() };
+    let err = run(|c| fetch(&http(), &cache, &release(&srv.base, data.len()), &sha(&data), Duration::ZERO, c)).unwrap_err();
+    assert!(matches!(err, Error::Size { .. }), "{err}");
+    assert!(!cache.dir("v2").join(format!("{NAME}.part")).exists());
+}
+
+#[test]
+fn a_verified_download_can_be_found_again_offline_and_tampering_hides_it() {
+    let data = body();
+    let d = data.clone();
+    let srv = support::serve(move |_| (200, d.clone(), vec![]));
+    let tmp = tempfile::tempdir().unwrap();
+    let cache = Cache { root: tmp.path().into() };
+    assert!(null_setup_core::download::cached(&cache, "v2").is_none());
+    let path = run(|c| fetch(&http(), &cache, &release(&srv.base, data.len()), &sha(&data), Duration::ZERO, c)).unwrap();
+    assert_eq!(null_setup_core::download::cached(&cache, "v2"), Some(path.clone()));
+    fs::write(&path, b"tampered").unwrap();
+    assert!(null_setup_core::download::cached(&cache, "v2").is_none());
+}
+
+#[test]
+fn an_empty_lock_file_from_a_crashed_writer_is_stolen_once_it_is_old() {
+    let tmp = tempfile::tempdir().unwrap();
+    let lock = tmp.path().join(".lock");
+    fs::write(&lock, "").unwrap();
+    // fresh and empty: the holder may still be between create and write
+    assert!(matches!(Lock::acquire(tmp.path(), Duration::ZERO), Err(Error::Busy)));
+    let old = std::time::SystemTime::now() - Duration::from_secs(60);
+    fs::OpenOptions::new().write(true).open(&lock).unwrap().set_modified(old).unwrap();
+    assert!(Lock::acquire(tmp.path(), Duration::ZERO).is_ok());
+}
+
+#[test]
+fn named_locks_do_not_collide_with_the_default_lock() {
+    let tmp = tempfile::tempdir().unwrap();
+    let a = Lock::acquire(tmp.path(), Duration::ZERO).unwrap();
+    let b = Lock::acquire_named(tmp.path(), ".other", Duration::ZERO).unwrap();
+    assert!(matches!(Lock::acquire_named(tmp.path(), ".other", Duration::ZERO), Err(Error::Busy)));
+    drop((a, b));
+}

@@ -17,6 +17,12 @@ fn safe_tag(t: &str) -> bool {
     !t.is_empty() && t.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_')) && !t.contains("..")
 }
 
+/// `owner/name` with GitHub's character set; it is interpolated into an API URL path.
+fn safe_repo(r: &str) -> bool {
+    let ok = |part: &str| !part.is_empty() && part.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_'));
+    matches!(r.split_once('/'), Some((o, n)) if ok(o) && ok(n) && o != ".." && n != "..")
+}
+
 pub fn parse<I: IntoIterator<Item = String>>(it: I) -> Result<Args, String> {
     let mut it = it.into_iter();
     let mode = match it.next().as_deref() {
@@ -35,6 +41,9 @@ pub fn parse<I: IntoIterator<Item = String>>(it: I) -> Result<Args, String> {
             "--launch" => launch = true,
             other => return Err(format!("unknown argument: {other}")),
         }
+    }
+    if !safe_repo(&repo) {
+        return Err("--repo must look like owner/name".into());
     }
     let install_dir = install_dir.ok_or("--install-dir is required")?;
     if mode != Mode::Recover && !safe_tag(&tag) {
@@ -71,6 +80,15 @@ mod tests {
         assert!(p("frobnicate").is_err());
         assert!(p("update --version ..\\evil --install-dir C:\\x").is_err()); // tag becomes a directory name
         assert!(p("update --version a/b --install-dir C:\\x").is_err());
+    }
+
+    #[test]
+    fn repo_must_be_owner_slash_name() {
+        assert!(p("update --repo ../x --version v1 --install-dir C:\\x").is_err());
+        assert!(p("update --repo a/b/c --version v1 --install-dir C:\\x").is_err());
+        assert!(p("update --repo a --version v1 --install-dir C:\\x").is_err());
+        assert!(p("update --repo a?b/c --version v1 --install-dir C:\\x").is_err());
+        assert!(p("update --repo Torres-Visual/null_ide.2 --version v1 --install-dir C:\\x").is_ok());
     }
 
     #[test]

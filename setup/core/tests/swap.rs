@@ -1,7 +1,7 @@
 use std::{fs, path::{Path, PathBuf}, process::Command, thread, time::Duration};
 
 use null_setup_core::{
-    swap::{commit, journal_path, plan_for, ready_marker, recover, rollback, swap, Hook, Plan, Recovered, Step, Timing},
+    swap::{commit, journal_path, lock_install, plan_for, ready_marker, recover, rollback, swap, Hook, Plan, Recovered, Step, Timing},
     Error,
 };
 
@@ -106,4 +106,67 @@ fn a_locked_install_directory_fails_the_swap_and_leaves_it_intact() {
     child.wait().unwrap();
     assert!(matches!(r, Err(Error::Io { .. })));
     assert!(f.plan.install.join("old.txt").exists() && !f.plan.install.join("new.txt").exists());
+}
+
+#[test]
+fn recover_does_nothing_while_another_live_process_holds_the_update_lock() {
+    let f = fixture();
+    assert!(matches!(swap(&f.plan, &T, &mut crash_at(Step::AsideDone)), Err(Error::Crashed)));
+    let parent = f.plan.install.parent().unwrap().to_path_buf();
+    let mut child = Command::new(r"C:\Windows\System32\PING.EXE").args(["-n", "30", "127.0.0.1"]).spawn().unwrap();
+    fs::write(parent.join(".null-update.lock"), child.id().to_string()).unwrap();
+    let r = recover(&f.plan.install, &T);
+    child.kill().unwrap();
+    child.wait().unwrap();
+    assert_eq!(r.unwrap(), Recovered::Nothing);
+    assert!(journal_path(&f.plan.install).exists() && f.plan.aside.exists());
+}
+
+#[test]
+fn a_second_update_cannot_take_the_install_lock() {
+    let f = fixture();
+    let _held = lock_install(&f.plan.install, Duration::ZERO).unwrap();
+    assert!(matches!(lock_install(&f.plan.install, Duration::ZERO), Err(Error::Busy)));
+}
+
+#[test]
+fn a_journal_for_another_install_or_with_foreign_paths_is_ignored() {
+    let f = fixture();
+    assert!(matches!(swap(&f.plan, &T, &mut crash_at(Step::AsideDone)), Err(Error::Crashed)));
+    let parent = f.plan.install.parent().unwrap();
+    // another install in the same parent folder must not be rolled back by this one's journal
+    let other = parent.join("Other IDE");
+    fs::create_dir_all(&other).unwrap();
+    assert_eq!(recover(&other, &T).unwrap(), Recovered::Nothing);
+    assert!(journal_path(&f.plan.install).exists());
+    // a journal whose paths do not look like ours is never acted on
+    let victim = parent.join("victim");
+    fs::create_dir_all(&victim).unwrap();
+    fs::write(victim.join("keep.txt"), "x").unwrap();
+    let forged = serde_json::json!({ "plan": { "install": f.plan.install, "staged": victim, "aside": f.plan.aside }, "step": "AsideDone" });
+    fs::write(journal_path(&f.plan.install), forged.to_string()).unwrap();
+    assert_eq!(recover(&f.plan.install, &T).unwrap(), Recovered::Nothing);
+    assert!(victim.join("keep.txt").exists());
+}
+
+#[test]
+fn the_installers_uninstaller_files_survive_a_swap_and_a_rollback() {
+    let f = fixture();
+    fs::write(f.plan.install.join("unins000.exe"), "u").unwrap();
+    fs::write(f.plan.install.join("unins000.dat"), "d").unwrap();
+    swap(&f.plan, &T, &mut |_| Hook::Continue).unwrap();
+    assert!(f.plan.install.join("unins000.exe").exists() && f.plan.install.join("unins000.dat").exists());
+    rollback(&f.plan, &T).unwrap();
+    assert!(f.plan.install.join("unins000.exe").exists() && f.plan.install.join("old.txt").exists());
+}
+
+#[test]
+fn rollback_leaves_no_failed_install_copy_behind() {
+    let f = fixture();
+    swap(&f.plan, &T, &mut |_| Hook::Continue).unwrap();
+    rollback(&f.plan, &T).unwrap();
+    let leftovers: Vec<_> = fs::read_dir(f.plan.install.parent().unwrap()).unwrap()
+        .flatten().map(|e| e.file_name().to_string_lossy().into_owned())
+        .filter(|n| n.starts_with(".null-ide-")).collect();
+    assert!(leftovers.is_empty(), "{leftovers:?}");
 }

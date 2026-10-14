@@ -27,7 +27,9 @@ pub fn maybe_relocate(a: &Args) {
     if fs::copy(&exe, &copy).is_err() {
         return; // run in place; the swap reports a clear error if the exe is locked
     }
-    if Command::new(&copy).args(env::args().skip(1)).env(FLAG, "1").spawn().is_ok() {
+    // Not the inherited directory: the extension host's cwd is the install dir, and a process whose cwd is
+    // inside a folder makes renaming that folder fail.
+    if Command::new(&copy).args(env::args().skip(1)).env(FLAG, "1").current_dir(&dir).spawn().is_ok() {
         std::process::exit(0);
     }
 }

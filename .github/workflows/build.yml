@@ -710,7 +710,7 @@ jobs:
       - name: Test null-setup
         shell: pwsh
         working-directory: ide-overlay/setup
-        run: cargo test --locked -p null-setup-core
+        run: cargo test --locked -p null-setup-core -p null-setup
 
       - name: Build null-setup
         shell: pwsh

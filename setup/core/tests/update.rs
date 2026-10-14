@@ -6,8 +6,8 @@ use null_setup_core::{
     download::Cache,
     http::Http,
     progress::{Ctx, Logger, NoInteract, Progress},
-    swap::{journal_path, Timing},
-    update::{prefetch, update, Opts},
+    swap::{journal_path, lock_install, Timing},
+    update::{launch_command, prefetch, update, Opts},
     Error,
 };
 use sha2::{Digest, Sha256};
@@ -155,4 +155,44 @@ fn a_new_ide_that_wrote_its_ready_marker_is_committed() {
     run(|c| update(&o, c)).0.unwrap();
     assert!(w.install.join("new.txt").exists());
     assert!(!journal_path(&w.install).exists());
+}
+
+#[test]
+fn a_prefetched_update_installs_without_any_network() {
+    let w = world(&[]);
+    let srv = serve_release(w.zip.clone(), sha(&w.zip), Arc::new(AtomicUsize::new(0)));
+    let o = opts(&w, &srv.base);
+    run(|c| prefetch(&o, c)).0.unwrap();
+    drop(srv); // the machine is offline when the user clicks "Restart to update"
+    let (r, _) = run(|c| update(&o, c));
+    r.unwrap();
+    assert!(w.install.join("new.txt").exists());
+}
+
+#[test]
+fn a_second_update_while_one_is_running_is_refused_and_touches_nothing() {
+    let w = world(&[]);
+    let srv = serve_release(w.zip.clone(), sha(&w.zip), Arc::new(AtomicUsize::new(0)));
+    let _running = lock_install(&w.install, Duration::ZERO).unwrap();
+    let (r, seen) = run(|c| update(&opts(&w, &srv.base), c));
+    assert!(matches!(r, Err(Error::Busy)));
+    assert_eq!(seen.last(), Some(&Progress::Busy));
+    assert_old(&w.install);
+}
+
+#[test]
+fn the_new_ide_is_started_without_the_extension_hosts_electron_and_vscode_environment() {
+    std::env::set_var("ELECTRON_RUN_AS_NODE", "1");
+    std::env::set_var("VSCODE_NULLTEST_CWD", "x");
+    let install = PathBuf::from(r"C:\Programs\Null IDE");
+    let cmd = launch_command(&install);
+    let removed: Vec<String> = cmd
+        .get_envs()
+        .filter(|(_, v)| v.is_none())
+        .map(|(k, _)| k.to_string_lossy().into_owned())
+        .collect();
+    for k in ["ELECTRON_RUN_AS_NODE", "VSCODE_NULLTEST_CWD", "NULL_SETUP_RELOCATED"] {
+        assert!(removed.iter().any(|r| r == k), "{k} is inherited: {removed:?}");
+    }
+    assert_eq!(cmd.get_current_dir(), Some(install.as_path()));
 }

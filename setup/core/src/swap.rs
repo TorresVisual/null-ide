@@ -7,7 +7,10 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
-use crate::error::{Error, IoCtx, Result};
+use crate::{
+    download::Lock,
+    error::{Error, IoCtx, Result},
+};
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
 pub enum Step { Started, AsideDone, MovedIn }
@@ -34,6 +37,30 @@ fn parent_of(install: &Path) -> &Path { install.parent().unwrap_or(Path::new("."
 
 pub fn journal_path(install: &Path) -> PathBuf { parent_of(install).join(".null-update-journal.json") }
 pub fn ready_marker(install: &Path) -> PathBuf { install.join(".null-ready") }
+
+/// One lock per install parent folder for the whole of `update` and `recover`, so two updaters never act on the same folders.
+pub fn lock_install(install: &Path, wait: Duration) -> Result<Lock> {
+    Lock::acquire_named(parent_of(install), ".null-update.lock", wait)
+}
+
+/// Files the installer (not the zip) puts in the install directory; the uninstaller needs them to keep working.
+const INSTALLER_FILES: [&str; 2] = ["unins000.exe", "unins000.dat"];
+
+fn norm(p: &Path) -> String {
+    p.to_string_lossy().to_lowercase().replace('/', "\\").trim_end_matches('\\').to_string()
+}
+
+/// A journal is only trusted when its paths have the exact shape `plan_for` produces for this install.
+fn plan_is_ours(plan: &Plan, install: &Path) -> bool {
+    let parent = norm(parent_of(install));
+    let child_of_parent = |p: &Path, prefix: &str| {
+        p.parent().is_some_and(|d| norm(d) == parent)
+            && p.file_name().is_some_and(|n| n.to_string_lossy().starts_with(prefix))
+    };
+    norm(&plan.install) == norm(install)
+        && child_of_parent(&plan.staged, ".null-ide-stage-")
+        && child_of_parent(&plan.aside, ".null-ide-bak-")
+}
 
 pub fn plan_for(install: &Path, tag: &str) -> Plan {
     let parent = parent_of(install);
@@ -104,6 +131,12 @@ fn run_swap(plan: &Plan, t: &Timing, hook: &mut dyn FnMut(Step) -> Hook) -> Resu
         if data.exists() {
             rename_retry(&data, &plan.staged.join("data"), t)?;
         }
+        for name in INSTALLER_FILES {
+            let (from, to) = (plan.aside.join(name), plan.staged.join(name));
+            if from.is_file() && !to.exists() {
+                fs::copy(&from, &to).ctx(format!("carry over {name}"))?; // a copy, so rollback needs no special case
+            }
+        }
     }
     rename_retry(&plan.staged, &plan.install, t)?;
     // ponytail: if this journal write fails the new install stays in place with a backup beside it; harmless, cleaned by the next update.
@@ -131,7 +164,20 @@ pub fn rollback(plan: &Plan, t: &Timing) -> Result<()> {
             if d.exists() && !aside_data.exists() {
                 rename_retry(&d, &aside_data, t)?;
             }
-            fs::remove_dir_all(&plan.install).ctx("remove the failed install")?;
+            // Rename, don't delete: a half-deleted install (locked DLL, scanner) must never be what remains.
+            let failed = plan.aside.with_file_name(format!(
+                "{}-failed",
+                plan.aside.file_name().unwrap_or_default().to_string_lossy()
+            ));
+            let _ = fs::remove_dir_all(&failed);
+            rename_retry(&plan.install, &failed, t)?;
+            rename_retry(&plan.aside, &plan.install, t)?;
+            let _ = fs::remove_dir_all(&failed);
+            if plan.staged.exists() {
+                let _ = fs::remove_dir_all(&plan.staged);
+            }
+            let _ = fs::remove_file(journal_path(&plan.install));
+            return Ok(());
         } else {
             let d = plan.staged.join("data");
             if d.exists() && !aside_data.exists() {
@@ -147,8 +193,18 @@ pub fn rollback(plan: &Plan, t: &Timing) -> Result<()> {
     Ok(())
 }
 
+/// Does nothing while another live process is running an update or recovery.
 pub fn recover(install: &Path, t: &Timing) -> Result<Recovered> {
+    let Ok(_lock) = lock_install(install, Duration::ZERO) else { return Ok(Recovered::Nothing) };
+    recover_unlocked(install, t)
+}
+
+/// For callers that already hold `lock_install`.
+pub fn recover_unlocked(install: &Path, t: &Timing) -> Result<Recovered> {
     let Some(j) = read_journal(install) else { return Ok(Recovered::Nothing) };
+    if !plan_is_ours(&j.plan, install) {
+        return Ok(Recovered::Nothing);
+    }
     if j.step == Step::MovedIn && ready_marker(&j.plan.install).exists() {
         commit(&j.plan)?;
         Ok(Recovered::Committed)
