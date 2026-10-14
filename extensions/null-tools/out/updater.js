@@ -36,6 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.onStagedUpdateChanged = void 0;
 exports.getUpdateProgress = getUpdateProgress;
 exports.findInstall = findInstall;
+exports.getAvailableUpdate = getAvailableUpdate;
 exports.checkForUpdate = checkForUpdate;
 exports.promptForUpdate = promptForUpdate;
 exports.installUpdate = installUpdate;
@@ -44,6 +45,7 @@ const vscode = __importStar(require("vscode"));
 const path = __importStar(require("path"));
 const fs = __importStar(require("fs"));
 const https = __importStar(require("https"));
+const os = __importStar(require("os"));
 const readline = __importStar(require("readline"));
 const child_process_1 = require("child_process");
 const versionComparison_1 = require("./versionComparison");
@@ -180,6 +182,19 @@ function hasWindowsPackage(release) {
     return Array.isArray(release.assets) &&
         release.assets.some(a => /^null-ide-win32-x64(-[^/\\]+)?\.zip$/i.test(a.name));
 }
+/** The remembered update, or undefined once the running version is already at or past it. */
+function getAvailableUpdate(context) {
+    const update = context.globalState.get('null.availableUpdate');
+    if (!update?.latest)
+        return undefined;
+    if (!(0, updateStatus_1.isStillAvailable)(update.latest, getCurrentVersion(context))) {
+        void context.globalState.update('null.availableUpdate', undefined);
+        void context.globalState.update('null.stagedUpdate', undefined);
+        void vscode.commands.executeCommand('setContext', 'nullUpdateAvailable', false);
+        return undefined;
+    }
+    return update;
+}
 let prefetching; // version being downloaded by this window's null-setup
 /** Downloads and verifies the release in the background; installing only ever starts from the user's click. */
 function startPrefetch(context, update) {
@@ -275,8 +290,7 @@ async function promptForUpdate(update) {
     }
 }
 async function installUpdate(context) {
-    const update = context.globalState.get('null.availableUpdate')
-        || await checkForUpdate(context, false);
+    const update = getAvailableUpdate(context) || await checkForUpdate(context, false);
     if (!update)
         return;
     const install = findInstall(context);
@@ -291,7 +305,9 @@ async function installUpdate(context) {
     const choice = await vscode.window.showWarningMessage(`Install Null IDE ${update.latest}? The IDE will close, update, and reopen.`, { modal: true, detail: truncateReleaseNotes(update.releaseNotes) }, 'Restart and Update');
     if (choice !== 'Restart and Update')
         return;
-    const child = (0, child_process_1.spawn)(install.setupExe, ['update', '--repo', update.repo, '--version', update.latest, '--install-dir', install.installDir, '--launch'], { detached: true, stdio: 'ignore' });
+    const child = (0, child_process_1.spawn)(install.setupExe, ['update', '--repo', update.repo, '--version', update.latest, '--install-dir', install.installDir, '--launch'], 
+    // cwd must not be the install dir (the extension host's): a process inside it blocks renaming it.
+    { detached: true, stdio: 'ignore', cwd: os.tmpdir() });
     const started = await new Promise(resolve => {
         child.once('spawn', () => resolve(true));
         child.once('error', err => {
@@ -303,6 +319,7 @@ async function installUpdate(context) {
         return;
     child.unref();
     await context.globalState.update('null.stagedUpdate', undefined);
+    await context.globalState.update('null.availableUpdate', undefined);
     latestProgress = undefined;
     exports.onStagedUpdateChanged.fire();
     // null-setup asks every window of this install to close; quitting here just makes that instant.
@@ -325,7 +342,7 @@ function acknowledgeUpdate(context) {
         return; // a Started journal belongs to an update still in progress
     try {
         fs.writeFileSync(path.join(install.installDir, '.null-ready'), String(Date.now()));
-        (0, child_process_1.spawn)(install.setupExe, ['recover', '--install-dir', install.installDir], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
+        (0, child_process_1.spawn)(install.setupExe, ['recover', '--install-dir', install.installDir], { detached: true, stdio: 'ignore', windowsHide: true, cwd: os.tmpdir() }).unref();
         output.appendLine('Acknowledged the completed update.');
     }
     catch (err) {

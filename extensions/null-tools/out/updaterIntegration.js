@@ -43,7 +43,7 @@ function registerUpdaterFeature(context) {
     updateBar.command = 'null.installUpdate';
     context.subscriptions.push(updateBar);
     function refreshUpdateButton() {
-        const update = context.globalState.get('null.availableUpdate');
+        const update = (0, updater_1.getAvailableUpdate)(context);
         if (!update?.latest) {
             updateBar.hide();
             return;

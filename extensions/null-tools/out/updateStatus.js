@@ -5,6 +5,8 @@ exports.formatBytes = formatBytes;
 exports.statusFor = statusFor;
 exports.isSafeTag = isSafeTag;
 exports.shouldAcknowledge = shouldAcknowledge;
+exports.isStillAvailable = isStillAvailable;
+const versionComparison_1 = require("./versionComparison");
 const PLAIN = new Set(['checking', 'verifying', 'preparing', 'installing', 'restarting', 'upToDate', 'ready', 'busy', 'needsReapproval']);
 function parseProgressLine(line) {
     let v;
@@ -70,5 +72,9 @@ function shouldAcknowledge(journalText) {
     catch {
         return false;
     }
+}
+/** The remembered "update available" is stale once the running version has caught up (e.g. right after updating). */
+function isStillAvailable(latest, current) {
+    return (0, versionComparison_1.compareVersionTags)(latest, current) > 0;
 }
 //# sourceMappingURL=updateStatus.js.map
