@@ -20,6 +20,7 @@
     "src/webview/detailHtml.ts",
     "src/webview/detailSidebarHtml.ts",
     "src/webview/composerText.ts",
-    "src/webview/createFormHtml.ts"
+    "src/webview/createFormHtml.ts",
+    "src/webview/commitGraphModel.ts"
   ]
 }
