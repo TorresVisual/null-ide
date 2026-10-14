@@ -256,11 +256,6 @@
           "id": "null-issues",
           "title": "GitHub Issues",
           "icon": "media/github-issues.svg"
-        },
-        {
-          "id": "null-graph",
-          "title": "Commit Graph",
-          "icon": "media/commit-graph.svg"
         }
       ]
     },
@@ -270,7 +265,8 @@
         { "id": "null.scratchView", "name": "Scratch Files", "visibility": "collapsed" },
         { "id": "null.notesView", "name": "Notes", "visibility": "collapsed" },
         { "id": "null.portsView", "name": "Null Ports", "visibility": "collapsed" },
-        { "id": "null.worktreesView", "name": "Worktrees", "visibility": "collapsed" }
+        { "id": "null.worktreesView", "name": "Worktrees", "visibility": "collapsed" },
+        { "id": "null.graphView", "name": "Recent Commits", "visibility": "collapsed" }
       ],
       "null-issues": [
         {
@@ -279,9 +275,6 @@
           "name": "GitHub Issues",
           "visibility": "visible"
         }
-      ],
-      "null-graph": [
-        { "id": "null.graphView", "name": "Recent Commits" }
       ]
     },
     "viewsWelcome": [

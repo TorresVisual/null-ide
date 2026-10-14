@@ -105,7 +105,7 @@ Rules for all actions:
 
 ## Activity-bar entry
 
-- New `viewsContainers.activitybar` container `null-graph` ("Commit Graph") with `media/commit-graph.svg`, separate from `null-workspace`.
+- `null.graphView` lives in the existing `null-workspace` container (collapsed by default); there is no separate graph container. `media/commit-graph.svg` is the tab icon.
 - One TreeView `null.graphView`: the first 50 commits of the shared listing (host data, no layout). Label is the subject; description is author, relative date and ref badges. Clicking runs `null.graph.open` with that SHA, which opens or focuses the tab, scrolls to and selects the commit.
 - View title buttons: Open Commit Graph (`$(git-commit)`) and Refresh. `view/item/context` carries the actions. `viewsWelcome` covers "not a git repository", remote windows and untrusted workspaces.
 - Commands: `null.graph.open`, `null.graph.refresh`, `null.graph.checkout`, `createBranch`, `cherryPick`, `revert`, `reset.soft|mixed|hard`, `copySha`, `continue`, `skip`, `abort`.
