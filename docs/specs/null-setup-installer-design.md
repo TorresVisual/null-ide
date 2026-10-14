@@ -10,7 +10,14 @@ Install and update are spread over four moving parts: the Inno Setup script, `sc
 
 Goals: one tested install/update pipeline; a personalizing wizard; updates that never lose user data and roll back on failure; install choices that can be changed later.
 
-Non-goals: delta updates, macOS/Linux installers, a second settings system, auto-installing marketplace extensions silently on updates, an offline (embedded-payload) installer (a later add: pass the zip as an argument).
+Non-goals:
+- Delta updates, macOS/Linux installers, a second settings system.
+- An offline (embedded-payload) installer (a later add: pass the zip as an argument).
+- Auto-installing marketplace extensions on updates.
+- Migrating existing installs. The only current user reinstalls once by hand; the old paths are deleted in the same release with no transition hop.
+- Code signing. The README documents the SmartScreen prompt; SHA256 only guards against corruption or truncation, not a compromised release.
+- A prerelease update channel (stable only; `-IncludePrerelease` is dropped).
+- A WebView2 bootstrapper or console fallback.
 
 ## Decisions
 
@@ -19,7 +26,11 @@ Non-goals: delta updates, macOS/Linux installers, a second settings system, auto
 | Installer technology | Rust core + Tauri (WebView2) UI, replacing Inno Setup | HTML/CSS/TS wizard that can follow `DESIGN.md`; Rust is already on the CI runner (`build.yml:84`); one binary replaces four moving parts |
 | Payload | Small online stub; downloads the release zip, verifies SHA256 | Install and update share one fetch, verify, stage and swap path |
 | Built-in selection | Unchecked built-ins are left off disk | Built-ins are discovered by scanning `resources/app/extensions/` (copied in `build.yml:233-245`); this avoids the private `state.vscdb` enablement state |
-| Personalization UI | In the wizard (system and extension choices) and `Null: Setup` in the IDE (change later) | One saved choice set, two entry points |
+| Locked "Core" built-ins | `null-tools`, `null-accounts`, `null-theme`, `null-icons` | `null-tools` hosts the updater, dashboard, `Null: Setup` and first-run consumer and depends on `null-accounts`; `product.json` names `null-theme`/`null-icons` as defaults |
+| Personalization UI | The wizard (system and extension choices) and `Null: Setup` in the IDE (change later) | One saved choice set, two entry points |
+| Download timing | Headless `prefetch` right after a release is detected; installs only start from an explicit click | Keeps "Restart to update" instant, as the current background staging does |
+| Supported Windows | Windows 11 and Windows 10 22H2 (both ship WebView2) | Revisit if other developers start using it |
+| UAC | Only a fresh install or `modify` may elevate; `update` and `repair` never do | No surprise admin prompt mid-update |
 
 ## Architecture
 
@@ -30,7 +41,8 @@ Modes:
 | Mode | Purpose |
 |---|---|
 | default (no install found) | Wizard, then fresh install |
-| `update --version <tag> --wait --launch` | Called by null-tools; progress window; download, verify, stage, swap, relaunch |
+| `prefetch --version <tag>` | Headless: resolve, download and verify the release zip into the updates cache; no window |
+| `update --version <tag> --wait --launch` | Called by null-tools; progress window; uses the prefetched zip if present, else downloads; verify, stage, swap, relaunch |
 | `modify` | Wizard pre-filled from `install-config.json` |
 | `repair` | Reinstall the current version with the saved choices |
 | `uninstall` | Remove files, registrations, PATH entry and the Add/Remove Programs entry |
@@ -38,20 +50,20 @@ Modes:
 An installed copy lives at `<installDir>\setup\null-setup.exe`. `update` runs from a temp copy so the install directory can be replaced.
 
 `core` modules:
-- `release`: resolves the release (tag, zip asset, `.sha256` sidecar, `builtins.json`), prerelease-aware, and reports HTTP status in errors.
-- `download`: resumable download into `%LOCALAPPDATA%\Null\updates\<version>\`, streaming SHA256, size check against `Content-Length`; a single-writer lock file so concurrent checks cannot delete a download in progress.
+- `release`: resolves the release (tag, zip asset, `.sha256` sidecar, `builtins.json`) for an exact tag, and reports HTTP status in errors.
+- `download`: resumable download into `%LOCALAPPDATA%\Null\updates\<version>\`, streaming SHA256, size check against `Content-Length`; a single-writer lock file so concurrent checks or a `prefetch` and an `update` cannot delete a download in progress. Old versions' caches are removed once an update succeeds.
 - `swap`: journaled directory swap (see Update safety).
 - `procs`: finds running `null.exe` processes of this install and closes them gracefully, then reports what is still locking files.
-- `shell`: ports `Register-*`/`Unregister-*` from `install-null-ide.ps1`: HKCU context menu, Win11 sparse APPX with the self-signed certificate flow, file associations, preview handler, PATH, shortcuts. Each registration is idempotent and individually reversible.
+- `shell`: ports `Register-*`/`Unregister-*` from `install-null-ide.ps1`: HKCU context menu, Win11 sparse APPX with the self-signed certificate flow, file associations, preview handler, PATH, shortcuts. Each registration is idempotent and individually reversible. Only the certificate step can elevate (see UAC below).
 - `config`: reads and writes `install-config.json` and the legacy `.null-ide-install.json`.
 
 ## State and files
 
 | File | Owner | Content |
 |---|---|---|
-| `<installDir>\.null-ide-install.json` | setup | `version`, `repo`, `installedAt`, `installDir`. Unchanged fields, so older null-tools builds keep working |
+| `<installDir>\.null-ide-install.json` | setup | `version`, `repo`, `installedAt`, `installDir`. Unchanged fields, so null-tools keeps reading it |
 | `<installDir>\install-config.json` | setup | shell-integration toggles; built-in extension selection; schema version |
-| `<release zip>\builtins.json` | build | per built-in: `id`, `label`, `description`, `default`, `requires[]` (e.g. `null-format` requires `null-env`); the wizard reads the manifest of the version being installed |
+| `builtins.json` (in the zip and a release asset) | build | per built-in: `id`, `label`, `description`, `default`, `locked`, `requires[]` (e.g. `null-format` requires `null-env`); plus the marketplace table (empty for now) and the settings table. The wizard reads the manifest of the version being installed |
 | `%APPDATA%\Null\null-setup\first-run.json` | setup writes, null-tools consumes | allowlisted settings; marketplace extension ids |
 | `%LOCALAPPDATA%\Null\logs\setup-<timestamp>.log` | setup | step-by-step log |
 
@@ -60,11 +72,12 @@ The installer never writes inside `%APPDATA%\Null\User\` (settings, keybindings,
 ## Wizard flow
 
 1. Welcome (version, install directory).
-2. Installation options: directory, desktop and Start Menu shortcuts, PATH, context menu, file associations, preview handler, Safe Mode shortcut.
-3. Built-in extensions: checklist with descriptions and defaults; selecting an extension selects its `requires`; deselecting one that others require is blocked with the reason.
-4. Marketplace extensions and settings (optional): a short curated list from `builtins.json`, a small allowlisted settings group (theme, font, telemetry-related, format on save). A "Use recommended defaults" button on every page skips ahead.
-5. Summary of all choices; Install.
-6. Progress (download, verify, extract, register), then Finish with "Launch Null IDE".
+2. Installation options: directory, desktop and Start Menu shortcuts, PATH, context menu, file associations, preview handler, Safe Mode shortcut. "Win11 context menu" is on by default with the note "may ask for administrator approval once".
+3. Built-in extensions: checklist with descriptions and defaults; the four Core extensions are shown checked and locked; selecting an extension selects its `requires`; deselecting one that others require is blocked with the reason.
+4. Marketplace extensions: shown only when the marketplace table has entries (it starts empty, so the page is hidden). The IDE installs them on first launch; the wizard never talks to the marketplace.
+5. Settings (optional): six settings: color theme variant, editor font family and size, auto save, format on save, update check on/off, classic vs compact menu bar. Anything else is edited in the normal Settings editor.
+6. Summary of all choices; Install. A "Use recommended defaults" button on every page skips ahead.
+7. Progress (download, verify, extract, register), then Finish with "Launch Null IDE".
 
 `modify` opens the same pages pre-filled, with only the changed parts applied.
 
@@ -79,32 +92,37 @@ null-tools reads `first-run.json` once:
 
 ## Update safety
 
-1. null-tools checks on a schedule (existing 6 h throttle) and shows status; it passes `update --version <tag>` and quits.
-2. `null-setup update` resolves the release for exactly that tag, downloads (resumable), verifies SHA256 and zip integrity, extracts to a staging directory beside the install.
+1. null-tools checks on a schedule (existing 6 h throttle) and shows status. On finding a newer stable release it runs `null-setup prefetch --version <tag>`. On the user's explicit click it runs `update --version <tag>` and quits. Nothing installs silently.
+2. `null-setup update` resolves the release for exactly that tag, uses the verified prefetched zip or downloads (resumable), verifies SHA256 and zip integrity, extracts to a staging directory beside the install.
 3. Close `null.exe` processes; if files stay locked, wait with a visible reason and a Retry button.
 4. Journaled swap: write the journal, rename the install directory aside, move the staged directory in, re-apply `install-config.json` (omit unselected built-ins) and registrations.
-5. Launch the new `null.exe`; delete the old copy only after it reports ready (or after 30 s alive). Any failure before step 5 renames the old install back and keeps the staged download for retry.
+5. Launch the new `null.exe`; delete the old copy only after null-tools writes a ready marker (or after 30 s alive). Any failure before that renames the old install back and keeps the downloaded zip for retry.
 6. A journal found at the next start (power loss mid-swap) is completed or rolled back automatically.
+
+UAC: `update` and `repair` never elevate. If the shell-extension certificate thumbprint is unchanged, the registration is kept. If trust is missing or the thumbprint changed, the update still succeeds, the context menu is reported as "needs re-approval", and a button runs `modify`. Only a fresh install or `modify` may start the elevated certificate import.
 
 States shown by both the window and null-tools' status item: checking, downloading (bytes and speed), verifying, preparing, installing, restarting, up to date, failed with the log path and a "Copy diagnostics" button.
 
+## Uninstall
+
+Removes the app, registrations, the PATH entry and the Add/Remove Programs entry. `%APPDATA%\Null` (settings, extensions, data) is kept by default; the last page has an unchecked "Also delete my settings, extensions and data".
+
 ## Release pipeline changes (`build.yml`)
 
-- Build `setup/` with cargo; sign nothing new (the installer is unsigned like today; SmartScreen behavior is unchanged and documented).
-- Generate `builtins.json` from the extensions' `package.json` descriptions plus a small hand-maintained table of defaults and dependencies; include it in the zip and as a release asset.
+- Build `setup/` with cargo. Nothing is signed; the README documents the SmartScreen prompt and the limits of the SHA256 check.
+- Generate `builtins.json` from the extensions' `package.json` descriptions plus a small hand-maintained table of defaults, locks, dependencies, settings and (empty) marketplace entries; include it in the zip and as a release asset.
 - Publish `NullIDESetup-<version>.exe` (the stub), the zip and its `.sha256`.
-- Remove the Inno Setup install step, `installer/null-ide.iss`, `updater/`, `scripts/update-null-ide.ps1`; keep `Null.VisualElementsManifest.xml` if still needed for the Win10 tile.
-- `scripts/install-null-ide.ps1` is deleted once `shell` in `core` reproduces its registrations. `scripts/build-local.ps1` and the README install instructions are updated to match.
+- Delete the Inno Setup install step, `installer/null-ide.iss`, `updater/`, `scripts/update-null-ide.ps1` and `scripts/install-null-ide.ps1` once `shell` in `core` reproduces its registrations. Keep `Null.VisualElementsManifest.xml` if still needed for the Win10 tile. Update `scripts/build-local.ps1` and the README install instructions to match.
 
 ## Sequencing
 
 **Sub-project 1: updater reliability.**
-1. Reproduce the failure on a real install (old version to new) and write down the root cause. Suspect to check first: `stageUpdateInBackground` removes the staging root on every check while another download may still be writing.
-2. Build `setup/core` and `update` mode with tests; add rollback and journal recovery.
+1. Reproduce the failure on a real install (old version to new) and write down the root cause. Suspect to check first: `stageUpdateInBackground` removes the staging root on every check while another download may still be writing. If the cause is a contained bug, ship a hotfix on the current path first, then continue; if it points at the architecture, skip the hotfix.
+2. Build `setup/core` with `prefetch` and `update` modes, tests, rollback and journal recovery.
 3. Switch null-tools to delegate download and install; delete the staging code, `updater/` and the PowerShell update path.
 4. Ship; run the manual update matrix (below).
 
-**Sub-project 2: installer and first-run setup.** Wizard UI, `builtins.json`, `install-config.json`, `modify`, `repair`, `uninstall`, `first-run.json` consumer in null-tools, `Null: Setup`, retire Inno.
+**Sub-project 2: installer and first-run setup.** Wizard UI, `builtins.json`, `install-config.json`, `modify`, `repair`, `uninstall`, the `first-run.json` consumer in null-tools, `Null: Setup`, retire Inno.
 
 Each sub-project gets its own implementation plan.
 
@@ -113,18 +131,18 @@ Each sub-project gets its own implementation plan.
 - Network: retried with backoff (3 attempts); resumable downloads; rate-limited or 4xx responses name the status and the URL.
 - Checksum or size mismatch: delete the partial file, retry once, then fail with the expected and actual hashes in the log.
 - Locked files or still-running IDE: visible wait with the blocking process names; never kill without an explicit button.
-- Missing WebView2 runtime: the stub embeds the evergreen bootstrapper and installs it first; if that fails the installer falls back to a plain-text console flow with default choices.
+- Missing WebView2 runtime: a native error dialog with the download link. No bootstrapper and no console fallback.
 - Disk space is checked before download.
-- Registration failures (APPX, preview handler) are non-fatal, reported on the final page and in the log, and repairable with `repair`.
+- Registration failures (APPX, preview handler, certificate trust) are non-fatal, reported on the final page and in the log, and repairable with `modify` or `repair`.
 
 ## Testing
 
-- `core`: unit tests for release parsing, download resume and mismatch handling (local HTTP server), swap and journal recovery (kill the process at each step, assert rollback or completion), dependency resolution of built-ins, config round-trips. All run in CI via `cargo test`.
+- `core`: unit tests for release parsing, download resume, lock handling and mismatch handling (local HTTP server), swap and journal recovery (kill the process at each step, assert rollback or completion), dependency resolution of built-ins, config round-trips. All run in CI via `cargo test`.
 - null-tools: tests for `first-run.json` consumption (set only when unset, allowlist, partial failure, retry) and for the status-item state mapping, in the existing `node --test` setup.
-- Manual matrix, recorded in the PR: fresh install with defaults; fresh install with a customized selection; update with the IDE running; update with a file locked; update with the network cut mid-download; update killed mid-swap; `modify` adding and removing a built-in; `uninstall`. Run on Windows 11 and Windows 10, with and without WebView2.
+- Manual matrix, recorded in the PR: fresh install with defaults; fresh install with a customized selection; update with the IDE running; update with a file locked; update with the network cut mid-download; update killed mid-swap; update with the certificate untrusted; `modify` adding and removing a built-in; `uninstall` with and without deleting data. Run on Windows 11 and Windows 10 22H2.
 
 ## Open risks
 
-- The unreproduced updater failure may be outside the update path (for example, a version-metadata mismatch). Step 1 of sub-project 1 settles this before any code is written.
-- Unsigned installer: SmartScreen warnings are unchanged by this work; code signing is a separate decision.
+- The unreproduced updater failure may be outside the update path (for example, a version-metadata mismatch). Step 1 of sub-project 1 settles this before any `setup/` code is written.
 - Porting the registration logic (APPX, certificate trust, preview handler) from PowerShell to Rust is the largest-risk piece; keep behavior identical and test on a clean machine.
+- With a single reinstall as the only migration, the first `null-setup` release has no fallback if the new installer itself is broken; keep the last Inno installer and zip from the previous release available for that one reinstall.
