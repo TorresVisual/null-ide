@@ -161,7 +161,7 @@ class CommitGraphPanel {
         }
     }
     async reload() {
-        const generation = ++this.generation;
+        let generation = ++this.generation;
         const availability = await this.session.availability();
         if (!availability.ok) {
             this.post({ type: 'unavailable', reason: availability.reason });
@@ -176,6 +176,8 @@ class CommitGraphPanel {
             this.rows = this.layouter.layoutPage(page.commits);
             this.nextSkip = page.rawCount;
             this.hasMore = page.hasMore;
+            // A loadMore that started while this reload was in flight holds the old skip offset; bumping here drops it.
+            generation = ++this.generation;
             this.post({ type: 'rows', rows: this.rows, hasMore: this.hasMore, reset: true });
             this.post({ type: 'state', inProgress: await availability.service.inProgress() });
             void this.session.prime();
