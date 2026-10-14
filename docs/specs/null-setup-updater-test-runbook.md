@@ -13,6 +13,8 @@ Companion to `null-setup-updater-test-record.md` (record results there). Everyth
 
 **The fake tag must be `v1.0.17`, not the plan's `v9.9.9`.** null-tools discovers updates through the real `api.github.com/.../releases/latest` (`updater.ts` `getLatestRelease`); `NULL_SETUP_API_BASE` only redirects `null-setup.exe`. So the fake server has to serve whatever tag GitHub currently calls latest, or prefetch gets a 404. Re-check with `gh release list --repo TorresVisual/null-ide --limit 1`.
 
+**The repo is private**, so the unauthenticated `releases/latest` call returns 404 ("Update check failed - GitHub returned 404"). `requestJson` sends `GITHUB_TOKEN` when set, so launch the scratch IDE with it (step 3). The token only reaches discovery; the prefetch goes to the fake server. A public-release build must have public release assets, otherwise every user's updater hits this 404.
+
 Rebuild the scratch install if the updater changes: `cargo build --release --locked -p null-setup` in `setup/`, then `scripts\sync-local.ps1 -InstallDir "$env:LOCALAPPDATA\NullTest\Null IDE"`. Careful: that script also syncs every other known install (including your real one) unless it is skipped.
 
 ## Every row: reset, serve, launch
@@ -28,6 +30,7 @@ node D:\Coding\Apps\null-ide\scripts\fake-release.mjs --zip "$env:LOCALAPPDATA\N
 
 # 3. Launch the scratch IDE from a terminal (terminal B) so it inherits the variable
 $env:NULL_SETUP_API_BASE = 'http://127.0.0.1:8787'
+$env:GITHUB_TOKEN = (gh auth token)   # the repo is private: without this, discovery fails with "GitHub returned 404"
 & "$env:LOCALAPPDATA\NullTest\Null IDE\Null.exe" --user-data-dir "$env:LOCALAPPDATA\NullTest\user-data"
 ```
 
