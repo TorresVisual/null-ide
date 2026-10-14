@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "module": "none",
+    "lib": ["ES2017", "DOM"],
+    "outFile": "./lib/commitGraph.js",
+    "strict": true,
+    "sourceMap": false,
+    "skipLibCheck": true
+  },
+  "include": [
+    "src/graph/protocol.ts",
+    "src/webview/shared/octicons.ts",
+    "src/webview/shared/time.ts",
+    "src/webview/shared/dom.ts",
+    "src/webview/commitGraphModel.ts",
+    "src/webview/commitGraph.ts"
+  ]
+}
