@@ -19,7 +19,7 @@ real Windows 10 / 11 install with two builds. Run it before the first release th
 
 ## Manual matrix (not run)
 
-Steps and inputs: [null-setup-updater-test-runbook.md](null-setup-updater-test-runbook.md). Note: the fake release must use the tag GitHub currently reports as latest (not `v9.9.9` as the plan says), because null-tools discovers updates through the real API.
+Steps and inputs: [null-setup-updater-test-runbook.md](null-setup-updater-test-runbook.md). Found while running it: on a portable install (`data\` inside the install) every update failed with `rename … Access is denied` because the updater, started by the extension host, inherited the host's open log files (Node opens files inheritable), which sit inside the install in portable mode. Fixed by `procs::release_inherited_handles`, which closes inherited handles that point into the install before the swap (logged as `closed inherited handle on …`). Re-run row 1 on a portable install to confirm. Note: the fake release must use the tag GitHub currently reports as latest (not `v9.9.9` as the plan says), because null-tools discovers updates through the real API.
 
 | # | Scenario | Result |
 |---|---|---|

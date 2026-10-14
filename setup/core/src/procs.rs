@@ -82,3 +82,81 @@ pub fn close_all(dir: &Path, ctx: &Ctx, grace: Duration) -> Result<()> {
         }
     }
 }
+
+mod handles {
+    use std::{ffi::c_void, os::windows::ffi::OsStringExt, path::PathBuf};
+
+    type Handle = *mut c_void;
+    const FILE_TYPE_DISK: u32 = 1;
+
+    extern "system" {
+        fn GetFileType(h: Handle) -> u32;
+        fn GetFinalPathNameByHandleW(h: Handle, buf: *mut u16, len: u32, flags: u32) -> u32;
+        fn CloseHandle(h: Handle) -> i32;
+    }
+
+    /// The file or directory a handle refers to; `None` for an invalid handle or anything but a disk object.
+    pub fn path_of(h: Handle) -> Option<PathBuf> {
+        // SAFETY: both calls only read the handle value; an invalid value fails and is reported as `None`.
+        unsafe {
+            if GetFileType(h) != FILE_TYPE_DISK {
+                return None;
+            }
+            let mut buf = [0u16; 1024];
+            let n = GetFinalPathNameByHandleW(h, buf.as_mut_ptr(), buf.len() as u32, 0) as usize;
+            if n == 0 || n >= buf.len() {
+                return None;
+            }
+            let s = std::ffi::OsString::from_wide(&buf[..n]).to_string_lossy().into_owned();
+            Some(PathBuf::from(s.strip_prefix(r"\\?\").unwrap_or(&s)))
+        }
+    }
+
+    /// Closes every handle value in this process that points inside `dir`; returns the paths it closed.
+    pub fn close_under(dir: &std::path::Path) -> Vec<PathBuf> {
+        let mut closed = Vec::new();
+        for v in (4..0x40000usize).step_by(4) {
+            let h = v as Handle;
+            if let Some(p) = path_of(h) {
+                if super::is_under(&p, dir) {
+                    // SAFETY: `h` is a live disk handle of this process that nothing here uses.
+                    unsafe { CloseHandle(h) };
+                    closed.push(p);
+                }
+            }
+        }
+        closed
+    }
+}
+
+/// A process started by the extension host inherits its open files (Node opens them inheritable), e.g. the
+/// session's log files. When user data lives inside the install (portable) those handles make renaming the
+/// install fail with "Access is denied", so drop them. The updater itself keeps no file open in the install.
+pub fn release_inherited_handles(dir: &Path, ctx: &Ctx) {
+    for p in handles::close_under(dir) {
+        ctx.log.line(&format!("closed inherited handle on {}", p.display()));
+    }
+}
+
+#[cfg(test)]
+mod handle_tests {
+    use super::handles;
+    use std::os::windows::io::AsRawHandle;
+
+    #[test]
+    fn closes_only_handles_inside_the_directory() {
+        let inside = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        let a = std::fs::File::create(inside.path().join("a.log")).unwrap();
+        let b = std::fs::File::create(outside.path().join("b.log")).unwrap();
+        let (ha, hb) = (a.as_raw_handle(), b.as_raw_handle());
+        assert!(handles::path_of(ha).is_some());
+
+        let closed = handles::close_under(inside.path());
+
+        assert_eq!(closed.len(), 1);
+        assert!(handles::path_of(ha).is_none(), "handle inside the dir is closed");
+        assert!(handles::path_of(hb).is_some(), "handle outside the dir stays open");
+        std::mem::forget(a); // already closed above; dropping it would close a possibly recycled handle
+    }
+}

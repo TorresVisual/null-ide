@@ -146,6 +146,7 @@ fn run_update(o: &Opts, ctx: &Ctx) -> Result<Outcome> {
 
 fn prepare_swap(o: &Opts, ctx: &Ctx) -> Result<()> {
     procs::close_all(&o.install_dir, ctx, o.close_grace)?;
+    procs::release_inherited_handles(&o.install_dir, ctx);
     if o.release_shell_ext {
         shellext::release(ctx);
     }
