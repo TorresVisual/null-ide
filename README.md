@@ -77,11 +77,7 @@ A portable `null-ide-win32-x64.zip` (with a `.sha256`) is also attached to each 
 
 ### Updating
 
-A status-bar button appears when a new release is available (checked on startup, at most every 6 hours). Click it and the IDE closes, updates, and reopens. You can also run **Null: Check for Updates** from the command palette, or:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\update-null-ide.ps1
-```
+A status-bar button appears when a new release is available (checked on startup, at most every 6 hours). Click it and the IDE closes, updates, and reopens. You can also run **Null: Check for Updates** from the command palette. Installs from before the `null-setup` updater cannot update themselves once: install that release by hand from the Releases page.
 
 ---
 

@@ -1,3 +1,5 @@
+> Superseded by docs/specs/null-setup-installer-design.md (sub-project 1). The C++ updater described here was removed.
+
 # Native Updater Fix + Improvement Implementation Plan
 
 > **For agentic workers:** See Execution Options below — the checked Execution Mode box names the REQUIRED SUB-SKILL (superpowers:executing-plans or superpowers:subagent-driven-development).

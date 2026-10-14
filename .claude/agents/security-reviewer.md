@@ -1,6 +1,6 @@
 ---
 name: security-reviewer
-description: Reviews changes to Null IDE's native Windows attack surface — the shell-ext IExplorerCommand COM DLL, the self-signed-cert-signed sparse APPX packaging/trust flow, and the self-update mechanism that stages and launches detached PowerShell scripts. Use after touching shell-ext/, installer/, scripts/install-null-ide.ps1, scripts/update-null-ide.ps1, the build.yml signing steps, or the updater code in extensions/null-tools/src/extension.ts (installUpdate / getUpdaterScriptPath and neighbors).
+description: Reviews changes to Null IDE's native Windows attack surface — the shell-ext IExplorerCommand COM DLL, the self-signed-cert-signed sparse APPX packaging/trust flow, and the self-update mechanism: the `setup/` Rust updater (`null-setup.exe`: download + SHA256, journaled swap, relocation to `%LOCALAPPDATA%\Null\updates\run\`, `NULL_SETUP_API_BASE` test seam) and the null-tools code that spawns it. Use after touching shell-ext/, installer/, setup/, scripts/install-null-ide.ps1, the build.yml signing steps, or the updater code in extensions/null-tools/src/updater.ts (installUpdate / acknowledgeUpdate and neighbors).
 tools: Read, Grep, Glob, Bash
 model: sonnet
 color: red
@@ -14,8 +14,9 @@ Only review changes that touch one of these areas. If the diff doesn't touch any
 
 1. **`shell-ext/src/`** — the native C++ `IExplorerCommand` COM in-process server that implements the Win11 Explorer right-click "Open in Null" menu. Registered via a sparse APPX with `ExternalLocation` pointing at the Null IDE install root.
 2. **`installer/null-ide.iss`, `shell-ext/AppxManifest.xml`, and the signing steps in `.github/workflows/build.yml`** (`New-SelfSignedCertificate` / `makeappx` / `Add-AppxPackage`, currently around the "Generate self-signed cert" step).
-3. **`scripts/install-null-ide.ps1`, `scripts/update-null-ide.ps1`** — the per-user (no elevation) installer/updater, and the GitHub Releases fetch + PATH/registry writes they perform.
-4. **The self-update trigger in `extensions/null-tools/src/extension.ts`** — `installUpdate()`, `getUpdaterScriptPath()`, and the code around them that stages `update-null-ide.ps1` / `install-null-ide.ps1` into a `%TEMP%\null-ide-updater-<timestamp>` directory and launches a detached `powershell.exe` via a generated `launcher.ps1`.
+3. **`scripts/install-null-ide.ps1`** — the per-user (no elevation) installer and the registration script `null-setup` runs after an update (`-ReapplyRegistrations -NoElevate`), and the PATH/registry writes it performs.
+4. **`setup/core/src/{extract,download,swap,registrations,update}.rs`, `setup/app/src/{args,relocate}.rs`** — the Rust updater: release fetch and SHA256 check, zip extraction, the journaled directory swap, the relocated copy of the exe, and the argument parsing that turns a tag into a directory name.
+5. **The self-update trigger in `extensions/null-tools/src/updater.ts`** — `installUpdate()`, `acknowledgeUpdate()`, and the code around them that spawns `null-setup.exe` (`prefetch`, `update`, `recover`).
 
 ## What to actually check
 
@@ -29,15 +30,19 @@ Only review changes that touch one of these areas. If the diff doesn't touch any
 - Does `ExternalLocation` in the manifest resolve to a path that is fully attacker-uncontrolled at install time (the Null IDE install root), not something derived from user input or a writable-by-others location?
 - Is the private key for the self-signed cert ever written somewhere that would persist beyond the CI job (committed, uploaded as a build artifact, logged)?
 
-**Installer/updater scripts (`install-null-ide.ps1`, `update-null-ide.ps1`):**
-- Does `update-null-ide.ps1` verify the fetched GitHub Release actually comes from this repo (not just "latest release from *a* repo" derived from unvalidated input) before running `-Force`?
-- Any integrity/signature check on the downloaded ZIP before it's extracted and executed, or is trust placed entirely in HTTPS+GitHub?
-- PATH/registry writes: confirm they stay under `HKCU` / per-user PATH as documented in CLAUDE.md's Scope Constraints — flag anything that would touch `HKLM`, system PATH, or require elevation, since that's an explicit boundary this repo does not cross.
+**Installer script (`install-null-ide.ps1`):**
+- PATH/registry writes: confirm they stay under `HKCU` / per-user PATH as documented in CLAUDE.md's Scope Constraints — flag anything that would touch `HKLM`, system PATH, or require elevation, since that's an explicit boundary this repo does not cross. With `-NoElevate` the script must never start an elevated process.
 
-**Self-update staging (`extension.ts`):**
-- `getUpdaterScriptPath()` / the staging code copies `update-null-ide.ps1` and `install-null-ide.ps1` into a fresh `%TEMP%\null-ide-updater-<timestamp>` directory. Check `fs.mkdirSync(..., { recursive: true })` calls: `recursive: true` silently succeeds if the directory already exists — if an attacker (or other local process running as the same user) can pre-create that path (e.g., as a symlink/junction) before the timestamp-named directory is picked, files could be copied through it to an unintended location. Look for whether the directory name has any unpredictability/collision resistance beyond `Date.now()`, and whether anything is written to it before its uniqueness is confirmed.
-- The generated `launcher.ps1` content — is anything attacker-influenced (a path containing spaces/quotes, an update URL, a version string) interpolated into that PowerShell script text via string concatenation rather than passed as a properly-escaped argument? That's a command-injection-into-a-detached-elevated-adjacent-process pattern.
-- Confirm the staged scripts are byte-identical copies of the ones shipped in the install (`fs.copyFileSync`), not re-fetched from the network at update time — re-fetching without pinning would be a bigger issue than what's likely here, but changes that introduce a fetch should be flagged hard.
+**Rust updater (`setup/`):**
+- Is the release resolved for the exact tag and repo passed in, and is the zip checked against the `.sha256` sidecar before it is extracted? (The sidecar comes from the same release, so it guards corruption, not a compromised release; nothing is code-signed.)
+- Zip extraction: entries with `..`, absolute paths or backslash tricks must never write outside the staging directory.
+- `--version` becomes part of directory names (`.null-ide-stage-<tag>`); `args.rs` must keep its conservative character set.
+- The relocated exe in `%LOCALAPPDATA%\Null\updates\run\` and the lock/journal files: can another local process swap them between check and use? `NULL_SETUP_API_BASE` is an environment-variable test seam; flag anything that makes it reachable from untrusted input.
+- Process handling: `taskkill /F` must only ever run after an explicit user choice.
+
+**Self-update trigger (`updater.ts`):**
+- Arguments to `null-setup.exe` are passed as an argv array (`spawn`), never interpolated into a shell string; the tag is checked with `isSafeTag` first.
+- `acknowledgeUpdate` must only write `.null-ready` when the journal is in step `MovedIn`.
 
 ## Output
 

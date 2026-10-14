@@ -25,6 +25,7 @@ Key characteristics:
 ├── extensions/                # One dir per built-in extension (see "Built-in Extensions"); each has src/ and a tracked out/
 ├── archive/
 │   └── wooting-analog/        # Archived, not built by CI — depth-sensitive key actions for Wooting keyboards
+├── setup/                     # null-setup (Rust workspace: core + Tauri app); update/prefetch/recover today, installer wizard in sub-project 2
 ├── shell-ext/                 # Win11 native Explorer context menu extension
 │   ├── src/                   # C++ IExplorerCommand implementation
 │   ├── deps/wil/              # Microsoft WIL headers (fetched by CI)
@@ -58,7 +59,7 @@ The entire build runs in GitHub Actions on a `windows-2022` runner — do **not*
 8. `npm ci && npx gulp vscode-win32-x64` produces `VSCode-win32-x64/`.
 9. Build Win11 shell extension: fetch WIL headers, compile DLL with CMake + MSVC, pack and sign sparse APPX (`null-shell-ext.appx`).
 10. Stamp version, commit hash, and server URL into the build output's `product.json`; replace letterpress SVGs; `rcedit` the icon into `null.exe`.
-11. Bundle `install-null-ide.ps1` and `update-null-ide.ps1` into `resources/app/null-updater/`.
+11. Build `setup/` with cargo (`cargo test`, then `cargo build --release`); ship `null-setup.exe` as `setup/null-setup.exe` and `install-null-ide.ps1` in `resources/app/null-updater/` (the registration script `null-setup` runs after an update).
 12. `Compress-Archive` → `null-ide-win32-x64.zip`; Inno Setup → `NullIDESetup-<version>.exe`; both uploaded to the GitHub Release (tag builds) and as workflow artifacts.
 
 ## Built-in Extensions
@@ -102,7 +103,7 @@ Written in TypeScript (`src/`). Activated on `onStartupFinished`. Provides:
 | **GitHub Issues panel** | Activity-bar view (`null-issues`), a full-width tab (`null.issues.openFullView`) and one tab per issue; GraphQL search, composer with per-issue drafts, image attach (committed to an orphan `null-issue-assets` branch, thumbnails cached in `.null/issue-images/`), *Copy as prompt*, and an "open this issue?" prompt when you switch to an `issue-<n>-…` branch. Signs in through null-accounts (`githubAuth.ts` → `githubSession.ts`); `null-tools` declares `extensionDependencies: ["null.null-accounts"]`. Webview code in `src/webview/` is compiled by separate `tsconfig.webview-*.json` projects into `lib/` |
 | **Commit message generation** | `null.generateCommitMessage` (`Ctrl+Shift+Alt+G`) — runs `claude --print` with staged diff; sets SCM input box |
 | **Commit message validation** | `commitValidation.ts` (pure Conventional Commits check) + `commitValidationIntegration.ts`: squiggles on the SCM commit box (`vscode-scm` docs) and the `null.commitMessage.check` command; `null.commitMessage.validation` = `off`/`warn` (default)/`strict`. Strict blocking needs patch 008 |
-| **In-app updater** | Checks GitHub Releases on startup; shows status bar button; self-updates via PowerShell |
+| **In-app updater** | Checks GitHub Releases on startup; shows status bar button; `null-setup prefetch` downloads in the background, the click runs `null-setup update` (no PowerShell, no staging code in the extension). Pure helpers in `updateStatus.ts` |
 | **Discord Rich Presence** | `discordRpcClient.ts` (IPC pipe / WebSocket transport), `discordPresence.ts` (activity building), `presenceOwnership.ts` (one window publishes), `discordAppInfo.ts` (Developer Portal diagnostics). Configured via `null.discord.*`; `null.discord.testConnection` reports setup problems |
 | **Crash recovery** | `src/recovery/` (#17). Unsaved editors come back through VS Code's own hot exit (`files.hotExit`/`window.restoreWindows` pinned in `product.json`). Each window writes `<pid>-<startedAt>.json` under `globalStorageUri/recovery` and deletes it on dispose; a marker with a dead pid is a crash and stays until the user reviews or discards it (`crashMarker.ts`). `interruptedSessions.ts` reads the head/tail of `~/.claude/projects/<workspace>/*.jsonl` written between the crashed run's start and this window's start and flags sessions whose last turn did not finish. `recoveryIntegration.ts` (only `vscode` file) shows Review / Later / Discard and opens sessions with `claude-vscode.editor.open`. Unsent prompts and interrupted operations cannot be recovered (the extension owns both). `null.recovery.enabled` is the master switch. Design `docs/specs/crash-recovery-design.md`; plan `docs/plans/crash-recovery.md` |
 | **Null Workspace hub** | `featureRegistry.ts` (pure) + `featuresTreeView.ts`: the **Features** view at the top of the `null-workspace` container lists launcher entries that every `null.*` extension declares as a top-level `nullWorkspace.features` array in its own `package.json` (`id`, `label`, `command`, `category`, optional `icon` codicon / `description` / `order`); categories `develop` / `insights` / `account` / `setup` (unknown ones append). Entries are static; non-`null` publishers are ignored. `featureManifests.test.ts` checks every entry's command exists. Design `docs/specs/null-workspace-hub-design.md`; plan `docs/plans/null-workspace-hub.md` |
@@ -140,11 +141,8 @@ Constraints for `splash.js`:
 - Seeds default settings into `%APPDATA%\Null\User\settings.json`
 - Writes `.null-ide-install.json` (repo, version, timestamp) for the in-app updater
 
-### `scripts/update-null-ide.ps1`
-- Reads `.null-ide-install.json` to determine the current version and target repo
-- Fetches the latest GitHub Release tag and compares versions
-- Delegates to `install-null-ide.ps1` with `-Force` when an update is available
-- Used by the in-app update flow: the extension stages the scripts to `%TEMP%`, launches them detached, then quits so files can be replaced
+### `setup/` (null-setup)
+`null-setup.exe` lives at `<installDir>\setup\null-setup.exe`. Modes: `prefetch` (headless download + SHA256 verify into `%LOCALAPPDATA%\Null\updates\<tag>\`, JSON progress lines on stdout), `update` (progress window; relocates itself out of the install dir, closes the IDE, journaled swap with rollback, re-applies registrations through `install-null-ide.ps1 -ReapplyRegistrations -NoElevate`, waits for the new IDE's `.null-ready` marker), `recover` (finishes or rolls back an interrupted swap from `<parent>\.null-update-journal.json`). `update` never elevates. `NULL_SETUP_API_BASE` redirects the GitHub API for tests (`scripts/fake-release.mjs`). Core logic and its tests are in `setup/core` (`cargo test -p null-setup-core`). Design `docs/specs/null-setup-installer-design.md`; plan `docs/plans/null-setup-updater.md`.
 
 ### `installer/null-ide.iss`
 Inno Setup script that builds `NullIDESetup-<version>.exe`. The installer runs `install-null-ide.ps1` with the bundled ZIP — it does not duplicate the installation logic.

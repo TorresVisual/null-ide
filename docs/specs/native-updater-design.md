@@ -1,3 +1,5 @@
+> Superseded by docs/specs/null-setup-installer-design.md (sub-project 1). The C++ updater described here was removed.
+
 # Native Updater: Fix + Improve
 
 ## Problem

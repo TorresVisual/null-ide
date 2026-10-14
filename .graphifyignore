@@ -1,7 +1,6 @@
 # Vendored / minified code: single-letter names collide across files and create phantom edges
 extensions/null-tools/lib/purify.min.js
 .claude/skills/impeccable/scripts/modern-screenshot.umd.js
-updater/src/miniz*
 
 # Byte-for-byte mirror of .claude/skills/impeccable and .claude/agents
 .github/skills/impeccable/
