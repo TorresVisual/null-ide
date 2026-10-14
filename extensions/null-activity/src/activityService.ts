@@ -2,11 +2,11 @@
 
 import { Emitter, Event } from './emitter';
 import { IntervalStore } from './intervalStore';
-import { ALL_TIME, languageStats, normalizeIntervals, periodStats, projectStats, sessions } from './stats';
+import { ALL_TIME, languageStats, machineTimes, normalizeIntervals, periodStats, projectStats, sessions } from './stats';
 import { Tracker } from './tracker';
 import { WAKATIME_WINDOW_ID } from './wakatimeImport';
 import {
-  DailyStat, DateRange, Heartbeat, Interval, LanguageStat, NullActivityApi, ProjectStat, ResolvedProject, Session,
+  DailyStat, DateRange, Heartbeat, Interval, LanguageStat, MachineStat, NullActivityApi, ProjectStat, ResolvedProject, Session,
 } from './types';
 
 const CACHE_TTL_MS = 15_000;
@@ -22,6 +22,10 @@ export interface ActivityServiceOptions {
   resolveProject: (workspace: string | undefined) => ResolvedProject;
   settings: () => ActivitySettings;
   clock?: () => number;
+  /** Display name of this machine. */
+  machineName?: () => string;
+  /** Names of other machines by id, as announced in their synced data. */
+  machineNames?: () => Record<string, string>;
 }
 
 export function normalizeSettings(raw: { enabled?: unknown; idleTimeout?: unknown; sessionGap?: unknown }): ActivitySettings {
@@ -105,7 +109,7 @@ export class ActivityService implements NullActivityApi {
       this.cache.set(key, hit);
     }
     const open = this.tracker.peek();
-    return open ? [...hit.intervals, { ...open, window: this.opts.store.windowId }] : hit.intervals;
+    return open ? [...hit.intervals, { ...open, window: this.opts.store.windowId, machine: this.opts.store.machineId }] : hit.intervals;
   }
 
   /** Union of every window, clipped to the range, including the in-progress interval. */
@@ -127,6 +131,19 @@ export class ActivityService implements NullActivityApi {
 
   getSessions(range: DateRange): Session[] {
     return sessions(this.raw(range), range, this.cfg.sessionGapMs);
+  }
+
+  /** Each machine's own tracked time, longest first. */
+  getMachineStats(range: DateRange): MachineStat[] {
+    const own = this.opts.store.machineId;
+    const names = this.opts.machineNames?.() ?? {};
+    return [...machineTimes(this.raw(range), range)]
+      .filter(([, ms]) => ms > 0)
+      .map(([id, ms]) => ({
+        machine: { id, name: id === own ? this.opts.machineName?.() || id : names[id] ?? id, isThisDevice: id === own },
+        ms,
+      }))
+      .sort((a, b) => b.ms - a.ms);
   }
 
   getMonthlyTotals(): DailyStat[] {
@@ -159,6 +176,11 @@ export class ActivityService implements NullActivityApi {
   dispose(): void {
     this.endSession();
     this.changed.dispose();
+  }
+
+  /** Data of other machines was pulled in. */
+  remoteChanged(): void {
+    this.dataChanged();
   }
 
   private dataChanged(): void {

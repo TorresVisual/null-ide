@@ -47,6 +47,12 @@
           "maximum": 1440,
           "description": "Minutes of inactivity that end a session."
         },
+        "null-activity.machineName": {
+          "type": "string",
+          "default": "",
+          "scope": "application",
+          "description": "How this computer is named in the Machines breakdown of the dashboard. Empty uses the computer name. Other machines see it once activity sync is on (Null Sync: Choose What to Sync)."
+        },
         "null-activity.badge.autoPublish": {
           "type": "boolean",
           "default": false,
@@ -57,7 +63,7 @@
   },
   "scripts": {
     "compile": "tsc -p tsconfig.json && tsc -p tsconfig.webview-dashboard-shared.json && tsc -p tsconfig.webview-dashboard.json",
-    "test": "tsc -p tsconfig.json && tsc -p tsconfig.webview-dashboard-shared.json && tsc -p tsconfig.webview-dashboard.json && node --test out/test/tracker.test.js out/test/stats.test.js out/test/intervalStore.test.js out/test/projectIdentity.test.js out/test/activityService.test.js out/test/privacy.test.js out/test/dashboardModel.test.js out/test/dashboardWebviewModel.test.js out/test/dashboardHtml.test.js out/test/gitLog.test.js out/test/gitStatsService.test.js out/test/gitStatsService.git.test.js out/test/badgeSvg.test.js out/test/badgeModel.test.js out/test/gistClient.test.js out/test/badgePublisher.test.js out/test/languageMap.test.js out/test/wakatimeImport.test.js out/test/wakatimeProjects.test.js",
+    "test": "tsc -p tsconfig.json && tsc -p tsconfig.webview-dashboard-shared.json && tsc -p tsconfig.webview-dashboard.json && node --test out/test/tracker.test.js out/test/stats.test.js out/test/intervalStore.test.js out/test/projectIdentity.test.js out/test/activityService.test.js out/test/privacy.test.js out/test/dashboardModel.test.js out/test/dashboardWebviewModel.test.js out/test/dashboardHtml.test.js out/test/gitLog.test.js out/test/gitStatsService.test.js out/test/gitStatsService.git.test.js out/test/badgeSvg.test.js out/test/badgeModel.test.js out/test/gistClient.test.js out/test/badgePublisher.test.js out/test/languageMap.test.js out/test/wakatimeImport.test.js out/test/wakatimeProjects.test.js out/test/activityBlob.test.js out/test/machineId.test.js out/test/activitySync.test.js",
     "pretest:integration": "tsc -p tsconfig.json",
     "test:integration": "node ./out/test/runTest.js"
   },

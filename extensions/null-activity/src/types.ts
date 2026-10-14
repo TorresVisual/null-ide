@@ -2,6 +2,9 @@
 
 import { Event } from './emitter';
 
+export const MACHINE_ID_RE = /^[0-9a-f]{10}$/;
+export const MONTH_RE = /^\d{4}-\d{2}$/;
+
 export interface ProjectRef {
   key: string;
   name: string;
@@ -21,6 +24,7 @@ export interface Interval {
   linesAdded: number;
   linesRemoved: number;
   window?: string; // set when read back from the log (the file name's window id), never persisted
+  machine?: string; // set when read back from the log (the machine that recorded it), never persisted
 }
 
 export interface Heartbeat {
@@ -67,6 +71,18 @@ export interface Session {
   files: string[];
 }
 
+export interface MachineRef {
+  id: string;
+  name: string;
+  isThisDevice: boolean;
+}
+
+/** Tracked time of one machine (parallel windows of that machine clipped, WakaTime imports excluded). */
+export interface MachineStat {
+  machine: MachineRef;
+  ms: number;
+}
+
 export interface NullActivityApi {
   startSession(): void;
   pauseSession(): void;
@@ -77,5 +93,6 @@ export interface NullActivityApi {
   getDailyStats(range: DateRange): DailyStat[];
   getSessions(range: DateRange): Session[];
   getIntervals(range: DateRange): Interval[];
+  getMachineStats(range: DateRange): MachineStat[];
   readonly onDidChange: Event<void>;
 }

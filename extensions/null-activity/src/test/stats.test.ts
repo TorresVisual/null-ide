@@ -3,7 +3,7 @@
 import assert from 'node:assert';
 import { test } from 'node:test';
 import {
-  attributedIntervals, dayKey, dayRange, formatClock, formatDuration, languageStats, lastDaysRange, mergeClip, monthRange, nextPeriodStart,
+  attributedIntervals, machineTimes, dayKey, dayRange, formatClock, formatDuration, languageStats, lastDaysRange, mergeClip, monthRange, nextPeriodStart,
   normalizeIntervals, periodStart, periodStats, projectStats, sessions,
 } from '../stats';
 import { Interval } from '../types';
@@ -175,4 +175,32 @@ test('an import completely covered by live windows contributes nothing', () => {
   const live = iv(at(8, 10), at(8, 11), { window: 'w1', project: proj('live') });
   const imported = iv(at(8, 10, 10), at(8, 10, 40), { window: WAKATIME_WINDOW_ID, project: proj('imp') });
   assert.deepStrictEqual(projectStats([live, imported], day).map((p) => p.project.key), ['live']);
+});
+
+test('two machines active at the same time: the headline counts it once, per-project time sums per machine', () => {
+  const a = iv(at(8, 9), at(8, 10), { window: 'w1', machine: 'aaaaaaaaaa' });
+  const b = iv(at(8, 9, 30), at(8, 10, 30), { window: 'w1', machine: 'bbbbbbbbbb' }); // same window id, other machine
+  const day = dayRange(at(8, 12));
+  assert.strictEqual(normalizeIntervals([a, b], day).reduce((n, i) => n + i.end - i.start, 0), 90 * MIN);
+  assert.strictEqual(projectStats([a, b], day)[0].ms, 120 * MIN);
+  assert.strictEqual(languageStats([a, b], day)[0].ms, 120 * MIN);
+});
+
+test('the same WakaTime import on two machines counts once', () => {
+  const live = iv(at(8, 9), at(8, 10), { window: 'w1', machine: 'aaaaaaaaaa' });
+  const imp = (machine: string) => iv(at(8, 9, 30), at(8, 11), { window: WAKATIME_WINDOW_ID, machine, project: { key: 'k2', name: 'old' } });
+  const day = dayRange(at(8, 12));
+  const stats = projectStats([live, imp('aaaaaaaaaa'), imp('bbbbbbbbbb')], day);
+  assert.strictEqual(stats.find((s) => s.project.key === 'k2')!.ms, 60 * MIN); // 10:00-11:00, the gap the live window left
+});
+
+test('machineTimes clips windows within a machine and leaves imports out', () => {
+  const day = dayRange(at(8, 12));
+  const times = machineTimes([
+    iv(at(8, 9), at(8, 10), { window: 'w1', machine: 'aaaaaaaaaa' }),
+    iv(at(8, 9, 30), at(8, 10, 30), { window: 'w2', machine: 'aaaaaaaaaa' }),
+    iv(at(8, 9), at(8, 9, 20), { window: 'w1', machine: 'bbbbbbbbbb' }),
+    iv(at(8, 14), at(8, 15), { window: WAKATIME_WINDOW_ID, machine: 'bbbbbbbbbb' }),
+  ], day);
+  assert.deepStrictEqual([...times], [['aaaaaaaaaa', 90 * MIN], ['bbbbbbbbbb', 20 * MIN]]);
 });

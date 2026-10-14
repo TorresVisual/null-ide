@@ -56,6 +56,8 @@ interface DashboardModel {
   /** Ranked, max 8, remainder folded into "Other". */
   projects: Share[];
   languages: Share[];
+  /** Each machine's own tracked time; only present when more than one machine has data in the range. */
+  machines?: Share[];
   /** Newest first, max 50. */
   sessions: SessionRow[];
   /** Absent until a load has finished, and when nothing resolved. */

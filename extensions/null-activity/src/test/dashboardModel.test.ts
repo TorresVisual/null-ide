@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import {
   DashboardSource, MAX_SESSIONS, TERMINAL_LABEL, buildDashboardModel, hourlyStats, isDashboardRange, parseWebviewMessage, rangeFor,
 } from '../dashboardModel';
-import { ALL_TIME, languageStats, normalizeIntervals, periodStats, projectStats, sessions } from '../stats';
+import { ALL_TIME, languageStats, machineTimes, normalizeIntervals, periodStats, projectStats, sessions } from '../stats';
 import { Interval } from '../types';
 
 // Set after the imports and before any Date is used: boundaries and DST are then the same on every machine.
@@ -27,6 +27,8 @@ const source = (intervals: Interval[], gapMs = 15 * MIN): DashboardSource => ({
   getLanguageStats: (r) => languageStats(intervals, r),
   getDailyStats: (r) => periodStats(intervals, r, 'day'),
   getSessions: (r) => sessions(intervals, r, gapMs),
+  getMachineStats: (r) =>
+    [...machineTimes(intervals, r)].map(([id, ms]) => ({ machine: { id, name: id, isThisDevice: id === 'aaaaaaaaaa' }, ms })),
 });
 const build = (intervals: Interval[], range: DashboardRange, now = NOW, enabled = true) =>
   buildDashboardModel(source(intervals), range, now, enabled);
@@ -221,4 +223,12 @@ test('parallel windows: the total is the union, the shares are relative to the s
   assert.strictEqual(sum(model.bars), 10 * MIN);
   assert.deepStrictEqual(model.projects.map((p) => [p.ms, p.percent]), [[10 * MIN, 33], [10 * MIN, 33], [10 * MIN, 33]]);
   assert.deepStrictEqual(model.sessions.map((s) => [s.ms, s.projects]), [[10 * MIN, ['a', 'b', 'c']]]);
+});
+
+test('the Machines breakdown appears only when more than one machine has data', () => {
+  const mine = iv(at(8, 9), at(8, 10), { machine: 'aaaaaaaaaa' });
+  const other = iv(at(8, 11), at(8, 12), { machine: 'bbbbbbbbbb' });
+  assert.strictEqual(build([mine], 'today').machines, undefined);
+  const shares = build([mine, other, iv(at(8, 13), at(8, 13, 30), { machine: 'bbbbbbbbbb' })], 'today').machines!;
+  assert.deepStrictEqual(shares.map((s) => [s.name, s.ms, s.percent]), [['bbbbbbbbbb', 90 * MIN, 60], ['aaaaaaaaaa (this device)', 60 * MIN, 40]]);
 });

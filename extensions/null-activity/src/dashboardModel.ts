@@ -8,7 +8,7 @@ import { DateRange, Interval, NullActivityApi } from './types';
 
 export type DashboardSource = Pick<
   NullActivityApi,
-  'getIntervals' | 'getProjectStats' | 'getLanguageStats' | 'getDailyStats' | 'getSessions'
+  'getIntervals' | 'getProjectStats' | 'getLanguageStats' | 'getDailyStats' | 'getSessions' | 'getMachineStats'
 >;
 
 export const MAX_SHARES = 8;
@@ -174,6 +174,9 @@ export function buildDashboardModel(
     barUnit = 'day';
   }
 
+  const machineStats = api.getMachineStats(r);
+  const machineMs = machineStats.reduce((n, m) => n + m.ms, 0);
+
   return {
     range,
     rangeLabel: rangeLabel(range, r),
@@ -195,6 +198,9 @@ export function buildDashboardModel(
         languages: s.languages,
         files: s.files,
       })),
+    ...(machineStats.length > 1
+      ? { machines: toShares(machineStats.map((m) => ({ name: m.machine.isThisDevice ? `${m.machine.name} (this device)` : m.machine.name, ms: m.ms })), machineMs) }
+      : {}),
     ...(git ? { git } : {}),
   };
 }

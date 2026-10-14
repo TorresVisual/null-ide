@@ -1,6 +1,9 @@
 'use strict';
 
+import * as os from 'os';
+import * as path from 'path';
 import * as vscode from 'vscode';
+import { fileState } from './activitySync';
 import { ActivityService, ActivitySettings, normalizeSettings } from './activityService';
 import { registerBadges } from './badgeCommands';
 import { registerCommands } from './commands';
@@ -8,8 +11,10 @@ import { DashboardPanel } from './dashboardPanel';
 import { startHeartbeatSource } from './heartbeatSource';
 import { registerImport } from './importCommand';
 import { IntervalStore, newWindowId } from './intervalStore';
+import { loadMachineId } from './machineId';
 import { resolveProject } from './projectIdentity';
 import { StatusBar } from './statusBar';
+import { startActivitySync } from './syncLink';
 import { NullActivityApi } from './types';
 
 function readSettings(): ActivitySettings {
@@ -22,8 +27,14 @@ export function activate(context: vscode.ExtensionContext): NullActivityApi {
   const storageDir = context.globalStorageUri.fsPath;
   const windowId = newWindowId();
 
-  const store = new IntervalStore({ dir: storageDir, windowId, log: (message) => output.appendLine(message) });
-  const service = new ActivityService({ store, resolveProject, settings: readSettings });
+  const machineId = loadMachineId(storageDir);
+  const machineName = () => vscode.workspace.getConfiguration('null-activity').get<string>('machineName')?.trim() || os.hostname();
+  const linkState = fileState(path.join(storageDir, 'sync-state.json'));
+
+  const store = new IntervalStore({ dir: storageDir, windowId, machineId, log: (message) => output.appendLine(message) });
+  const service = new ActivityService({
+    store, resolveProject, settings: readSettings, machineName, machineNames: () => linkState.load().names,
+  });
   const statusBar = new StatusBar(service);
   const dashboard = new DashboardPanel(context, service, (message) => output.appendLine(message));
 
@@ -35,6 +46,13 @@ export function activate(context: vscode.ExtensionContext): NullActivityApi {
     statusBar,
     dashboard,
     startHeartbeatSource(service),
+    startActivitySync({
+      store,
+      machine: { id: machineId, name: machineName },
+      state: linkState,
+      onPulled: () => service.remoteChanged(),
+      log: (message) => output.appendLine(message),
+    }),
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration('null-activity')) {
         service.refresh();
@@ -58,6 +76,7 @@ export function activate(context: vscode.ExtensionContext): NullActivityApi {
     getDailyStats: (r) => service.getDailyStats(r),
     getSessions: (r) => service.getSessions(r),
     getIntervals: (r) => service.getIntervals(r),
+    getMachineStats: (r) => service.getMachineStats(r),
     onDidChange: service.onDidChange,
   };
 }

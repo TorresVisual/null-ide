@@ -193,3 +193,42 @@ test('newWindowId yields a fresh filename-safe id on every call', () => {
   assert.strictEqual(ids.size, 50);
   assert.ok([...ids].every((id) => /^[0-9a-f]{10}$/.test(id)));
 });
+
+test('own data is tagged with the machine; cached data of another machine is read, tagged and replaced wholesale', () => {
+  const dir = tmpDir();
+  const store = new IntervalStore({ dir, windowId: 'w1', machineId: 'aaaaaaaaaa' });
+  store.append(iv(at(8, 10), at(8, 11)));
+  store.replaceRemote('bbbbbbbbbb', '2026-10', [iv(at(8, 12), at(8, 13), { window: 'x1' })]);
+  const day = dayRange(at(8, 12));
+  assert.deepStrictEqual(store.read(day).sort(byStart).map((i) => [i.machine, i.window]), [['aaaaaaaaaa', 'w1'], ['bbbbbbbbbb', 'x1']]);
+  store.replaceRemote('bbbbbbbbbb', '2026-10', [iv(at(8, 14), at(8, 15))]);
+  assert.deepStrictEqual(store.read(day).filter((i) => i.machine === 'bbbbbbbbbb').map((i) => [i.start, i.window]), [[at(8, 14), '']]);
+  assert.deepStrictEqual(store.remoteMonths(), [{ machine: 'bbbbbbbbbb', month: '2026-10' }]);
+  assert.deepStrictEqual(store.read(dayRange(at(8, 12, 0, 10))), [], 'other months are not read');
+  store.removeRemote('bbbbbbbbbb', '2026-10');
+  assert.deepStrictEqual(store.remoteMonths(), []);
+});
+
+test('deleting data only touches this machine; exportOwn lists every window of a month with its window id', () => {
+  const dir = tmpDir();
+  const a = new IntervalStore({ dir, windowId: 'w1', machineId: 'aaaaaaaaaa' });
+  const b = new IntervalStore({ dir, windowId: 'w2', machineId: 'aaaaaaaaaa' });
+  a.append(iv(at(8, 10), at(8, 11)));
+  b.append(iv(at(8, 12), at(8, 13)));
+  a.append(iv(at(8, 10, 0, 10), at(8, 11, 0, 10)));
+  a.replaceRemote('bbbbbbbbbb', '2026-10', [iv(at(8, 12), at(8, 13))]);
+  assert.deepStrictEqual(a.ownMonths(), ['2026-10', '2026-11']);
+  assert.deepStrictEqual(a.exportOwn('2026-10').map((i) => i.window).sort(), ['w1']);
+  b.flush();
+  assert.deepStrictEqual(a.exportOwn('2026-10').map((i) => i.window).sort(), ['w1', 'w2']);
+  a.deleteAll();
+  assert.deepStrictEqual(a.ownMonths(), []);
+  assert.strictEqual(a.read({ from: -Infinity, to: Infinity }).length, 1, 'the other machine survives');
+});
+
+test('replaceRemote rejects ids and months that could escape the cache folder', () => {
+  const store = new IntervalStore({ dir: tmpDir(), windowId: 'w1' });
+  for (const [machine, month] of [['../../x', '2026-10'], ['aaaaaaaaaa', '../2026'], ['AAAAAAAAAA', '2026-10']]) {
+    assert.throws(() => store.replaceRemote(machine, month, []), /invalid/);
+  }
+});

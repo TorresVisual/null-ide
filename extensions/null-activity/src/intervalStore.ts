@@ -4,15 +4,19 @@ import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { nextPeriodStart } from './stats';
-import { DateRange, Interval } from './types';
+import { DateRange, Interval, MACHINE_ID_RE, MONTH_RE } from './types';
 
 const FILE_RE = /^intervals-(\d{4})-(\d{2})-(.+)\.jsonl$/;
 const DEFAULT_MAX_BUFFERED = 5_000;
+const REMOTE_DIR = 'machines';
+const REMOTE_FILE_RE = /^(\d{4}-\d{2})\.jsonl$/;
 const EVERYTHING: DateRange = { from: -Infinity, to: Infinity };
 
 export interface IntervalStoreOptions {
   dir: string;
   windowId: string;
+  /** This installation's id (see machineId.ts); tags everything this store wrote. */
+  machineId?: string;
   maxBuffered?: number;
   log?: (message: string) => void;
 }
@@ -25,7 +29,7 @@ export function monthKey(ts: number): string {
 /** A fresh id per extension-host launch. `env.sessionId` is shared by every window of one app launch, so it cannot tell windows apart. */
 export const newWindowId = (): string => crypto.randomBytes(5).toString('hex');
 
-function parseInterval(line: string): Interval | undefined {
+export function parseInterval(line: string): Interval | undefined {
   try {
     const v = JSON.parse(line);
     if (
@@ -49,6 +53,10 @@ export class IntervalStore {
 
   get windowId(): string {
     return this.opts.windowId;
+  }
+
+  get machineId(): string {
+    return this.opts.machineId ?? 'local';
   }
 
   /** Splits at local month boundaries; lines stay on the first piece. */
@@ -105,10 +113,73 @@ export class IntervalStore {
     const out: Interval[] = [];
     for (const name of this.listFiles(range)) {
       const window = FILE_RE.exec(name)![3];
-      for (const i of this.parseFile(path.join(this.opts.dir, name))) out.push({ ...i, window });
+      for (const i of this.parseFile(path.join(this.opts.dir, name))) out.push({ ...i, window, machine: this.machineId });
     }
-    for (const i of this.buffer) out.push({ ...i, window: this.opts.windowId });
+    for (const i of this.buffer) out.push({ ...i, window: this.opts.windowId, machine: this.machineId });
+    for (const { machine, month } of this.remoteMonths()) {
+      const start = new Date(Number(month.slice(0, 4)), Number(month.slice(5)) - 1, 1).getTime();
+      if (nextPeriodStart(start, 'month') <= range.from || start >= range.to) continue;
+      for (const i of this.parseFile(this.remoteFile(machine, month))) out.push({ ...i, window: i.window ?? '', machine });
+    }
     return out.filter((i) => overlaps(i, range));
+  }
+
+  /** Months (`YYYY-MM`) for which this machine has data on disk, oldest first. */
+  ownMonths(): string[] {
+    this.flush();
+    const months = new Set<string>();
+    for (const name of this.listFiles(EVERYTHING)) {
+      const m = FILE_RE.exec(name)!;
+      months.add(`${m[1]}-${m[2]}`);
+    }
+    return [...months].sort();
+  }
+
+  /** Everything this machine recorded in `month`, every window (imports included), tagged with its window. */
+  exportOwn(month: string): Interval[] {
+    this.flush();
+    const out: Interval[] = [];
+    for (const name of this.listFiles(EVERYTHING).sort()) {
+      const m = FILE_RE.exec(name)!;
+      if (`${m[1]}-${m[2]}` !== month) continue;
+      for (const i of this.parseFile(path.join(this.opts.dir, name))) out.push({ ...i, window: m[3] });
+    }
+    return out;
+  }
+
+  /** The cached month files of other machines. */
+  remoteMonths(): { machine: string; month: string }[] {
+    const out: { machine: string; month: string }[] = [];
+    const root = path.join(this.opts.dir, REMOTE_DIR);
+    let machines: string[];
+    try {
+      machines = fs.readdirSync(root);
+    } catch {
+      return out;
+    }
+    for (const machine of machines.filter((id) => MACHINE_ID_RE.test(id))) {
+      for (const name of fs.readdirSync(path.join(root, machine), { withFileTypes: true }).filter((e) => e.isFile()).map((e) => e.name)) {
+        const m = REMOTE_FILE_RE.exec(name);
+        if (m) out.push({ machine, month: m[1] });
+      }
+    }
+    return out;
+  }
+
+  /** Replaces another machine's cached month. Throws on an invalid id or month (remote names are untrusted). */
+  replaceRemote(machine: string, month: string, intervals: Interval[]): void {
+    const file = this.remoteFile(machine, month);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    this.rewrite(file, intervals.map(({ machine: _machine, ...i }) => i));
+  }
+
+  removeRemote(machine: string, month: string): void {
+    fs.rmSync(this.remoteFile(machine, month), { force: true });
+  }
+
+  private remoteFile(machine: string, month: string): string {
+    if (!MACHINE_ID_RE.test(machine) || !MONTH_RE.test(month)) throw new Error('invalid machine or month');
+    return path.join(this.opts.dir, REMOTE_DIR, machine, `${month}.jsonl`);
   }
 
   /**
