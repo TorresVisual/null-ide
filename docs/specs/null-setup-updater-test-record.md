@@ -1,4 +1,4 @@
-﻿# null-setup updater: test record
+# null-setup updater: test record
 
 Status: **automated checks passed; the manual matrix has not been run.** Nothing below was exercised on a
 real Windows 10 / 11 install with two builds. Run it before the first release that ships `setup\null-setup.exe`.
@@ -28,18 +28,18 @@ Steps and inputs: [null-setup-updater-test-runbook.md](null-setup-updater-test-r
 | 3 | Locked files: console with cwd inside the install folder; Retry and Close Null IDE | not run |
 | 4 | Network cut mid-download (`--cut-after`) | not run |
 | 5 | Slow link (`--throttle`); second `prefetch` reports busy | not run |
-| 6 | Kill `null-setup.exe` after "Installingâ€¦"; `recover` restores or commits | not run |
+| 6 | Kill `null-setup.exe` after "Installing…"; `recover` restores or commits | not run |
 | 7 | Certificate untrusted: no UAC, update succeeds, existing package still registered | not run |
 | 8 | Explorer holding the shell DLL | not run |
 | 9 | Broken new build (exits at once): old version comes back and is relaunched | not run |
-| 10 | Path with spaces and non-ASCII (`Null IDE Ã¼nÃ¯`) | not run |
+| 10 | Path with spaces and non-ASCII (`Null IDE ünï`) | not run |
 | 11 | Tag `a b` refused by null-tools | not run |
-| 12 | Second IDE window during "Installingâ€¦": update not rolled back | not run |
+| 12 | Second IDE window during "Installing…": update not rolled back | not run |
 | 13 | Offline click on "Restart to update" after a finished prefetch | not run |
 
 ## Known gaps carried into the release
 
-- No automatic recovery when the process is killed while the install directory is renamed away (`null-setup recover --install-dir â€¦` restores it).
+- No automatic recovery when the process is killed while the install directory is renamed away (`null-setup recover --install-dir …` restores it).
 - Opening the IDE during the registration step can make a successful update report failure.
 - `bin\null.cmd` comes from the zip, not from the installer.
 - Installs from before this release have no `setup\null-setup.exe`: the first release containing it must be installed by hand (README says so). Keep the previous release's installer and zip available for rollback.
