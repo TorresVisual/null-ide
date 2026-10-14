@@ -19,6 +19,7 @@ param(
     [switch]$RegisterPreviewHandler,
     [switch]$UnregisterPreviewHandler,
     [switch]$ReapplyRegistrations,
+    [switch]$NoElevate,
     [switch]$Launch
 )
 
@@ -368,6 +369,16 @@ function Register-Win11ContextMenu {
     $cerPath = Join-Path $installDir 'shell-ext\NullIDECert.cer'
     Ensure-NullIDEContextMenuRegistry -InstallDir $installDir
 
+    if ($NoElevate) {
+        # Updates never elevate: if the certificate is not already trusted machine-wide, keep the
+        # existing registration untouched and let the caller ask for a one-time approval.
+        $thumb = (New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($cerPath)).Thumbprint
+        if (-not (Test-Path "Cert:\LocalMachine\TrustedPeople\$thumb")) {
+            Write-Host 'NULL-SETUP: needs-reapproval'
+            return
+        }
+    }
+
     try {
         Install-ShellExtSigningCertificate -CerPath $cerPath
     }
@@ -397,6 +408,10 @@ function Register-Win11ContextMenu {
     }
 
     if (-not $registered) {
+        if ($NoElevate) {
+            Write-Host 'NULL-SETUP: needs-reapproval'
+            return
+        }
         Write-Host 'Windows requires a one-time UAC approval to trust the Null IDE shell extension certificate.'
         Install-ShellExtSigningCertificateElevated -CerPath $cerPath
         Add-AppxPackage -Path $appxPath -ExternalLocation $installDir -ForceUpdateFromAnyVersion -ErrorAction Stop
