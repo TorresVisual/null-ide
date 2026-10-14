@@ -4,10 +4,14 @@ import * as vscode from 'vscode';
 import { passphraseProblem } from './cryptoBox';
 import { EnablePrompts } from './enable';
 import { Revision } from './gistStore';
-import { FirstSync } from './types';
+import { Category, FirstSync } from './types';
 
 const secret = (options: vscode.InputBoxOptions): Thenable<string | undefined> =>
   vscode.window.showInputBox({ password: true, ignoreFocusOut: true, ...options });
+
+/** What the user is agreeing to upload, in words (the setting name alone says little for `activity`). */
+export const describeCategory = (category: Category): string =>
+  category === 'activity' ? 'coding activity history (project names, file paths, languages and times)' : category;
 
 export const enablePrompts: EnablePrompts = {
   async chooseAccount(accounts) {
@@ -20,7 +24,7 @@ export const enablePrompts: EnablePrompts = {
 
   async consent(categories) {
     const answer = await vscode.window.showWarningMessage(
-      `Upload your ${categories.join(', ')} to a secret GitHub Gist? They are encrypted on this device with a passphrase you choose, so only someone who knows it can read them. The passphrase cannot be recovered or reset.`,
+      `Upload your ${categories.map(describeCategory).join(', ')} to a secret GitHub Gist? They are encrypted on this device with a passphrase you choose, so only someone who knows it can read them. The passphrase cannot be recovered or reset.`,
       { modal: true },
       'Enable Sync',
     );

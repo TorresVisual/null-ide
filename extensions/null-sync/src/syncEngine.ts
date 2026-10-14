@@ -7,7 +7,7 @@ import { Failure, GistIo, GistStore, Revision, createGistStore } from './gistSto
 import { EXTENSIONS_REMOTE, CORE_FILES, MANIFEST, SETTINGS, categoryOf, fileOfRemoteName, isDeletable, remoteNameOf } from './layout';
 import { reapplyExcluded, stripExcluded } from './settingsFilter';
 import { planFile } from './syncPlan';
-import { Base, CATEGORIES, Category, Conflict, FirstSync, StoredState, SyncAccount, SyncStatus, Value } from './types';
+import { ActivityExchange, Base, CATEGORIES, Category, Conflict, FirstSync, StoredState, SyncAccount, SyncStatus, Value } from './types';
 
 /** Gist files over 1 MB are truncated by the API; stay well below. */
 const MAX_FILE_BYTES = 900_000;
@@ -55,6 +55,8 @@ export interface RunOptions {
   /** How the Enable flow resolved first-sync conflicts, applied to this run's conflicts that have no base yet. */
   firstSync?: FirstSync;
 }
+
+const ACTIVITY_PREFIX = 'activity__';
 
 const hash = (text: string | null): Value => (text === null ? null : crypto.createHash('sha256').update(text).digest('hex'));
 const enabledCategories = (c: Record<Category, boolean>): Category[] => CATEGORIES.filter((category) => c[category]);
@@ -483,6 +485,52 @@ export class SyncEngine {
       merge = mergeExtensions(local, remote, c.st.extensionsBase);
     }
     return { pendingInstalls: merge.install, pendingRemovals: merge.notifyRemoved, push: merge.push, nextBase: merge.nextBase };
+  }
+
+  /**
+   * Hands the `activity__*` files to `exchange` and uploads what it returns. A background task: it never prompts and does
+   * not touch the settings-sync status. This engine's own sync ignores these files (`fileOfRemoteName` rejects their names).
+   */
+  async syncActivity(exchange: ActivityExchange): Promise<boolean> {
+    if (!this.d.enabled() || !this.d.categories().activity) return false;
+    let done = false;
+    await this.serialized(async () => {
+      const st = this.d.state.get();
+      const account = st && (await this.d.accounts()).find((a) => a.id === st.accountId);
+      const passphrase = await this.d.passphrase();
+      const token = account && passphrase ? await this.d.token(account.id, false) : undefined;
+      if (!st || !token || !passphrase) return;
+      const store = createGistStore(this.d.io, token);
+      const read = await store.read(st.gistId);
+      if (!read.ok) return;
+      const key = await unlock(passphrase, read.value.files[MANIFEST]);
+      if (!key) return;
+      const files = read.value.files;
+      let writes: Record<string, string | null>;
+      try {
+        writes = await exchange({
+          names: Object.keys(files)
+            .filter((name) => name.startsWith(ACTIVITY_PREFIX))
+            .map((name) => ({ name, version: crypto.createHash('sha256').update(files[name]).digest('hex') })),
+          read: (name) => (name.startsWith(ACTIVITY_PREFIX) && name in files ? open(key, name, files[name]) : undefined),
+        });
+      } catch {
+        return; // the caller's bug must not show up as a settings-sync error
+      }
+      const changes: Record<string, string | null> = {};
+      for (const [name, text] of Object.entries(writes)) {
+        if (!name.startsWith(ACTIVITY_PREFIX) || name.includes('/')) continue;
+        if (text === null) {
+          if (name in files) changes[name] = null;
+          continue;
+        }
+        const sealed = seal(key, name, text);
+        if (!tooLarge(sealed)) changes[name] = sealed;
+      }
+      if (Object.keys(changes).length > 0 && !(await store.update(st.gistId, changes)).ok) return;
+      done = true;
+    }, true);
+    return done;
   }
 
   /** Uninstalls an extension that was removed on another device, and stops reporting it. */

@@ -6,7 +6,7 @@ import { CANCELLED, EnableDeps, enable } from './enable';
 import * as prompts from './prompts';
 import { describeStatus, reportOf } from './statusText';
 import { SyncEngine } from './syncEngine';
-import { CATEGORIES } from './types';
+import { CATEGORIES, CATEGORY_DEFAULTS } from './types';
 
 const config = () => vscode.workspace.getConfiguration('null-sync');
 
@@ -89,15 +89,20 @@ export function registerCommands(context: vscode.ExtensionContext, engine: SyncE
     vscode.commands.registerCommand('null.sync.stop', stop),
 
     vscode.commands.registerCommand('null.sync.setCategories', async () => {
-      const current: Record<string, boolean> = {
-        ...Object.fromEntries(CATEGORIES.map((category) => [category, true])),
-        ...config().get<Record<string, boolean>>('categories'),
-      };
+      const current: Record<string, boolean> = { ...CATEGORY_DEFAULTS, ...config().get<Record<string, boolean>>('categories') };
       const picked = await vscode.window.showQuickPick(
-        CATEGORIES.map((category) => ({ label: category, picked: current[category] !== false })),
+        CATEGORIES.map((category) => ({ label: category, picked: current[category] === true })),
         { canPickMany: true, placeHolder: 'Choose what to sync on this device' },
       );
       if (!picked) return;
+      if (picked.some((p) => p.label === 'activity') && !current.activity) {
+        const ok = await vscode.window.showWarningMessage(
+          `Upload your ${prompts.describeCategory('activity')} to your secret sync Gist? It is encrypted on this device with your sync passphrase, so other machines signed in to this account can show it next to theirs.`,
+          { modal: true },
+          'Sync Activity',
+        );
+        if (ok !== 'Sync Activity') return;
+      }
       const next = Object.fromEntries(CATEGORIES.map((category) => [category, picked.some((p) => p.label === category)]));
       await config().update('categories', next, vscode.ConfigurationTarget.Global);
     }),

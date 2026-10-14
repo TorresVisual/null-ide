@@ -10,7 +10,7 @@ import { fetchJson, fetchText } from './gistHttp';
 import { LocalFiles } from './localFiles';
 import { acquire } from './lock';
 import { SyncEngine } from './syncEngine';
-import { CATEGORIES, Category, NullSyncApi, StoredState, SyncAccount } from './types';
+import { CATEGORY_DEFAULTS, Category, NullSyncApi, StoredState, SyncAccount } from './types';
 
 const STATE_KEY = 'null-sync.state';
 const PASSPHRASE_KEY = 'null-sync/passphrase';
@@ -43,7 +43,7 @@ export function activate(context: vscode.ExtensionContext): NullSyncApi {
 
   const accountsApi = () => vscode.extensions.getExtension<AccountsApi>('null.null-accounts')?.activate();
   const categories = (): Record<Category, boolean> => ({
-    ...(Object.fromEntries(CATEGORIES.map((category) => [category, true])) as Record<Category, boolean>),
+    ...CATEGORY_DEFAULTS,
     ...config().get<Partial<Record<Category, boolean>>>('categories'),
   });
   const githubAccounts = async (): Promise<SyncAccount[]> =>
@@ -87,7 +87,7 @@ export function activate(context: vscode.ExtensionContext): NullSyncApi {
     accounts: githubAccounts,
     token,
     io,
-    categories: () => CATEGORIES.filter((category) => categories()[category]),
+    categories: () => (Object.keys(CATEGORY_DEFAULTS) as Category[]).filter((category) => categories()[category]),
     savePassphrase: async (passphrase) => { await context.secrets.store(PASSPHRASE_KEY, passphrase); },
     setState: async (state) => { await context.globalState.update(STATE_KEY, state); },
   };
@@ -123,6 +123,7 @@ export function activate(context: vscode.ExtensionContext): NullSyncApi {
     syncNow: () => engine.run({ interactive: true }),
     resolveConflict: (file, side) => engine.resolve(file, side),
     uninstallRemoved: (id) => engine.uninstallRemoved(id),
+    syncActivity: (exchange) => engine.syncActivity(exchange),
   };
 }
 

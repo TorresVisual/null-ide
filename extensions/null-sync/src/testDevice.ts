@@ -31,7 +31,7 @@ export class Device {
   overwrite = false;
   state: StoredState | undefined;
   passphrase: string | undefined;
-  categories: Record<Category, boolean> = { settings: true, keybindings: true, snippets: true, extensions: true };
+  categories: Record<Category, boolean> = { settings: true, keybindings: true, snippets: true, extensions: true, activity: false };
   excluded = ['*.path', '*token*'];
   /** The extensions installed on this machine (enabled or not). */
   readonly installed = new Set<string>();

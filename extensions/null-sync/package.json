@@ -40,12 +40,13 @@
         "null-sync.categories": {
           "type": "object",
           "scope": "application",
-          "default": { "settings": true, "keybindings": true, "snippets": true, "extensions": true },
+          "default": { "settings": true, "keybindings": true, "snippets": true, "extensions": true, "activity": false },
           "properties": {
             "settings": { "type": "boolean" },
             "keybindings": { "type": "boolean" },
             "snippets": { "type": "boolean" },
-            "extensions": { "type": "boolean" }
+            "extensions": { "type": "boolean" },
+            "activity": { "type": "boolean", "description": "Coding activity of this device (Null Activity), so the dashboard can show all your machines. Off by default." }
           },
           "additionalProperties": false,
           "markdownDescription": "What to sync on this device. Change it with **Null: Choose What to Sync**."
@@ -65,7 +66,7 @@
   },
   "scripts": {
     "compile": "tsc -p tsconfig.json",
-    "test": "tsc -p tsconfig.json && node --test out/layout.test.js out/cryptoBox.test.js out/syncPlan.test.js out/settingsFilter.test.js out/gistStore.test.js out/localFiles.test.js out/lock.test.js out/enable.test.js out/syncEngine.test.js out/statusText.test.js out/manifest.test.js out/extensionSet.test.js",
+    "test": "tsc -p tsconfig.json && node --test out/layout.test.js out/cryptoBox.test.js out/syncPlan.test.js out/settingsFilter.test.js out/gistStore.test.js out/localFiles.test.js out/lock.test.js out/enable.test.js out/syncEngine.test.js out/statusText.test.js out/manifest.test.js out/extensionSet.test.js out/activityBlobs.test.js",
     "pretest:integration": "tsc -p tsconfig.json",
     "test:integration": "node ./out/test/runTest.js"
   },

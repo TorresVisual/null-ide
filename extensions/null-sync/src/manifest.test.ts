@@ -3,7 +3,7 @@ import * as assert from 'node:assert/strict';
 import * as fs from 'fs';
 import * as path from 'path';
 import { matchesKey } from './settingsFilter';
-import { CATEGORIES } from './types';
+import { CATEGORIES, CATEGORY_DEFAULTS } from './types';
 
 const root = path.join(__dirname, '..');
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
@@ -31,10 +31,11 @@ describe('package.json contract', () => {
     for (const key of Object.keys(props)) assert.equal(props[key].scope, 'application', key);
   });
 
-  it('syncs every category by default', () => {
+  it('syncs every category by default except activity, which is opt-in', () => {
     const defaults = props['null-sync.categories'].default;
     assert.deepEqual(Object.keys(defaults), [...CATEGORIES]);
-    assert.ok(Object.values(defaults).every((v) => v === true));
+    assert.deepEqual(defaults, CATEGORY_DEFAULTS);
+    assert.equal(defaults.activity, false);
   });
 
   it('excludes machine-specific paths and secrets by default', () => {
