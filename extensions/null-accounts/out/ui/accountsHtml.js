@@ -60,7 +60,7 @@ button.danger:hover,button.icon.danger:hover{color:var(--vscode-errorForeground)
 .field dt{color:var(--muted);margin-bottom:2px;}
 .field dd{display:flex;align-items:center;gap:4px;min-height:26px;font-size:13px;}
 .field .value{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
-.identity-foot{margin-top:10px;}
+.identity-foot{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:10px;}
 .lead{margin-bottom:12px;}
 .kv .tag{justify-self:start;}
 
