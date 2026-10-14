@@ -799,19 +799,23 @@ else {
 # UPDATER + INSTALLER PAYLOAD
 # ============================================================
 
-Write-Step "Building null-updater"
-$updaterBuild = Join-Path $RepoRoot "updater/build"
-Invoke-Native "cmake configure (updater)" {
-    cmake -S (Join-Path $RepoRoot "updater") -B $updaterBuild -G "Visual Studio 17 2022" -A x64
+Write-Step "Building null-setup"
+Push-Location (Join-Path $RepoRoot "setup")
+try {
+    Invoke-Native "cargo build (null-setup)" { cargo build --release --locked -p null-setup }
 }
-Invoke-Native "cmake build (updater)" { cmake --build $updaterBuild --config Release }
+finally {
+    Pop-Location
+}
 
-Write-Step "Preparing installer and updater payload"
-$updaterDir = Join-Path $OutDir "resources/app/null-updater"
-New-Item -ItemType Directory -Path $updaterDir -Force | Out-Null
-Copy-Item (Join-Path $RepoRoot "scripts/install-null-ide.ps1") $updaterDir -Force
-Copy-Item (Join-Path $RepoRoot "scripts/update-null-ide.ps1")  $updaterDir -Force
-Copy-Item (Join-Path $updaterBuild "Release/null-updater.exe") $updaterDir -Force
+Write-Step "Preparing installer payload"
+$payloadDir = Join-Path $OutDir "resources/app/null-updater"
+New-Item -ItemType Directory -Path $payloadDir -Force | Out-Null
+Copy-Item (Join-Path $RepoRoot "scripts/install-null-ide.ps1") $payloadDir -Force
+
+$setupDir = Join-Path $OutDir "setup"
+New-Item -ItemType Directory -Path $setupDir -Force | Out-Null
+Copy-Item (Join-Path $RepoRoot "setup/target/release/null-setup.exe") $setupDir -Force
 
 @{
     repo        = "TorresVisual/null-ide"

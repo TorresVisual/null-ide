@@ -707,13 +707,17 @@ jobs:
           Write-Host "Shell-ext layout:"
           Get-ChildItem $pkgDir -Recurse | Select-Object FullName
 
-      - name: Build null-updater
+      - name: Test null-setup
         shell: pwsh
-        run: |
-          cmake -S ide-overlay/updater -B ide-overlay/updater/build -G "Visual Studio 17 2022" -A x64
-          cmake --build ide-overlay/updater/build --config Release
+        working-directory: ide-overlay/setup
+        run: cargo test --locked -p null-setup-core
 
-      - name: Prepare installer and updater payload
+      - name: Build null-setup
+        shell: pwsh
+        working-directory: ide-overlay/setup
+        run: cargo build --release --locked -p null-setup
+
+      - name: Prepare installer payload
         shell: pwsh
         run: |
           $outDir = "VSCode-win32-x64"
@@ -722,11 +726,14 @@ jobs:
             $version = '${{ steps.tag.outputs.tag }}'
           }
 
-          $updaterDir = Join-Path $outDir "resources/app/null-updater"
-          New-Item -ItemType Directory -Path $updaterDir -Force | Out-Null
-          Copy-Item ide-overlay/scripts/install-null-ide.ps1 $updaterDir -Force
-          Copy-Item ide-overlay/scripts/update-null-ide.ps1  $updaterDir -Force
-          Copy-Item ide-overlay/updater/build/Release/null-updater.exe   $updaterDir -Force
+          # Registration script, run by null-setup after an update until sub-project 2 ports it to Rust.
+          $payloadDir = Join-Path $outDir "resources/app/null-updater"
+          New-Item -ItemType Directory -Path $payloadDir -Force | Out-Null
+          Copy-Item ide-overlay/scripts/install-null-ide.ps1 $payloadDir -Force
+
+          $setupDir = Join-Path $outDir "setup"
+          New-Item -ItemType Directory -Path $setupDir -Force | Out-Null
+          Copy-Item ide-overlay/setup/target/release/null-setup.exe $setupDir -Force
 
           $metadata = [ordered]@{
             repo        = '${{ github.repository }}'

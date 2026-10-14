@@ -11,7 +11,7 @@
       - Built-in extensions
       - Workbench CSS + splash JS
       - Media assets
-      - Null updater scripts + native updater
+      - null-setup.exe + registration script
 
     Optional:
       - -Icons       Win32 icons + VisualElementsManifest
@@ -157,8 +157,8 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 
 $extensionsSrc = Join-Path $repoRoot "extensions"
 
-$nativeUpdater =
-    Join-Path $repoRoot "updater\build\Release\null-updater.exe"
+$nullSetupExe =
+    Join-Path $repoRoot "setup\target\release\null-setup.exe"
 
 $rcedit =
     Join-Path $PSScriptRoot "rcedit-tool\node_modules\rcedit\bin\rcedit.exe"
@@ -633,7 +633,7 @@ foreach ($installFullPath in $targets) {
     # 4. UPDATER
     # ========================================================
 
-    Write-Step "Syncing updater"
+    Write-Step "Syncing null-setup"
 
     $updaterDir =
         Join-Path $app "null-updater"
@@ -649,24 +649,28 @@ foreach ($installFullPath in $targets) {
         $updaterDir `
         -Force
 
-    Copy-Item `
-        (Join-Path $repoRoot "scripts\update-null-ide.ps1") `
-        $updaterDir `
-        -Force
+    if (Test-Path $nullSetupExe) {
 
-    if (Test-Path $nativeUpdater) {
+        $setupDir =
+            Join-Path $installFullPath "setup"
+
+        New-Item `
+            -ItemType Directory `
+            -Path $setupDir `
+            -Force |
+            Out-Null
 
         Copy-Item `
-            $nativeUpdater `
-            $updaterDir `
+            $nullSetupExe `
+            $setupDir `
             -Force
 
-        Write-Host "  [ok] updater scripts + null-updater.exe"
+        Write-Host "  [ok] registration script + setup\null-setup.exe"
     }
     else {
-        Write-Host "  [ok] updater scripts"
+        Write-Host "  [ok] registration script"
         Write-Warning `
-            "Native updater not found: $nativeUpdater"
+            "null-setup.exe not built: $nullSetupExe"
     }
 
     # ========================================================

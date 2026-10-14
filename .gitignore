@@ -2,7 +2,6 @@
 vscode-src/
 vscodium-src/
 shell-ext-build/
-updater/build/
 shell-ext/build/
 appx-validate-stage/
 
@@ -56,3 +55,4 @@ dist/
 graphify-out/
 
 setup/target/
+setup/app/gen/
