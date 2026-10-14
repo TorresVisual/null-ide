@@ -370,11 +370,21 @@ function Register-Win11ContextMenu {
     Ensure-NullIDEContextMenuRegistry -InstallDir $installDir
 
     if ($NoElevate) {
-        # Updates never elevate: if the certificate is not already trusted machine-wide, keep the
-        # existing registration untouched and let the caller ask for a one-time approval.
-        $thumb = (New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($cerPath)).Thumbprint
-        if (-not (Test-Path "Cert:\LocalMachine\TrustedPeople\$thumb")) {
-            Write-Host 'NULL-SETUP: needs-reapproval'
+        # Updates never elevate. Each build has its own signing certificate, so the new one is usually not
+        # trusted yet. Then the existing registration is kept (it points at the same install directory, so
+        # Explorer loads the new DLL under it); only when nothing is registered is approval requested.
+        $trusted = $false
+        if (Test-Path $cerPath) {
+            $thumb = (New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($cerPath)).Thumbprint
+            $trusted = Test-Path "Cert:\LocalMachine\TrustedPeople\$thumb"
+        }
+        if (-not $trusted) {
+            if (Get-AppxPackage -Name 'NullIDE.ExplorerCommand' -ErrorAction SilentlyContinue) {
+                Write-Host 'Keeping the existing Windows 11 context menu registration.'
+            }
+            else {
+                Write-Host 'NULL-SETUP: needs-reapproval'
+            }
             return
         }
     }
@@ -965,7 +975,8 @@ if ($ReapplyRegistrations) {
     Register-Win11ContextMenu -InstallDir $dir
     Register-FileAssociations -InstallDir $dir
     Register-PreviewHandler -InstallDir $dir
-    Set-DefaultSettings
+    # An update never writes into the user's settings (it would re-seed keys they removed).
+    if (-not $NoElevate) { Set-DefaultSettings }
     Write-Host "Done."
     return
 }
