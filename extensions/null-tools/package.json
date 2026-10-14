@@ -34,7 +34,9 @@
       { "id": "dashboard", "label": "Dashboard", "category": "develop", "icon": "home",
         "command": "null.openDashboard", "description": "Projects & recent folders", "order": 10 },
       { "id": "issues", "label": "GitHub Issues", "category": "develop", "icon": "issues",
-        "command": "null.issues.focus", "description": "Open the issues sidebar", "order": 20 }
+        "command": "null.issues.focus", "description": "Open the issues sidebar", "order": 20 },
+      { "id": "graph", "label": "Commit Graph", "category": "develop", "icon": "git-commit",
+        "command": "null.graph.open", "description": "Browse and act on git history", "order": 30 }
     ]
   },
   "contributes": {
@@ -228,7 +230,20 @@
         "command": "null.issues.insertReference",
         "title": "Null: Insert Issue Reference into Commit Message",
         "icon": "$(references)"
-      }
+      },
+      { "command": "null.graph.open", "title": "Null: Open Commit Graph", "icon": "$(git-commit)" },
+      { "command": "null.graph.refresh", "title": "Null: Refresh Commit Graph", "icon": "$(refresh)" },
+      { "command": "null.graph.checkout", "title": "Checkout…" },
+      { "command": "null.graph.createBranch", "title": "Create Branch Here…" },
+      { "command": "null.graph.cherryPick", "title": "Cherry-pick" },
+      { "command": "null.graph.revert", "title": "Revert" },
+      { "command": "null.graph.reset.soft", "title": "Reset (soft)…" },
+      { "command": "null.graph.reset.mixed", "title": "Reset (mixed)…" },
+      { "command": "null.graph.reset.hard", "title": "Reset (hard)…" },
+      { "command": "null.graph.copySha", "title": "Copy SHA" },
+      { "command": "null.graph.continue", "title": "Null: Continue Git Operation" },
+      { "command": "null.graph.skip", "title": "Null: Skip Git Operation Step" },
+      { "command": "null.graph.abort", "title": "Null: Abort Git Operation" }
     ],
     "viewsContainers": {
       "activitybar": [
@@ -241,6 +256,11 @@
           "id": "null-issues",
           "title": "GitHub Issues",
           "icon": "media/github-issues.svg"
+        },
+        {
+          "id": "null-graph",
+          "title": "Commit Graph",
+          "icon": "media/commit-graph.svg"
         }
       ]
     },
@@ -259,8 +279,21 @@
           "name": "GitHub Issues",
           "visibility": "visible"
         }
+      ],
+      "null-graph": [
+        { "id": "null.graphView", "name": "Recent Commits" }
       ]
     },
+    "viewsWelcome": [
+      { "view": "null.graphView", "contents": "The open folder is not a Git repository.\n[Initialize Repository](command:git.init)", "when": "null.graph.state == not-a-repo" },
+      { "view": "null.graphView", "contents": "Git was not found. Install Git and reload the window.", "when": "null.graph.state == no-git" },
+      { "view": "null.graphView", "contents": "Commit Graph isn't available in remote windows yet.", "when": "null.graph.state == remote" },
+      { "view": "null.graphView", "contents": "Commit Graph doesn't run in an untrusted workspace.\n[Manage Workspace Trust](command:workbench.trust.manage)", "when": "null.graph.state == untrusted" },
+      { "view": "null.graphView", "contents": "Open a folder to see its commit history.\n[Open Folder](command:workbench.action.files.openFolder)", "when": "null.graph.state == no-folder" }
+    ],
+    "submenus": [
+      { "id": "null.graph.resetMenu", "label": "Reset Current Branch To Here" }
+    ],
     "menus": {
       "editor/title": [
         {
@@ -328,7 +361,9 @@
           "command": "null.worktrees.prune",
           "when": "view == null.worktreesView",
           "group": "navigation"
-        }
+        },
+        { "command": "null.graph.open", "when": "view == null.graphView", "group": "navigation@1" },
+        { "command": "null.graph.refresh", "when": "view == null.graphView", "group": "navigation@2" }
       ],
       "view/item/context": [
         {
@@ -388,7 +423,13 @@
         {
           "command": "null.worktrees.remove",
           "when": "view == null.worktreesView && viewItem == worktreeEntry"
-        }
+        },
+        { "command": "null.graph.checkout", "when": "view == null.graphView && viewItem == graphCommit && !null.graph.operationInProgress", "group": "1_ops@1" },
+        { "command": "null.graph.createBranch", "when": "view == null.graphView && viewItem == graphCommit && !null.graph.operationInProgress", "group": "1_ops@2" },
+        { "command": "null.graph.cherryPick", "when": "view == null.graphView && viewItem == graphCommit && !null.graph.operationInProgress", "group": "2_edit@1" },
+        { "command": "null.graph.revert", "when": "view == null.graphView && viewItem == graphCommit && !null.graph.operationInProgress", "group": "2_edit@2" },
+        { "submenu": "null.graph.resetMenu", "when": "view == null.graphView && viewItem == graphCommit && !null.graph.operationInProgress", "group": "2_edit@3" },
+        { "command": "null.graph.copySha", "when": "view == null.graphView && viewItem == graphCommit", "group": "3_copy@1" }
       ],
       "commandPalette": [
         { "command": "null.checkForUpdates" },
@@ -422,7 +463,31 @@
         { "command": "null.issues.signIn" },
         { "command": "null.issues.markRead" },
         { "command": "null.issues.linkFromCommitMessage" },
-        { "command": "null.issues.insertReference" }
+        { "command": "null.issues.insertReference" },
+        { "command": "null.graph.checkout", "when": "false" },
+        { "command": "null.graph.createBranch", "when": "false" },
+        { "command": "null.graph.cherryPick", "when": "false" },
+        { "command": "null.graph.revert", "when": "false" },
+        { "command": "null.graph.reset.soft", "when": "false" },
+        { "command": "null.graph.reset.mixed", "when": "false" },
+        { "command": "null.graph.reset.hard", "when": "false" },
+        { "command": "null.graph.copySha", "when": "false" },
+        { "command": "null.graph.continue", "when": "null.graph.operationInProgress" },
+        { "command": "null.graph.skip", "when": "null.graph.operationInProgress" },
+        { "command": "null.graph.abort", "when": "null.graph.operationInProgress" }
+      ],
+      "webview/context": [
+        { "command": "null.graph.checkout", "when": "webviewId == 'null.commitGraph' && webviewSection == 'commit' && !null.graph.operationInProgress", "group": "1_ops@1" },
+        { "command": "null.graph.createBranch", "when": "webviewId == 'null.commitGraph' && webviewSection == 'commit' && !null.graph.operationInProgress", "group": "1_ops@2" },
+        { "command": "null.graph.cherryPick", "when": "webviewId == 'null.commitGraph' && webviewSection == 'commit' && !null.graph.operationInProgress", "group": "2_edit@1" },
+        { "command": "null.graph.revert", "when": "webviewId == 'null.commitGraph' && webviewSection == 'commit' && !null.graph.operationInProgress", "group": "2_edit@2" },
+        { "submenu": "null.graph.resetMenu", "when": "webviewId == 'null.commitGraph' && webviewSection == 'commit' && !null.graph.operationInProgress", "group": "2_edit@3" },
+        { "command": "null.graph.copySha", "when": "webviewId == 'null.commitGraph' && webviewSection == 'commit'", "group": "3_copy@1" }
+      ],
+      "null.graph.resetMenu": [
+        { "command": "null.graph.reset.soft", "group": "1@1" },
+        { "command": "null.graph.reset.mixed", "group": "1@2" },
+        { "command": "null.graph.reset.hard", "group": "1@3" }
       ]
     },
     "configuration": {

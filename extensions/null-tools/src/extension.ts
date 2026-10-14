@@ -10,6 +10,7 @@ import { registerScratchAndNotesFeature } from './scratchNotesIntegration';
 import { registerAutoGitignoreFeature } from './autoGitignore';
 import { registerPortsFeature } from './portsIntegration';
 import { registerWorktreesFeature } from './worktreesIntegration';
+import { registerGraphFeature } from './graph/graphIntegration';
 import { registerDiscordPresenceFeature } from './discordPresenceIntegration';
 import { registerIssuesPanelFeature } from './issuesPanelIntegration';
 import { getStagedDiff, getChangedFiles, heuristicMessage, runClaude } from './commitMessage';
@@ -148,6 +149,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   registerPortsFeature(context);
   registerWorktreesFeature(context);
+  registerGraphFeature(context);
   registerIssuesPanelFeature(context);
   registerDiscordPresenceFeature(context);
   registerOpenInNullNotesFeature(context);
