@@ -11,6 +11,7 @@ pub mod progress;
 pub mod registrations;
 pub mod shellext;
 pub mod swap;
+pub mod update;
 pub mod release;
 
 pub use error::{Error, Result};

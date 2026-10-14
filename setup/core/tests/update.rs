@@ -1,0 +1,158 @@
+mod support;
+use std::{fs, path::{Path, PathBuf}, sync::{atomic::{AtomicUsize, Ordering}, Arc}, time::Duration};
+
+use null_setup_core::{
+    config,
+    download::Cache,
+    http::Http,
+    progress::{Ctx, Logger, NoInteract, Progress},
+    swap::{journal_path, Timing},
+    update::{prefetch, update, Opts},
+    Error,
+};
+use sha2::{Digest, Sha256};
+
+struct World { _tmp: tempfile::TempDir, install: PathBuf, cache: PathBuf, zip: Vec<u8> }
+
+fn world(extra: &[(&str, &[u8])]) -> World {
+    let tmp = tempfile::tempdir().unwrap();
+    let install = tmp.path().join("Null IDE ünï");
+    fs::create_dir_all(install.join("data")).unwrap();
+    fs::write(install.join("old.txt"), "old").unwrap();
+    fs::write(install.join("data").join("user.txt"), "mine").unwrap();
+    config::write(&install, &config::InstallMeta { repo: "o/r".into(), version: "v1".into(), installed_at: None, install_dir: None }).unwrap();
+    let zip_path = tmp.path().join("pkg.zip");
+    let mut entries: Vec<(&str, &[u8])> = vec![("null.exe", b"MZ"), ("new.txt", b"new")];
+    entries.extend_from_slice(extra);
+    support::make_zip(&zip_path, &entries);
+    let zip = fs::read(&zip_path).unwrap();
+    World { cache: tmp.path().join("cache"), install, zip, _tmp: tmp }
+}
+
+fn serve_release(zip: Vec<u8>, sha: String, zip_hits: Arc<AtomicUsize>) -> support::Server {
+    support::serve(move |req| match req.url.as_str() {
+        "/repos/o/r/releases/tags/v2" => (
+            200,
+            serde_json::json!({ "assets": [
+                { "name": "null-ide-win32-x64.zip", "browser_download_url": format!("{}/zip", req.base), "size": zip.len() },
+                { "name": "null-ide-win32-x64.zip.sha256", "browser_download_url": format!("{}/sha", req.base), "size": 64 }
+            ]}).to_string().into_bytes(),
+            vec![],
+        ),
+        "/sha" => (200, sha.clone().into_bytes(), vec![]),
+        "/zip" => { zip_hits.fetch_add(1, Ordering::SeqCst); (200, zip.clone(), vec![]) }
+        _ => (404, vec![], vec![]),
+    })
+}
+
+fn opts(w: &World, base: &str) -> Opts {
+    let mut o = Opts::standard("o/r".into(), "v2".into(), w.install.clone());
+    o.api_base = base.into();
+    o.cache = Cache { root: w.cache.clone() };
+    o.http = Http::with_delay(Duration::from_millis(1));
+    o.timing = Timing { retries: 2, delay: Duration::from_millis(1) };
+    o.launch = false;
+    o.reapply = false;
+    o.release_shell_ext = false;
+    o.close_grace = Duration::from_millis(500);
+    o
+}
+
+fn run<T>(f: impl FnOnce(&Ctx) -> T) -> (T, Vec<Progress>) {
+    let log = Logger::none();
+    let seen = std::sync::Mutex::new(vec![]);
+    let progress = |p: Progress| seen.lock().unwrap().push(p);
+    let r = f(&Ctx { progress: &progress, log: &log, interact: &NoInteract });
+    (r, seen.into_inner().unwrap())
+}
+
+fn sha(b: &[u8]) -> String { format!("{:x}  null-ide-win32-x64.zip", Sha256::digest(b)) }
+fn assert_old(install: &Path) {
+    assert!(install.join("old.txt").exists() && !install.join("new.txt").exists());
+    assert_eq!(fs::read_to_string(install.join("data").join("user.txt")).unwrap(), "mine");
+}
+
+#[test]
+fn update_installs_the_new_version_keeps_data_and_prunes_the_cache() {
+    let w = world(&[]);
+    let srv = serve_release(w.zip.clone(), sha(&w.zip), Arc::new(AtomicUsize::new(0)));
+    fs::create_dir_all(w.cache.join("v0-old")).unwrap();
+    let (r, seen) = run(|c| update(&opts(&w, &srv.base), c));
+    r.unwrap();
+    assert!(w.install.join("new.txt").exists() && !w.install.join("old.txt").exists());
+    assert_eq!(fs::read_to_string(w.install.join("data").join("user.txt")).unwrap(), "mine");
+    let meta = config::read(&w.install).unwrap();
+    assert_eq!((meta.version.as_str(), meta.repo.as_str()), ("v2", "o/r"));
+    assert!(!journal_path(&w.install).exists());
+    assert!(!w.cache.join("v0-old").exists());
+    for s in [Progress::Checking, Progress::Preparing, Progress::Installing] { assert!(seen.contains(&s), "{s:?}"); }
+}
+
+#[test]
+fn prefetch_then_update_downloads_the_zip_only_once() {
+    let w = world(&[]);
+    let hits = Arc::new(AtomicUsize::new(0));
+    let srv = serve_release(w.zip.clone(), sha(&w.zip), hits.clone());
+    let o = opts(&w, &srv.base);
+    let (r, seen) = run(|c| prefetch(&o, c));
+    r.unwrap();
+    assert_eq!(seen.last(), Some(&Progress::Ready));
+    run(|c| update(&o, c)).0.unwrap();
+    assert_eq!(hits.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn a_bad_checksum_fails_the_update_and_leaves_the_old_install_untouched() {
+    let w = world(&[]);
+    let srv = serve_release(w.zip.clone(), format!("{}  x", "0".repeat(64)), Arc::new(AtomicUsize::new(0)));
+    let (r, seen) = run(|c| update(&opts(&w, &srv.base), c));
+    assert!(matches!(r, Err(Error::Checksum { .. })));
+    assert_old(&w.install);
+    assert!(matches!(seen.last(), Some(Progress::Failed { .. })));
+}
+
+#[test]
+fn an_unknown_tag_reports_the_http_status() {
+    let w = world(&[]);
+    let srv = serve_release(w.zip.clone(), sha(&w.zip), Arc::new(AtomicUsize::new(0)));
+    let mut o = opts(&w, &srv.base);
+    o.tag = "v9".into();
+    let (r, _) = run(|c| update(&o, c));
+    assert!(matches!(r, Err(Error::Http { status: 404, .. })));
+    assert_old(&w.install);
+}
+
+#[test]
+fn a_new_ide_that_exits_at_once_is_rolled_back() {
+    // PING.EXE as null.exe prints usage and exits immediately, like a broken build.
+    let ping = fs::read(r"C:\Windows\System32\PING.EXE").unwrap();
+    let w = world(&[]);
+    let zip_path = w._tmp.path().join("broken.zip");
+    support::make_zip(&zip_path, &[("null.exe", &ping), ("new.txt", b"new")]);
+    let zip = fs::read(&zip_path).unwrap();
+    let srv = serve_release(zip.clone(), sha(&zip), Arc::new(AtomicUsize::new(0)));
+    let mut o = opts(&w, &srv.base);
+    o.launch = true;
+    o.ready_timeout = Duration::from_secs(5);
+    let (r, _) = run(|c| update(&o, c));
+    assert!(r.is_err());
+    assert_old(&w.install);
+    assert!(!journal_path(&w.install).exists());
+}
+
+#[test]
+fn a_new_ide_that_wrote_its_ready_marker_is_committed() {
+    let ping = fs::read(r"C:\Windows\System32\PING.EXE").unwrap();
+    let tmp = tempfile::tempdir().unwrap();
+    let zip_path = tmp.path().join("ok.zip");
+    support::make_zip(&zip_path, &[("null.exe", &ping), ("new.txt", b"new"), (".null-ready", b"1")]);
+    let zip = fs::read(&zip_path).unwrap();
+    let w = world(&[]);
+    let srv = serve_release(zip.clone(), sha(&zip), Arc::new(AtomicUsize::new(0)));
+    let mut o = opts(&w, &srv.base);
+    o.launch = true;
+    o.ready_timeout = Duration::from_secs(5);
+    run(|c| update(&o, c)).0.unwrap();
+    assert!(w.install.join("new.txt").exists());
+    assert!(!journal_path(&w.install).exists());
+}
