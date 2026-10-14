@@ -30,10 +30,10 @@ node D:\Coding\Apps\null-ide\scripts\fake-release.mjs --zip "$env:LOCALAPPDATA\N
 
 # 3. Launch the scratch IDE from a terminal (terminal B) so it inherits the variable
 $env:NULL_SETUP_API_BASE = 'http://127.0.0.1:8787'
-& "$env:LOCALAPPDATA\NullTest\Null IDE\Null.exe" --user-data-dir "$env:LOCALAPPDATA\NullTest\user-data"
+& "$env:LOCALAPPDATA\NullTest\Null IDE\Null.exe"
 ```
 
-`--user-data-dir` keeps the scratch IDE's settings and state apart from your real one. Then run **Null: Check for Updates** and watch the status bar and the fake server's request log.
+The scratch install is **portable** (a `data\` folder next to `Null.exe`, also in the pristine copy), so it has its own profile and single-instance lock. Do not use `--user-data-dir` instead: the updater relaunches `Null.exe` without flags, which then lands in your default profile, hands off to your running daily-driver IDE and exits 0, and the updater reports "the new Null IDE exited right after the update (exit code: 0)" and rolls back. Then run **Null: Check for Updates** and watch the status bar and the fake server's request log.
 
 `bin\null.cmd` and the registry/PATH entries belong to your real install, so the scratch install is not "registered". That is fine for every row except 7 and 8.
 
@@ -60,6 +60,17 @@ Row 11 note: because discovery uses the real API, the fake tag can't differ from
 ## Windows 10
 
 The plan asks for Windows 11 **and** Windows 10 22H2. Only Windows 11 is available for now, so the Windows 10 pass stays open in the record.
+
+## Registrations leak to the real machine
+
+A successful (or even rolled-back) update runs `install-null-ide.ps1 -ReapplyRegistrations`, which re-points **HKCU file associations, `Applications\Null.exe` and the Win11 context menu at the scratch install**, and launching the scratch IDE re-points the `null:` URL handler. A rollback restores files, not the registry. Restore your real install after testing (or after any row that got that far):
+
+```powershell
+& powershell -NoProfile -ExecutionPolicy Bypass -File D:\Coding\Apps\null-ide\scripts\install-null-ide.ps1 -InstallDir "$env:LOCALAPPDATA\Programs\Null IDE" -ReapplyRegistrations -NoElevate
+Set-ItemProperty 'HKCU:\Software\Classes\null\shell\open\command' -Name '(default)' -Value ('"' + "$env:LOCALAPPDATA\Programs\Null IDE\Null.exe" + '" --open-url -- "%1"')
+```
+
+Check nothing still mentions `NullTest` under `HKCU:\Software\Classes\*\shell\open\command`.
 
 ## After
 

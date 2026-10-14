@@ -41,5 +41,7 @@ Steps and inputs: [null-setup-updater-test-runbook.md](null-setup-updater-test-r
 
 - No automatic recovery when the process is killed while the install directory is renamed away (`null-setup recover --install-dir …` restores it).
 - Opening the IDE during the registration step can make a successful update report failure.
+- A rollback restores the install folder but not the HKCU registrations that `-ReapplyRegistrations` already rewrote. Harmless when the same folder is updated; found when a scratch install updated and its registrations replaced those of the daily install.
+- The updater relaunches `Null.exe` with no flags. An IDE started with `--user-data-dir` (or any other instance holding the default profile's lock) makes the relaunched process hand off and exit 0, which the updater reports as "the new Null IDE exited right after the update" and rolls back. Seen while testing; the matrix uses a portable scratch install to avoid it.
 - `bin\null.cmd` comes from the zip, not from the installer.
 - Installs from before this release have no `setup\null-setup.exe`: the first release containing it must be installed by hand (README says so). Keep the previous release's installer and zip available for rollback.
