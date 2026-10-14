@@ -46,7 +46,10 @@ export class CommitGraphPanel implements vscode.Disposable {
       retainContextWhenHidden: true,
       localResourceRoots: [lib],
     });
-    panel.iconPath = vscode.Uri.joinPath(this.context.extensionUri, 'media', 'commit-graph.svg');
+    panel.iconPath = {
+      light: vscode.Uri.joinPath(this.context.extensionUri, 'media', 'commit-graph.svg'),
+      dark: vscode.Uri.joinPath(this.context.extensionUri, 'media', 'commit-graph-dark.svg'),
+    };
     this.panel = panel;
     this.ready = false;
     const asset = (file: string) => panel.webview.asWebviewUri(vscode.Uri.joinPath(lib, file)).toString();
