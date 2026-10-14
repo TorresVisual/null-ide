@@ -64,10 +64,13 @@ async function main() {
     const workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), 'null-tools-spec-workspace-'));
     const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'null-tools-spec-userdata-'));
     const extensionsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'null-tools-spec-extensions-'));
-    // null-tools rewrites these global settings on every activation
-    // (disableRestrictedMode / ensureWindowTitleFormat). In a fresh profile
-    // that write races the end of the run and makes the host exit 1 even when
-    // every spec passed, so pre-seed the values it would otherwise write.
+    // null-tools rewrites window.title on every activation
+    // (ensureWindowTitleFormat). In a fresh profile that write races the end of
+    // the run and makes the host exit 1 even when every spec passed, so pre-seed
+    // the value it would otherwise write. Vanilla VS Code has workspace trust on
+    // and Null's product.json default is off, so the trust keys mirror that
+    // default; without them the extensions would be disabled in the untrusted
+    // temp workspace.
     fs.mkdirSync(path.join(userDataDir, 'User'), { recursive: true });
     fs.writeFileSync(path.join(userDataDir, 'User', 'settings.json'), JSON.stringify({
         'security.workspace.trust.enabled': false,

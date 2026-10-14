@@ -59,26 +59,6 @@ const followAlongIntegration_1 = require("./followAlongIntegration");
 const whyIsThisHereIntegration_1 = require("./whyIsThisHereIntegration");
 const recoveryIntegration_1 = require("./recovery/recoveryIntegration");
 // ── Activation ─────────────────────────────────────────────────────────────
-async function disableRestrictedMode() {
-    try {
-        const config = vscode.workspace.getConfiguration('security.workspace.trust');
-        if (config.get('enabled') !== false) {
-            await config.update('enabled', false, vscode.ConfigurationTarget.Global);
-        }
-        if (config.get('startupPrompt') !== 'never') {
-            await config.update('startupPrompt', 'never', vscode.ConfigurationTarget.Global);
-        }
-        if (config.get('untrustedFiles') !== 'open') {
-            await config.update('untrustedFiles', 'open', vscode.ConfigurationTarget.Global);
-        }
-        if (config.get('emptyWindow') !== false) {
-            await config.update('emptyWindow', false, vscode.ConfigurationTarget.Global);
-        }
-    }
-    catch {
-        // Ignore error
-    }
-}
 async function ensureWindowTitleFormat() {
     try {
         const config = vscode.workspace.getConfiguration('window');
@@ -92,7 +72,6 @@ async function ensureWindowTitleFormat() {
     }
 }
 function activate(context) {
-    disableRestrictedMode();
     ensureWindowTitleFormat();
     const bar = vscode.window.createStatusBarItem('null.gen', vscode.StatusBarAlignment.Right, 0);
     bar.text = '$(sparkle)';
