@@ -112,13 +112,15 @@ function registerCommands(context, engine, enableDeps, userDir) {
         await engine.run({ interactive: true });
         report(engine, 'up to date.');
     }), vscode.commands.registerCommand('null.sync.resolveConflicts', resolveAll), vscode.commands.registerCommand('null.sync.restore', restore), vscode.commands.registerCommand('null.sync.stop', stop), vscode.commands.registerCommand('null.sync.setCategories', async () => {
-        const current = {
-            ...Object.fromEntries(types_1.CATEGORIES.map((category) => [category, true])),
-            ...config().get('categories'),
-        };
-        const picked = await vscode.window.showQuickPick(types_1.CATEGORIES.map((category) => ({ label: category, picked: current[category] !== false })), { canPickMany: true, placeHolder: 'Choose what to sync on this device' });
+        const current = { ...types_1.CATEGORY_DEFAULTS, ...config().get('categories') };
+        const picked = await vscode.window.showQuickPick(types_1.CATEGORIES.map((category) => ({ label: category, picked: current[category] === true })), { canPickMany: true, placeHolder: 'Choose what to sync on this device' });
         if (!picked)
             return;
+        if (picked.some((p) => p.label === 'activity') && !current.activity) {
+            const ok = await vscode.window.showWarningMessage(`Upload your ${prompts.describeCategory('activity')} to your secret sync Gist? It is encrypted on this device with your sync passphrase, so other machines signed in to this account can show it next to theirs.`, { modal: true }, 'Sync Activity');
+            if (ok !== 'Sync Activity')
+                return;
+        }
         const next = Object.fromEntries(types_1.CATEGORIES.map((category) => [category, picked.some((p) => p.label === category)]));
         await config().update('categories', next, vscode.ConfigurationTarget.Global);
     }), vscode.commands.registerCommand('null.sync.showStatus', async () => {

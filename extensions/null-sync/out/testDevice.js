@@ -64,7 +64,7 @@ class Device {
     overwrite = false;
     state;
     passphrase;
-    categories = { settings: true, keybindings: true, snippets: true, extensions: true };
+    categories = { settings: true, keybindings: true, snippets: true, extensions: true, activity: false };
     excluded = ['*.path', '*token*'];
     /** The extensions installed on this machine (enabled or not). */
     installed = new Set();

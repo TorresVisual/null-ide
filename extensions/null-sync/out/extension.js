@@ -60,7 +60,7 @@ function activate(context) {
     fs.mkdirSync(storage, { recursive: true });
     const accountsApi = () => vscode.extensions.getExtension('null.null-accounts')?.activate();
     const categories = () => ({
-        ...Object.fromEntries(types_1.CATEGORIES.map((category) => [category, true])),
+        ...types_1.CATEGORY_DEFAULTS,
         ...config().get('categories'),
     });
     const githubAccounts = async () => ((await accountsApi())?.getAccounts() ?? [])
@@ -99,7 +99,7 @@ function activate(context) {
         accounts: githubAccounts,
         token,
         io,
-        categories: () => types_1.CATEGORIES.filter((category) => categories()[category]),
+        categories: () => Object.keys(types_1.CATEGORY_DEFAULTS).filter((category) => categories()[category]),
         savePassphrase: async (passphrase) => { await context.secrets.store(PASSPHRASE_KEY, passphrase); },
         setState: async (state) => { await context.globalState.update(STATE_KEY, state); },
     };
@@ -126,6 +126,7 @@ function activate(context) {
         syncNow: () => engine.run({ interactive: true }),
         resolveConflict: (file, side) => engine.resolve(file, side),
         uninstallRemoved: (id) => engine.uninstallRemoved(id),
+        syncActivity: (exchange) => engine.syncActivity(exchange),
     };
 }
 function deactivate() { }

@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.enablePrompts = void 0;
+exports.enablePrompts = exports.describeCategory = void 0;
 exports.chooseConflictAction = chooseConflictAction;
 exports.chooseRevision = chooseRevision;
 exports.confirmRestore = confirmRestore;
@@ -41,13 +41,16 @@ exports.confirmStop = confirmStop;
 const vscode = __importStar(require("vscode"));
 const cryptoBox_1 = require("./cryptoBox");
 const secret = (options) => vscode.window.showInputBox({ password: true, ignoreFocusOut: true, ...options });
+/** What the user is agreeing to upload, in words (the setting name alone says little for `activity`). */
+const describeCategory = (category) => category === 'activity' ? 'coding activity history (project names, file paths, languages and times)' : category;
+exports.describeCategory = describeCategory;
 exports.enablePrompts = {
     async chooseAccount(accounts) {
         const picked = await vscode.window.showQuickPick(accounts.map((account) => ({ label: `@${account.username}`, account })), { placeHolder: 'Sync settings with which GitHub account?' });
         return picked?.account;
     },
     async consent(categories) {
-        const answer = await vscode.window.showWarningMessage(`Upload your ${categories.join(', ')} to a secret GitHub Gist? They are encrypted on this device with a passphrase you choose, so only someone who knows it can read them. The passphrase cannot be recovered or reset.`, { modal: true }, 'Enable Sync');
+        const answer = await vscode.window.showWarningMessage(`Upload your ${categories.map(exports.describeCategory).join(', ')} to a secret GitHub Gist? They are encrypted on this device with a passphrase you choose, so only someone who knows it can read them. The passphrase cannot be recovered or reset.`, { modal: true }, 'Enable Sync');
         return answer === 'Enable Sync';
     },
     async newPassphrase() {

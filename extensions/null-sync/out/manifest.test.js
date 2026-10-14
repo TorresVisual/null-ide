@@ -62,10 +62,11 @@ const props = pkg.contributes.configuration.properties;
         for (const key of Object.keys(props))
             assert.equal(props[key].scope, 'application', key);
     });
-    (0, node_test_1.it)('syncs every category by default', () => {
+    (0, node_test_1.it)('syncs every category by default except activity, which is opt-in', () => {
         const defaults = props['null-sync.categories'].default;
         assert.deepEqual(Object.keys(defaults), [...types_1.CATEGORIES]);
-        assert.ok(Object.values(defaults).every((v) => v === true));
+        assert.deepEqual(defaults, types_1.CATEGORY_DEFAULTS);
+        assert.equal(defaults.activity, false);
     });
     (0, node_test_1.it)('excludes machine-specific paths and secrets by default', () => {
         const excluded = props['null-sync.excludedSettings'].default;

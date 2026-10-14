@@ -44,6 +44,7 @@ const syncPlan_1 = require("./syncPlan");
 const types_1 = require("./types");
 /** Gist files over 1 MB are truncated by the API; stay well below. */
 const MAX_FILE_BYTES = 900_000;
+const ACTIVITY_PREFIX = 'activity__';
 const hash = (text) => (text === null ? null : crypto.createHash('sha256').update(text).digest('hex'));
 const enabledCategories = (c) => types_1.CATEGORIES.filter((category) => c[category]);
 const tooLarge = (content) => content !== null && Buffer.byteLength(content) > MAX_FILE_BYTES;
@@ -449,6 +450,60 @@ class SyncEngine {
             merge = (0, extensionSet_1.mergeExtensions)(local, remote, c.st.extensionsBase);
         }
         return { pendingInstalls: merge.install, pendingRemovals: merge.notifyRemoved, push: merge.push, nextBase: merge.nextBase };
+    }
+    /**
+     * Hands the `activity__*` files to `exchange` and uploads what it returns. A background task: it never prompts and does
+     * not touch the settings-sync status. This engine's own sync ignores these files (`fileOfRemoteName` rejects their names).
+     */
+    async syncActivity(exchange) {
+        if (!this.d.enabled() || !this.d.categories().activity)
+            return false;
+        let done = false;
+        await this.serialized(async () => {
+            const st = this.d.state.get();
+            const account = st && (await this.d.accounts()).find((a) => a.id === st.accountId);
+            const passphrase = await this.d.passphrase();
+            const token = account && passphrase ? await this.d.token(account.id, false) : undefined;
+            if (!st || !token || !passphrase)
+                return;
+            const store = (0, gistStore_1.createGistStore)(this.d.io, token);
+            const read = await store.read(st.gistId);
+            if (!read.ok)
+                return;
+            const key = await (0, cryptoBox_1.unlock)(passphrase, read.value.files[layout_1.MANIFEST]);
+            if (!key)
+                return;
+            const files = read.value.files;
+            let writes;
+            try {
+                writes = await exchange({
+                    names: Object.keys(files)
+                        .filter((name) => name.startsWith(ACTIVITY_PREFIX))
+                        .map((name) => ({ name, version: crypto.createHash('sha256').update(files[name]).digest('hex') })),
+                    read: (name) => (name.startsWith(ACTIVITY_PREFIX) && name in files ? (0, cryptoBox_1.open)(key, name, files[name]) : undefined),
+                });
+            }
+            catch {
+                return; // the caller's bug must not show up as a settings-sync error
+            }
+            const changes = {};
+            for (const [name, text] of Object.entries(writes)) {
+                if (!name.startsWith(ACTIVITY_PREFIX) || name.includes('/'))
+                    continue;
+                if (text === null) {
+                    if (name in files)
+                        changes[name] = null;
+                    continue;
+                }
+                const sealed = (0, cryptoBox_1.seal)(key, name, text);
+                if (!tooLarge(sealed))
+                    changes[name] = sealed;
+            }
+            if (Object.keys(changes).length > 0 && !(await store.update(st.gistId, changes)).ok)
+                return;
+            done = true;
+        }, true);
+        return done;
     }
     /** Uninstalls an extension that was removed on another device, and stops reporting it. */
     uninstallRemoved(id) {
