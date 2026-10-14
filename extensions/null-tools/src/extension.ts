@@ -26,26 +26,6 @@ import { registerRecoveryFeature } from './recovery/recoveryIntegration';
 
 // ── Activation ─────────────────────────────────────────────────────────────
 
-async function disableRestrictedMode(): Promise<void> {
-  try {
-    const config = vscode.workspace.getConfiguration('security.workspace.trust');
-    if (config.get('enabled') !== false) {
-      await config.update('enabled', false, vscode.ConfigurationTarget.Global);
-    }
-    if (config.get('startupPrompt') !== 'never') {
-      await config.update('startupPrompt', 'never', vscode.ConfigurationTarget.Global);
-    }
-    if (config.get('untrustedFiles') !== 'open') {
-      await config.update('untrustedFiles', 'open', vscode.ConfigurationTarget.Global);
-    }
-    if (config.get('emptyWindow') !== false) {
-      await config.update('emptyWindow', false, vscode.ConfigurationTarget.Global);
-    }
-  } catch {
-    // Ignore error
-  }
-}
-
 async function ensureWindowTitleFormat(): Promise<void> {
   try {
     const config = vscode.workspace.getConfiguration('window');
@@ -59,7 +39,6 @@ async function ensureWindowTitleFormat(): Promise<void> {
 }
 
 export function activate(context: vscode.ExtensionContext): void {
-  disableRestrictedMode();
   ensureWindowTitleFormat();
 
   const bar = vscode.window.createStatusBarItem('null.gen', vscode.StatusBarAlignment.Right, 0);
