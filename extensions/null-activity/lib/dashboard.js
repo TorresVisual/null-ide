@@ -221,6 +221,7 @@ function renderBody(model) {
     return [
         renderGraph(model),
         h('div', { class: 'columns' }, renderBreakdown('Projects', model.projects, model.git), renderBreakdown('Languages', model.languages)),
+        ...(model.machines ? [h('div', { class: 'columns' }, renderBreakdown('Machines', model.machines))] : []),
         renderSessions(model.sessions),
     ];
 }

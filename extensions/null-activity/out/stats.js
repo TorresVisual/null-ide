@@ -11,6 +11,7 @@ exports.mergeClip = mergeClip;
 exports.sliceInterval = sliceInterval;
 exports.normalizeIntervals = normalizeIntervals;
 exports.attributedIntervals = attributedIntervals;
+exports.machineTimes = machineTimes;
 exports.periodStats = periodStats;
 exports.projectStats = projectStats;
 exports.languageStats = languageStats;
@@ -97,9 +98,10 @@ function fillGaps(imported, cover) {
     return out;
 }
 /**
- * The per-project / per-language view: overlaps are removed only inside one window, so three parallel
- * windows with 10 min each give 30 min (the union view, `normalizeIntervals`, gives 10). A WakaTime import
- * records the same activity Null IDE saw itself, so it only fills the gaps the live windows left.
+ * The per-project / per-language view: overlaps are removed only inside one window (of one machine), so three
+ * parallel windows with 10 min each give 30 min (the union view, `normalizeIntervals`, gives 10). A WakaTime
+ * import records the same activity Null IDE saw itself, so it only fills the gaps the live windows left; imports
+ * of every machine are pooled first, so the same export imported on two machines counts once.
  */
 function attributedIntervals(intervals, range) {
     const byWindow = new Map();
@@ -109,7 +111,7 @@ function attributedIntervals(intervals, range) {
             imported.push(i);
             continue;
         }
-        const key = i.window ?? '';
+        const key = `${i.machine ?? ''}/${i.window ?? ''}`;
         const list = byWindow.get(key);
         if (list)
             list.push(i);
@@ -121,6 +123,21 @@ function attributedIntervals(intervals, range) {
     return all
         .flatMap((i) => sliceInterval(i, range.from, range.to) ?? [])
         .sort((a, b) => a.start - b.start || a.end - b.end);
+}
+/** Tracked time per machine id: parallel windows of one machine are clipped, WakaTime imports are left out. */
+function machineTimes(intervals, range) {
+    const by = new Map();
+    for (const i of intervals) {
+        if (i.window === wakatimeImport_1.WAKATIME_WINDOW_ID)
+            continue;
+        const key = i.machine ?? '';
+        const list = by.get(key);
+        if (list)
+            list.push(i);
+        else
+            by.set(key, [i]);
+    }
+    return new Map([...by].map(([id, list]) => [id, normalizeIntervals(list, range).reduce((n, i) => n + i.end - i.start, 0)]));
 }
 function* pieces(i, p) {
     for (let from = i.start; from < i.end;) {

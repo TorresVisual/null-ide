@@ -77,7 +77,7 @@ class ActivityService {
             this.cache.set(key, hit);
         }
         const open = this.tracker.peek();
-        return open ? [...hit.intervals, { ...open, window: this.opts.store.windowId }] : hit.intervals;
+        return open ? [...hit.intervals, { ...open, window: this.opts.store.windowId, machine: this.opts.store.machineId }] : hit.intervals;
     }
     /** Union of every window, clipped to the range, including the in-progress interval. */
     getIntervals(range) {
@@ -94,6 +94,18 @@ class ActivityService {
     }
     getSessions(range) {
         return (0, stats_1.sessions)(this.raw(range), range, this.cfg.sessionGapMs);
+    }
+    /** Each machine's own tracked time, longest first. */
+    getMachineStats(range) {
+        const own = this.opts.store.machineId;
+        const names = this.opts.machineNames?.() ?? {};
+        return [...(0, stats_1.machineTimes)(this.raw(range), range)]
+            .filter(([, ms]) => ms > 0)
+            .map(([id, ms]) => ({
+            machine: { id, name: id === own ? this.opts.machineName?.() || id : names[id] ?? id, isThisDevice: id === own },
+            ms,
+        }))
+            .sort((a, b) => b.ms - a.ms);
     }
     getMonthlyTotals() {
         return (0, stats_1.periodStats)(this.raw(stats_1.ALL_TIME), stats_1.ALL_TIME, 'month');
@@ -120,6 +132,10 @@ class ActivityService {
     dispose() {
         this.endSession();
         this.changed.dispose();
+    }
+    /** Data of other machines was pulled in. */
+    remoteChanged() {
+        this.dataChanged();
     }
     dataChanged() {
         this.cache.clear();

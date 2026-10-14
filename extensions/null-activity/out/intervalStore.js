@@ -35,12 +35,16 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.IntervalStore = exports.newWindowId = void 0;
 exports.monthKey = monthKey;
+exports.parseInterval = parseInterval;
 const crypto = __importStar(require("crypto"));
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const stats_1 = require("./stats");
+const types_1 = require("./types");
 const FILE_RE = /^intervals-(\d{4})-(\d{2})-(.+)\.jsonl$/;
 const DEFAULT_MAX_BUFFERED = 5_000;
+const REMOTE_DIR = 'machines';
+const REMOTE_FILE_RE = /^(\d{4}-\d{2})\.jsonl$/;
 const EVERYTHING = { from: -Infinity, to: Infinity };
 function monthKey(ts) {
     const d = new Date(ts);
@@ -71,6 +75,9 @@ class IntervalStore {
     }
     get windowId() {
         return this.opts.windowId;
+    }
+    get machineId() {
+        return this.opts.machineId ?? 'local';
     }
     /** Splits at local month boundaries; lines stay on the first piece. */
     split(interval) {
@@ -128,11 +135,75 @@ class IntervalStore {
         for (const name of this.listFiles(range)) {
             const window = FILE_RE.exec(name)[3];
             for (const i of this.parseFile(path.join(this.opts.dir, name)))
-                out.push({ ...i, window });
+                out.push({ ...i, window, machine: this.machineId });
         }
         for (const i of this.buffer)
-            out.push({ ...i, window: this.opts.windowId });
+            out.push({ ...i, window: this.opts.windowId, machine: this.machineId });
+        for (const { machine, month } of this.remoteMonths()) {
+            const start = new Date(Number(month.slice(0, 4)), Number(month.slice(5)) - 1, 1).getTime();
+            if ((0, stats_1.nextPeriodStart)(start, 'month') <= range.from || start >= range.to)
+                continue;
+            for (const i of this.parseFile(this.remoteFile(machine, month)))
+                out.push({ ...i, window: i.window ?? '', machine });
+        }
         return out.filter((i) => overlaps(i, range));
+    }
+    /** Months (`YYYY-MM`) for which this machine has data on disk, oldest first. */
+    ownMonths() {
+        this.flush();
+        const months = new Set();
+        for (const name of this.listFiles(EVERYTHING)) {
+            const m = FILE_RE.exec(name);
+            months.add(`${m[1]}-${m[2]}`);
+        }
+        return [...months].sort();
+    }
+    /** Everything this machine recorded in `month`, every window (imports included), tagged with its window. */
+    exportOwn(month) {
+        this.flush();
+        const out = [];
+        for (const name of this.listFiles(EVERYTHING).sort()) {
+            const m = FILE_RE.exec(name);
+            if (`${m[1]}-${m[2]}` !== month)
+                continue;
+            for (const i of this.parseFile(path.join(this.opts.dir, name)))
+                out.push({ ...i, window: m[3] });
+        }
+        return out;
+    }
+    /** The cached month files of other machines. */
+    remoteMonths() {
+        const out = [];
+        const root = path.join(this.opts.dir, REMOTE_DIR);
+        let machines;
+        try {
+            machines = fs.readdirSync(root);
+        }
+        catch {
+            return out;
+        }
+        for (const machine of machines.filter((id) => types_1.MACHINE_ID_RE.test(id))) {
+            for (const name of fs.readdirSync(path.join(root, machine), { withFileTypes: true }).filter((e) => e.isFile()).map((e) => e.name)) {
+                const m = REMOTE_FILE_RE.exec(name);
+                if (m)
+                    out.push({ machine, month: m[1] });
+            }
+        }
+        return out;
+    }
+    /** Replaces another machine's cached month. Throws on an invalid id or month (remote names are untrusted). */
+    replaceRemote(machine, month, intervals) {
+        const file = this.remoteFile(machine, month);
+        fs.mkdirSync(path.dirname(file), { recursive: true });
+        this.rewrite(file, intervals.map(({ machine: _machine, ...i }) => i));
+    }
+    removeRemote(machine, month) {
+        fs.rmSync(this.remoteFile(machine, month), { force: true });
+    }
+    remoteFile(machine, month) {
+        if (!types_1.MACHINE_ID_RE.test(machine) || !types_1.MONTH_RE.test(month))
+            throw new Error('invalid machine or month');
+        return path.join(this.opts.dir, REMOTE_DIR, machine, `${month}.jsonl`);
     }
     /**
      * Drops every interval overlapping the range, so it can over-delete one interval at each edge.

@@ -25,6 +25,7 @@ const source = (intervals, gapMs = 15 * MIN) => ({
     getLanguageStats: (r) => (0, stats_1.languageStats)(intervals, r),
     getDailyStats: (r) => (0, stats_1.periodStats)(intervals, r, 'day'),
     getSessions: (r) => (0, stats_1.sessions)(intervals, r, gapMs),
+    getMachineStats: (r) => [...(0, stats_1.machineTimes)(intervals, r)].map(([id, ms]) => ({ machine: { id, name: id, isThisDevice: id === 'aaaaaaaaaa' }, ms })),
 });
 const build = (intervals, range, now = NOW, enabled = true) => (0, dashboardModel_1.buildDashboardModel)(source(intervals), range, now, enabled);
 const sum = (bars) => bars.reduce((n, b) => n + b.ms, 0);
@@ -198,5 +199,12 @@ const sum = (bars) => bars.reduce((n, b) => n + b.ms, 0);
     node_assert_1.default.strictEqual(sum(model.bars), 10 * MIN);
     node_assert_1.default.deepStrictEqual(model.projects.map((p) => [p.ms, p.percent]), [[10 * MIN, 33], [10 * MIN, 33], [10 * MIN, 33]]);
     node_assert_1.default.deepStrictEqual(model.sessions.map((s) => [s.ms, s.projects]), [[10 * MIN, ['a', 'b', 'c']]]);
+});
+(0, node_test_1.test)('the Machines breakdown appears only when more than one machine has data', () => {
+    const mine = iv(at(8, 9), at(8, 10), { machine: 'aaaaaaaaaa' });
+    const other = iv(at(8, 11), at(8, 12), { machine: 'bbbbbbbbbb' });
+    node_assert_1.default.strictEqual(build([mine], 'today').machines, undefined);
+    const shares = build([mine, other, iv(at(8, 13), at(8, 13, 30), { machine: 'bbbbbbbbbb' })], 'today').machines;
+    node_assert_1.default.deepStrictEqual(shares.map((s) => [s.name, s.ms, s.percent]), [['bbbbbbbbbb', 90 * MIN, 60], ['aaaaaaaaaa (this device)', 60 * MIN, 40]]);
 });
 //# sourceMappingURL=dashboardModel.test.js.map

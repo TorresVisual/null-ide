@@ -158,6 +158,8 @@ function buildDashboardModel(api, range, now, enabled, git) {
         bars = dailyBars(api, r);
         barUnit = 'day';
     }
+    const machineStats = api.getMachineStats(r);
+    const machineMs = machineStats.reduce((n, m) => n + m.ms, 0);
     return {
         range,
         rangeLabel: rangeLabel(range, r),
@@ -179,6 +181,9 @@ function buildDashboardModel(api, range, now, enabled, git) {
             languages: s.languages,
             files: s.files,
         })),
+        ...(machineStats.length > 1
+            ? { machines: toShares(machineStats.map((m) => ({ name: m.machine.isThisDevice ? `${m.machine.name} (this device)` : m.machine.name, ms: m.ms })), machineMs) }
+            : {}),
         ...(git ? { git } : {}),
     };
 }

@@ -206,4 +206,40 @@ const byStart = (a, b) => a.start - b.start;
     node_assert_1.default.strictEqual(ids.size, 50);
     node_assert_1.default.ok([...ids].every((id) => /^[0-9a-f]{10}$/.test(id)));
 });
+(0, node_test_1.test)('own data is tagged with the machine; cached data of another machine is read, tagged and replaced wholesale', () => {
+    const dir = tmpDir();
+    const store = new intervalStore_1.IntervalStore({ dir, windowId: 'w1', machineId: 'aaaaaaaaaa' });
+    store.append(iv(at(8, 10), at(8, 11)));
+    store.replaceRemote('bbbbbbbbbb', '2026-10', [iv(at(8, 12), at(8, 13), { window: 'x1' })]);
+    const day = (0, stats_1.dayRange)(at(8, 12));
+    node_assert_1.default.deepStrictEqual(store.read(day).sort(byStart).map((i) => [i.machine, i.window]), [['aaaaaaaaaa', 'w1'], ['bbbbbbbbbb', 'x1']]);
+    store.replaceRemote('bbbbbbbbbb', '2026-10', [iv(at(8, 14), at(8, 15))]);
+    node_assert_1.default.deepStrictEqual(store.read(day).filter((i) => i.machine === 'bbbbbbbbbb').map((i) => [i.start, i.window]), [[at(8, 14), '']]);
+    node_assert_1.default.deepStrictEqual(store.remoteMonths(), [{ machine: 'bbbbbbbbbb', month: '2026-10' }]);
+    node_assert_1.default.deepStrictEqual(store.read((0, stats_1.dayRange)(at(8, 12, 0, 10))), [], 'other months are not read');
+    store.removeRemote('bbbbbbbbbb', '2026-10');
+    node_assert_1.default.deepStrictEqual(store.remoteMonths(), []);
+});
+(0, node_test_1.test)('deleting data only touches this machine; exportOwn lists every window of a month with its window id', () => {
+    const dir = tmpDir();
+    const a = new intervalStore_1.IntervalStore({ dir, windowId: 'w1', machineId: 'aaaaaaaaaa' });
+    const b = new intervalStore_1.IntervalStore({ dir, windowId: 'w2', machineId: 'aaaaaaaaaa' });
+    a.append(iv(at(8, 10), at(8, 11)));
+    b.append(iv(at(8, 12), at(8, 13)));
+    a.append(iv(at(8, 10, 0, 10), at(8, 11, 0, 10)));
+    a.replaceRemote('bbbbbbbbbb', '2026-10', [iv(at(8, 12), at(8, 13))]);
+    node_assert_1.default.deepStrictEqual(a.ownMonths(), ['2026-10', '2026-11']);
+    node_assert_1.default.deepStrictEqual(a.exportOwn('2026-10').map((i) => i.window).sort(), ['w1']);
+    b.flush();
+    node_assert_1.default.deepStrictEqual(a.exportOwn('2026-10').map((i) => i.window).sort(), ['w1', 'w2']);
+    a.deleteAll();
+    node_assert_1.default.deepStrictEqual(a.ownMonths(), []);
+    node_assert_1.default.strictEqual(a.read({ from: -Infinity, to: Infinity }).length, 1, 'the other machine survives');
+});
+(0, node_test_1.test)('replaceRemote rejects ids and months that could escape the cache folder', () => {
+    const store = new intervalStore_1.IntervalStore({ dir: tmpDir(), windowId: 'w1' });
+    for (const [machine, month] of [['../../x', '2026-10'], ['aaaaaaaaaa', '../2026'], ['AAAAAAAAAA', '2026-10']]) {
+        node_assert_1.default.throws(() => store.replaceRemote(machine, month, []), /invalid/);
+    }
+});
 //# sourceMappingURL=intervalStore.test.js.map

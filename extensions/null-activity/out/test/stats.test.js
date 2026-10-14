@@ -148,4 +148,29 @@ const proj = (key) => ({ key, name: key.toUpperCase() });
     const imported = iv(at(8, 10, 10), at(8, 10, 40), { window: wakatimeImport_1.WAKATIME_WINDOW_ID, project: proj('imp') });
     node_assert_1.default.deepStrictEqual((0, stats_1.projectStats)([live, imported], day).map((p) => p.project.key), ['live']);
 });
+(0, node_test_1.test)('two machines active at the same time: the headline counts it once, per-project time sums per machine', () => {
+    const a = iv(at(8, 9), at(8, 10), { window: 'w1', machine: 'aaaaaaaaaa' });
+    const b = iv(at(8, 9, 30), at(8, 10, 30), { window: 'w1', machine: 'bbbbbbbbbb' }); // same window id, other machine
+    const day = (0, stats_1.dayRange)(at(8, 12));
+    node_assert_1.default.strictEqual((0, stats_1.normalizeIntervals)([a, b], day).reduce((n, i) => n + i.end - i.start, 0), 90 * MIN);
+    node_assert_1.default.strictEqual((0, stats_1.projectStats)([a, b], day)[0].ms, 120 * MIN);
+    node_assert_1.default.strictEqual((0, stats_1.languageStats)([a, b], day)[0].ms, 120 * MIN);
+});
+(0, node_test_1.test)('the same WakaTime import on two machines counts once', () => {
+    const live = iv(at(8, 9), at(8, 10), { window: 'w1', machine: 'aaaaaaaaaa' });
+    const imp = (machine) => iv(at(8, 9, 30), at(8, 11), { window: wakatimeImport_1.WAKATIME_WINDOW_ID, machine, project: { key: 'k2', name: 'old' } });
+    const day = (0, stats_1.dayRange)(at(8, 12));
+    const stats = (0, stats_1.projectStats)([live, imp('aaaaaaaaaa'), imp('bbbbbbbbbb')], day);
+    node_assert_1.default.strictEqual(stats.find((s) => s.project.key === 'k2').ms, 60 * MIN); // 10:00-11:00, the gap the live window left
+});
+(0, node_test_1.test)('machineTimes clips windows within a machine and leaves imports out', () => {
+    const day = (0, stats_1.dayRange)(at(8, 12));
+    const times = (0, stats_1.machineTimes)([
+        iv(at(8, 9), at(8, 10), { window: 'w1', machine: 'aaaaaaaaaa' }),
+        iv(at(8, 9, 30), at(8, 10, 30), { window: 'w2', machine: 'aaaaaaaaaa' }),
+        iv(at(8, 9), at(8, 9, 20), { window: 'w1', machine: 'bbbbbbbbbb' }),
+        iv(at(8, 14), at(8, 15), { window: wakatimeImport_1.WAKATIME_WINDOW_ID, machine: 'bbbbbbbbbb' }),
+    ], day);
+    node_assert_1.default.deepStrictEqual([...times], [['aaaaaaaaaa', 90 * MIN], ['bbbbbbbbbb', 20 * MIN]]);
+});
 //# sourceMappingURL=stats.test.js.map
