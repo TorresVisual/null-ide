@@ -1,6 +1,8 @@
 use std::path::PathBuf;
 
 pub mod config;
+pub mod disk;
+pub mod download;
 pub mod error;
 pub mod http;
 pub mod procs;
