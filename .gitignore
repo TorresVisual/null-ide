@@ -54,3 +54,5 @@ dist/
 *.log
 .impeccable/
 graphify-out/
+
+setup/target/
