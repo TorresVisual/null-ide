@@ -192,4 +192,50 @@ const flush = () => new Promise(r => setImmediate(r));
     await flush();
     node_assert_1.default.strictEqual(registry.getState('dev')?.kind, 'passed');
 });
+class FakeTaskHost extends FakeTerminalHost {
+    tasks = [];
+    async runTask(label, command, options) {
+        let end;
+        const exitCode = new Promise(r => { end = r; });
+        const rec = { label, command, matcher: options.problemMatcher, end, terminated: false, shown: false };
+        this.tasks.push(rec);
+        return { exitCode, terminate: () => { rec.terminated = true; end(undefined); }, show: () => { rec.shown = true; } };
+    }
+}
+(0, node_test_1.test)('a button with a problem matcher runs as a task, not in a terminal', async () => {
+    const host = new FakeTaskHost();
+    const registry = new terminalRegistry_1.TerminalRegistry(host);
+    await registry.dispatch('build', 'Build', 'cargo build', { problemMatcher: '$null-rustc' });
+    node_assert_1.default.strictEqual(host.createCount, 0);
+    node_assert_1.default.deepStrictEqual([host.tasks[0].label, host.tasks[0].command, host.tasks[0].matcher], ['Build', 'cargo build', '$null-rustc']);
+    node_assert_1.default.strictEqual(registry.isBusy('build'), true);
+    host.tasks[0].end(101);
+    await new Promise(r => setImmediate(r));
+    node_assert_1.default.strictEqual(registry.getState('build')?.kind, 'failed');
+});
+(0, node_test_1.test)('task runs restart and show through the task, not a terminal', async () => {
+    const host = new FakeTaskHost();
+    const registry = new terminalRegistry_1.TerminalRegistry(host);
+    await registry.dispatch('build', 'Build', 'cargo build', { problemMatcher: '$null-rustc' });
+    await registry.interrupt('build');
+    node_assert_1.default.strictEqual(host.tasks[0].terminated, true);
+    registry.show('build');
+    node_assert_1.default.strictEqual(host.tasks[0].shown, true);
+});
+(0, node_test_1.test)('without a matcher, or a host that cannot run tasks, dispatch still uses the terminal', async () => {
+    const withTasks = new FakeTaskHost();
+    await new terminalRegistry_1.TerminalRegistry(withTasks).dispatch('a', 'A', 'echo');
+    node_assert_1.default.strictEqual(withTasks.tasks.length, 0);
+    node_assert_1.default.strictEqual(withTasks.terminals[0].sentTexts[0], 'echo');
+    const plain = new FakeTerminalHost();
+    await new terminalRegistry_1.TerminalRegistry(plain).dispatch('a', 'A', 'echo', { problemMatcher: '$tsc' });
+    node_assert_1.default.strictEqual(plain.terminals[0].sentTexts[0], 'echo');
+});
+(0, node_test_1.test)('a task that fails to start clears the running state', async () => {
+    const host = new FakeTaskHost();
+    host.runTask = async () => { throw new Error('unknown matcher'); };
+    const registry = new terminalRegistry_1.TerminalRegistry(host);
+    await node_assert_1.default.rejects(registry.dispatch('a', 'A', 'x', { problemMatcher: '$nope' }));
+    node_assert_1.default.strictEqual(registry.getState('a'), undefined);
+});
 //# sourceMappingURL=terminalRegistry.test.js.map

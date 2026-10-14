@@ -64,7 +64,7 @@ async function runButton(button, registry) {
     }
     const cwd = button.cwd ? (0, variableResolver_1.resolveVariables)(button.cwd, ctx) : ctx.workspaceFolder;
     const command = (0, variableResolver_1.resolveVariables)(button.command, ctx);
-    const run = () => registry.dispatch(button.id, button.label, command, { cwd, focus: button.focus });
+    const run = () => registry.dispatch(button.id, button.label, command, { cwd, focus: button.focus, problemMatcher: button.problemMatcher });
     if (!registry.isBusy(button.id)) {
         await run();
         return;

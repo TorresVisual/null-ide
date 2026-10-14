@@ -296,6 +296,7 @@ class ActionButtonsPanel {
             '    fieldRow("Type", "<select id=field-type-" + index + " data-field=type data-index=" + index + "><option value=terminal" + (btn.type === "terminal" ? " selected" : "") + ">terminal</option><option value=vscode-command" + (btn.type === "vscode-command" ? " selected" : "") + ">vscode-command</option></select>", "field-type-" + index) +' +
             '    "<div class=\\"row args-row\\" data-index=" + index + " style=\\"display:" + argsDisplay + "\\"><label for=field-args-" + index + ">Args</label><input type=text id=field-args-" + index + " data-field=args data-index=" + index + " value=\\"" + ((btn.args || []).join(",")) + "\\" placeholder=arg1,arg2></div>" +' +
             '    fieldRow("Cwd", "<input type=text id=field-cwd-" + index + " data-field=cwd data-index=" + index + " value=\\"" + (btn.cwd || "") + "\\" placeholder=${workspaceFolder}>", "field-cwd-" + index) +' +
+            '    fieldRow("Problem matcher", "<input type=text id=field-problemMatcher-" + index + " data-field=problemMatcher data-index=" + index + " value=\\"" + (btn.problemMatcher || "") + "\\" placeholder=$tsc>", "field-problemMatcher-" + index) +' +
             '    fieldRow("Save all", "<input type=checkbox id=field-saveAll-" + index + " data-field=saveAll data-index=" + index + (btn.saveAll ? " checked" : "") + ">", "field-saveAll-" + index) +' +
             '    fieldRow("Focus", "<input type=checkbox id=field-focus-" + index + " data-field=focus data-index=" + index + (btn.focus !== false ? " checked" : "") + ">", "field-focus-" + index) +' +
             '    fieldRow("If running", "<select id=field-onBusy-" + index + " data-field=onBusy data-index=" + index + ">" + ["ask", "restart", "show", "run"].map(function(m){return "<option value=" + m + ((btn.onBusy || "ask") === m ? " selected" : "") + ">" + m + "</option>";}).join("") + "</select>", "field-onBusy-" + index) +' +
@@ -383,7 +384,7 @@ class ActionButtonsPanel {
             '    const id = t.getAttribute("data-id");' +
             '    const s = suggestions.find(function(x) { return x.id === id; });' +
             '    if (s) {' +
-            '      buttons.push({ id: s.id, label: s.label, command: s.command, icon: s.icon, type: "terminal", background: "none", priority: 0, saveAll: false, focus: true });' +
+            '      buttons.push({ id: s.id, label: s.label, command: s.command, icon: s.icon, problemMatcher: s.problemMatcher, type: "terminal", background: "none", priority: 0, saveAll: false, focus: true });' +
             '      render();' +
             '    }' +
             '  }' +

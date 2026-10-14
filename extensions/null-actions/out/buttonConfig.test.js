@@ -26,6 +26,7 @@ const buttonConfig_1 = require("./buttonConfig");
         saveAll: false,
         focus: true,
         onBusy: 'ask',
+        problemMatcher: undefined,
         priority: 0,
     });
 });
@@ -82,5 +83,13 @@ const buttonConfig_1 = require("./buttonConfig");
     ]);
     node_assert_1.default.strictEqual(buttons[0].onBusy, 'restart');
     node_assert_1.default.strictEqual(buttons[1].onBusy, 'ask');
+});
+(0, node_test_1.test)('problemMatcher is kept when a non-empty string, otherwise dropped', () => {
+    const { buttons } = (0, buttonConfig_1.parseButtonConfigs)([
+        { id: 'a', label: 'A', command: 'x', problemMatcher: ' $tsc ' },
+        { id: 'b', label: 'B', command: 'x', problemMatcher: '  ' },
+        { id: 'c', label: 'C', command: 'x', problemMatcher: 7 },
+    ]);
+    node_assert_1.default.deepStrictEqual(buttons.map(b => b.problemMatcher), ['$tsc', undefined, undefined]);
 });
 //# sourceMappingURL=buttonConfig.test.js.map

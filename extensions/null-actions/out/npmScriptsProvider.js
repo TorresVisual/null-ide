@@ -2,6 +2,16 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.parseNpmScripts = parseNpmScripts;
 exports.toActionButtonConfig = toActionButtonConfig;
+// ponytail: keyword guess on the script body; scripts that wrap tsc/eslint in another tool get no matcher.
+function matcherFor(script) {
+    if (/\btsc\b/.test(script)) {
+        return '$tsc';
+    }
+    if (/\beslint\b/.test(script)) {
+        return '$eslint-stylish';
+    }
+    return undefined;
+}
 function parseNpmScripts(packageJsonContent) {
     let parsed;
     try {
@@ -22,7 +32,12 @@ function parseNpmScripts(packageJsonContent) {
         if (typeof value !== 'string') {
             continue;
         }
-        buttons.push({ id: `npm-${name}`, label: `npm run ${name}`, command: `npm run ${name}` });
+        const button = { id: `npm-${name}`, label: `npm run ${name}`, command: `npm run ${name}` };
+        const problemMatcher = matcherFor(value);
+        if (problemMatcher) {
+            button.problemMatcher = problemMatcher;
+        }
+        buttons.push(button);
     }
     return buttons;
 }
@@ -41,6 +56,7 @@ function toActionButtonConfig(script, priority) {
         saveAll: false,
         focus: true,
         onBusy: 'ask',
+        problemMatcher: script.problemMatcher,
         priority,
     };
 }

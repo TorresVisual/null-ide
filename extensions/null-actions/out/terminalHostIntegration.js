@@ -75,6 +75,38 @@ class VscodeTerminalHost {
         });
         return { exitCode };
     }
+    async runTask(label, command, options) {
+        const name = `Action: ${label}`;
+        const task = new vscode.Task({ type: 'shell' }, vscode.workspace.workspaceFolders?.[0] ?? vscode.TaskScope.Workspace, name, 'null-actions', new vscode.ShellExecution(command, { cwd: options.cwd }), [options.problemMatcher]);
+        task.presentationOptions = {
+            reveal: options.focus ? vscode.TaskRevealKind.Always : vscode.TaskRevealKind.Silent,
+            focus: options.focus,
+            panel: vscode.TaskPanelKind.Dedicated,
+            showReuseMessage: false,
+        };
+        const execution = await vscode.tasks.executeTask(task);
+        // onDidEndTaskProcess carries the exit code; onDidEndTask is the fallback when no process ran or it was terminated.
+        const exitCode = new Promise(resolve => {
+            const subs = [
+                vscode.tasks.onDidEndTaskProcess(e => { if (e.execution === execution) {
+                    done(e.exitCode);
+                } }),
+                vscode.tasks.onDidEndTask(e => { if (e.execution === execution) {
+                    done(undefined);
+                } }),
+            ];
+            function done(code) {
+                subs.forEach(s => s.dispose());
+                resolve(code);
+            }
+        });
+        return {
+            exitCode,
+            terminate: () => execution.terminate(),
+            // Task terminals are titled "Task - <name>"; the API exposes no handle to them.
+            show: () => vscode.window.terminals.filter(t => t.name.endsWith(name)).pop()?.show(false),
+        };
+    }
     waitForIntegration(terminal) {
         const remaining = INTEGRATION_WAIT_MS - (Date.now() - (this.createdAt.get(terminal) ?? 0));
         if (remaining <= 0) {

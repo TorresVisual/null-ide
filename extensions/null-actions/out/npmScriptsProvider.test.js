@@ -10,7 +10,7 @@ const npmScriptsProvider_1 = require("./npmScriptsProvider");
     const content = JSON.stringify({ scripts: { build: 'tsc', test: 'node --test out' } });
     const buttons = (0, npmScriptsProvider_1.parseNpmScripts)(content);
     node_assert_1.default.deepStrictEqual(buttons, [
-        { id: 'npm-build', label: 'npm run build', command: 'npm run build' },
+        { id: 'npm-build', label: 'npm run build', command: 'npm run build', problemMatcher: '$tsc' },
         { id: 'npm-test', label: 'npm run test', command: 'npm run test' },
     ]);
 });
@@ -36,5 +36,13 @@ const npmScriptsProvider_1 = require("./npmScriptsProvider");
     node_assert_1.default.strictEqual(config.background, 'none');
     node_assert_1.default.strictEqual(config.saveAll, false);
     node_assert_1.default.strictEqual(config.focus, true);
+});
+(0, node_test_1.test)('tsc and eslint scripts get a matching problem matcher, others none', () => {
+    const content = JSON.stringify({ scripts: { build: 'tsc -p .', lint: 'eslint src', test: 'node --test' } });
+    const [build, lint, test] = (0, npmScriptsProvider_1.parseNpmScripts)(content);
+    node_assert_1.default.strictEqual(build.problemMatcher, '$tsc');
+    node_assert_1.default.strictEqual(lint.problemMatcher, '$eslint-stylish');
+    node_assert_1.default.strictEqual(test.problemMatcher, undefined);
+    node_assert_1.default.strictEqual((0, npmScriptsProvider_1.toActionButtonConfig)(build, 0).problemMatcher, '$tsc');
 });
 //# sourceMappingURL=npmScriptsProvider.test.js.map

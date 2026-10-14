@@ -45,4 +45,8 @@ const detecting = (...projects) => () => projects;
     (0, projectDetector_1.detectSuggestedButtons)('/some/folder', p => { seen = p; return []; });
     node_assert_1.default.strictEqual(seen, '/some/folder');
 });
+(0, node_test_1.test)('cargo suggestions carry the rustc problem matcher', () => {
+    const suggestions = (0, projectDetector_1.detectSuggestedButtons)('/x', detecting({ language: 'rust', manifest: 'Cargo.toml' }));
+    node_assert_1.default.ok(suggestions.length > 0 && suggestions.every(s => s.problemMatcher === '$null-rustc'));
+});
 //# sourceMappingURL=projectDetector.test.js.map
