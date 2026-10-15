@@ -122,9 +122,13 @@ Removes the app, registrations, the PATH entry and the Add/Remove Programs entry
 3. Switch null-tools to delegate download and install; delete the staging code, `updater/` and the PowerShell update path.
 4. Ship; run the manual update matrix (below).
 
-**Sub-project 2: installer and first-run setup.** Wizard UI, `builtins.json`, `install-config.json`, `modify`, `repair`, `uninstall`, the `first-run.json` consumer in null-tools, `Null: Setup`, retire Inno.
+**Sub-project 2: installer and first-run setup.** Wizard UI, `builtins.json`, `install-config.json`, `modify`, `repair`, `uninstall`, the `first-run.json` consumer in null-tools, `Null: Setup`, retire Inno. Too large for one plan, so it ships in three slices:
 
-Each sub-project gets its own implementation plan.
+- **2a installer engine** (`docs/plans/null-setup-installer-engine.md`): `builtins.json` and `install-config.json`, the `install`, `modify`, `repair` and `uninstall` modes as a headless CLI, per-feature registrations (still through `install-null-ide.ps1`), updates that honor the saved choices.
+- **2b registrations in Rust**: the `shell` module replaces `install-null-ide.ps1`.
+- **2c wizard and first run**: the wizard UI and stub installer, `first-run.json` and its null-tools consumer, `Null: Setup`, the Add/Remove Programs entry, retiring Inno.
+
+Each sub-project and slice gets its own implementation plan.
 
 ## Error handling
 
