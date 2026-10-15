@@ -971,7 +971,8 @@ if ($UnregisterPreviewHandler) {
 
 if ($Register -or $Unregister) {
     $dir = [System.IO.Path]::GetFullPath($InstallDir)
-    $target = Get-NullIdeExecutable -Dir $dir
+    # Only registering needs the executable; removing must still work when null.exe is gone (quarantined, half-deleted).
+    $target = if ($Register) { Get-NullIdeExecutable -Dir $dir }
     $binDir = Join-Path $dir 'bin'
     $startMenu = Join-Path ([Environment]::GetFolderPath('Programs')) 'Null IDE'
     $desktopLnk = Join-Path ([Environment]::GetFolderPath('Desktop')) 'Null IDE.lnk'

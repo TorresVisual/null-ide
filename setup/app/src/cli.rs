@@ -6,6 +6,7 @@ use null_setup_core::{
     manage::{self, UninstallOpts},
     procs::Running,
     progress::{logs_dir, Ctx, Interact, LockedChoice, Logger, Progress},
+    registrations::Registration,
     update::{self, Kind, Opts},
     Error, Result,
 };
@@ -57,7 +58,10 @@ fn deploy(a: &Args, kind: Kind, tag: String, cfg: Option<InstallConfig>, ctx: &C
     o.launch = a.launch;
     // Only a fresh install or a modify may start the elevated certificate import.
     o.allow_elevate = kind == Kind::Install || a.mode == Mode::Modify;
-    update::update(&o, ctx).map(|_| ())
+    match update::update(&o, ctx)?.registration {
+        Registration::Warning(w) => Err(Error::Other(format!("installed, but some registrations failed: {w}"))),
+        _ => Ok(()),
+    }
 }
 
 fn dispatch(a: &Args, ctx: &Ctx) -> Result<()> {
@@ -73,7 +77,7 @@ fn dispatch(a: &Args, ctx: &Ctx) -> Result<()> {
             if install_config::builtins_changed(&old, &new) {
                 deploy(a, Kind::Repair, installed_tag(a)?, Some(new), ctx)
             } else {
-                manage::modify_in_place(&a.install_dir, &new, true, ctx).map(|_| ())
+                manage::modify_in_place(&a.install_dir, &new, true, ctx).map(|_| ())  // Warning is an Err there
             }
         }
         Mode::Uninstall => {

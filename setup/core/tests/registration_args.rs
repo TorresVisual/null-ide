@@ -58,3 +58,18 @@ fn nothing_to_do_is_skipped() {
     let ctx = Ctx { progress: &progress, log: &log, interact: &NoInteract };
     assert_eq!(apply(Path::new(r"C:\does\not\exist"), &[], &[], false, &ctx), Registration::Skipped);
 }
+
+#[test]
+fn unregistering_does_not_need_a_working_executable() {
+    // A quarantined null.exe must not stop the shortcuts, PATH entry and associations from being removed.
+    let tmp = tempfile::tempdir().unwrap();
+    let script = concat!(env!("CARGO_MANIFEST_DIR"), "/../../scripts/install-null-ide.ps1");
+    let o = std::process::Command::new("powershell.exe")
+        .args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script, "-InstallDir"])
+        .arg(tmp.path())
+        .args(["-Unregister", "bogus", "-NoElevate"])
+        .output()
+        .unwrap();
+    let err = String::from_utf8_lossy(&o.stderr);
+    assert!(err.contains("Unknown feature"), "{err}");
+}

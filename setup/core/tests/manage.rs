@@ -118,3 +118,51 @@ fn deleting_user_data_refuses_a_folder_that_overlaps_the_install() {
     assert!(run(|c| uninstall(&opts(&dir, true, &relative), c)).is_err());
     assert!(dir.join("null.exe").exists());
 }
+
+#[test]
+fn a_failed_uninstall_keeps_the_marker_so_it_can_be_retried() {
+    use std::io::{BufRead, BufReader};
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = install_in(tmp.path());
+    let locked = dir.join("resources").join("app").join("locked.bin");
+    fs::write(&locked, "x").unwrap();
+    // Another process holds the file: the installer closes handles of its own process, so the lock must live elsewhere.
+    let mut holder = std::process::Command::new("powershell.exe")
+        .args(["-NoProfile", "-Command"])
+        .arg(format!("$f=[IO.File]::Open('{}','Open','Read','None'); [Console]::Out.WriteLine('locked'); Start-Sleep 120", locked.display()))
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    let mut line = String::new();
+    BufReader::new(holder.stdout.take().unwrap()).read_line(&mut line).unwrap();
+    assert_eq!(line.trim(), "locked");
+    let failed = run(|c| uninstall(&opts(&dir, false, &tmp.path().join("Null")), c)).is_err();
+    let marker_kept = dir.join(".null-ide-install.json").exists();
+    holder.kill().unwrap();
+    holder.wait().unwrap();
+    assert!(failed && marker_kept);
+    run(|c| uninstall(&opts(&dir, false, &tmp.path().join("Null")), c)).unwrap();
+    assert!(!dir.join("null.exe").exists());
+}
+
+#[test]
+fn uninstall_keeps_a_portable_profile_whatever_its_case() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = install_in(tmp.path());
+    fs::rename(dir.join("data"), dir.join("Data")).unwrap();
+    run(|c| uninstall(&opts(&dir, false, &tmp.path().join("Null")), c)).unwrap();
+    assert_eq!(fs::read_to_string(dir.join("Data").join("user.txt")).unwrap(), "mine");
+}
+
+#[test]
+fn modify_in_place_does_not_save_the_config_when_a_registration_fails() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = install_in(tmp.path());
+    let script = dir.join("resources").join("app").join("null-updater");
+    fs::create_dir_all(&script).unwrap();
+    fs::write(script.join("install-null-ide.ps1"), "[Console]::Error.WriteLine('boom'); exit 1\r\n").unwrap();
+    let new = InstallConfig { desktop_shortcut: true, ..Default::default() };
+    let e = run(|c| modify_in_place(&dir, &new, true, c)).unwrap_err().to_string();
+    assert!(e.contains("boom"), "{e}");
+    assert!(!dir.join("install-config.json").exists());
+}

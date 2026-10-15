@@ -256,8 +256,15 @@ fn finish(o: &Opts, plan: &Plan, before: &InstallConfig, cfg: &InstallConfig, ct
     let registration = if o.reapply { register(o, before, cfg, ctx) } else { Registration::Skipped };
     if o.launch {
         ctx.emit(Progress::Restarting);
-        let mut child = launch_ide(&o.install_dir)?;
-        wait_ready(&mut child, &swap::ready_marker(&o.install_dir), o.ready_timeout)?;
+        let started = launch_ide(&o.install_dir)
+            .and_then(|mut child| wait_ready(&mut child, &swap::ready_marker(&o.install_dir), o.ready_timeout));
+        match started {
+            Ok(()) => {}
+            // A fresh install has no previous version to roll back to; undoing it would leave its registrations pointing nowhere.
+            // The IDE may also have handed off to a running instance and exited, which is not a failure of the install.
+            Err(e) if o.kind == Kind::Install => ctx.log.line(&format!("installed, but the first start did not confirm: {e}")),
+            Err(e) => return Err(e),
+        }
     }
     // A commit that cannot delete the backup (locked) is not a failed update: the journal stays and the next start retries.
     if let Err(e) = swap::commit(plan) {

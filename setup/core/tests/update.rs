@@ -348,3 +348,14 @@ fn install_into_something_that_is_not_a_folder_is_refused() {
     assert!(e.contains("not a folder"), "{e}");
     assert_eq!(fs::read_to_string(&t).unwrap(), "i am a file");
 }
+
+#[test]
+fn a_fresh_install_whose_first_launch_fails_stays_installed() {
+    let w = with_builtins();
+    let srv = serve_release(w.zip.clone(), sha(&w.zip), Arc::new(AtomicUsize::new(0)));
+    let mut o = install_opts(&w, &srv.base, InstallConfig::default());
+    o.launch = true; // the fake null.exe cannot start
+    run(|c| update(&o, c)).0.unwrap();
+    let t = fresh_target(&w);
+    assert!(t.join("new.txt").exists() && t.join(".null-ide-install.json").exists());
+}

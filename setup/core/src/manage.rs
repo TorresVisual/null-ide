@@ -15,8 +15,10 @@ use crate::{
     update::report,
 };
 
+const MARKER: &str = ".null-ide-install.json";
+
 fn is_ours(dir: &Path) -> bool {
-    dir.join(".null-ide-install.json").is_file()
+    dir.join(MARKER).is_file()
 }
 
 /// Applies a changed config when the built-in set is the same: only registrations move and the file is rewritten.
@@ -35,6 +37,10 @@ fn modify_inner(install: &Path, new: &InstallConfig, allow_elevate: bool, ctx: &
         return Err(Error::Other("the built-in selection changed; that needs a repair with the new config".into()));
     }
     let reg = registrations::apply(install, &old.added_features(new), &old.removed_features(new), allow_elevate, ctx);
+    // A config that records features which did not get registered would make the next modify see "nothing to do".
+    if let Registration::Warning(w) = &reg {
+        return Err(Error::Other(format!("registrations failed, the saved choices were not changed: {w}")));
+    }
     install_config::write(install, new)?;
     Ok(reg)
 }
@@ -105,7 +111,10 @@ fn uninstall_inner(o: &UninstallOpts, ctx: &Ctx) -> Result<()> {
 fn remove_install(dir: &Path, keep_data: bool) -> Result<()> {
     for entry in fs::read_dir(dir).ctx("list the install folder")? {
         let entry = entry.ctx("list the install folder")?;
-        if keep_data && entry.file_name() == "data" {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        // The marker goes last: if anything above fails, the folder is still recognizably ours and a retry works.
+        // VS Code's portable check is case-insensitive on NTFS, so `Data` is the profile too.
+        if name == MARKER || (keep_data && name.eq_ignore_ascii_case("data")) {
             continue;
         }
         let path = entry.path();
@@ -113,6 +122,7 @@ fn remove_install(dir: &Path, keep_data: bool) -> Result<()> {
         let done = if is_dir { fs::remove_dir_all(&path) } else { fs::remove_file(&path) };
         done.ctx(format!("remove {}", path.display()))?;
     }
+    fs::remove_file(dir.join(MARKER)).ctx("remove the install marker")?;
     let _ = fs::remove_dir(dir); // succeeds only when empty, i.e. when no portable data was kept
     Ok(())
 }
