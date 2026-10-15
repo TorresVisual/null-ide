@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+pub mod builtins;
 pub mod config;
 pub mod disk;
 pub mod download;
