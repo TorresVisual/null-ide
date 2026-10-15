@@ -1,0 +1,20 @@
+{
+  "builtins": [
+    { "id": "null-tools", "locked": true },
+    { "id": "null-accounts", "locked": true },
+    { "id": "null-theme", "label": "Null Dark theme", "locked": true },
+    { "id": "null-icons", "label": "Null file icons", "locked": true },
+    { "id": "null-markdown" },
+    { "id": "null-format" },
+    { "id": "null-cpp" },
+    { "id": "null-actions" },
+    { "id": "null-env" },
+    { "id": "null-sync" },
+    { "id": "null-activity" },
+    { "id": "null-music" },
+    { "id": "null-startup" },
+    { "id": "code-spell-checker", "label": "Code Spell Checker", "description": "Spell checking for code, comments and documents (streetsidesoftware.code-spell-checker)." },
+    { "id": "open-remote-wsl", "label": "Remote - WSL", "description": "Open folders inside WSL (jeanp413.open-remote-wsl)." },
+    { "id": "open-remote-ssh", "label": "Remote - SSH", "description": "Open folders on SSH hosts (jeanp413.open-remote-ssh)." }
+  ]
+}

@@ -731,6 +731,10 @@ jobs:
           New-Item -ItemType Directory -Path $payloadDir -Force | Out-Null
           Copy-Item ide-overlay/scripts/install-null-ide.ps1 $payloadDir -Force
 
+          node ide-overlay/scripts/gen-builtins.mjs (Join-Path $outDir "builtins.json")
+          if ($LASTEXITCODE -ne 0) { Write-Error "gen-builtins failed"; exit 1 }
+          Copy-Item (Join-Path $outDir "builtins.json") builtins.json -Force
+
           $setupDir = Join-Path $outDir "setup"
           New-Item -ItemType Directory -Path $setupDir -Force | Out-Null
           Copy-Item ide-overlay/setup/target/release/null-setup.exe $setupDir -Force
@@ -802,6 +806,7 @@ jobs:
           files: |
             null-ide-win32-x64.zip
             null-ide-win32-x64.zip.sha256
+            builtins.json
             NullIDESetup-*.exe
             null-reh-linux-*.tar.gz
             ide-overlay/scripts/install-null-ide.ps1
@@ -814,6 +819,7 @@ jobs:
           path: |
             null-ide-win32-x64.zip
             null-ide-win32-x64.zip.sha256
+            builtins.json
             NullIDESetup-*.exe
             null-reh-linux-*.tar.gz
             ide-overlay/scripts/install-null-ide.ps1

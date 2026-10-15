@@ -813,6 +813,10 @@ $payloadDir = Join-Path $OutDir "resources/app/null-updater"
 New-Item -ItemType Directory -Path $payloadDir -Force | Out-Null
 Copy-Item (Join-Path $RepoRoot "scripts/install-null-ide.ps1") $payloadDir -Force
 
+$builtinsJson = Join-Path $OutDir "builtins.json"
+node (Join-Path $RepoRoot "scripts/gen-builtins.mjs") $builtinsJson
+if ($LASTEXITCODE -ne 0) { throw "gen-builtins failed" }
+
 $setupDir = Join-Path $OutDir "setup"
 New-Item -ItemType Directory -Path $setupDir -Force | Out-Null
 Copy-Item (Join-Path $RepoRoot "setup/target/release/null-setup.exe") $setupDir -Force
@@ -858,7 +862,7 @@ else {
 if ($PublishRelease) {
     Write-Step "Publishing GitHub release $buildVersion"
 
-    $releaseFiles = @($zipPath, "$zipPath.sha256", $installer.FullName, (Join-Path $RepoRoot "scripts/install-null-ide.ps1"))
+    $releaseFiles = @($zipPath, "$zipPath.sha256", $builtinsJson, $installer.FullName,(Join-Path $RepoRoot "scripts/install-null-ide.ps1"))
 
     $tagExists = (git tag --list $buildVersion)
     Write-Host ""
