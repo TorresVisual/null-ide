@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
-pub enum Mode { Prefetch, Update, Recover }
+pub enum Mode { Prefetch, Update, Recover, Install, Modify, Repair, Uninstall }
 
 #[derive(Debug)]
 pub struct Args {
@@ -10,6 +10,9 @@ pub struct Args {
     pub tag: String,
     pub install_dir: PathBuf,
     pub launch: bool,
+    pub config: Option<PathBuf>,
+    pub force_close: bool,
+    pub delete_data: bool,
 }
 
 /// Tags become directory names (`.null-ide-stage-<tag>`), so only a conservative character set is accepted.
@@ -29,16 +32,28 @@ pub fn parse<I: IntoIterator<Item = String>>(it: I) -> Result<Args, String> {
         Some("prefetch") => Mode::Prefetch,
         Some("update") => Mode::Update,
         Some("recover") => Mode::Recover,
-        other => return Err(format!("unknown or missing mode: {other:?} (expected prefetch, update or recover)")),
+        Some("install") => Mode::Install,
+        Some("modify") => Mode::Modify,
+        Some("repair") => Mode::Repair,
+        Some("uninstall") => Mode::Uninstall,
+        other => {
+            return Err(format!(
+                "unknown or missing mode: {other:?} (expected prefetch, update, recover, install, modify, repair or uninstall)"
+            ))
+        }
     };
     let (mut repo, mut tag, mut install_dir, mut launch) = ("TorresVisual/null-ide".to_string(), String::new(), None, false);
+    let (mut config, mut force_close, mut delete_data) = (None, false, false);
     while let Some(flag) = it.next() {
         let mut value = |name: &str| it.next().ok_or_else(|| format!("{name} needs a value"));
         match flag.as_str() {
             "--repo" => repo = value("--repo")?,
             "--version" => tag = value("--version")?,
             "--install-dir" => install_dir = Some(PathBuf::from(value("--install-dir")?)),
+            "--config" => config = Some(PathBuf::from(value("--config")?)),
             "--launch" => launch = true,
+            "--force-close" => force_close = true,
+            "--delete-data" => delete_data = true,
             other => return Err(format!("unknown argument: {other}")),
         }
     }
@@ -46,10 +61,15 @@ pub fn parse<I: IntoIterator<Item = String>>(it: I) -> Result<Args, String> {
         return Err("--repo must look like owner/name".into());
     }
     let install_dir = install_dir.ok_or("--install-dir is required")?;
-    if mode != Mode::Recover && !safe_tag(&tag) {
+    // Modes that download for a version need one; the others use the installed version and only validate a given tag.
+    let needs_tag = matches!(mode, Mode::Prefetch | Mode::Update | Mode::Install);
+    if (needs_tag || !tag.is_empty()) && !safe_tag(&tag) {
         return Err("--version is required and may only contain letters, digits, '.', '-' and '_'".into());
     }
-    Ok(Args { mode, repo, tag, install_dir, launch })
+    if mode == Mode::Modify && config.is_none() {
+        return Err("modify needs --config <file>".into());
+    }
+    Ok(Args { mode, repo, tag, install_dir, launch, config, force_close, delete_data })
 }
 
 #[cfg(test)]
@@ -89,6 +109,30 @@ mod tests {
         assert!(p("update --repo a --version v1 --install-dir C:\\x").is_err());
         assert!(p("update --repo a?b/c --version v1 --install-dir C:\\x").is_err());
         assert!(p("update --repo Torres-Visual/null_ide.2 --version v1 --install-dir C:\\x").is_ok());
+    }
+
+    #[test]
+    fn parses_the_management_modes() {
+        let a = p("install --version v1 --install-dir C:\\x --config C:\\c.json --launch").unwrap();
+        assert_eq!(a.mode, Mode::Install);
+        assert_eq!(a.config.as_deref(), Some(std::path::Path::new("C:\\c.json")));
+        assert!(a.launch);
+        assert_eq!(p("repair --install-dir C:\\x --force-close").unwrap().mode, Mode::Repair);
+        assert!(p("repair --install-dir C:\\x --force-close").unwrap().force_close);
+        let m = p("modify --install-dir C:\\x --config C:\\c.json").unwrap();
+        assert_eq!(m.mode, Mode::Modify);
+        let u = p("uninstall --install-dir C:\\x --delete-data").unwrap();
+        assert_eq!((u.mode, u.delete_data), (Mode::Uninstall, true));
+        assert!(!p("uninstall --install-dir C:\\x").unwrap().delete_data);
+    }
+
+    #[test]
+    fn only_install_needs_a_version_among_the_management_modes() {
+        assert!(p("install --install-dir C:\\x").is_err());
+        assert!(p("repair --install-dir C:\\x").is_ok());
+        assert!(p("modify --install-dir C:\\x --config C:\\c.json").is_ok());
+        assert!(p("uninstall --install-dir C:\\x").is_ok());
+        assert!(p("uninstall --version ..\\evil --install-dir C:\\x").is_err()); // a given tag is still validated
     }
 
     #[test]
