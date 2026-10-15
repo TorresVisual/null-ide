@@ -324,3 +324,27 @@ fn a_chosen_set_that_breaks_a_dependency_fails_and_leaves_the_old_install() {
     assert_old(&w.install);
     assert!(!journal_path(&w.install).exists());
 }
+
+#[test]
+fn a_tag_that_could_escape_the_parent_folder_is_refused_before_anything_changes() {
+    let w = with_builtins();
+    let srv = serve_release(w.zip.clone(), sha(&w.zip), Arc::new(AtomicUsize::new(0)));
+    let mut o = opts(&w, &srv.base);
+    o.kind = Kind::Repair;
+    o.tag = r"x\..\..\Victim".into();
+    let e = run(|c| update(&o, c)).0.unwrap_err().to_string();
+    assert!(e.contains("version"), "{e}");
+    assert_old(&w.install);
+}
+
+#[test]
+fn install_into_something_that_is_not_a_folder_is_refused() {
+    let w = with_builtins();
+    let srv = serve_release(w.zip.clone(), sha(&w.zip), Arc::new(AtomicUsize::new(0)));
+    let o = install_opts(&w, &srv.base, InstallConfig::default());
+    let t = fresh_target(&w);
+    fs::write(&t, "i am a file").unwrap();
+    let e = run(|c| update(&o, c)).0.unwrap_err().to_string();
+    assert!(e.contains("not a folder"), "{e}");
+    assert_eq!(fs::read_to_string(&t).unwrap(), "i am a file");
+}

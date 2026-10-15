@@ -72,6 +72,15 @@ fn uninstall_inner(o: &UninstallOpts, ctx: &Ctx) -> Result<()> {
     if o.delete_user_data && o.user_data_dir.file_name() != Some(std::ffi::OsStr::new("Null")) {
         return Err(Error::Other(format!("refusing to delete {}: not a folder named Null", o.user_data_dir.display())));
     }
+    if o.delete_user_data {
+        let (u, i) = (&o.user_data_dir, &o.install_dir);
+        if !u.is_absolute() || u.starts_with(i) || i.starts_with(u) {
+            return Err(Error::Other(format!(
+                "refusing to delete {}: it must be an absolute path that does not overlap the install",
+                u.display()
+            )));
+        }
+    }
     let _lock = swap::lock_install(&o.install_dir, Duration::ZERO)?;
     swap::recover_unlocked(&o.install_dir, &o.timing)?;
     if !is_ours(&o.install_dir) {

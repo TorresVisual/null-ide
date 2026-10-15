@@ -77,6 +77,7 @@ fn dispatch(a: &Args, ctx: &Ctx) -> Result<()> {
             }
         }
         Mode::Uninstall => {
+            // Without APPDATA this stays relative, which `uninstall` refuses when deleting user data.
             let user_data = std::env::var_os("APPDATA").map(std::path::PathBuf::from).unwrap_or_default().join("Null");
             manage::uninstall(&UninstallOpts::standard(a.install_dir.clone(), a.delete_data, user_data), ctx)
         }

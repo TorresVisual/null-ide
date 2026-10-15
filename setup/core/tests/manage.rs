@@ -105,3 +105,16 @@ fn deleting_user_data_only_ever_targets_a_folder_named_null() {
     assert!(not_null.join("thesis.txt").exists());
     assert!(dir.join("null.exe").exists()); // refused before anything was removed
 }
+
+#[test]
+fn deleting_user_data_refuses_a_folder_that_overlaps_the_install() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = install_in(tmp.path());
+    let inside = dir.join("Null");
+    fs::create_dir_all(&inside).unwrap();
+    assert!(run(|c| uninstall(&opts(&dir, true, &inside), c)).is_err());
+    assert!(dir.join("null.exe").exists());
+    let relative = std::path::PathBuf::from("Null");
+    assert!(run(|c| uninstall(&opts(&dir, true, &relative), c)).is_err());
+    assert!(dir.join("null.exe").exists());
+}

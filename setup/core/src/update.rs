@@ -98,7 +98,7 @@ fn fetch_verified(o: &Opts, wait: Duration, ctx: &Ctx) -> Result<(Release, PathB
 }
 
 pub fn prefetch(o: &Opts, ctx: &Ctx) -> Result<PathBuf> {
-    let r = fetch_verified(o, Duration::ZERO, ctx).map(|(_, zip)| zip);
+    let r = check_tag(&o.tag).and_then(|_| fetch_verified(o, Duration::ZERO, ctx)).map(|(_, zip)| zip);
     if r.is_ok() {
         ctx.emit(Progress::Ready);
     }
@@ -109,8 +109,30 @@ pub fn update(o: &Opts, ctx: &Ctx) -> Result<Outcome> {
     report(run_update(o, ctx), ctx)
 }
 
-fn has_entries(dir: &Path) -> bool {
-    fs::read_dir(dir).map(|mut r| r.next().is_some()).unwrap_or(false)
+/// Tags become directory names (`.null-ide-stage-<tag>`), so only a conservative character set is accepted.
+pub fn safe_tag(t: &str) -> bool {
+    !t.is_empty() && t.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_')) && !t.contains("..")
+}
+
+fn check_tag(tag: &str) -> Result<()> {
+    if safe_tag(tag) {
+        Ok(())
+    } else {
+        Err(Error::Other(format!("refusing version {tag:?}: it may only contain letters, digits, '.', '-' and '_'")))
+    }
+}
+
+/// Only a missing folder or a listable empty one counts as empty; anything unreadable must not look empty,
+/// because the swap would rename it aside and delete it.
+fn is_empty_target(dir: &Path) -> Result<bool> {
+    match fs::read_dir(dir) {
+        Ok(mut r) => Ok(r.next().is_none()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(true),
+        Err(e) if dir.exists() && !dir.is_dir() => {
+            Err(Error::Other(format!("{} is not a folder ({e})", dir.display())))
+        }
+        Err(e) => Err(Error::Io { context: format!("read {}", dir.display()), source: e }),
+    }
 }
 
 /// Refuses to touch a folder that is not what the kind expects, then returns the choices saved in it.
@@ -120,7 +142,7 @@ fn check_target(o: &Opts) -> Result<InstallConfig> {
     let ours = o.install_dir.join(".null-ide-install.json").is_file();
     match o.kind {
         Kind::Install if ours => Err(Error::Other(format!("Null IDE is already installed in {dir}; use repair or update"))),
-        Kind::Install if has_entries(&o.install_dir) => {
+        Kind::Install if !is_empty_target(&o.install_dir)? => {
             Err(Error::Other(format!("{dir} is not empty and is not a Null IDE install; pick an empty folder")))
         }
         Kind::Install => Ok(InstallConfig::default()),
@@ -130,6 +152,7 @@ fn check_target(o: &Opts) -> Result<InstallConfig> {
 }
 
 fn run_update(o: &Opts, ctx: &Ctx) -> Result<Outcome> {
+    check_tag(&o.tag)?;
     let parent = o.install_dir.parent().unwrap_or(Path::new("."));
     if o.kind == Kind::Install {
         fs::create_dir_all(parent).ctx("create the install location")?;

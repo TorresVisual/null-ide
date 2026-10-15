@@ -15,10 +15,7 @@ pub struct Args {
     pub delete_data: bool,
 }
 
-/// Tags become directory names (`.null-ide-stage-<tag>`), so only a conservative character set is accepted.
-fn safe_tag(t: &str) -> bool {
-    !t.is_empty() && t.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_')) && !t.contains("..")
-}
+use null_setup_core::update::safe_tag;
 
 /// `owner/name` with GitHub's character set; it is interpolated into an API URL path.
 fn safe_repo(r: &str) -> bool {
@@ -61,6 +58,13 @@ pub fn parse<I: IntoIterator<Item = String>>(it: I) -> Result<Args, String> {
         return Err("--repo must look like owner/name".into());
     }
     let install_dir = install_dir.ok_or("--install-dir is required")?;
+    // The working directory is changed before the work starts, so a relative path would mean something else than the caller meant.
+    if !install_dir.is_absolute() || install_dir.parent().is_none() {
+        return Err("--install-dir must be an absolute path to a folder (not a drive root)".into());
+    }
+    if config.as_deref().is_some_and(|c| !c.is_absolute()) {
+        return Err("--config must be an absolute path".into());
+    }
     // Modes that download for a version need one; the others use the installed version and only validate a given tag.
     let needs_tag = matches!(mode, Mode::Prefetch | Mode::Update | Mode::Install);
     if (needs_tag || !tag.is_empty()) && !safe_tag(&tag) {
@@ -133,6 +137,13 @@ mod tests {
         assert!(p("modify --install-dir C:\\x --config C:\\c.json").is_ok());
         assert!(p("uninstall --install-dir C:\\x").is_ok());
         assert!(p("uninstall --version ..\\evil --install-dir C:\\x").is_err()); // a given tag is still validated
+    }
+
+    #[test]
+    fn paths_must_be_absolute_and_not_a_drive_root() {
+        assert!(p("repair --install-dir Foo").is_err());
+        assert!(p("repair --install-dir C:\\").is_err());
+        assert!(p("modify --install-dir C:\\x --config c.json").is_err());
     }
 
     #[test]
