@@ -7,13 +7,14 @@ use std::{
 };
 
 use crate::{
+    builtins,
     config::{self, InstallMeta},
     disk,
     download::{self, Cache},
     error::{Error, IoCtx, Result},
     extract,
     http::Http,
-    install_config::Feature,
+    install_config::{self, InstallConfig},
     procs, registrations,
     progress::{Ctx, Progress},
     registrations::Registration,
@@ -21,6 +22,10 @@ use crate::{
     shellext,
     swap::{self, Hook, Plan, Timing},
 };
+
+/// What `update` does with the folder. `Install` needs an empty or missing folder, the others an existing install.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Kind { Install, Update, Repair }
 
 pub struct Opts {
     pub repo: String,
@@ -35,6 +40,12 @@ pub struct Opts {
     pub release_shell_ext: bool,
     pub ready_timeout: Duration,
     pub close_grace: Duration,
+    pub kind: Kind,
+    /// `None`: keep the choices saved in the install (exclusions that no longer fit lapse with a log note).
+    /// `Some`: a person chose these; any exclusion that cannot be honored is an error.
+    pub config: Option<InstallConfig>,
+    /// Only a fresh install or `modify` may start the elevated certificate import.
+    pub allow_elevate: bool,
 }
 
 impl Opts {
@@ -53,13 +64,17 @@ impl Opts {
             release_shell_ext: true,
             ready_timeout: Duration::from_secs(30),
             close_grace: Duration::from_secs(15),
+            kind: Kind::Update,
+            config: None,
+            allow_elevate: false,
         }
     }
 }
 
+#[derive(Debug)]
 pub struct Outcome { pub registration: Registration }
 
-fn report<T>(r: Result<T>, ctx: &Ctx) -> Result<T> {
+pub(crate) fn report<T>(r: Result<T>, ctx: &Ctx) -> Result<T> {
     if let Err(e) = &r {
         ctx.log.line(&format!("failed: {e}"));
         match e {
@@ -94,10 +109,36 @@ pub fn update(o: &Opts, ctx: &Ctx) -> Result<Outcome> {
     report(run_update(o, ctx), ctx)
 }
 
+fn has_entries(dir: &Path) -> bool {
+    fs::read_dir(dir).map(|mut r| r.next().is_some()).unwrap_or(false)
+}
+
+/// Refuses to touch a folder that is not what the kind expects, then returns the choices saved in it.
+/// The swap renames the whole folder aside and deletes it on commit, so this is what protects someone else's files.
+fn check_target(o: &Opts) -> Result<InstallConfig> {
+    let dir = o.install_dir.display();
+    let ours = o.install_dir.join(".null-ide-install.json").is_file();
+    match o.kind {
+        Kind::Install if ours => Err(Error::Other(format!("Null IDE is already installed in {dir}; use repair or update"))),
+        Kind::Install if has_entries(&o.install_dir) => {
+            Err(Error::Other(format!("{dir} is not empty and is not a Null IDE install; pick an empty folder")))
+        }
+        Kind::Install => Ok(InstallConfig::default()),
+        Kind::Update | Kind::Repair if !ours => Err(Error::Other(format!("no Null IDE install found in {dir}"))),
+        Kind::Update | Kind::Repair => install_config::read(&o.install_dir),
+    }
+}
+
 fn run_update(o: &Opts, ctx: &Ctx) -> Result<Outcome> {
+    let parent = o.install_dir.parent().unwrap_or(Path::new("."));
+    if o.kind == Kind::Install {
+        fs::create_dir_all(parent).ctx("create the install location")?;
+    }
     // One update at a time per install: a second one must not touch the first one's staging, backup or journal.
     let _lock = swap::lock_install(&o.install_dir, Duration::ZERO)?;
     swap::recover_unlocked(&o.install_dir, &o.timing)?;
+    let before = check_target(o)?;
+    let cfg = o.config.clone().unwrap_or_else(|| before.clone());
     // A zip that `prefetch` verified needs no network, so "Restart to update" also works offline.
     let zip = match download::cached(&o.cache, &o.tag) {
         Some(z) => z,
@@ -106,23 +147,13 @@ fn run_update(o: &Opts, ctx: &Ctx) -> Result<Outcome> {
     let zip_size = fs::metadata(&zip).map(|m| m.len()).unwrap_or(0);
 
     let plan = swap::plan_for(&o.install_dir, &o.tag);
-    let parent = o.install_dir.parent().unwrap_or(Path::new("."));
     disk::ensure(parent, zip_size.saturating_mul(3))?;
     if plan.staged.exists() {
         fs::remove_dir_all(&plan.staged).ctx("remove stale staging directory")?;
     }
     extract::extract(&zip, &plan.staged, ctx)?;
-    config::write(
-        &plan.staged,
-        &InstallMeta {
-            repo: o.repo.clone(),
-            version: o.tag.clone(),
-            installed_at: Some(config::now_iso()),
-            install_dir: Some(o.install_dir.display().to_string()),
-        },
-    )?;
 
-    if let Err(e) = prepare_swap(o, ctx) {
+    if let Err(e) = stage(o, &plan, &cfg, ctx).and_then(|_| prepare_swap(o, ctx)) {
         let _ = fs::remove_dir_all(&plan.staged);
         return Err(e);
     }
@@ -130,7 +161,7 @@ fn run_update(o: &Opts, ctx: &Ctx) -> Result<Outcome> {
     ctx.emit(Progress::Installing);
     swap::swap(&plan, &o.timing, &mut |_| Hook::Continue)?;
 
-    match finish(o, &plan, ctx) {
+    match finish(o, &plan, &before, &cfg, ctx) {
         Ok(outcome) => {
             o.cache.prune_except("");
             Ok(outcome)
@@ -145,6 +176,40 @@ fn run_update(o: &Opts, ctx: &Ctx) -> Result<Outcome> {
     }
 }
 
+/// Everything that goes into the new tree before it replaces the old one.
+fn stage(o: &Opts, plan: &Plan, cfg: &InstallConfig, ctx: &Ctx) -> Result<()> {
+    config::write(
+        &plan.staged,
+        &InstallMeta {
+            repo: o.repo.clone(),
+            version: o.tag.clone(),
+            installed_at: Some(config::now_iso()),
+            install_dir: Some(o.install_dir.display().to_string()),
+        },
+    )?;
+    install_config::write(&plan.staged, cfg)?;
+    prune_builtins(&plan.staged, cfg, o.config.is_some(), ctx)
+}
+
+fn prune_builtins(staged: &Path, cfg: &InstallConfig, strict: bool, ctx: &Ctx) -> Result<()> {
+    let Some(m) = builtins::load(staged)? else {
+        if strict && !cfg.excluded_builtins.is_empty() {
+            return Err(Error::Other("this release has no builtins.json, so built-ins cannot be left out".into()));
+        }
+        return Ok(());
+    };
+    let r = builtins::resolve(&m, &cfg.excluded_builtins);
+    for n in &r.notes {
+        ctx.log.line(&format!("built-ins: {n}"));
+    }
+    if strict && !r.notes.is_empty() {
+        return Err(Error::Other(r.notes.join("; ")));
+    }
+    let removed = builtins::prune(&staged.join("resources").join("app").join("extensions"), &r.excluded)?;
+    ctx.log.line(&format!("built-ins left off disk: {}", removed.join(", ")));
+    Ok(())
+}
+
 fn prepare_swap(o: &Opts, ctx: &Ctx) -> Result<()> {
     procs::close_all(&o.install_dir, ctx, o.close_grace)?;
     procs::release_inherited_handles(&o.install_dir, ctx);
@@ -154,8 +219,18 @@ fn prepare_swap(o: &Opts, ctx: &Ctx) -> Result<()> {
     Ok(())
 }
 
-fn finish(o: &Opts, plan: &Plan, ctx: &Ctx) -> Result<Outcome> {
-    let registration = if o.reapply { registrations::apply(&o.install_dir, &[Feature::ContextMenu, Feature::FileAssociations, Feature::PreviewHandler], &[], false, ctx) } else { Registration::Skipped };
+fn register(o: &Opts, before: &InstallConfig, cfg: &InstallConfig, ctx: &Ctx) -> Registration {
+    let mut wanted = cfg.enabled();
+    // An update only re-points what is tied to the install folder; shortcuts and PATH survive the swap.
+    if o.kind == Kind::Update {
+        wanted.retain(|f| f.follows_install());
+    }
+    let dropped = if o.kind == Kind::Install { Vec::new() } else { before.removed_features(cfg) };
+    registrations::apply(&o.install_dir, &wanted, &dropped, o.allow_elevate, ctx)
+}
+
+fn finish(o: &Opts, plan: &Plan, before: &InstallConfig, cfg: &InstallConfig, ctx: &Ctx) -> Result<Outcome> {
+    let registration = if o.reapply { register(o, before, cfg, ctx) } else { Registration::Skipped };
     if o.launch {
         ctx.emit(Progress::Restarting);
         let mut child = launch_ide(&o.install_dir)?;

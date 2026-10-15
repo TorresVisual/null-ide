@@ -5,9 +5,10 @@ use null_setup_core::{
     config,
     download::Cache,
     http::Http,
+    install_config::{self, InstallConfig},
     progress::{Ctx, Logger, NoInteract, Progress},
     swap::{journal_path, lock_install, Timing},
-    update::{launch_command, prefetch, update, Opts},
+    update::{launch_command, prefetch, update, Kind, Opts},
     Error,
 };
 use sha2::{Digest, Sha256};
@@ -195,4 +196,131 @@ fn the_new_ide_is_started_without_the_extension_hosts_electron_and_vscode_enviro
         assert!(removed.iter().any(|r| r == k), "{k} is inherited: {removed:?}");
     }
     assert_eq!(cmd.get_current_dir(), Some(install.as_path()));
+}
+
+const MANIFEST: &str = r#"{"schema":1,"builtins":[
+  {"id":"null-env","label":"Env"},
+  {"id":"null-format","label":"Format","requires":["null-env"]},
+  {"id":"null-music","label":"Music"}]}"#;
+
+fn with_builtins() -> World {
+    world(&[
+        ("builtins.json", MANIFEST.as_bytes()),
+        ("resources/app/extensions/null-env/package.json", b"{}"),
+        ("resources/app/extensions/null-format/package.json", b"{}"),
+        ("resources/app/extensions/null-music/package.json", b"{}"),
+    ])
+}
+
+fn ext(install: &Path, id: &str) -> PathBuf { install.join("resources").join("app").join("extensions").join(id) }
+
+fn excluding(ids: &[&str]) -> InstallConfig {
+    InstallConfig { excluded_builtins: ids.iter().map(|s| s.to_string()).collect(), ..Default::default() }
+}
+
+fn fresh_target(w: &World) -> PathBuf { w.install.parent().unwrap().join("Fresh Null ünï") }
+
+fn install_opts(w: &World, base: &str, cfg: InstallConfig) -> Opts {
+    let mut o = opts(w, base);
+    o.install_dir = fresh_target(w);
+    o.kind = Kind::Install;
+    o.config = Some(cfg);
+    o
+}
+
+#[test]
+fn install_into_a_new_folder_applies_the_choices_and_leaves_excluded_builtins_off_disk() {
+    let w = with_builtins();
+    let srv = serve_release(w.zip.clone(), sha(&w.zip), Arc::new(AtomicUsize::new(0)));
+    let o = install_opts(&w, &srv.base, excluding(&["null-music"]));
+    run(|c| update(&o, c)).0.unwrap();
+    let t = fresh_target(&w);
+    assert!(t.join("new.txt").exists() && ext(&t, "null-env").exists() && ext(&t, "null-format").exists());
+    assert!(!ext(&t, "null-music").exists());
+    assert_eq!(install_config::read(&t).unwrap(), excluding(&["null-music"]));
+    assert_eq!(config::read(&t).unwrap().version, "v2");
+    assert!(!journal_path(&t).exists());
+    assert_old(&w.install); // the other install is not involved
+}
+
+#[test]
+fn install_refuses_a_folder_that_is_not_empty_and_not_ours() {
+    let w = with_builtins();
+    let srv = serve_release(w.zip.clone(), sha(&w.zip), Arc::new(AtomicUsize::new(0)));
+    let o = install_opts(&w, &srv.base, InstallConfig::default());
+    let t = fresh_target(&w);
+    fs::create_dir_all(&t).unwrap();
+    fs::write(t.join("precious.txt"), "mine").unwrap();
+    let e = run(|c| update(&o, c)).0.unwrap_err().to_string();
+    assert!(e.contains("not empty"), "{e}");
+    assert_eq!(fs::read_to_string(t.join("precious.txt")).unwrap(), "mine");
+    assert!(!t.join("new.txt").exists() && !journal_path(&t).exists());
+}
+
+#[test]
+fn install_refuses_an_existing_install() {
+    let w = with_builtins();
+    let srv = serve_release(w.zip.clone(), sha(&w.zip), Arc::new(AtomicUsize::new(0)));
+    let mut o = install_opts(&w, &srv.base, InstallConfig::default());
+    o.install_dir = w.install.clone();
+    let e = run(|c| update(&o, c)).0.unwrap_err().to_string();
+    assert!(e.contains("already installed"), "{e}");
+    assert_old(&w.install);
+}
+
+#[test]
+fn an_update_keeps_the_saved_exclusions() {
+    let w = with_builtins();
+    install_config::write(&w.install, &excluding(&["null-music"])).unwrap();
+    let srv = serve_release(w.zip.clone(), sha(&w.zip), Arc::new(AtomicUsize::new(0)));
+    run(|c| update(&opts(&w, &srv.base), c)).0.unwrap();
+    assert!(!ext(&w.install, "null-music").exists() && ext(&w.install, "null-env").exists());
+    assert_eq!(install_config::read(&w.install).unwrap(), excluding(&["null-music"]));
+}
+
+#[test]
+fn an_update_survives_saved_choices_the_new_release_cannot_honor() {
+    let w = with_builtins();
+    // null-gone no longer exists; null-env is needed by the still-included null-format.
+    install_config::write(&w.install, &excluding(&["null-gone", "null-env"])).unwrap();
+    let srv = serve_release(w.zip.clone(), sha(&w.zip), Arc::new(AtomicUsize::new(0)));
+    run(|c| update(&opts(&w, &srv.base), c)).0.unwrap();
+    assert!(ext(&w.install, "null-env").exists());
+    assert_eq!(install_config::read(&w.install).unwrap(), excluding(&["null-gone", "null-env"])); // the file is not rewritten
+}
+
+#[test]
+fn a_corrupt_config_stops_the_update_before_anything_changes() {
+    let w = with_builtins();
+    fs::write(w.install.join("install-config.json"), "{nope").unwrap();
+    let srv = serve_release(w.zip.clone(), sha(&w.zip), Arc::new(AtomicUsize::new(0)));
+    let e = run(|c| update(&opts(&w, &srv.base), c)).0.unwrap_err().to_string();
+    assert!(e.contains("install-config.json"), "{e}");
+    assert_old(&w.install);
+    assert!(!journal_path(&w.install).exists());
+}
+
+#[test]
+fn repair_with_a_new_choice_reinstalls_and_prunes_the_newly_excluded_builtin() {
+    let w = with_builtins();
+    let srv = serve_release(w.zip.clone(), sha(&w.zip), Arc::new(AtomicUsize::new(0)));
+    let mut o = opts(&w, &srv.base);
+    o.kind = Kind::Repair;
+    o.config = Some(excluding(&["null-music"]));
+    run(|c| update(&o, c)).0.unwrap();
+    assert!(!ext(&w.install, "null-music").exists() && w.install.join("new.txt").exists());
+    assert_eq!(fs::read_to_string(w.install.join("data").join("user.txt")).unwrap(), "mine");
+}
+
+#[test]
+fn a_chosen_set_that_breaks_a_dependency_fails_and_leaves_the_old_install() {
+    let w = with_builtins();
+    let srv = serve_release(w.zip.clone(), sha(&w.zip), Arc::new(AtomicUsize::new(0)));
+    let mut o = opts(&w, &srv.base);
+    o.kind = Kind::Repair;
+    o.config = Some(excluding(&["null-env"])); // null-format stays and needs it
+    let e = run(|c| update(&o, c)).0.unwrap_err().to_string();
+    assert!(e.contains("null-env") && e.contains("null-format"), "{e}");
+    assert_old(&w.install);
+    assert!(!journal_path(&w.install).exists());
 }
