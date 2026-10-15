@@ -25,21 +25,25 @@ Command shapes: `null-setup.exe install --version <tag> --install-dir <dir> [--c
 
 | # | Scenario | Expect | Result |
 |---|---|---|---|
-| 1 | `install` into a new folder with no `--config` | files, `install-config.json` = defaults, `builtins.json` present, Start Menu shortcut + Safe Mode shortcut exist, file associations registered, `<install>\bin` on the user PATH | pending |
-| 2 | `install` with a config excluding `null-music` and `null-activity` | the two folders are absent, IDE starts, they are missing from `@builtin` | pending |
-| 3 | `install` with a config excluding `null-env` (null-format needs it) | fails with both names in the message; target folder untouched | pending |
-| 4 | `install` into a folder holding a text file | refused ("not empty"); the file is untouched | pending |
-| 5 | `install` onto the existing scratch install | refused ("already installed") | pending |
-| 6 | Update (fake newer tag) on row 2's install | `null-music`/`null-activity` still absent; `install-config.json` unchanged | pending |
-| 7 | `modify` with only `desktopShortcut: true` and the IDE running | desktop shortcut appears; IDE not closed; no `.null-ide-bak-*` folder was created; only `install-config.json` changed | pending |
-| 8 | `modify` re-adding `null-music` (exclusions now only `null-activity`) | swap happens; `null-music` is back, data kept | pending |
-| 9 | `modify` with `path: false` | `<install>\bin` leaves the user PATH | pending |
-| 10 | `repair` after deleting `null.exe` from the install | `null.exe` is back, config kept | pending |
-| 11 | `uninstall` of a portable scratch install, no `--delete-data` | app gone, `data\` kept, shortcuts, PATH entry, associations and context menu removed | pending |
-| 12 | `uninstall --delete-data` | folder gone, a stand-in `%APPDATA%\Null` is the only user-data target (`$env:APPDATA = "$env:TEMP\ApData"`) | pending |
-| 13 | `uninstall` pointed at a normal folder | refused; folder untouched | pending |
-| 14 | Install dir with spaces and non-ASCII (`Null IDE ünï`) for rows 1, 7, 11 | works | pending |
+| 1 | `install` into a new folder with no `--config` | files, `install-config.json` = defaults, `builtins.json` present, Start Menu shortcut + Safe Mode shortcut exist, file associations registered, `<install>\bin` on the user PATH | PASS: defaults config, builtins.json present, Start Menu + Safe Mode shortcuts, associations, `bin` on PATH, Win11 package re-pointed (43 s) |
+| 2 | `install` with a config excluding `null-music` and `null-activity` | the two folders are absent, IDE starts, they are missing from `@builtin` | PASS: null-music and null-activity absent, null-env/null-tools present |
+| 3 | `install` with a config excluding `null-env` (null-format needs it) | fails with both names in the message; target folder untouched | PASS: `null-env stays installed because null-format needs it`, target folder not created |
+| 4 | `install` into a folder holding a text file | refused ("not empty"); the file is untouched | PASS: refused ("not empty"), `precious.txt` untouched |
+| 5 | `install` onto the existing scratch install | refused ("already installed") | PASS in unit test `install_refuses_an_existing_install`; not repeated by hand |
+| 6 | Update (fake newer tag) on row 2's install | `null-music`/`null-activity` still absent; `install-config.json` unchanged | PASS: v1.0.17 -> v1.0.18 via `update`, both exclusions still absent, install-config.json unchanged |
+| 7 | `modify` with only `desktopShortcut: true` and the IDE running | desktop shortcut appears; IDE not closed; no `.null-ide-bak-*` folder was created; only `install-config.json` changed | PASS: with the IDE running (10 processes), modify off/on moved the desktop shortcut, IDE kept running, no `.null-*` folder, only install-config.json changed |
+| 8 | `modify` re-adding `null-music` (exclusions now only `null-activity`) | swap happens; `null-music` is back, data kept | PASS: null-music back, null-activity still off, data kept, version unchanged. Without `--force-close` the core still closed the IDE (graceful close within the grace period) and swapped |
+| 9 | `modify` with `path: false` | `<install>\bin` leaves the user PATH | PASS: `<install>\bin` left the user PATH |
+| 10 | `repair` after deleting `null.exe` from the install | `null.exe` is back, config kept | PASS: Null.exe restored, install-config.json byte-identical, data kept |
+| 11 | `uninstall` of a portable scratch install, no `--delete-data` | app gone, `data\` kept, shortcuts, PATH entry, associations and context menu removed | PASS: app, marker, Start Menu folder, desktop shortcut, PATH entry, associations and Win11 package removed; `data\` kept |
+| 12 | `uninstall --delete-data` | folder gone, a stand-in `%APPDATA%\Null` is the only user-data target (`$env:APPDATA = "$env:TEMP\ApData"`) | PASS: install folder and the stand-in `APPDATA\Null` removed, `APPDATA\Other` kept |
+| 13 | `uninstall` pointed at a normal folder | refused; folder untouched | PASS: refused ("is not a Null IDE install; nothing was removed"), `thesis.txt` kept |
+| 14 | Install dir with spaces and non-ASCII (`Null IDE ünï`) for rows 1, 7, 11 | works | PASS: install (row 1), modify (7) and uninstall (11) all ran in `Null IDE ünï` |
 
 ## Environment
 
-Windows 11 only; the Windows 10 22H2 pass stays open.
+Windows 11 Pro 10.0.26100, 2026-10-15, release build of `null-setup` after the security-review fixes, scratch release = the pristine build zip with the repo's `install-null-ide.ps1` and a generated `builtins.json`. Windows 10 22H2 stays open.
+
+Notes from the run:
+- Launching a scratch IDE from a terminal inside VS Code needs `ELECTRON_RUN_AS_NODE` and `VSCODE_*` removed from the environment, or `Null.exe` runs as Node and exits 0 at once.
+- As predicted above, rows 1, 7, 11 and 14 changed the real shortcuts, PATH, file associations and the Win11 package. They were restored from a backup taken before the run (Start Menu `Null IDE.lnk`, Desktop shortcut, user PATH, `install-null-ide.ps1 -Register startMenuShortcut,contextMenu,fileAssociations,previewHandler`).
