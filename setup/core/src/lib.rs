@@ -7,6 +7,7 @@ pub mod download;
 pub mod extract;
 pub mod error;
 pub mod install_config;
+pub mod manage;
 pub mod http;
 pub mod procs;
 pub mod progress;
