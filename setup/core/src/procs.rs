@@ -36,13 +36,15 @@ pub fn is_under(exe: &Path, dir: &Path) -> bool {
     norm(exe).starts_with(&d)
 }
 
+/// Processes that run from `dir` or have it (or a subfolder) as their working directory: both make renaming
+/// `dir` fail with "Access is denied", e.g. a console someone `cd`'d into the install folder.
 pub fn running_in(dir: &Path) -> Vec<Running> {
     let me = std::process::id();
     let sys = processes();
     sys.processes()
         .values()
         .filter(|p| p.pid().as_u32() != me)
-        .filter(|p| p.exe().is_some_and(|e| is_under(e, dir)))
+        .filter(|p| p.exe().is_some_and(|e| is_under(e, dir)) || p.cwd().is_some_and(|c| is_under(&c.join(""), dir)))
         .map(|p| Running { pid: p.pid().as_u32(), name: p.name().to_string() })
         .collect()
 }

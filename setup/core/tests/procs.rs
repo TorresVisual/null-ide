@@ -38,6 +38,25 @@ fn finds_a_process_running_from_the_directory_and_none_after_it_exits() {
 }
 
 #[test]
+fn finds_a_process_whose_working_directory_is_inside_the_directory() {
+    let tmp = tempfile::tempdir().unwrap();
+    let sub = tmp.path().join("bin");
+    fs::create_dir(&sub).unwrap();
+    for cwd in [tmp.path(), sub.as_path()] {
+        let mut child = Command::new(r"C:\Windows\System32\PING.EXE")
+            .args(["-n", "30", "127.0.0.1"])
+            .current_dir(cwd)
+            .spawn()
+            .unwrap();
+        thread::sleep(Duration::from_millis(500));
+        let found = running_in(tmp.path()).iter().any(|r| r.pid == child.id());
+        child.kill().unwrap();
+        child.wait().unwrap();
+        assert!(found, "cwd {} not detected", cwd.display());
+    }
+}
+
+#[test]
 fn close_all_without_a_choice_reports_the_blocking_process_names() {
     let tmp = tempfile::tempdir().unwrap();
     let exe = ping_copy(tmp.path());
