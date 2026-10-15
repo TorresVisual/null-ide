@@ -20,6 +20,8 @@ param(
     [switch]$UnregisterPreviewHandler,
     [switch]$ReapplyRegistrations,
     [switch]$NoElevate,
+    [string]$Register,
+    [string]$Unregister,
     [switch]$Launch
 )
 
@@ -964,6 +966,44 @@ if ($UnregisterPreviewHandler) {
     Write-Step "Unregistering preview handler"
     Unregister-PreviewHandler
     Write-Host "Done."
+    return
+}
+
+if ($Register -or $Unregister) {
+    $dir = [System.IO.Path]::GetFullPath($InstallDir)
+    $target = Get-NullIdeExecutable -Dir $dir
+    $binDir = Join-Path $dir 'bin'
+    $startMenu = Join-Path ([Environment]::GetFolderPath('Programs')) 'Null IDE'
+    $desktopLnk = Join-Path ([Environment]::GetFolderPath('Desktop')) 'Null IDE.lnk'
+    foreach ($f in @($Unregister -split ',' | Where-Object { $_ })) {
+        switch ($f) {
+            'desktopShortcut'   { Remove-Item -LiteralPath $desktopLnk -Force -ErrorAction SilentlyContinue }
+            'startMenuShortcut' { Remove-Item -LiteralPath (Join-Path $startMenu 'Null IDE.lnk') -Force -ErrorAction SilentlyContinue }
+            'safeModeShortcut'  { Remove-Item -LiteralPath (Join-Path $startMenu 'Null IDE (Safe Mode).lnk') -Force -ErrorAction SilentlyContinue }
+            'path'              { Unregister-Path -Dir $binDir; Unregister-Path -Dir $dir }
+            'contextMenu'       { Unregister-ContextMenu; Unregister-Win11ContextMenu }
+            'fileAssociations'  { Unregister-FileAssociations }
+            'previewHandler'    { Unregister-PreviewHandler }
+            default             { throw "Unknown feature: $f" }
+        }
+    }
+    foreach ($f in @($Register -split ',' | Where-Object { $_ })) {
+        switch ($f) {
+            'desktopShortcut'   { New-Shortcut -ShortcutPath $desktopLnk -TargetPath $target -WorkingDirectory $dir }
+            'startMenuShortcut' { New-Shortcut -ShortcutPath (Join-Path $startMenu 'Null IDE.lnk') -TargetPath $target -WorkingDirectory $dir }
+            'safeModeShortcut'  { New-Shortcut -ShortcutPath (Join-Path $startMenu 'Null IDE (Safe Mode).lnk') -TargetPath $target -WorkingDirectory $dir -Arguments '--safe-mode' }
+            'path'              { Unregister-Path -Dir $dir; Register-Path -Dir $binDir }
+            'contextMenu'       { Register-ContextMenu -ExePath $target; Register-Win11ContextMenu -InstallDir $dir }
+            'fileAssociations'  { Register-FileAssociations -InstallDir $dir }
+            'previewHandler'    { Register-PreviewHandler -InstallDir $dir }
+            default             { throw "Unknown feature: $f" }
+        }
+    }
+    # The Start Menu folder goes away with its last shortcut.
+    if ((Test-Path -LiteralPath $startMenu) -and -not (Get-ChildItem -LiteralPath $startMenu -Force)) {
+        Remove-Item -LiteralPath $startMenu -Force
+    }
+    Write-Host 'Done.'
     return
 }
 

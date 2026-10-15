@@ -13,6 +13,7 @@ use crate::{
     error::{Error, IoCtx, Result},
     extract,
     http::Http,
+    install_config::Feature,
     procs, registrations,
     progress::{Ctx, Progress},
     registrations::Registration,
@@ -154,7 +155,7 @@ fn prepare_swap(o: &Opts, ctx: &Ctx) -> Result<()> {
 }
 
 fn finish(o: &Opts, plan: &Plan, ctx: &Ctx) -> Result<Outcome> {
-    let registration = if o.reapply { registrations::reapply(&o.install_dir, ctx) } else { Registration::Skipped };
+    let registration = if o.reapply { registrations::apply(&o.install_dir, &[Feature::ContextMenu, Feature::FileAssociations, Feature::PreviewHandler], &[], false, ctx) } else { Registration::Skipped };
     if o.launch {
         ctx.emit(Progress::Restarting);
         let mut child = launch_ide(&o.install_dir)?;
