@@ -12,6 +12,7 @@ pub mod http;
 pub mod procs;
 pub mod progress;
 pub mod registrations;
+pub mod shell;
 pub mod shellext;
 pub mod swap;
 pub mod update;

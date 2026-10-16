@@ -1966,6 +1966,8 @@ dependencies = [
  "thiserror 1.0.69",
  "tiny_http",
  "ureq",
+ "windows 0.62.2",
+ "winreg",
  "zip",
 ]
 
