@@ -5,6 +5,7 @@ use winreg::{enums::*, RegKey};
 use crate::error::{Error, Result};
 
 pub mod assoc;
+pub mod classes;
 
 /// Where registrations are written. Production: the real HKCU and shell folders. Tests: a scratch key prefix and temp folders.
 #[derive(Clone, Debug)]
