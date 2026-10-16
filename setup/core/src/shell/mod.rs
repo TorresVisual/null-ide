@@ -45,3 +45,8 @@ pub(crate) fn remove_tree(loc: &Locations, rel: &str) -> Result<()> {
 pub(crate) fn set(k: &RegKey, name: &str, value: &str) -> Result<()> {
     k.set_value(name, &value).map_err(|e| io_err(format!("write registry value {name:?}"), e))
 }
+
+/// Everything with a side effect outside the registry and the file system, so decisions can be tested with a fake.
+pub trait System {
+    fn assoc_changed(&self);
+}

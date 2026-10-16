@@ -123,3 +123,18 @@ impl Hive {
 impl Drop for Hive {
     fn drop(&mut self) { let _ = RegKey::predef(HKEY_CURRENT_USER).delete_subkey_all(&self.root); }
 }
+
+use std::cell::RefCell;
+
+use null_setup_core::shell::System;
+
+#[derive(Default)]
+pub struct FakeSystem { pub calls: RefCell<Vec<String>> }
+
+impl FakeSystem {
+    pub fn count(&self, what: &str) -> usize { self.calls.borrow().iter().filter(|c| c.as_str() == what).count() }
+}
+
+impl System for FakeSystem {
+    fn assoc_changed(&self) { self.calls.borrow_mut().push("assoc_changed".into()); }
+}
