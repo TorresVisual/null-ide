@@ -1,6 +1,7 @@
 use std::{
     fs,
     path::{Path, PathBuf},
+    sync::Arc,
     time::Duration,
 };
 
@@ -9,7 +10,7 @@ use crate::{
     install_config::{self, Feature, InstallConfig},
     procs,
     progress::Ctx,
-    registrations::{self, Registration},
+    registrations::{self, Registrar, Registration},
     shellext,
     swap::{self, Timing},
     update::report,
@@ -23,11 +24,11 @@ fn is_ours(dir: &Path) -> bool {
 
 /// Applies a changed config when the built-in set is the same: only registrations move and the file is rewritten.
 /// No swap, the IDE keeps running. A changed built-in set needs `update` with `Kind::Repair` and the new config.
-pub fn modify_in_place(install: &Path, new: &InstallConfig, allow_elevate: bool, ctx: &Ctx) -> Result<Registration> {
-    report(modify_inner(install, new, allow_elevate, ctx), ctx)
+pub fn modify_in_place(install: &Path, new: &InstallConfig, allow_elevate: bool, registrar: &dyn Registrar, ctx: &Ctx) -> Result<Registration> {
+    report(modify_inner(install, new, allow_elevate, registrar, ctx), ctx)
 }
 
-fn modify_inner(install: &Path, new: &InstallConfig, allow_elevate: bool, ctx: &Ctx) -> Result<Registration> {
+fn modify_inner(install: &Path, new: &InstallConfig, allow_elevate: bool, registrar: &dyn Registrar, ctx: &Ctx) -> Result<Registration> {
     let _lock = swap::lock_install(install, Duration::ZERO)?;
     if !is_ours(install) {
         return Err(Error::Other(format!("no Null IDE install found in {}", install.display())));
@@ -36,7 +37,7 @@ fn modify_inner(install: &Path, new: &InstallConfig, allow_elevate: bool, ctx: &
     if install_config::builtins_changed(&old, new) {
         return Err(Error::Other("the built-in selection changed; that needs a repair with the new config".into()));
     }
-    let reg = registrations::apply(install, &old.added_features(new), &old.removed_features(new), allow_elevate, ctx);
+    let reg = registrar.apply(install, &old.added_features(new), &old.removed_features(new), allow_elevate, ctx);
     // A config that records features which did not get registered would make the next modify see "nothing to do".
     if let Registration::Warning(w) = &reg {
         return Err(Error::Other(format!("registrations failed, the saved choices were not changed: {w}")));
@@ -53,6 +54,7 @@ pub struct UninstallOpts {
     pub timing: Timing,
     pub close_grace: Duration,
     pub release_shell_ext: bool,
+    pub registrar: Arc<dyn Registrar>,
 }
 
 impl UninstallOpts {
@@ -64,6 +66,7 @@ impl UninstallOpts {
             timing: Timing::STANDARD,
             close_grace: Duration::from_secs(15),
             release_shell_ext: true,
+            registrar: registrations::standard(),
         }
     }
 }
@@ -98,7 +101,7 @@ fn uninstall_inner(o: &UninstallOpts, ctx: &Ctx) -> Result<()> {
         shellext::release(ctx);
     }
     // Registrations first: the script that removes them lives inside the folder deleted below.
-    if let Registration::Warning(w) = registrations::apply(&o.install_dir, &[], &Feature::ALL, false, ctx) {
+    if let Registration::Warning(w) = o.registrar.apply(&o.install_dir, &[], &Feature::ALL, false, ctx) {
         ctx.log.line(&format!("some registrations could not be removed: {w}"));
     }
     remove_install(&o.install_dir, !o.delete_user_data)?;

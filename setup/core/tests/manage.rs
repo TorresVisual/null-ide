@@ -1,7 +1,9 @@
 use std::{fs, path::Path, time::Duration};
 
+mod support;
+
 use null_setup_core::{
-    install_config::{self, InstallConfig},
+    install_config::{self, Feature, InstallConfig},
     manage::{modify_in_place, uninstall, UninstallOpts},
     progress::{Ctx, Logger, NoInteract},
     registrations::Registration,
@@ -29,6 +31,7 @@ fn opts(dir: &Path, delete: bool, user_data: &Path) -> UninstallOpts {
     o.timing = Timing { retries: 2, delay: Duration::from_millis(1) };
     o.close_grace = Duration::from_millis(500);
     o.release_shell_ext = false;
+    o.registrar = support::Recorder::new(Registration::Done);
     o
 }
 
@@ -37,8 +40,13 @@ fn modify_in_place_only_rewrites_the_config() {
     let tmp = tempfile::tempdir().unwrap();
     let dir = install_in(tmp.path());
     let new = InstallConfig { desktop_shortcut: true, ..Default::default() };
-    let r = run(|c| modify_in_place(&dir, &new, true, c)).unwrap();
-    assert_eq!(r, Registration::Skipped); // no registration script in this fake install
+    let rec = support::Recorder::new(Registration::Done);
+    let r = run(|c| modify_in_place(&dir, &new, true, &*rec, c)).unwrap();
+    assert_eq!(r, Registration::Done);
+    let calls = rec.calls.lock().unwrap();
+    assert_eq!(calls.len(), 1);
+    assert_eq!(calls[0].register, [Feature::DesktopShortcut]);
+    assert!(calls[0].unregister.is_empty() && calls[0].allow_elevate);
     assert_eq!(install_config::read(&dir).unwrap(), new);
     assert!(dir.join("null.exe").exists() && dir.join("data").join("user.txt").exists());
     assert!(!dir.parent().unwrap().join(".null-update-journal.json").exists());
@@ -49,13 +57,13 @@ fn modify_in_place_refuses_a_changed_builtin_set_and_a_foreign_folder() {
     let tmp = tempfile::tempdir().unwrap();
     let dir = install_in(tmp.path());
     let changed = InstallConfig { excluded_builtins: vec!["null-music".into()], ..Default::default() };
-    let e = run(|c| modify_in_place(&dir, &changed, true, c)).unwrap_err().to_string();
+    let e = run(|c| modify_in_place(&dir, &changed, true, &*support::Recorder::new(Registration::Done), c)).unwrap_err().to_string();
     assert!(e.contains("built-in"), "{e}");
     assert!(!dir.join("install-config.json").exists());
 
     let foreign = tmp.path().join("Documents");
     fs::create_dir_all(&foreign).unwrap();
-    assert!(run(|c| modify_in_place(&foreign, &InstallConfig::default(), true, c)).is_err());
+    assert!(run(|c| modify_in_place(&foreign, &InstallConfig::default(), true, &*support::Recorder::new(Registration::Done), c)).is_err());
     assert!(!foreign.join("install-config.json").exists());
 }
 
@@ -158,11 +166,9 @@ fn uninstall_keeps_a_portable_profile_whatever_its_case() {
 fn modify_in_place_does_not_save_the_config_when_a_registration_fails() {
     let tmp = tempfile::tempdir().unwrap();
     let dir = install_in(tmp.path());
-    let script = dir.join("resources").join("app").join("null-updater");
-    fs::create_dir_all(&script).unwrap();
-    fs::write(script.join("install-null-ide.ps1"), "[Console]::Error.WriteLine('boom'); exit 1\r\n").unwrap();
+    let rec = support::Recorder::new(Registration::Warning("boom".into()));
     let new = InstallConfig { desktop_shortcut: true, ..Default::default() };
-    let e = run(|c| modify_in_place(&dir, &new, true, c)).unwrap_err().to_string();
+    let e = run(|c| modify_in_place(&dir, &new, true, &*rec, c)).unwrap_err().to_string();
     assert!(e.contains("boom"), "{e}");
     assert!(!dir.join("install-config.json").exists());
 }

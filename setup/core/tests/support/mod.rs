@@ -47,3 +47,27 @@ pub fn make_zip(path: &Path, entries: &[(&str, &[u8])]) {
     }
     w.finish().unwrap();
 }
+
+use std::sync::Mutex;
+
+use null_setup_core::{
+    install_config::Feature,
+    progress::Ctx,
+    registrations::{Registrar, Registration},
+};
+
+pub struct Call { pub register: Vec<Feature>, pub unregister: Vec<Feature>, pub allow_elevate: bool }
+
+/// Stands in for the real registrar so no test writes the registry, PATH or Start Menu.
+pub struct Recorder { pub calls: Mutex<Vec<Call>>, pub result: Registration }
+
+impl Recorder {
+    pub fn new(result: Registration) -> Arc<Recorder> { Arc::new(Recorder { calls: Mutex::new(vec![]), result }) }
+}
+
+impl Registrar for Recorder {
+    fn apply(&self, _: &std::path::Path, register: &[Feature], unregister: &[Feature], allow_elevate: bool, _: &Ctx) -> Registration {
+        self.calls.lock().unwrap().push(Call { register: register.to_vec(), unregister: unregister.to_vec(), allow_elevate });
+        self.result.clone()
+    }
+}

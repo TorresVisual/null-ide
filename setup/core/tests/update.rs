@@ -54,6 +54,7 @@ fn opts(w: &World, base: &str) -> Opts {
     o.timing = Timing { retries: 2, delay: Duration::from_millis(1) };
     o.launch = false;
     o.reapply = false;
+    o.registrar = support::Recorder::new(null_setup_core::registrations::Registration::Done);
     o.release_shell_ext = false;
     o.close_grace = Duration::from_millis(500);
     o

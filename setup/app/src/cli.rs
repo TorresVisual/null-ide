@@ -6,7 +6,7 @@ use null_setup_core::{
     manage::{self, UninstallOpts},
     procs::Running,
     progress::{logs_dir, Ctx, Interact, LockedChoice, Logger, Progress},
-    registrations::Registration,
+    registrations::{self, Registration},
     update::{self, Kind, Opts},
     Error, Result,
 };
@@ -77,7 +77,7 @@ fn dispatch(a: &Args, ctx: &Ctx) -> Result<()> {
             if install_config::builtins_changed(&old, &new) {
                 deploy(a, Kind::Repair, installed_tag(a)?, Some(new), ctx)
             } else {
-                manage::modify_in_place(&a.install_dir, &new, true, ctx).map(|_| ())  // Warning is an Err there
+                manage::modify_in_place(&a.install_dir, &new, true, &*registrations::standard(), ctx).map(|_| ())  // Warning is an Err there
             }
         }
         Mode::Uninstall => {

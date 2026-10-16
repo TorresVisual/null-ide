@@ -2,6 +2,7 @@ use std::{
     fs,
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
+    sync::Arc,
     thread,
     time::{Duration, Instant},
 };
@@ -17,7 +18,7 @@ use crate::{
     install_config::{self, InstallConfig},
     procs, registrations,
     progress::{Ctx, Progress},
-    registrations::Registration,
+    registrations::{Registrar, Registration},
     release::{self, Release},
     shellext,
     swap::{self, Hook, Plan, Timing},
@@ -46,6 +47,7 @@ pub struct Opts {
     pub config: Option<InstallConfig>,
     /// Only a fresh install or `modify` may start the elevated certificate import.
     pub allow_elevate: bool,
+    pub registrar: Arc<dyn Registrar>,
 }
 
 impl Opts {
@@ -67,6 +69,7 @@ impl Opts {
             kind: Kind::Update,
             config: None,
             allow_elevate: false,
+            registrar: registrations::standard(),
         }
     }
 }
@@ -249,7 +252,7 @@ fn register(o: &Opts, before: &InstallConfig, cfg: &InstallConfig, ctx: &Ctx) ->
         wanted.retain(|f| f.follows_install());
     }
     let dropped = if o.kind == Kind::Install { Vec::new() } else { before.removed_features(cfg) };
-    registrations::apply(&o.install_dir, &wanted, &dropped, o.allow_elevate, ctx)
+    o.registrar.apply(&o.install_dir, &wanted, &dropped, o.allow_elevate, ctx)
 }
 
 fn finish(o: &Opts, plan: &Plan, before: &InstallConfig, cfg: &InstallConfig, ctx: &Ctx) -> Result<Outcome> {

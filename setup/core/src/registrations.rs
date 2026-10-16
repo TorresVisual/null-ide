@@ -3,6 +3,7 @@ use std::{
     os::windows::process::CommandExt,
     path::Path,
     process::{Command, Stdio},
+    sync::Arc,
     thread,
     time::{Duration, Instant},
 };
@@ -25,6 +26,21 @@ pub fn classify(stdout: &str, exit_ok: bool, stderr: &str) -> Registration {
         Registration::Warning(first.to_string())
     }
 }
+
+pub trait Registrar: Send + Sync {
+    fn apply(&self, install: &Path, register: &[Feature], unregister: &[Feature], allow_elevate: bool, ctx: &Ctx) -> Registration;
+}
+
+/// Until Task 9 of sub-project 2b: the script shipped inside the install does the work.
+pub struct ScriptRegistrar;
+
+impl Registrar for ScriptRegistrar {
+    fn apply(&self, install: &Path, register: &[Feature], unregister: &[Feature], allow_elevate: bool, ctx: &Ctx) -> Registration {
+        apply(install, register, unregister, allow_elevate, ctx)
+    }
+}
+
+pub fn standard() -> Arc<dyn Registrar> { Arc::new(ScriptRegistrar) }
 
 /// Arguments after `-File <script>`. Pure, so the wiring between features and the script is testable without PowerShell.
 pub fn script_args(install: &Path, register: &[Feature], unregister: &[Feature], allow_elevate: bool) -> Vec<OsString> {
