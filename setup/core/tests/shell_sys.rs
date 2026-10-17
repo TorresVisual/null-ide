@@ -52,3 +52,9 @@ fn powershell_quoting_doubles_every_quote_character_powershell_recognises() {
     assert_eq!(quote(Path::new(r"C:\it's")), r"'C:\it''s'");
     assert_eq!(quote(Path::new("C:\\x\u{2019}; calc; \u{2018}")), "'C:\\x\u{2019}\u{2019}; calc; \u{2018}\u{2018}'");
 }
+
+#[test]
+fn the_machine_store_can_be_asked_about_without_admin_rights() {
+    // Opening LocalMachine\TrustedPeople for writing needs admin; the trust question must only read.
+    assert!(machine_store_readable());
+}

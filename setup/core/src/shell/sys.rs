@@ -174,6 +174,9 @@ pub fn trust_cert_machine(install: &Path) -> Result<()> {
     cert::add_der(CERT_SYSTEM_STORE_LOCAL_MACHINE, &trust_der(install)?)
 }
 
+/// Can `LocalMachine\TrustedPeople` be read by this process? (The trust check must not need admin rights.)
+pub fn machine_store_readable() -> bool { cert::readable(CERT_SYSTEM_STORE_LOCAL_MACHINE) }
+
 /// Simple display name of the certificate's subject.
 pub fn cert_subject(cer: &Path) -> Result<String> { cert::subject(cer) }
 
@@ -203,9 +206,11 @@ mod cert {
 
     struct Store(HCERTSTORE);
     impl Store {
-        fn open(location: u32) -> Result<Store> {
+        fn open(location: u32, readonly: bool) -> Result<Store> {
+            // Without the read-only flag the system store is opened for writing, which needs admin rights for LocalMachine.
+            let flags = if readonly { location | CERT_STORE_READONLY_FLAG.0 } else { location };
             let name = w!("TrustedPeople");
-            let h = unsafe { CertOpenStore(CERT_STORE_PROV_SYSTEM_W, CERT_QUERY_ENCODING_TYPE(0), None, CERT_OPEN_STORE_FLAGS(location), Some(name.as_ptr() as *const _)) }
+            let h = unsafe { CertOpenStore(CERT_STORE_PROV_SYSTEM_W, CERT_QUERY_ENCODING_TYPE(0), None, CERT_OPEN_STORE_FLAGS(flags), Some(name.as_ptr() as *const _)) }
                 .map_err(|e| Error::Other(format!("could not open the certificate store: {e}")))?;
             Ok(Store(h))
         }
@@ -235,9 +240,11 @@ mod cert {
         Ok(String::from_utf16_lossy(&buf[..n - 1]))
     }
 
+    pub fn readable(location: u32) -> bool { Store::open(location, true).is_ok() }
+
     /// A question, not an operation: any failure answers "no".
     pub fn trusted(location: u32, thumbprint: &str) -> bool {
-        let Ok(store) = Store::open(location) else { return false };
+        let Ok(store) = Store::open(location, true) else { return false };
         let hash: Option<Vec<u8>> = (0..thumbprint.len() / 2)
             .map(|i| u8::from_str_radix(thumbprint.get(i * 2..i * 2 + 2)?, 16).ok())
             .collect();
@@ -255,7 +262,7 @@ mod cert {
 
     pub fn add_der(location: u32, der: &[u8]) -> Result<()> {
         Context::from_der(der)?; // refuse bytes that are not a certificate
-        let store = Store::open(location)?;
+        let store = Store::open(location, false)?;
         unsafe { CertAddEncodedCertificateToStore(Some(store.0), X509_ASN_ENCODING, der, CERT_STORE_ADD_USE_EXISTING, None) }
             .map_err(|e| Error::Other(format!("could not add the certificate: {e}")))
     }
