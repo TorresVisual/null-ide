@@ -39,3 +39,29 @@ test('the real repo config is consistent', () => {
   for (const b of m.builtins) for (const r of b.requires) assert.ok(ids.has(r), `${b.id} requires unknown ${r}`);
   assert.ok(m.builtins.find((b) => b.id === 'null-format').requires.includes('null-env'));
 });
+
+test('settings and marketplace pass through and default to empty', () => {
+  const s = [{ key: 'files.autoSave', label: 'Auto save', kind: 'choice', default: 'off', options: [{ value: 'off', label: 'Off' }] }];
+  const m = build({ builtins: [{ id: 'null-a' }], settings: s }, read, ['null-a']);
+  assert.deepEqual(m.settings, s);
+  assert.deepEqual(m.marketplace, []);
+  const bare = build({ builtins: [{ id: 'null-a' }] }, read, []);
+  assert.deepEqual([bare.settings, bare.marketplace], [[], []]);
+});
+
+test('the real repo settings table lists the seven first-run settings with valid defaults', () => {
+  const { settings, marketplace } = main();
+  assert.deepEqual(settings.map((s) => s.key), [
+    'workbench.colorTheme', 'editor.fontFamily', 'editor.fontSize', 'files.autoSave',
+    'editor.formatOnSave', 'window.menuBarVisibility', 'null.updates.check',
+  ]);
+  for (const s of settings) {
+    assert.ok(s.label && s.description, `${s.key} needs a label and a description`);
+    assert.ok(['choice', 'bool', 'number', 'text'].includes(s.kind), s.key);
+    if (s.kind === 'choice') assert.ok(s.options.some((o) => o.value === s.default), `${s.key} default is not an option`);
+    if (s.kind === 'bool') assert.equal(typeof s.default, 'boolean', s.key);
+    if (s.kind === 'number') assert.ok(s.default >= s.min && s.default <= s.max, `${s.key} default out of range`);
+    if (s.kind === 'text') assert.equal(typeof s.default, 'string', s.key);
+  }
+  assert.deepEqual(marketplace, []);
+});

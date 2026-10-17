@@ -33,7 +33,7 @@ export function build(config, readPackage, repoExtensionIds) {
       requires: [...new Set([...(c.requires ?? []), ...fromPackage])],
     };
   });
-  return { schema: 1, builtins };
+  return { schema: 1, builtins, settings: config.settings ?? [], marketplace: config.marketplace ?? [] };
 }
 
 export function main(out) {

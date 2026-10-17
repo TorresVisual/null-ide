@@ -16,5 +16,52 @@
     { "id": "code-spell-checker", "label": "Code Spell Checker", "description": "Spell checking for code, comments and documents (streetsidesoftware.code-spell-checker)." },
     { "id": "open-remote-wsl", "label": "Remote - WSL", "description": "Open folders inside WSL (jeanp413.open-remote-wsl)." },
     { "id": "open-remote-ssh", "label": "Remote - SSH", "description": "Open folders on SSH hosts (jeanp413.open-remote-ssh)." }
-  ]
+  ],
+  "settings": [
+    {
+      "key": "workbench.colorTheme", "label": "Color theme", "description": "The look of the editor and the workbench.",
+      "kind": "choice", "default": "Null Dark",
+      "options": [
+        { "value": "Null Dark", "label": "Null Dark" },
+        { "value": "Null OLED", "label": "Null OLED" },
+        { "value": "Null Light", "label": "Null Light" },
+        { "value": "Null Retro", "label": "Null Retro" }
+      ]
+    },
+    {
+      "key": "editor.fontFamily", "label": "Editor font", "description": "A CSS font list; the first installed family is used.",
+      "kind": "text", "default": "'Geist Mono', 'JetBrains Mono', 'Cascadia Code', monospace"
+    },
+    {
+      "key": "editor.fontSize", "label": "Editor font size", "description": "In pixels.",
+      "kind": "number", "default": 13, "min": 8, "max": 40
+    },
+    {
+      "key": "files.autoSave", "label": "Auto save", "description": "When edited files are saved without asking.",
+      "kind": "choice", "default": "off",
+      "options": [
+        { "value": "off", "label": "Off" },
+        { "value": "afterDelay", "label": "After a delay" },
+        { "value": "onFocusChange", "label": "When the editor loses focus" },
+        { "value": "onWindowChange", "label": "When the window loses focus" }
+      ]
+    },
+    {
+      "key": "editor.formatOnSave", "label": "Format on save", "description": "Run the formatter every time a file is saved.",
+      "kind": "bool", "default": false
+    },
+    {
+      "key": "window.menuBarVisibility", "label": "Menu bar", "description": "Classic shows the full menu bar; compact folds it into one button.",
+      "kind": "choice", "default": "classic",
+      "options": [
+        { "value": "classic", "label": "Classic" },
+        { "value": "compact", "label": "Compact" }
+      ]
+    },
+    {
+      "key": "null.updates.check", "label": "Check for updates", "description": "Look for a new Null IDE release when the IDE starts.",
+      "kind": "bool", "default": true
+    }
+  ],
+  "marketplace": []
 }
