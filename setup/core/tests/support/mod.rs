@@ -126,7 +126,7 @@ impl Drop for Hive {
 
 use std::cell::RefCell;
 
-use null_setup_core::shell::System;
+use null_setup_core::shell::{shortcuts::ShortcutSpec, System};
 
 #[derive(Default)]
 pub struct FakeSystem { pub calls: RefCell<Vec<String>> }
@@ -138,4 +138,8 @@ impl FakeSystem {
 impl System for FakeSystem {
     fn assoc_changed(&self) { self.calls.borrow_mut().push("assoc_changed".into()); }
     fn env_changed(&self) { self.calls.borrow_mut().push("env_changed".into()); }
+    fn create_shortcut(&self, s: &ShortcutSpec) -> null_setup_core::Result<()> {
+        self.calls.borrow_mut().push(format!("shortcut:{}", s.path.file_name().unwrap().to_string_lossy()));
+        Ok(())
+    }
 }

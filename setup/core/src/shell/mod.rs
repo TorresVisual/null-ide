@@ -7,6 +7,8 @@ use crate::error::{Error, Result};
 pub mod assoc;
 pub mod classes;
 pub mod path;
+pub mod shortcuts;
+pub mod sys;
 
 /// Where registrations are written. Production: the real HKCU and shell folders. Tests: a scratch key prefix and temp folders.
 #[derive(Clone, Debug)]
@@ -51,4 +53,15 @@ pub(crate) fn set(k: &RegKey, name: &str, value: &str) -> Result<()> {
 pub trait System {
     fn assoc_changed(&self);
     fn env_changed(&self);
+    fn create_shortcut(&self, s: &shortcuts::ShortcutSpec) -> Result<()>;
+}
+
+impl Locations {
+    pub fn real() -> Result<Locations> {
+        Ok(Locations {
+            hkcu: String::new(),
+            desktop: sys::known_folder(sys::KnownFolder::Desktop)?,
+            programs: sys::known_folder(sys::KnownFolder::Programs)?,
+        })
+    }
 }
