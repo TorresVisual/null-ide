@@ -5,6 +5,7 @@ pub mod config;
 pub mod disk;
 pub mod download;
 pub mod extract;
+pub mod first_run;
 pub mod error;
 pub mod install_config;
 pub mod manage;
