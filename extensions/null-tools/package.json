@@ -486,6 +486,11 @@
     "configuration": {
       "title": "Null IDE",
       "properties": {
+        "null.updates.check": {
+          "type": "boolean",
+          "default": true,
+          "description": "Check for a new Null IDE release when the IDE starts. The command \"Null: Check for Updates\" always works."
+        },
         "null.recentProjects.maxItems": {
           "type": "number",
           "default": 20,

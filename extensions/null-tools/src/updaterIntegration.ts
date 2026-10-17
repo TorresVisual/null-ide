@@ -45,7 +45,9 @@ export function registerUpdaterFeature(context: vscode.ExtensionContext): void {
   }));
 
   refreshUpdateButton();
-  checkForUpdate(context, true)
-    .then(update => { refreshUpdateButton(); if (update) return promptForUpdate(update); })
-    .catch(() => { /* startup check — stay silent when offline */ });
+  if (vscode.workspace.getConfiguration('null').get<boolean>('updates.check', true)) {
+    checkForUpdate(context, true)
+      .then(update => { refreshUpdateButton(); if (update) return promptForUpdate(update); })
+      .catch(() => { /* startup check — stay silent when offline */ });
+  }
 }
