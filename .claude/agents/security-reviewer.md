@@ -14,9 +14,10 @@ Only review changes that touch one of these areas. If the diff doesn't touch any
 
 1. **`shell-ext/src/`** — the native C++ `IExplorerCommand` COM in-process server that implements the Win11 Explorer right-click "Open in Null" menu. Registered via a sparse APPX with `ExternalLocation` pointing at the Null IDE install root.
 2. **`installer/null-ide.iss`, `shell-ext/AppxManifest.xml`, and the signing steps in `.github/workflows/build.yml`** (`New-SelfSignedCertificate` / `makeappx` / `Add-AppxPackage`, currently around the "Generate self-signed cert" step).
-3. **`scripts/install-null-ide.ps1`** — the per-user (no elevation) installer and the registration script `null-setup` runs after an update (`-ReapplyRegistrations -NoElevate`), and the PATH/registry writes it performs.
-4. **`setup/core/src/{extract,download,swap,registrations,update}.rs`, `setup/app/src/{args,relocate}.rs`** — the Rust updater: release fetch and SHA256 check, zip extraction, the journaled directory swap, the relocated copy of the exe, and the argument parsing that turns a tag into a directory name.
-5. **The self-update trigger in `extensions/null-tools/src/updater.ts`** — `installUpdate()`, `acknowledgeUpdate()`, and the code around them that spawns `null-setup.exe` (`prefetch`, `update`, `recover`).
+3. **`scripts/install-null-ide.ps1`** — the per-user (no elevation) installer and the PATH/registry writes it performs. `null-setup` no longer runs it; it remains only for Inno and the README one-liner until 2c.
+4. **`setup/core/src/shell/`** (registry writes under HKCU, `sys.rs` certificate store and `ShellExecuteExW "runas"`) and the `trust-cert` mode (`setup/app/src/headless.rs`), the one elevated entry point: it must read only `<install>\shell-ext\NullIDECert.cer`, only in a folder holding `.null-ide-install.json`, and only a certificate whose subject is `Null IDE`.
+5. **`setup/core/src/{extract,download,swap,registrations,update}.rs`, `setup/app/src/{args,relocate}.rs`** — the Rust updater: release fetch and SHA256 check, zip extraction, the journaled directory swap, the relocated copy of the exe, and the argument parsing that turns a tag into a directory name.
+6. **The self-update trigger in `extensions/null-tools/src/updater.ts`** — `installUpdate()`, `acknowledgeUpdate()`, and the code around them that spawns `null-setup.exe` (`prefetch`, `update`, `recover`).
 
 ## What to actually check
 
