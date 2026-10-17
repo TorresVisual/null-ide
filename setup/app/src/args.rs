@@ -13,6 +13,7 @@ pub struct Args {
     pub config: Option<PathBuf>,
     pub force_close: bool,
     pub delete_data: bool,
+    pub first_run: Option<PathBuf>,
 }
 
 use null_setup_core::update::safe_tag;
@@ -42,6 +43,7 @@ pub fn parse<I: IntoIterator<Item = String>>(it: I) -> Result<Args, String> {
     };
     let (mut repo, mut tag, mut install_dir, mut launch) = ("TorresVisual/null-ide".to_string(), String::new(), None, false);
     let (mut config, mut force_close, mut delete_data) = (None, false, false);
+    let mut first_run = None;
     while let Some(flag) = it.next() {
         let mut value = |name: &str| it.next().ok_or_else(|| format!("{name} needs a value"));
         match flag.as_str() {
@@ -49,6 +51,7 @@ pub fn parse<I: IntoIterator<Item = String>>(it: I) -> Result<Args, String> {
             "--version" => tag = value("--version")?,
             "--install-dir" => install_dir = Some(PathBuf::from(value("--install-dir")?)),
             "--config" => config = Some(PathBuf::from(value("--config")?)),
+            "--first-run" => first_run = Some(PathBuf::from(value("--first-run")?)),
             "--launch" => launch = true,
             "--force-close" => force_close = true,
             "--delete-data" => delete_data = true,
@@ -73,6 +76,12 @@ pub fn parse<I: IntoIterator<Item = String>>(it: I) -> Result<Args, String> {
     if config.as_deref().is_some_and(|c| !c.is_absolute()) {
         return Err("--config must be an absolute path".into());
     }
+    if first_run.as_deref().is_some_and(|f| !f.is_absolute()) {
+        return Err("--first-run must be an absolute path".into());
+    }
+    if first_run.is_some() && mode != Mode::Install {
+        return Err("--first-run only applies to install".into());
+    }
     // Modes that download for a version need one; the others use the installed version and only validate a given tag.
     let needs_tag = matches!(mode, Mode::Prefetch | Mode::Update | Mode::Install);
     if (needs_tag || !tag.is_empty()) && !safe_tag(&tag) {
@@ -81,7 +90,7 @@ pub fn parse<I: IntoIterator<Item = String>>(it: I) -> Result<Args, String> {
     if mode == Mode::Modify && config.is_none() {
         return Err("modify needs --config <file>".into());
     }
-    Ok(Args { mode, repo, tag, install_dir, launch, config, force_close, delete_data })
+    Ok(Args { mode, repo, tag, install_dir, launch, config, force_close, delete_data, first_run })
 }
 
 #[cfg(test)]
@@ -171,6 +180,17 @@ mod tests {
     fn install_dirs_with_path_separators_or_percent_are_refused() {
         assert!(p("repair --install-dir C:\\a;b").is_err()); // would split the user PATH
         assert!(p("repair --install-dir C:\\%TEMP%").is_err()); // REG_EXPAND_SZ would expand it
+    }
+
+    #[test]
+    fn first_run_is_an_absolute_file_for_install_only() {
+        let a = p("install --version v1 --install-dir C:\\x --first-run C:\\f.json").unwrap();
+        assert_eq!(a.first_run.as_deref(), Some(std::path::Path::new("C:\\f.json")));
+        assert!(p("install --version v1 --install-dir C:\\x").unwrap().first_run.is_none());
+        assert!(p("install --version v1 --install-dir C:\\x --first-run f.json").is_err()); // relative: the cwd is changed before the work starts
+        assert!(p("repair --install-dir C:\\x --first-run C:\\f.json").is_err());
+        assert!(p("update --version v1 --install-dir C:\\x --first-run C:\\f.json").is_err());
+        assert!(p("install --version v1 --install-dir C:\\x --first-run").is_err());
     }
 
     #[test]

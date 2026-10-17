@@ -1,7 +1,7 @@
 use std::io::Write;
 
 use null_setup_core::{
-    config,
+    config, first_run,
     install_config::{self, InstallConfig},
     manage::{self, UninstallOpts},
     procs::Running,
@@ -68,7 +68,13 @@ fn dispatch(a: &Args, ctx: &Ctx) -> Result<()> {
     match a.mode {
         Mode::Install => {
             let cfg = load_config(a)?.unwrap_or_default();
-            deploy(a, Kind::Install, a.tag.clone(), Some(cfg), ctx)
+            deploy(a, Kind::Install, a.tag.clone(), Some(cfg), ctx)?;
+            // ponytail: a registration warning from deploy() returns before this, so a partly-registered install loses its first-run choices; re-run install after `repair` if that matters.
+            if let Some(f) = &a.first_run {
+                first_run::save_from_file(&a.install_dir, f, &first_run::dir()?)
+                    .map_err(|e| Error::Other(format!("installed, but the first-run choices were not saved: {e}")))?;
+            }
+            Ok(())
         }
         Mode::Repair => deploy(a, Kind::Repair, installed_tag(a)?, None, ctx),
         Mode::Modify => {
