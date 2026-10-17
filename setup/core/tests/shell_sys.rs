@@ -37,3 +37,12 @@ fn trust_target_only_accepts_a_null_install_with_a_null_certificate() {
     assert!(trust_target(&install(&t.path().join("b"), true, None)).is_err()); // no certificate
     assert!(trust_target(&install(&t.path().join("c"), true, Some(b"not a cert"))).is_err());
 }
+
+#[test]
+fn trust_der_returns_the_one_buffer_that_was_checked() {
+    let t = tempfile::tempdir().unwrap();
+    let good = fs::read(FIXTURE).unwrap();
+    assert_eq!(trust_der(&install(t.path(), true, Some(&good))).unwrap(), good);
+    assert!(trust_der(&install(&t.path().join("a"), false, Some(&good))).is_err());
+    assert!(trust_der(&install(&t.path().join("c"), true, Some(b"not a cert"))).is_err());
+}

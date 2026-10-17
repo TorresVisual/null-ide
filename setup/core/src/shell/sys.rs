@@ -139,19 +139,27 @@ pub fn is_untrusted_root(message: &str) -> bool {
 
 /// Runs elevated. Accepts only an install folder, never a path: the certificate is the one shipped in it.
 pub fn trust_target(install: &Path) -> Result<PathBuf> {
+    trust_der(install)?;
+    Ok(install.join("shell-ext").join("NullIDECert.cer"))
+}
+
+/// The certificate bytes are read once, checked, and these same bytes are what gets imported, so the file
+/// cannot be swapped between the check and the import.
+pub fn trust_der(install: &Path) -> Result<Vec<u8>> {
     if !install.join(".null-ide-install.json").is_file() {
         return Err(Error::Other(format!("{} is not a Null IDE install", install.display())));
     }
     let cer = install.join("shell-ext").join("NullIDECert.cer");
-    let subject = cert_subject(&cer)?; // fails for a file that is not a certificate
+    let der = std::fs::read(&cer).map_err(|e| Error::Io { context: format!("read {}", cer.display()), source: e })?;
+    let subject = cert::subject_of(&der)?; // fails for bytes that are not a certificate
     if subject != "Null IDE" {
         return Err(Error::Other(format!("refusing a certificate issued to {subject:?}")));
     }
-    Ok(cer)
+    Ok(der)
 }
 
 pub fn trust_cert_machine(install: &Path) -> Result<()> {
-    cert::add(CERT_SYSTEM_STORE_LOCAL_MACHINE, &trust_target(install)?)
+    cert::add_der(CERT_SYSTEM_STORE_LOCAL_MACHINE, &trust_der(install)?)
 }
 
 /// Simple display name of the certificate's subject.
@@ -203,8 +211,10 @@ mod cert {
         Ok(buf[..len as usize].iter().map(|b| format!("{b:02X}")).collect())
     }
 
-    pub fn subject(cer: &Path) -> Result<String> {
-        let ctx = Context::from_der(&read_der(cer)?)?;
+    pub fn subject(cer: &Path) -> Result<String> { subject_of(&read_der(cer)?) }
+
+    pub fn subject_of(der: &[u8]) -> Result<String> {
+        let ctx = Context::from_der(der)?;
         let mut buf = [0u16; 256];
         let n = unsafe { CertGetNameStringW(ctx.0, CERT_NAME_SIMPLE_DISPLAY_TYPE, 0, None, Some(&mut buf)) } as usize;
         if n <= 1 {
@@ -229,11 +239,12 @@ mod cert {
         true
     }
 
-    pub fn add(location: u32, cer: &Path) -> Result<()> {
-        let der = read_der(cer)?;
-        Context::from_der(&der)?; // refuse bytes that are not a certificate
+    pub fn add(location: u32, cer: &Path) -> Result<()> { add_der(location, &read_der(cer)?) }
+
+    pub fn add_der(location: u32, der: &[u8]) -> Result<()> {
+        Context::from_der(der)?; // refuse bytes that are not a certificate
         let store = Store::open(location)?;
-        unsafe { CertAddEncodedCertificateToStore(Some(store.0), X509_ASN_ENCODING, &der, CERT_STORE_ADD_USE_EXISTING, None) }
+        unsafe { CertAddEncodedCertificateToStore(Some(store.0), X509_ASN_ENCODING, der, CERT_STORE_ADD_USE_EXISTING, None) }
             .map_err(|e| Error::Other(format!("could not add the certificate: {e}")))
     }
 }
