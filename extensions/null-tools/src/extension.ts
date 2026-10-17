@@ -23,6 +23,7 @@ import { registerClaudeTabFeature } from './claudeTabIntegration';
 import { registerFollowAlongFeature } from './followAlongIntegration';
 import { registerWhyIsThisHereFeature } from './whyIsThisHereIntegration';
 import { registerRecoveryFeature } from './recovery/recoveryIntegration';
+import { registerFirstRunFeature } from './firstRunIntegration';
 
 // ── Activation ─────────────────────────────────────────────────────────────
 
@@ -53,6 +54,7 @@ export function activate(context: vscode.ExtensionContext): void {
   registerAutoGitignoreFeature(context);
 
   registerUpdaterFeature(context);
+  registerFirstRunFeature(context);
   registerCommitValidationFeature(context);
 
   context.subscriptions.push(vscode.commands.registerCommand('null.generateCommitMessage', async () => {
