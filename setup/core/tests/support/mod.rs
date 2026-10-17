@@ -137,4 +137,5 @@ impl FakeSystem {
 
 impl System for FakeSystem {
     fn assoc_changed(&self) { self.calls.borrow_mut().push("assoc_changed".into()); }
+    fn env_changed(&self) { self.calls.borrow_mut().push("env_changed".into()); }
 }

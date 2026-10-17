@@ -6,6 +6,7 @@ use crate::error::{Error, Result};
 
 pub mod assoc;
 pub mod classes;
+pub mod path;
 
 /// Where registrations are written. Production: the real HKCU and shell folders. Tests: a scratch key prefix and temp folders.
 #[derive(Clone, Debug)]
@@ -49,4 +50,5 @@ pub(crate) fn set(k: &RegKey, name: &str, value: &str) -> Result<()> {
 /// Everything with a side effect outside the registry and the file system, so decisions can be tested with a fake.
 pub trait System {
     fn assoc_changed(&self);
+    fn env_changed(&self);
 }
