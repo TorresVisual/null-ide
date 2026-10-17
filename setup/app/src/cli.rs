@@ -85,6 +85,6 @@ fn dispatch(a: &Args, ctx: &Ctx) -> Result<()> {
             let user_data = std::env::var_os("APPDATA").map(std::path::PathBuf::from).unwrap_or_default().join("Null");
             manage::uninstall(&UninstallOpts::standard(a.install_dir.clone(), a.delete_data, user_data), ctx)
         }
-        Mode::Prefetch | Mode::Update | Mode::Recover => unreachable!("handled in main"),
+        Mode::Prefetch | Mode::Update | Mode::Recover | Mode::TrustCert => unreachable!("handled in main"),
     }
 }

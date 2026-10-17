@@ -36,3 +36,14 @@ pub fn recover(a: &Args) -> i32 {
         }
     }
 }
+
+pub fn trust_cert(a: &Args) -> i32 {
+    let log = Logger::open(&logs_dir());
+    match null_setup_core::shell::sys::trust_cert_machine(&a.install_dir) {
+        Ok(()) => 0,
+        Err(e) => {
+            log.line(&format!("trust-cert failed: {e}"));
+            1
+        }
+    }
+}

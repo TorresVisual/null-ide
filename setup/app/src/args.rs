@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
-pub enum Mode { Prefetch, Update, Recover, Install, Modify, Repair, Uninstall }
+pub enum Mode { Prefetch, Update, Recover, Install, Modify, Repair, Uninstall, TrustCert }
 
 #[derive(Debug)]
 pub struct Args {
@@ -33,9 +33,10 @@ pub fn parse<I: IntoIterator<Item = String>>(it: I) -> Result<Args, String> {
         Some("modify") => Mode::Modify,
         Some("repair") => Mode::Repair,
         Some("uninstall") => Mode::Uninstall,
+        Some("trust-cert") => Mode::TrustCert,
         other => {
             return Err(format!(
-                "unknown or missing mode: {other:?} (expected prefetch, update, recover, install, modify, repair or uninstall)"
+                "unknown or missing mode: {other:?} (expected prefetch, update, recover, install, modify, repair, uninstall or trust-cert)"
             ))
         }
     };
@@ -144,6 +145,14 @@ mod tests {
         assert!(p("repair --install-dir Foo").is_err());
         assert!(p("repair --install-dir C:\\").is_err());
         assert!(p("modify --install-dir C:\\x --config c.json").is_err());
+    }
+
+    #[test]
+    fn trust_cert_needs_only_an_install_dir() {
+        let a = p("trust-cert --install-dir C:\\x").unwrap();
+        assert_eq!(a.mode, Mode::TrustCert);
+        assert!(p("trust-cert").is_err());
+        assert!(p("trust-cert --install-dir C:\\x --version v1").is_ok()); // ignored, not an error
     }
 
     #[test]

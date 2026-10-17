@@ -19,6 +19,7 @@ fn main() {
     let code = match args.mode {
         Mode::Prefetch => headless::prefetch(&args),
         Mode::Recover => headless::recover(&args),
+        Mode::TrustCert => headless::trust_cert(&args), // no relocation, no log in the install: a few lines run elevated
         Mode::Update => {
             // Never keep a handle on the install dir (inherited cwd): the swap renames it.
             let _ = std::env::set_current_dir(null_setup_core::local_app_data());
