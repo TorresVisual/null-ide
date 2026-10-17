@@ -1,6 +1,7 @@
 use std::{collections::HashSet, fs, io, path::Path};
 
 use serde::Deserialize;
+use serde_json::Value;
 
 use crate::error::{Error, IoCtx, Result};
 
@@ -23,10 +24,69 @@ pub struct Builtin {
     pub requires: Vec<String>,
 }
 
+#[derive(Deserialize, Clone, Debug, PartialEq)]
+pub struct Choice {
+    pub value: String,
+    pub label: String,
+}
+
+#[derive(Deserialize, Clone, Copy, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub enum SettingKind { Choice, Bool, Number, Text }
+
+/// One IDE setting the installer may preset. `default` is what the IDE has when the key is unset.
+#[derive(Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct SettingDef {
+    pub key: String,
+    pub label: String,
+    #[serde(default)]
+    pub description: String,
+    pub kind: SettingKind,
+    pub default: Value,
+    #[serde(default)]
+    pub options: Vec<Choice>,
+    pub min: Option<f64>,
+    pub max: Option<f64>,
+}
+
+impl SettingDef {
+    /// The only values `first-run.json` may carry for this key. null-tools has the same rules in `firstRun.ts`.
+    pub fn accepts(&self, v: &Value) -> bool {
+        match self.kind {
+            SettingKind::Choice => v.as_str().is_some_and(|s| self.options.iter().any(|o| o.value == s)),
+            SettingKind::Bool => v.is_boolean(),
+            SettingKind::Number => v
+                .as_f64()
+                .is_some_and(|n| self.min.map_or(true, |m| n >= m) && self.max.map_or(true, |m| n <= m)),
+            SettingKind::Text => v.as_str().is_some_and(|s| !s.is_empty() && s.chars().count() <= 200 && !s.chars().any(char::is_control)),
+        }
+    }
+}
+
+/// An extension the IDE installs from the marketplace on first launch.
+#[derive(Deserialize, Clone, Debug, PartialEq)]
+pub struct MarketplaceExt {
+    pub id: String,
+    pub label: String,
+    #[serde(default)]
+    pub description: String,
+}
+
+/// `publisher.name`, each part alphanumeric or `-` and starting alphanumeric. The id reaches the extension installer.
+pub fn valid_extension_id(id: &str) -> bool {
+    let part = |p: &str| p.chars().next().is_some_and(|c| c.is_ascii_alphanumeric()) && p.chars().all(|c| c.is_ascii_alphanumeric() || c == '-');
+    matches!(id.split_once('.'), Some((a, b)) if part(a) && part(b))
+}
+
 #[derive(Deserialize, Debug, PartialEq)]
 pub struct Manifest {
     pub schema: u32,
     pub builtins: Vec<Builtin>,
+    #[serde(default)]
+    pub settings: Vec<SettingDef>,
+    #[serde(default)]
+    pub marketplace: Vec<MarketplaceExt>,
 }
 
 /// Ids are folder names under `resources/app/extensions/`, so only a conservative character set is accepted.
@@ -54,6 +114,23 @@ pub fn parse(text: &str) -> Result<Manifest> {
     for b in &m.builtins {
         if let Some(r) = b.requires.iter().find(|r| !seen.contains(r.as_str())) {
             return Err(Error::Package(format!("{FILE}: {} requires unknown {r}", b.id)));
+        }
+    }
+    let mut keys = HashSet::new();
+    for s in &m.settings {
+        if s.key.is_empty() || !keys.insert(s.key.as_str()) {
+            return Err(Error::Package(format!("{FILE}: empty or duplicate setting key {:?}", s.key)));
+        }
+        if s.kind == SettingKind::Choice && s.options.is_empty() {
+            return Err(Error::Package(format!("{FILE}: {} is a choice without options", s.key)));
+        }
+        if !s.accepts(&s.default) {
+            return Err(Error::Package(format!("{FILE}: the default of {} is not a valid value for it", s.key)));
+        }
+    }
+    for e in &m.marketplace {
+        if !valid_extension_id(&e.id) {
+            return Err(Error::Package(format!("{FILE}: invalid marketplace extension id {:?}", e.id)));
         }
     }
     Ok(m)
