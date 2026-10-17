@@ -58,6 +58,7 @@ const claudeTabIntegration_1 = require("./claudeTabIntegration");
 const followAlongIntegration_1 = require("./followAlongIntegration");
 const whyIsThisHereIntegration_1 = require("./whyIsThisHereIntegration");
 const recoveryIntegration_1 = require("./recovery/recoveryIntegration");
+const firstRunIntegration_1 = require("./firstRunIntegration");
 // ── Activation ─────────────────────────────────────────────────────────────
 async function ensureWindowTitleFormat() {
     try {
@@ -85,6 +86,7 @@ function activate(context) {
     (0, scratchNotesIntegration_1.registerScratchAndNotesFeature)(context);
     (0, autoGitignore_1.registerAutoGitignoreFeature)(context);
     (0, updaterIntegration_1.registerUpdaterFeature)(context);
+    (0, firstRunIntegration_1.registerFirstRunFeature)(context);
     (0, commitValidationIntegration_1.registerCommitValidationFeature)(context);
     context.subscriptions.push(vscode.commands.registerCommand('null.generateCommitMessage', async () => {
         const folders = vscode.workspace.workspaceFolders;

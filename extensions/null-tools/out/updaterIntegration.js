@@ -76,9 +76,11 @@ function registerUpdaterFeature(context) {
         }
     }));
     refreshUpdateButton();
-    (0, updater_1.checkForUpdate)(context, true)
-        .then(update => { refreshUpdateButton(); if (update)
-        return (0, updater_1.promptForUpdate)(update); })
-        .catch(() => { });
+    if (vscode.workspace.getConfiguration('null').get('updates.check', true)) {
+        (0, updater_1.checkForUpdate)(context, true)
+            .then(update => { refreshUpdateButton(); if (update)
+            return (0, updater_1.promptForUpdate)(update); })
+            .catch(() => { });
+    }
 }
 //# sourceMappingURL=updaterIntegration.js.map
