@@ -1,4 +1,4 @@
-use std::{io, path::PathBuf};
+use std::{io, path::{Path, PathBuf}};
 
 use winreg::{enums::*, RegKey};
 
@@ -9,6 +9,7 @@ pub mod classes;
 pub mod path;
 pub mod shortcuts;
 pub mod sys;
+pub mod win11;
 
 /// Where registrations are written. Production: the real HKCU and shell folders. Tests: a scratch key prefix and temp folders.
 #[derive(Clone, Debug)]
@@ -54,7 +55,23 @@ pub trait System {
     fn assoc_changed(&self);
     fn env_changed(&self);
     fn create_shortcut(&self, s: &shortcuts::ShortcutSpec) -> Result<()>;
+    fn restart_explorer(&self);
+    /// PackageFullName of NullIDE.ExplorerCommand, if registered.
+    fn appx_installed(&self) -> Result<Option<String>>;
+    fn appx_remove(&self, full_name: &str) -> Result<()>;
+    fn appx_add(&self, appx: &Path, external: &Path) -> AppxAdd;
+    /// Uppercase hex SHA-1.
+    fn cert_thumbprint(&self, cer: &Path) -> Result<String>;
+    /// Is the thumbprint in LocalMachine\TrustedPeople?
+    fn cert_trusted_machine(&self, thumbprint: &str) -> bool;
+    /// CurrentUser\TrustedPeople.
+    fn cert_add_current_user(&self, cer: &Path) -> Result<()>;
+    /// UAC prompt; Err when declined or failed.
+    fn cert_add_machine_elevated(&self, install: &Path) -> Result<()>;
 }
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum AppxAdd { Added, UntrustedRoot, Failed(String) }
 
 impl Locations {
     pub fn real() -> Result<Locations> {

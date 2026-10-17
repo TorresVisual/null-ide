@@ -124,12 +124,21 @@ impl Drop for Hive {
     fn drop(&mut self) { let _ = RegKey::predef(HKEY_CURRENT_USER).delete_subkey_all(&self.root); }
 }
 
-use std::cell::RefCell;
 
-use null_setup_core::shell::{shortcuts::ShortcutSpec, System};
+use std::cell::{Cell, RefCell};
+
+use null_setup_core::shell::{shortcuts::ShortcutSpec, AppxAdd, System};
 
 #[derive(Default)]
-pub struct FakeSystem { pub calls: RefCell<Vec<String>> }
+pub struct FakeSystem {
+    pub calls: RefCell<Vec<String>>,
+    /// PackageFullName of the registered package, if any.
+    pub package: RefCell<Option<String>>,
+    /// Results of successive `appx_add` calls; the last one repeats. Empty = Added.
+    pub adds: RefCell<Vec<AppxAdd>>,
+    pub machine_trusted: Cell<bool>,
+    pub elevated: RefCell<Option<Result<(), String>>>, // None = Ok
+}
 
 impl FakeSystem {
     pub fn count(&self, what: &str) -> usize { self.calls.borrow().iter().filter(|c| c.as_str() == what).count() }
@@ -141,5 +150,34 @@ impl System for FakeSystem {
     fn create_shortcut(&self, s: &ShortcutSpec) -> null_setup_core::Result<()> {
         self.calls.borrow_mut().push(format!("shortcut:{}", s.path.file_name().unwrap().to_string_lossy()));
         Ok(())
+    }
+    fn restart_explorer(&self) { self.calls.borrow_mut().push("restart_explorer".into()); }
+    fn appx_installed(&self) -> null_setup_core::Result<Option<String>> { Ok(self.package.borrow().clone()) }
+    fn appx_remove(&self, f: &str) -> null_setup_core::Result<()> {
+        self.calls.borrow_mut().push(format!("appx_remove:{f}"));
+        *self.package.borrow_mut() = None;
+        Ok(())
+    }
+    fn appx_add(&self, _: &Path, _: &Path) -> AppxAdd {
+        self.calls.borrow_mut().push("appx_add".into());
+        let mut q = self.adds.borrow_mut();
+        let r = if q.len() > 1 { q.remove(0) } else { q.first().cloned().unwrap_or(AppxAdd::Added) };
+        if r == AppxAdd::Added {
+            *self.package.borrow_mut() = Some("NullIDE.ExplorerCommand_1_x64".into());
+        }
+        r
+    }
+    fn cert_thumbprint(&self, _: &Path) -> null_setup_core::Result<String> { Ok("AB12".into()) }
+    fn cert_trusted_machine(&self, _: &str) -> bool { self.machine_trusted.get() }
+    fn cert_add_current_user(&self, _: &Path) -> null_setup_core::Result<()> {
+        self.calls.borrow_mut().push("cert_user".into());
+        Ok(())
+    }
+    fn cert_add_machine_elevated(&self, _: &Path) -> null_setup_core::Result<()> {
+        self.calls.borrow_mut().push("cert_machine".into());
+        match self.elevated.borrow().clone() {
+            None | Some(Ok(())) => Ok(()),
+            Some(Err(m)) => Err(null_setup_core::Error::Other(m)),
+        }
     }
 }

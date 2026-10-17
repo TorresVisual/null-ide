@@ -9,7 +9,7 @@ use windows::{
     },
 };
 
-use super::{shortcuts::ShortcutSpec, System};
+use super::{shortcuts::ShortcutSpec, AppxAdd, System};
 use crate::error::{Error, Result};
 
 pub enum KnownFolder { Desktop, Programs }
@@ -70,6 +70,16 @@ impl System for WinSystem {
             file.Save(&HSTRING::from(s.path.as_os_str()), true).map_err(com)
         }
     }
+
+    // Scaffolding until the real side effects land in the next task.
+    fn restart_explorer(&self) {}
+    fn appx_installed(&self) -> Result<Option<String>> { Err(Error::Other("not implemented yet".into())) }
+    fn appx_remove(&self, _: &str) -> Result<()> { Err(Error::Other("not implemented yet".into())) }
+    fn appx_add(&self, _: &Path, _: &Path) -> AppxAdd { AppxAdd::Failed("not implemented yet".into()) }
+    fn cert_thumbprint(&self, _: &Path) -> Result<String> { Err(Error::Other("not implemented yet".into())) }
+    fn cert_trusted_machine(&self, _: &str) -> bool { false }
+    fn cert_add_current_user(&self, _: &Path) -> Result<()> { Err(Error::Other("not implemented yet".into())) }
+    fn cert_add_machine_elevated(&self, _: &Path) -> Result<()> { Err(Error::Other("not implemented yet".into())) }
 }
 
 /// (target, arguments, working directory) of an existing `.lnk`. Used by the tests to prove the writer above.
