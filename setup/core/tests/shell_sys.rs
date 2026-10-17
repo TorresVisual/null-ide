@@ -46,3 +46,9 @@ fn trust_der_returns_the_one_buffer_that_was_checked() {
     assert!(trust_der(&install(&t.path().join("a"), false, Some(&good))).is_err());
     assert!(trust_der(&install(&t.path().join("c"), true, Some(b"not a cert"))).is_err());
 }
+
+#[test]
+fn powershell_quoting_doubles_every_quote_character_powershell_recognises() {
+    assert_eq!(quote(Path::new(r"C:\it's")), r"'C:\it''s'");
+    assert_eq!(quote(Path::new("C:\\x\u{2019}; calc; \u{2018}")), "'C:\\x\u{2019}\u{2019}; calc; \u{2018}\u{2018}'");
+}

@@ -130,7 +130,19 @@ fn powershell(script: &str) -> std::io::Result<std::process::Output> {
         .output()
 }
 
-fn quote(p: &Path) -> String { format!("'{}'", p.display().to_string().replace('\'', "''")) }
+/// A PowerShell single-quoted literal. PowerShell treats the typographic single quotes as quote characters too,
+/// and a doubled quote character is the escape for each of them.
+pub fn quote(p: &Path) -> String {
+    let mut out = String::from("'");
+    for c in p.display().to_string().chars() {
+        out.push(c);
+        if matches!(c, '\'' | '\u{2018}' | '\u{2019}' | '\u{201A}' | '\u{201B}') {
+            out.push(c);
+        }
+    }
+    out.push('\'');
+    out
+}
 
 /// The text the cmdlet fails with when the signing certificate is not trusted.
 pub fn is_untrusted_root(message: &str) -> bool {

@@ -59,6 +59,13 @@ pub fn parse<I: IntoIterator<Item = String>>(it: I) -> Result<Args, String> {
         return Err("--repo must look like owner/name".into());
     }
     let install_dir = install_dir.ok_or("--install-dir is required")?;
+    let raw = install_dir.to_string_lossy();
+    // ';' would split the user PATH entry and '%' would be expanded in it (REG_EXPAND_SZ).
+    if raw.contains([';', '%']) {
+        return Err("--install-dir may not contain ';' or '%'".into());
+    }
+    // A trailing backslash would swallow the closing quote when the path is passed on to the elevated process.
+    let install_dir = if install_dir.parent().is_some() { PathBuf::from(raw.trim_end_matches('\\')) } else { install_dir.clone() };
     // The working directory is changed before the work starts, so a relative path would mean something else than the caller meant.
     if !install_dir.is_absolute() || install_dir.parent().is_none() {
         return Err("--install-dir must be an absolute path to a folder (not a drive root)".into());
@@ -153,6 +160,17 @@ mod tests {
         assert_eq!(a.mode, Mode::TrustCert);
         assert!(p("trust-cert").is_err());
         assert!(p("trust-cert --install-dir C:\\x --version v1").is_ok()); // ignored, not an error
+    }
+
+    #[test]
+    fn a_trailing_backslash_is_dropped_so_it_cannot_swallow_a_quote_on_a_command_line() {
+        assert_eq!(p("trust-cert --install-dir C:\\Null\\").unwrap().install_dir.to_string_lossy(), "C:\\Null");
+    }
+
+    #[test]
+    fn install_dirs_with_path_separators_or_percent_are_refused() {
+        assert!(p("repair --install-dir C:\\a;b").is_err()); // would split the user PATH
+        assert!(p("repair --install-dir C:\\%TEMP%").is_err()); // REG_EXPAND_SZ would expand it
     }
 
     #[test]
