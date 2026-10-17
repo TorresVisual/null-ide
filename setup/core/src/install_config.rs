@@ -21,8 +21,8 @@ impl Feature {
         Feature::PreviewHandler,
     ];
 
-    /// The name `install-null-ide.ps1 -Register/-Unregister` understands.
-    pub fn script_name(self) -> &'static str {
+    /// Stable id used in logs and messages.
+    pub fn name(self) -> &'static str {
         match self {
             Feature::DesktopShortcut => "desktopShortcut",
             Feature::StartMenuShortcut => "startMenuShortcut",
