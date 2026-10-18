@@ -74,15 +74,19 @@ pub fn write(dir: &Path, f: &FirstRun) -> Result<()> {
     fs::rename(&tmp, dir.join(FILE)).ctx("replace first-run.json")
 }
 
-/// Reads the choices file the caller gave, checks it against the `builtins.json` of the installed package and, when
-/// it holds anything, writes it to `dir`. Nothing is written on any error.
+/// Checks `f` against the manifest and, when it holds anything, writes it to `dir`. Nothing is written on any error.
+pub fn save(m: &Manifest, f: &FirstRun, dir: &Path) -> Result<()> {
+    validate(m, f)?;
+    if f.is_empty() {
+        return Ok(());
+    }
+    write(dir, f)
+}
+
+/// Reads the choices file the caller gave and saves it against the `builtins.json` of the installed package.
 pub fn save_from_file(install: &Path, file: &Path, dir: &Path) -> Result<()> {
     let f = from_json(&fs::read_to_string(file).ctx(format!("read {}", file.display()))?)?;
     let m = builtins::load(install)?
         .ok_or_else(|| Error::Other("this package has no builtins.json, so the first-run choices cannot be checked".into()))?;
-    validate(&m, &f)?;
-    if f.is_empty() {
-        return Ok(());
-    }
-    write(dir, &f)
+    save(&m, &f, dir)
 }

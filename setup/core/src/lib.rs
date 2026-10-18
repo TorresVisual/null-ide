@@ -18,6 +18,8 @@ pub mod shellext;
 pub mod swap;
 pub mod update;
 pub mod release;
+pub mod webview2;
+pub mod wizard;
 
 pub use error::{Error, Result};
 

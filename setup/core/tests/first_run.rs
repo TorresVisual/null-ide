@@ -89,3 +89,17 @@ fn save_from_file_needs_a_manifest_in_the_install_and_a_readable_file() {
     assert!(first_run::save_from_file(&install, Path::new("Z:\\nope\\choices.json"), &dir).is_err());
     assert!(!dir.exists());
 }
+
+#[test]
+fn save_validates_then_writes_and_skips_an_empty_set() {
+    let m = manifest();
+    let dir = tempfile::tempdir().unwrap();
+    first_run::save(&m, &parse(r#"{"schema":1,"settings":{"files.autoSave":"off"}}"#), dir.path()).unwrap();
+    assert!(dir.path().join(first_run::FILE).is_file());
+    let empty = tempfile::tempdir().unwrap();
+    first_run::save(&m, &FirstRun::default(), empty.path()).unwrap();
+    assert!(!empty.path().join(first_run::FILE).exists());
+    let bad = tempfile::tempdir().unwrap();
+    assert!(first_run::save(&m, &parse(r#"{"schema":1,"settings":{"not.a.key":1}}"#), bad.path()).is_err());
+    assert!(!bad.path().join(first_run::FILE).exists());
+}

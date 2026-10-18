@@ -131,7 +131,7 @@ fn check_tag(tag: &str) -> Result<()> {
 
 /// Only a missing folder or a listable empty one counts as empty; anything unreadable must not look empty,
 /// because the swap would rename it aside and delete it.
-fn is_empty_target(dir: &Path) -> Result<bool> {
+pub fn is_empty_target(dir: &Path) -> Result<bool> {
     match fs::read_dir(dir) {
         Ok(mut r) => Ok(r.next().is_none()),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(true),

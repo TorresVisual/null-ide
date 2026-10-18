@@ -1,6 +1,6 @@
 use std::{collections::HashSet, fs, io, path::Path};
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::error::{Error, IoCtx, Result};
@@ -9,7 +9,7 @@ pub const FILE: &str = "builtins.json";
 
 fn yes() -> bool { true }
 
-#[derive(Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Builtin {
     pub id: String,
@@ -24,18 +24,18 @@ pub struct Builtin {
     pub requires: Vec<String>,
 }
 
-#[derive(Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Choice {
     pub value: String,
     pub label: String,
 }
 
-#[derive(Deserialize, Clone, Copy, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub enum SettingKind { Choice, Bool, Number, Text }
 
 /// One IDE setting the installer may preset. `default` is what the IDE has when the key is unset.
-#[derive(Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct SettingDef {
     pub key: String,
@@ -65,7 +65,7 @@ impl SettingDef {
 }
 
 /// An extension the IDE installs from the marketplace on first launch.
-#[derive(Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct MarketplaceExt {
     pub id: String,
     pub label: String,
@@ -79,7 +79,7 @@ pub fn valid_extension_id(id: &str) -> bool {
     matches!(id.split_once('.'), Some((a, b)) if part(a) && part(b))
 }
 
-#[derive(Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct Manifest {
     pub schema: u32,
     pub builtins: Vec<Builtin>,

@@ -142,3 +142,15 @@ fn the_real_repo_settings_table_parses() {
     let text = json!({ "schema": 1, "builtins": [], "settings": cfg["settings"], "marketplace": cfg["marketplace"] }).to_string();
     assert_eq!(parse(&text).unwrap().settings.len(), 7);
 }
+
+#[test]
+fn the_manifest_serializes_in_the_shape_the_ui_reads() {
+    let m = parse(r#"{"schema":1,"builtins":[{"id":"a","label":"A","requires":[]}],
+        "settings":[{"key":"editor.fontSize","label":"S","kind":"number","default":13,"min":8,"max":40}],
+        "marketplace":[]}"#).unwrap();
+    let v = serde_json::to_value(&m).unwrap();
+    assert_eq!(v["builtins"][0]["id"], "a");
+    assert_eq!(v["builtins"][0]["default"], true);
+    assert_eq!(v["settings"][0]["kind"], "number");
+    assert_eq!(v["settings"][0]["min"], 8.0);
+}
