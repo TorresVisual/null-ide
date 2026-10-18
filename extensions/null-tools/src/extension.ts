@@ -24,6 +24,7 @@ import { registerFollowAlongFeature } from './followAlongIntegration';
 import { registerWhyIsThisHereFeature } from './whyIsThisHereIntegration';
 import { registerRecoveryFeature } from './recovery/recoveryIntegration';
 import { registerFirstRunFeature } from './firstRunIntegration';
+import { registerSetupFeature } from './setupIntegration';
 
 // ── Activation ─────────────────────────────────────────────────────────────
 
@@ -55,6 +56,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   registerUpdaterFeature(context);
   registerFirstRunFeature(context);
+  registerSetupFeature(context);
   registerCommitValidationFeature(context);
 
   context.subscriptions.push(vscode.commands.registerCommand('null.generateCommitMessage', async () => {

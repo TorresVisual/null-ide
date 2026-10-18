@@ -238,6 +238,17 @@ mod tests {
     }
 
     #[test]
+    fn the_arguments_null_tools_sends_for_null_setup_parse() {
+        // Same list as extensions/null-tools/src/setupIntegration.ts; a path with spaces and a non-ASCII letter is one element.
+        let argv = ["wizard", "--install-dir", "C:\\Users\\Zoë B\\Null IDE", "--intent", "modify"];
+        let a = parse(argv.map(String::from)).unwrap();
+        assert_eq!(a.mode, Mode::Wizard);
+        assert_eq!(a.intent, Intent::Modify);
+        assert!(a.install_dir_given);
+        assert_eq!(a.install_dir, PathBuf::from("C:\\Users\\Zoë B\\Null IDE"));
+    }
+
+    #[test]
     fn the_wizard_takes_an_intent_and_an_optional_folder() {
         let a = p("wizard --install-dir C:\\x --intent uninstall").unwrap();
         assert_eq!((a.mode, a.intent, a.install_dir_given), (Mode::Wizard, Intent::Uninstall, true));

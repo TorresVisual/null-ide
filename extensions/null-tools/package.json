@@ -36,7 +36,9 @@
       { "id": "issues", "label": "GitHub Issues", "category": "develop", "icon": "issues",
         "command": "null.issues.focus", "description": "Open the issues sidebar", "order": 20 },
       { "id": "graph", "label": "Commit Graph", "category": "develop", "icon": "git-commit",
-        "command": "null.graph.open", "description": "Browse and act on git history", "order": 30 }
+        "command": "null.graph.open", "description": "Browse and act on git history", "order": 30 },
+      { "id": "setup", "label": "Null Setup", "category": "setup", "icon": "settings-gear",
+        "command": "null.setup.open", "description": "Shortcuts, built-ins, uninstall", "order": 5 }
     ]
   },
   "contributes": {
@@ -63,6 +65,11 @@
         "command": "null.installUpdate",
         "title": "Null: Install Update",
         "icon": "$(cloud-download)"
+      },
+      {
+        "command": "null.setup.open",
+        "title": "Null: Setup",
+        "icon": "$(settings-gear)"
       },
       {
         "command": "null.clearWebviewCache",
