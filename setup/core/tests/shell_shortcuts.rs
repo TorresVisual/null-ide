@@ -60,5 +60,7 @@ fn a_real_lnk_round_trips_target_arguments_and_working_dir() {
     let spec = ShortcutSpec { path: lnk.clone(), target: exe.clone(), working_dir: install.clone(), args: "--safe-mode".into() };
     create(&WinSystem, &spec).unwrap();
     let (target, args, wd) = read_shortcut(&lnk).unwrap();
-    assert_eq!((target, args.as_str(), wd), (exe, "--safe-mode", install));
+    // The shell hands the target back in long form even when the temp dir is an 8.3 path (RUNNER~1 on CI).
+    let long = |p: &std::path::Path| fs::canonicalize(p).unwrap();
+    assert_eq!((long(&target), args.as_str(), wd), (long(&exe), "--safe-mode", install));
 }
