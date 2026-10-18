@@ -59,5 +59,4 @@ Later phases get their own plan when they start (the repo's convention: `github-
 - Review threads: first 100 threads, first 50 comments each; outdated threads (no current line) are not shown, only counted.
 - Comments post immediately (no pending review) until Phase 3; no edit or delete.
 - Only `origin` of the first folder; no `upstream`, no multi-root, nothing in remote or untrusted windows.
-- Fork PRs: the head commit is read through the base repo's Contents API (GitHub serves PR commits from the base repo's object store). **Plan Task 0 verifies this first.** If it proves false, the fallback is `git fetch origin pull/<n>/head` plus `git show`, which brings git back into the read path and rewrites decision 3 and the content provider.
 - No fake-GitHub test seam exists (`api.github.com` is hardcoded), so the integration spec covers registration, states and URI hardening, not PR data; the live check is manual.
