@@ -1,0 +1,35 @@
+/* Pull request tab. Layout, posts, the timeline rail, the sidebar, buttons and the toast come from issueDetail.css;
+   tokens, the state badge and labels from issues.css. Only what a pull request adds is here. */
+
+.state-badge.state-closed { background:var(--vscode-charts-red); }
+.tl-badge.state-closed, .tl-badge.pr-changes { color:var(--vscode-charts-red); }
+.tl-badge.pr-approved { color:var(--gh-open); }
+.pr-add { color:var(--vscode-charts-green); }
+.pr-del { color:var(--vscode-charts-red); }
+.pr-foot { margin:16px 0 0 52px; }
+
+.checks, .commits { margin:0 0 16px 52px; border:1px solid var(--vscode-widget-border,rgba(128,128,128,.3)); border-radius:6px; }
+.checks-head {
+  display:flex; align-items:center; gap:8px; padding:6px 8px 6px 12px;
+  background:color-mix(in srgb, var(--vscode-foreground) 6%, transparent); border-bottom:1px solid var(--vscode-widget-border,rgba(128,128,128,.3));
+}
+.checks-head .btn { margin-left:auto; }
+.check-row { display:flex; align-items:center; gap:8px; padding:6px 12px; }
+.check-row + .check-row, .commit-row { border-top:1px solid var(--vscode-widget-border,rgba(128,128,128,.2)); }
+.check-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+.check-success { background:var(--vscode-charts-green); }
+.check-failure { background:var(--vscode-charts-red); }
+.check-pending { background:var(--vscode-charts-yellow); }
+.check-neutral { background:var(--gh-neutral); }
+.check-name { font-weight:600; }
+.check-link, .commit-row a { color:var(--vscode-textLink-foreground); text-decoration:none; }
+.check-link { margin-left:auto; }
+.check-link:hover, .commit-row a:hover { text-decoration:underline; }
+.check-more { padding:6px 12px; }
+.commits > summary { cursor:pointer; padding:6px 12px; font-weight:600; }
+.commit-row { display:flex; flex-direction:column; padding:6px 12px; }
+
+#sidebar .sb-person { width:100%; }
+.rv { margin-left:auto; display:inline-flex; }
+.rv-approved { color:var(--gh-open); }
+.rv-changes { color:var(--vscode-charts-red); }
