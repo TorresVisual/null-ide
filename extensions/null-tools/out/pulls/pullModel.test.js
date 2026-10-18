@@ -10,21 +10,18 @@ const pullModel_1 = require("./pullModel");
 const A = 'a'.repeat(40);
 const B = 'b'.repeat(40);
 const pullNode = (over = {}) => ({
-    number: 12, title: 'Add x', url: 'https://github.com/o/r/pull/12', isDraft: false, updatedAt: '2026-10-02T10:00:00Z',
+    number: 12, title: 'Add x', url: 'https://github.com/o/r/pull/12', state: 'OPEN', isDraft: false, updatedAt: '2026-10-02T10:00:00Z',
     isCrossRepository: false,
     headRefName: 'feat/x', baseRefName: 'main', headRefOid: A, baseRefOid: B, reviewDecision: 'APPROVED',
     author: { login: 'octocat' }, commits: { nodes: [{ commit: { statusCheckRollup: { state: 'SUCCESS' } } }] },
     ...over,
 });
 const list = (nodes) => ({ search: { nodes } });
-(0, node_test_1.default)('openPullsQuery searches open PRs of one repo, newest update first', () => {
-    node_assert_1.default.strictEqual((0, pullModel_1.openPullsQuery)('o', 'r'), 'repo:o/r is:pr is:open sort:updated-desc');
-});
 (0, node_test_1.default)('mapPulls maps a PR and skips non-PR search nodes', () => {
     const [pull, ...rest] = (0, pullModel_1.mapPulls)(list([pullNode(), {}]));
     node_assert_1.default.strictEqual(rest.length, 0);
     node_assert_1.default.deepStrictEqual(pull, {
-        number: 12, title: 'Add x', url: 'https://github.com/o/r/pull/12', draft: false, author: 'octocat', fork: false,
+        number: 12, title: 'Add x', url: 'https://github.com/o/r/pull/12', state: 'open', draft: false, author: 'octocat', fork: false,
         headRef: 'feat/x', baseRef: 'main', headSha: A, baseSha: B, updatedAt: '2026-10-02T10:00:00Z',
         checks: 'success', review: 'approved',
     });
@@ -98,6 +95,13 @@ const threads = (nodes) => ({ repository: { pullRequest: { reviewThreads: { node
     const { threads: all } = (0, pullModel_1.mapThreads)(threads([thread(), thread(), thread({ path: 'b.ts' })]));
     node_assert_1.default.strictEqual((0, pullModel_1.threadCount)(all, 'src/a.ts'), 2);
     node_assert_1.default.strictEqual((0, pullModel_1.threadCount)(all, 'none.ts'), 0);
+});
+(0, node_test_1.default)('mapPulls: merged and closed PRs keep their state, anything unknown counts as open', () => {
+    const state = (s) => (0, pullModel_1.mapPulls)(list([pullNode({ state: s })]))[0].state;
+    node_assert_1.default.strictEqual(state('MERGED'), 'merged');
+    node_assert_1.default.strictEqual(state('CLOSED'), 'closed');
+    node_assert_1.default.strictEqual(state('OPEN'), 'open');
+    node_assert_1.default.strictEqual(state('SOMETHING_NEW'), 'open');
 });
 const summary = (over) => ({ ...(0, pullModel_1.mapPulls)(list([pullNode()]))[0], ...over });
 (0, node_test_1.default)('pullBranch: a same-repo PR keeps its head branch, a fork PR (or an option-looking name) becomes pr/<n>', () => {

@@ -40,12 +40,15 @@ const githubAuth_1 = require("../github/githubAuth");
 const githubRemote_1 = require("../github/githubRemote");
 const graphMessages_1 = require("../graph/graphMessages");
 const gitRun_1 = require("../graph/gitRun");
+const pullFilter_1 = require("./pullFilter");
 const pullApi_1 = require("./pullApi");
 const pullModel_1 = require("./pullModel");
 const CHECK_COLORS = { success: 'charts.green', failure: 'charts.red', pending: 'charts.yellow', none: undefined };
 const STATUS_LETTER = { added: 'A', removed: 'D', renamed: 'R', modified: 'M' };
+const FILTER_KEY = 'null.pulls.filter';
 class PullsTreeProvider {
     review;
+    store;
     emitter = new vscode.EventEmitter();
     onDidChangeTreeData = this.emitter.event;
     pulls = [];
@@ -57,10 +60,22 @@ class PullsTreeProvider {
     current = null;
     loaded = false;
     state = 'no-folder';
-    /** The tree's one-line detail for the `error` state; undefined otherwise. */
+    filter;
+    /** The tree's one-line detail: the failure for `error`, the active filters otherwise. */
     onMessage = () => undefined;
-    constructor(review) {
+    constructor(review, store) {
         this.review = review;
+        this.store = store;
+        this.filter = (0, pullFilter_1.parseFilter)(store.get(FILTER_KEY));
+    }
+    /** The repo and token the last refresh resolved; null before the view first loads or without a GitHub remote. */
+    context() {
+        return this.repo ? { repo: this.repo, token: this.token } : null;
+    }
+    async setFilter(next) {
+        this.filter = next;
+        await this.store.update(FILTER_KEY, (0, pullFilter_1.isDefaultFilter)(next) ? undefined : next);
+        await this.refresh();
     }
     async refresh() {
         this.loaded = true;
@@ -72,8 +87,11 @@ class PullsTreeProvider {
         this.state = await this.resolveState();
         if (this.state === 'ready') {
             try {
-                this.pulls = (0, pullModel_1.pinCurrent)(await (0, pullApi_1.listOpenPulls)(this.repo.owner, this.repo.repo, this.token), this.current);
-                this.state = this.pulls.length === 0 ? 'empty' : 'ready';
+                this.pulls = (0, pullModel_1.pinCurrent)(await (0, pullApi_1.listPulls)(this.repo.owner, this.repo.repo, this.filter, this.token), this.current);
+                const plain = (0, pullFilter_1.isDefaultFilter)(this.filter);
+                this.state = this.pulls.length > 0 ? 'ready' : plain ? 'empty' : 'empty-filtered';
+                if (!plain)
+                    message = (0, pullFilter_1.describeFilter)(this.filter);
             }
             catch (err) {
                 this.state = 'error';
@@ -118,11 +136,13 @@ class PullsTreeProvider {
         }
         const { pull } = node;
         const item = new vscode.TreeItem(`#${pull.number} ${pull.title}`, vscode.TreeItemCollapsibleState.Collapsed);
-        const color = CHECK_COLORS[pull.checks];
-        item.iconPath = new vscode.ThemeIcon(pull.draft ? 'git-pull-request-draft' : 'git-pull-request', color ? new vscode.ThemeColor(color) : undefined);
+        const color = pull.state === 'merged' ? 'charts.purple' : pull.state === 'closed' ? 'charts.red' : CHECK_COLORS[pull.checks];
+        const icon = pull.state === 'merged' ? 'git-merge' : pull.state === 'closed' ? 'git-pull-request-closed'
+            : pull.draft ? 'git-pull-request-draft' : 'git-pull-request';
+        item.iconPath = new vscode.ThemeIcon(icon, color ? new vscode.ThemeColor(color) : undefined);
         const isCurrent = this.current !== null && (0, pullModel_1.pullBranch)(pull) === this.current;
         item.description = `${isCurrent ? '● ' : ''}${pull.author} · ${pull.headRef} → ${pull.baseRef}`;
-        const checks = pull.checks === 'none' ? 'no checks' : `checks ${pull.checks}`;
+        const checks = pull.state !== 'open' ? pull.state : pull.checks === 'none' ? 'no checks' : `checks ${pull.checks}`;
         const review = pull.review === 'none' ? '' : ` · ${pull.review === 'changes' ? 'changes requested' : pull.review}`;
         const outdated = this.outdated.get(pull.number);
         const hidden = outdated ? `\n${outdated} outdated thread${outdated === 1 ? '' : 's'} not shown` : '';

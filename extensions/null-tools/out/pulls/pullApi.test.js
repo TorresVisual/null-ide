@@ -41,6 +41,7 @@ const node_events_1 = require("node:events");
 const node_https_1 = __importDefault(require("node:https"));
 const node_test_1 = __importStar(require("node:test"));
 const pullApi_1 = require("./pullApi");
+const pullFilter_1 = require("./pullFilter");
 (0, node_test_1.afterEach)(() => node_test_1.mock.restoreAll());
 /** Answers each https.request with the next canned response (the last one repeats) and records what was asked. */
 function stub(responses) {
@@ -63,11 +64,14 @@ function stub(responses) {
     return calls;
 }
 const restFile = (i) => ({ filename: `f${i}.ts`, status: 'modified', additions: 1, deletions: 0 });
-(0, node_test_1.default)('listOpenPulls asks for this repo\'s open PRs', async () => {
-    const calls = stub([{ data: { search: { nodes: [] } } }]);
-    node_assert_1.default.deepStrictEqual(await (0, pullApi_1.listOpenPulls)('o', 'r', 't'), []);
+(0, node_test_1.default)('listPulls sends the filter as the search query', async () => {
+    const empty = { data: { search: { nodes: [] } } };
+    const calls = stub([empty, empty]);
+    node_assert_1.default.deepStrictEqual(await (0, pullApi_1.listPulls)('o', 'r', pullFilter_1.DEFAULT_FILTER, 't'), []);
     node_assert_1.default.strictEqual(calls[0].url, 'https://api.github.com/graphql');
     node_assert_1.default.strictEqual(calls[0].body.variables.q, 'repo:o/r is:pr is:open sort:updated-desc');
+    await (0, pullApi_1.listPulls)('o', 'r', { ...pullFilter_1.DEFAULT_FILTER, state: 'merged', mine: true }, 't');
+    node_assert_1.default.strictEqual(calls[1].body.variables.q, 'repo:o/r is:pr is:merged author:@me sort:updated-desc');
 });
 (0, node_test_1.default)('fetchPullFiles pages until a short page, so a PR with more than 100 files is not cut off', async () => {
     const page1 = Array.from({ length: 100 }, (_, i) => restFile(i));
@@ -110,5 +114,15 @@ const posted = { id: 9, body: 'ok', created_at: '2026-10-01T10:00:00Z', user: { 
     await (0, pullApi_1.replyToComment)('o', 'r', 5, 101, 'thanks', 't');
     node_assert_1.default.strictEqual(calls[0].url, 'https://api.github.com/repos/o/r/pulls/5/comments/101/replies');
     node_assert_1.default.deepStrictEqual(calls[0].body, { body: 'thanks' });
+});
+(0, node_test_1.default)('fetchLabelNames returns the names and drops any that could break out of a search qualifier', async () => {
+    const calls = stub([[{ name: 'bug' }, { name: 'good first issue' }, { name: 'x" is:closed' }]]);
+    node_assert_1.default.deepStrictEqual(await (0, pullApi_1.fetchLabelNames)('o', 'r', 't'), ['bug', 'good first issue']);
+    node_assert_1.default.strictEqual(calls[0].url, 'https://api.github.com/repos/o/r/labels?per_page=100');
+});
+(0, node_test_1.default)('fetchMilestoneTitles lists open and closed milestones, minus unsafe titles', async () => {
+    const calls = stub([[{ title: 'v1' }, { title: 'v2\nis:open' }]]);
+    node_assert_1.default.deepStrictEqual(await (0, pullApi_1.fetchMilestoneTitles)('o', 'r', 't'), ['v1']);
+    node_assert_1.default.strictEqual(calls[0].url, 'https://api.github.com/repos/o/r/milestones?state=all&per_page=100');
 });
 //# sourceMappingURL=pullApi.test.js.map

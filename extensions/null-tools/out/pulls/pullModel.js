@@ -1,6 +1,6 @@
 'use strict';
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.threadCount = exports.openPullsQuery = exports.REVIEW_THREADS = exports.LIST_PULLS = void 0;
+exports.threadCount = exports.checkStateOf = exports.pullStateOf = exports.REVIEW_THREADS = exports.LIST_PULLS = void 0;
 exports.mapPulls = mapPulls;
 exports.mapFiles = mapFiles;
 exports.leftPath = leftPath;
@@ -14,7 +14,7 @@ exports.LIST_PULLS = `
 query ListPulls($q: String!, $first: Int!) {
   search(query: $q, type: ISSUE, first: $first) {
     nodes { ... on PullRequest {
-      number title url isDraft updatedAt isCrossRepository headRefName baseRefName headRefOid baseRefOid reviewDecision
+      number title url state isDraft updatedAt isCrossRepository headRefName baseRefName headRefOid baseRefOid reviewDecision
       author { login }
       commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
     } }
@@ -31,12 +31,14 @@ query ReviewThreads($owner: String!, $name: String!, $number: Int!) {
     }
   }
 }`;
-const openPullsQuery = (owner, repo) => `repo:${owner}/${repo} is:pr is:open sort:updated-desc`;
-exports.openPullsQuery = openPullsQuery;
 const CHECKS = {
     SUCCESS: 'success', FAILURE: 'failure', ERROR: 'failure', PENDING: 'pending', EXPECTED: 'pending',
 };
 const REVIEWS = { APPROVED: 'approved', CHANGES_REQUESTED: 'changes', REVIEW_REQUIRED: 'required' };
+const pullStateOf = (s) => (s === 'MERGED' ? 'merged' : s === 'CLOSED' ? 'closed' : 'open');
+exports.pullStateOf = pullStateOf;
+const checkStateOf = (s) => CHECKS[s ?? ''] ?? 'none';
+exports.checkStateOf = checkStateOf;
 function mapPulls(data) {
     return data.search.nodes
         .filter((n) => typeof n.number === 'number')
@@ -44,6 +46,7 @@ function mapPulls(data) {
         number: n.number,
         title: n.title,
         url: n.url,
+        state: (0, exports.pullStateOf)(n.state),
         draft: n.isDraft,
         author: n.author?.login ?? 'ghost',
         fork: n.isCrossRepository,
@@ -52,7 +55,7 @@ function mapPulls(data) {
         headSha: n.headRefOid,
         baseSha: n.baseRefOid,
         updatedAt: n.updatedAt,
-        checks: CHECKS[n.commits.nodes[0]?.commit.statusCheckRollup?.state ?? ''] ?? 'none',
+        checks: (0, exports.checkStateOf)(n.commits.nodes[0]?.commit.statusCheckRollup?.state),
         review: REVIEWS[n.reviewDecision ?? ''] ?? 'none',
     }));
 }

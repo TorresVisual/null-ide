@@ -1,16 +1,19 @@
 'use strict';
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.listOpenPulls = listOpenPulls;
+exports.listPulls = listPulls;
 exports.fetchPullFiles = fetchPullFiles;
 exports.fetchMergeBase = fetchMergeBase;
 exports.fetchReviewThreads = fetchReviewThreads;
 exports.createLineComment = createLineComment;
 exports.replyToComment = replyToComment;
+exports.fetchLabelNames = fetchLabelNames;
+exports.fetchMilestoneTitles = fetchMilestoneTitles;
 const githubApi_1 = require("../github/githubApi");
+const pullFilter_1 = require("./pullFilter");
 const pullModel_1 = require("./pullModel");
-// ponytail: the 50 most recently updated open PRs; add cursor paging (like the issues list) if a repo has more.
-async function listOpenPulls(owner, repo, token) {
-    return (0, pullModel_1.mapPulls)(await (0, githubApi_1.requestGraphql)(pullModel_1.LIST_PULLS, { q: (0, pullModel_1.openPullsQuery)(owner, repo), first: 50 }, token));
+// ponytail: the first 50 matches; add cursor paging (like the issues list) if a repo has more.
+async function listPulls(owner, repo, filter, token) {
+    return (0, pullModel_1.mapPulls)(await (0, githubApi_1.requestGraphql)(pullModel_1.LIST_PULLS, { q: (0, pullFilter_1.pullsQuery)(owner, repo, filter), first: 50 }, token));
 }
 /** All changed files. GitHub caps a PR at 3000 files, i.e. 30 pages of 100. */
 async function fetchPullFiles(owner, repo, pull, token) {
@@ -42,5 +45,14 @@ async function createLineComment(owner, repo, pull, input, token) {
 async function replyToComment(owner, repo, pull, commentId, body, token) {
     const created = await (0, githubApi_1.requestJson)(`/repos/${owner}/${repo}/pulls/${pull}/comments/${commentId}/replies`, token, 'POST', { body });
     return (0, pullModel_1.commentFromRest)(created);
+}
+// ponytail: the first 100 labels / milestones; add paging if a repo has more to pick from.
+async function fetchLabelNames(owner, repo, token) {
+    const raw = await (0, githubApi_1.requestJson)(`/repos/${owner}/${repo}/labels?per_page=100`, token);
+    return raw.map(l => l.name).filter(pullFilter_1.isSafeSearchValue);
+}
+async function fetchMilestoneTitles(owner, repo, token) {
+    const raw = await (0, githubApi_1.requestJson)(`/repos/${owner}/${repo}/milestones?state=all&per_page=100`, token);
+    return raw.map(m => m.title).filter(pullFilter_1.isSafeSearchValue);
 }
 //# sourceMappingURL=pullApi.js.map

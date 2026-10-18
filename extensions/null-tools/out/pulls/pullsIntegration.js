@@ -37,16 +37,20 @@ exports.registerPullsFeature = registerPullsFeature;
 const vscode = __importStar(require("vscode"));
 const githubAuth_1 = require("../github/githubAuth");
 const gitRun_1 = require("../graph/gitRun");
+const pullApi_1 = require("./pullApi");
 const pullCheckout_1 = require("./pullCheckout");
 const pullContentProvider_1 = require("./pullContentProvider");
 const pullDocs_1 = require("./pullDocs");
 const pullDiff_1 = require("./pullDiff");
+const pullFilter_1 = require("./pullFilter");
+const pullFilterMenu_1 = require("./pullFilterMenu");
+const pullDetailPanel_1 = require("./pullDetailPanel");
 const pullReview_1 = require("./pullReview");
 const pullsTreeView_1 = require("./pullsTreeView");
 const FOCUS_REFRESH_MIN_MS = 60_000;
 function registerPullsFeature(context) {
     const review = new pullReview_1.PullReview(context.globalState);
-    const tree = new pullsTreeView_1.PullsTreeProvider(review);
+    const tree = new pullsTreeView_1.PullsTreeProvider(review, context.workspaceState);
     const view = vscode.window.createTreeView('null.pullsView', { treeDataProvider: tree });
     tree.onMessage = message => { view.message = message; };
     let lastRefresh = 0;
@@ -81,6 +85,28 @@ function registerPullsFeature(context) {
     }), vscode.commands.registerCommand('null.pulls.openFileDiff', (node) => {
         if (node.kind === 'file')
             return (0, pullDiff_1.openPullFileDiff)(node.detail, node.file);
+    }), vscode.commands.registerCommand('null.pulls.filter', async () => {
+        const ctx = tree.context();
+        if (!ctx) {
+            void vscode.window.showInformationMessage('Open the Pull Requests view of a folder with a GitHub remote first.');
+            return;
+        }
+        const { owner, repo } = ctx.repo;
+        const next = await (0, pullFilterMenu_1.editFilter)(tree.filter, {
+            labels: () => (0, pullApi_1.fetchLabelNames)(owner, repo, ctx.token),
+            milestones: () => (0, pullApi_1.fetchMilestoneTitles)(owner, repo, ctx.token),
+        });
+        if (next) {
+            lastRefresh = Date.now();
+            await tree.setFilter(next);
+        }
+    }), vscode.commands.registerCommand('null.pulls.resetFilter', async () => {
+        lastRefresh = Date.now();
+        await tree.setFilter(pullFilter_1.DEFAULT_FILTER);
+    }), vscode.commands.registerCommand('null.pulls.openDetail', (node) => {
+        const ctx = tree.context();
+        if (node.kind === 'pull' && ctx)
+            pullDetailPanel_1.PullDetailPanel.show(context.extensionUri, ctx.repo, node.pull);
     }), vscode.commands.registerCommand('null.pulls.comment', (reply) => review.submit(reply)), 
     // Nothing is fetched until the view is first shown, and nothing polls while it is hidden.
     view.onDidChangeVisibility(e => { if (e.visible && !tree.loaded)
