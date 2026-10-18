@@ -76,3 +76,24 @@ export function shouldAcknowledge(journalText: string | undefined): boolean {
 export function isStillAvailable(latest: string, current: string): boolean {
   return compareVersionTags(latest, current) > 0;
 }
+
+const PACKAGE_ASSETS: Partial<Record<NodeJS.Platform, RegExp>> = {
+  win32: /^null-ide-win32-x64(-[^/\\]+)?\.zip$/i,
+  linux: /^null-ide-linux-x64(-[^/\\]+)?\.tar\.gz$/i,
+};
+
+/** Whether a release carries the package this platform installs (the Linux .deb is a convenience, not what the updater checks). */
+export function hasPlatformPackage(platform: NodeJS.Platform, assets: readonly { name: string }[] | undefined): boolean {
+  const pattern = PACKAGE_ASSETS[platform];
+  return !!pattern && Array.isArray(assets) && assets.some(a => pattern.test(a.name));
+}
+
+/** Only the Windows install ships null-setup, so only it can download, swap and restart itself. */
+export function canSelfUpdate(platform: NodeJS.Platform): boolean {
+  return platform === 'win32';
+}
+
+/** Linux installs update by hand, so the status button just points at the release. */
+export function releasePageStatus(version: string): StatusView {
+  return { text: `$(cloud-download) ${version}`, tooltip: `Null IDE ${version} is available. Click to open the release page.` };
+}

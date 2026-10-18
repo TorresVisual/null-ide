@@ -2,7 +2,7 @@
 
 import * as vscode from 'vscode';
 import { StagedUpdate, acknowledgeUpdate, checkForUpdate, getAvailableUpdate, getUpdateProgress, installUpdate, onStagedUpdateChanged, promptForUpdate } from './updater';
-import { statusFor } from './updateStatus';
+import { canSelfUpdate, releasePageStatus, statusFor } from './updateStatus';
 
 export function registerUpdaterFeature(context: vscode.ExtensionContext): void {
   acknowledgeUpdate(context);
@@ -21,7 +21,9 @@ export function registerUpdaterFeature(context: vscode.ExtensionContext): void {
     const staged = context.globalState.get<StagedUpdate>('null.stagedUpdate');
     const isReady = staged?.version === update.latest && staged.verified;
 
-    const view = statusFor(update.latest, getUpdateProgress(), isReady);
+    const view = canSelfUpdate(process.platform)
+      ? statusFor(update.latest, getUpdateProgress(), isReady)
+      : releasePageStatus(update.latest);
     updateBar.text = view.text;
     updateBar.tooltip = view.tooltip;
     updateBar.show();

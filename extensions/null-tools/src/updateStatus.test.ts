@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 import test from 'node:test';
-import { formatBytes, isSafeTag, isStillAvailable, parseProgressLine, shouldAcknowledge, statusFor } from './updateStatus';
+import { formatBytes, canSelfUpdate, hasPlatformPackage, isSafeTag, isStillAvailable, parseProgressLine, releasePageStatus, shouldAcknowledge, statusFor } from './updateStatus';
 
 test('parseProgressLine reads the lines null-setup prints', () => {
   assert.deepStrictEqual(parseProgressLine('{"state":"checking"}'), { state: 'checking' });
@@ -67,4 +67,34 @@ test('a remembered update is dropped once the running version has caught up', ()
   assert.ok(!isStillAvailable('v1.0.18', 'v1.0.18'));
   assert.ok(!isStillAvailable('v1.0.18', 'v1.1.0'));
   assert.ok(isStillAvailable('v1.0.18', 'local'));
+});
+
+const assets = (...names: string[]) => names.map(name => ({ name }));
+
+test('hasPlatformPackage picks each platform\'s own package, never a sidecar or the deb', () => {
+  const release = assets(
+    'null-ide-win32-x64-v2.zip', 'null-ide-win32-x64-v2.zip.sha256',
+    'null-ide-linux-x64-v2.tar.gz', 'null-ide-linux-x64-v2.tar.gz.sha256', 'null-ide-linux-x64-v2.deb',
+  );
+  assert.strictEqual(hasPlatformPackage('win32', release), true);
+  assert.strictEqual(hasPlatformPackage('linux', release), true);
+  assert.strictEqual(hasPlatformPackage('win32', assets('null-ide-win32-x64.zip')), true);
+  assert.strictEqual(hasPlatformPackage('win32', assets('null-ide-win32-x64-v2.zip.sha256', 'null-ide-linux-x64-v2.tar.gz')), false);
+  assert.strictEqual(hasPlatformPackage('linux', assets('null-ide-linux-x64-v2.tar.gz.sha256', 'null-ide-linux-x64-v2.deb', 'null-ide-win32-x64-v2.zip')), false);
+});
+
+test('hasPlatformPackage is false for unknown platforms and missing asset lists', () => {
+  assert.strictEqual(hasPlatformPackage('darwin', assets('null-ide-win32-x64-v2.zip')), false);
+  assert.strictEqual(hasPlatformPackage('linux', undefined), false);
+});
+
+test('only Windows installs can replace themselves', () => {
+  assert.strictEqual(canSelfUpdate('win32'), true);
+  assert.strictEqual(canSelfUpdate('linux'), false);
+});
+
+test('the Linux status button points at the release page', () => {
+  const view = releasePageStatus('v2');
+  assert.match(view.text, /v2/);
+  assert.match(view.tooltip, /release page/);
 });

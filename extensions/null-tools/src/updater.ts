@@ -8,7 +8,7 @@ import * as os from 'os';
 import * as readline from 'readline';
 import { spawn } from 'child_process';
 import { compareVersionTags } from './versionComparison';
-import { Progress, isSafeTag, isStillAvailable, parseProgressLine, shouldAcknowledge } from './updateStatus';
+import { Progress, canSelfUpdate, hasPlatformPackage, isSafeTag, isStillAvailable, parseProgressLine, shouldAcknowledge } from './updateStatus';
 
 // Electron adds resourcesPath to the Node process object; @types/node doesn't know about it.
 declare global {
@@ -195,11 +195,6 @@ async function getLatestRelease(repo: string): Promise<GithubRelease> {
   return requestJson<GithubRelease>(`https://api.github.com/repos/${repo}/releases/latest`);
 }
 
-function hasWindowsPackage(release: GithubRelease): boolean {
-  return Array.isArray(release.assets) &&
-    release.assets.some(a => /^null-ide-win32-x64(-[^/\\]+)?\.zip$/i.test(a.name));
-}
-
 /** The remembered update, or undefined once the running version is already at or past it. */
 export function getAvailableUpdate(context: vscode.ExtensionContext): AvailableUpdate | undefined {
   const update = context.globalState.get<AvailableUpdate>('null.availableUpdate');
@@ -217,6 +212,7 @@ let prefetching: string | undefined;   // version being downloaded by this windo
 
 /** Downloads and verifies the release in the background; installing only ever starts from the user's click. */
 function startPrefetch(context: vscode.ExtensionContext, update: AvailableUpdate): void {
+  if (!canSelfUpdate(process.platform)) return;
   const staged = context.globalState.get<StagedUpdate>('null.stagedUpdate');
   if (prefetching === update.latest || (staged?.version === update.latest && staged.verified)) return;
   if (!isSafeTag(update.latest)) {
@@ -275,8 +271,8 @@ export async function checkForUpdate(
   output.appendLine(`Checking for updates from ${repo}. Current version: ${current}`);
   const release    = await getLatestRelease(repo);
   const latest     = String(release.tag_name || '');
-  const hasPackage = hasWindowsPackage(release);
-  output.appendLine(`Latest release: ${latest || '(none)'}. Windows package: ${hasPackage ? 'yes' : 'no'}`);
+  const hasPackage = hasPlatformPackage(process.platform, release.assets);
+  output.appendLine(`Latest release: ${latest || '(none)'}. Package for ${process.platform}: ${hasPackage ? 'yes' : 'no'}`);
 
   if (!latest || !hasPackage || compareVersionTags(latest, current) <= 0) {
     await context.globalState.update('null.availableUpdate', undefined);
@@ -285,7 +281,7 @@ export async function checkForUpdate(
     latestProgress = undefined;
     onStagedUpdateChanged.fire();
     if (!silent) {
-      const packageNote = hasPackage ? '' : ' No Windows package was found on the latest release.';
+      const packageNote = hasPackage ? '' : ' No package for this platform was found on the latest release.';
       vscode.window.showInformationMessage(
         `Null IDE is up to date (${current}; latest ${latest || 'unknown'}).${packageNote}`,
       );
@@ -315,13 +311,16 @@ function truncateReleaseNotes(notes: string | undefined): string | undefined {
 }
 
 export async function promptForUpdate(update: AvailableUpdate): Promise<void> {
+  const buttons = canSelfUpdate(process.platform)
+    ? ['Update Now', 'Release Notes', 'Later']
+    : ['Open Release Page', 'Later'];
   const action = await vscode.window.showInformationMessage(
     `Null IDE ${update.latest} is available. You are running ${update.current}.`,
     { detail: truncateReleaseNotes(update.releaseNotes) },
-    'Update Now', 'Release Notes', 'Later',
+    ...buttons,
   );
 
-  if (action === 'Update Now') {
+  if (action === 'Update Now' || action === 'Open Release Page') {
     await vscode.commands.executeCommand('null.installUpdate');
   } else if (action === 'Release Notes' && update.url) {
     await vscode.env.openExternal(vscode.Uri.parse(update.url));
@@ -331,6 +330,11 @@ export async function promptForUpdate(update: AvailableUpdate): Promise<void> {
 export async function installUpdate(context: vscode.ExtensionContext): Promise<void> {
   const update = getAvailableUpdate(context) || await checkForUpdate(context, false);
   if (!update) return;
+
+  if (!canSelfUpdate(process.platform)) {
+    if (update.url) await vscode.env.openExternal(vscode.Uri.parse(update.url));
+    return;
+  }
 
   const install = findInstall(context);
   if (!install) {
