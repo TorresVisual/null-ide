@@ -75,7 +75,7 @@ function failure(res: RawResponse): ApiError {
   return new ApiError(formatApiError(res.status, res.body), res.status, limited ? rateLimitRetryAt(res.headers) : null);
 }
 
-async function requestJson<T>(
+export async function requestJson<T>(
   path: string, token: string | null, method: 'GET' | 'PATCH' | 'POST' | 'PUT' | 'DELETE' = 'GET', body?: unknown,
 ): Promise<T> {
   const res = await request(path, token, method, body);
