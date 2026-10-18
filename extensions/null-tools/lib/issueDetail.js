@@ -1161,7 +1161,8 @@ function renderCreateForm(root, init, io) {
                 io.saveDraftSoon(v); },
             onSubmit: submit,
         });
-        byId('create-composer').replaceWith(composer.el);
+        // Append, not replaceWith: the #create-composer wrapper carries the gap above the Cancel / Create row.
+        byId('create-composer').append(composer.el);
         renderSidebar();
         byId('create-form').addEventListener('click', onFormClick);
         byId('create-more').addEventListener('change', e => { state.createMore = e.target.checked; });

@@ -93,7 +93,8 @@ function renderCreateForm(root: HTMLElement, init: CreateInit, io: CreateIo): Cr
       onChange: v => { if (!state.template && !state.busy) io.saveDraftSoon(v); },
       onSubmit: submit,
     });
-    byId('create-composer').replaceWith(composer.el);
+    // Append, not replaceWith: the #create-composer wrapper carries the gap above the Cancel / Create row.
+    byId('create-composer').append(composer.el);
     renderSidebar();
     byId('create-form').addEventListener('click', onFormClick);
     byId<HTMLInputElement>('create-more').addEventListener('change', e => { state.createMore = (e.target as HTMLInputElement).checked; });
