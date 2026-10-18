@@ -6,7 +6,7 @@ import { getGithubSession } from '../github/githubAuth';
 import { getWorkspaceGithubRepo } from '../github/githubRemote';
 import { classifyWorkspace } from '../graph/graphMessages';
 import { makeRunGit } from '../graph/gitRun';
-import { DEFAULT_FILTER } from './pullFilter';
+import { PullFilter, describeFilter, isDefaultFilter, parseFilter } from './pullFilter';
 import { fetchMergeBase, fetchPullFiles, fetchReviewThreads, listPulls } from './pullApi';
 import { PullDetail, PullFile, PullSummary, describeFailure, pinCurrent, pullBranch, threadCount } from './pullModel';
 import { PullReview } from './pullReview';
@@ -15,10 +15,11 @@ export type PullNode = { kind: 'pull'; pull: PullSummary } | { kind: 'file'; det
 
 /** What the view shows; every value except `ready` has a welcome message in package.json (`null.pulls.state`). */
 export type PullsState =
-  | 'no-folder' | 'remote' | 'untrusted' | 'not-a-repo' | 'no-git' | 'no-repo' | 'signed-out' | 'error' | 'empty' | 'ready';
+  | 'no-folder' | 'remote' | 'untrusted' | 'not-a-repo' | 'no-git' | 'no-repo' | 'signed-out' | 'error' | 'empty' | 'empty-filtered' | 'ready';
 
 const CHECK_COLORS = { success: 'charts.green', failure: 'charts.red', pending: 'charts.yellow', none: undefined } as const;
 const STATUS_LETTER = { added: 'A', removed: 'D', renamed: 'R', modified: 'M' } as const;
+const FILTER_KEY = 'null.pulls.filter';
 
 export class PullsTreeProvider implements vscode.TreeDataProvider<PullNode> {
   private readonly emitter = new vscode.EventEmitter<PullNode | undefined>();
@@ -33,10 +34,24 @@ export class PullsTreeProvider implements vscode.TreeDataProvider<PullNode> {
 
   loaded = false;
   state: PullsState = 'no-folder';
-  /** The tree's one-line detail for the `error` state; undefined otherwise. */
+  filter: PullFilter;
+  /** The tree's one-line detail: the failure for `error`, the active filters otherwise. */
   onMessage: (message: string | undefined) => void = () => undefined;
 
-  constructor(private readonly review: PullReview) {}
+  constructor(private readonly review: PullReview, private readonly store: vscode.Memento) {
+    this.filter = parseFilter(store.get(FILTER_KEY));
+  }
+
+  /** The repo and token the last refresh resolved; null before the view first loads or without a GitHub remote. */
+  context(): { repo: { owner: string; repo: string }; token: string | null } | null {
+    return this.repo ? { repo: this.repo, token: this.token } : null;
+  }
+
+  async setFilter(next: PullFilter): Promise<void> {
+    this.filter = next;
+    await this.store.update(FILTER_KEY, isDefaultFilter(next) ? undefined : next);
+    await this.refresh();
+  }
 
   async refresh(): Promise<void> {
     this.loaded = true;
@@ -48,8 +63,10 @@ export class PullsTreeProvider implements vscode.TreeDataProvider<PullNode> {
     this.state = await this.resolveState();
     if (this.state === 'ready') {
       try {
-        this.pulls = pinCurrent(await listPulls(this.repo!.owner, this.repo!.repo, DEFAULT_FILTER, this.token), this.current);
-        this.state = this.pulls.length === 0 ? 'empty' : 'ready';
+        this.pulls = pinCurrent(await listPulls(this.repo!.owner, this.repo!.repo, this.filter, this.token), this.current);
+        const plain = isDefaultFilter(this.filter);
+        this.state = this.pulls.length > 0 ? 'ready' : plain ? 'empty' : 'empty-filtered';
+        if (!plain) message = describeFilter(this.filter);
       } catch (err) {
         this.state = 'error';
         message = describeFailure(err);
@@ -92,11 +109,13 @@ export class PullsTreeProvider implements vscode.TreeDataProvider<PullNode> {
     }
     const { pull } = node;
     const item = new vscode.TreeItem(`#${pull.number} ${pull.title}`, vscode.TreeItemCollapsibleState.Collapsed);
-    const color = CHECK_COLORS[pull.checks];
-    item.iconPath = new vscode.ThemeIcon(pull.draft ? 'git-pull-request-draft' : 'git-pull-request', color ? new vscode.ThemeColor(color) : undefined);
+    const color = pull.state === 'merged' ? 'charts.purple' : pull.state === 'closed' ? 'charts.red' : CHECK_COLORS[pull.checks];
+    const icon = pull.state === 'merged' ? 'git-merge' : pull.state === 'closed' ? 'git-pull-request-closed'
+      : pull.draft ? 'git-pull-request-draft' : 'git-pull-request';
+    item.iconPath = new vscode.ThemeIcon(icon, color ? new vscode.ThemeColor(color) : undefined);
     const isCurrent = this.current !== null && pullBranch(pull) === this.current;
     item.description = `${isCurrent ? '● ' : ''}${pull.author} · ${pull.headRef} → ${pull.baseRef}`;
-    const checks = pull.checks === 'none' ? 'no checks' : `checks ${pull.checks}`;
+    const checks = pull.state !== 'open' ? pull.state : pull.checks === 'none' ? 'no checks' : `checks ${pull.checks}`;
     const review = pull.review === 'none' ? '' : ` · ${pull.review === 'changes' ? 'changes requested' : pull.review}`;
     const outdated = this.outdated.get(pull.number);
     const hidden = outdated ? `\n${outdated} outdated thread${outdated === 1 ? '' : 's'} not shown` : '';

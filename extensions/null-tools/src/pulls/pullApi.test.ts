@@ -4,7 +4,9 @@ import assert from 'node:assert';
 import { EventEmitter } from 'node:events';
 import https from 'node:https';
 import test, { afterEach, mock } from 'node:test';
-import { createLineComment, fetchMergeBase, fetchPullFiles, fetchReviewThreads, listPulls, replyToComment } from './pullApi';
+import {
+  createLineComment, fetchLabelNames, fetchMergeBase, fetchMilestoneTitles, fetchPullFiles, fetchReviewThreads, listPulls, replyToComment,
+} from './pullApi';
 import { DEFAULT_FILTER } from './pullFilter';
 
 afterEach(() => mock.restoreAll());
@@ -91,4 +93,16 @@ test('replyToComment posts to the thread\'s first comment', async () => {
   await replyToComment('o', 'r', 5, 101, 'thanks', 't');
   assert.strictEqual(calls[0].url, 'https://api.github.com/repos/o/r/pulls/5/comments/101/replies');
   assert.deepStrictEqual(calls[0].body, { body: 'thanks' });
+});
+
+test('fetchLabelNames returns the names and drops any that could break out of a search qualifier', async () => {
+  const calls = stub([[{ name: 'bug' }, { name: 'good first issue' }, { name: 'x" is:closed' }]]);
+  assert.deepStrictEqual(await fetchLabelNames('o', 'r', 't'), ['bug', 'good first issue']);
+  assert.strictEqual(calls[0].url, 'https://api.github.com/repos/o/r/labels?per_page=100');
+});
+
+test('fetchMilestoneTitles lists open and closed milestones, minus unsafe titles', async () => {
+  const calls = stub([[{ title: 'v1' }, { title: 'v2\nis:open' }]]);
+  assert.deepStrictEqual(await fetchMilestoneTitles('o', 'r', 't'), ['v1']);
+  assert.strictEqual(calls[0].url, 'https://api.github.com/repos/o/r/milestones?state=all&per_page=100');
 });

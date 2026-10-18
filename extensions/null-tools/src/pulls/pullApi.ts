@@ -1,7 +1,7 @@
 'use strict';
 
 import { requestGraphql, requestJson } from '../github/githubApi';
-import { PullFilter, pullsQuery } from './pullFilter';
+import { PullFilter, isSafeSearchValue, pullsQuery } from './pullFilter';
 import {
   LIST_PULLS, ListPullsData, PullFile, PullSummary, REVIEW_THREADS, RestComment, RestFile, ReviewComment, ReviewThread,
   ThreadsData, commentFromRest, mapFiles, mapPulls, mapThreads,
@@ -56,4 +56,15 @@ export async function replyToComment(
   const created = await requestJson<RestComment>(
     `/repos/${owner}/${repo}/pulls/${pull}/comments/${commentId}/replies`, token, 'POST', { body });
   return commentFromRest(created);
+}
+
+// ponytail: the first 100 labels / milestones; add paging if a repo has more to pick from.
+export async function fetchLabelNames(owner: string, repo: string, token: string | null): Promise<string[]> {
+  const raw = await requestJson<Array<{ name: string }>>(`/repos/${owner}/${repo}/labels?per_page=100`, token);
+  return raw.map(l => l.name).filter(isSafeSearchValue);
+}
+
+export async function fetchMilestoneTitles(owner: string, repo: string, token: string | null): Promise<string[]> {
+  const raw = await requestJson<Array<{ title: string }>>(`/repos/${owner}/${repo}/milestones?state=all&per_page=100`, token);
+  return raw.map(m => m.title).filter(isSafeSearchValue);
 }

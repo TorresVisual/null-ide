@@ -3,10 +3,13 @@
 import * as vscode from 'vscode';
 import { getAccountsApi } from '../github/githubAuth';
 import { makeRunGit } from '../graph/gitRun';
+import { fetchLabelNames, fetchMilestoneTitles } from './pullApi';
 import { checkoutPull } from './pullCheckout';
 import { PullContentProvider } from './pullContentProvider';
 import { PULL_SCHEME } from './pullDocs';
 import { openPullFileDiff } from './pullDiff';
+import { DEFAULT_FILTER } from './pullFilter';
+import { editFilter } from './pullFilterMenu';
 import { PullReview } from './pullReview';
 import { PullNode, PullsTreeProvider } from './pullsTreeView';
 
@@ -14,7 +17,7 @@ const FOCUS_REFRESH_MIN_MS = 60_000;
 
 export function registerPullsFeature(context: vscode.ExtensionContext): void {
   const review = new PullReview(context.globalState);
-  const tree = new PullsTreeProvider(review);
+  const tree = new PullsTreeProvider(review, context.workspaceState);
   const view = vscode.window.createTreeView<PullNode>('null.pullsView', { treeDataProvider: tree });
   tree.onMessage = message => { view.message = message; };
   let lastRefresh = 0;
@@ -54,6 +57,26 @@ export function registerPullsFeature(context: vscode.ExtensionContext): void {
     }),
     vscode.commands.registerCommand('null.pulls.openFileDiff', (node: PullNode) => {
       if (node.kind === 'file') return openPullFileDiff(node.detail, node.file);
+    }),
+    vscode.commands.registerCommand('null.pulls.filter', async () => {
+      const ctx = tree.context();
+      if (!ctx) {
+        void vscode.window.showInformationMessage('Open the Pull Requests view of a folder with a GitHub remote first.');
+        return;
+      }
+      const { owner, repo } = ctx.repo;
+      const next = await editFilter(tree.filter, {
+        labels: () => fetchLabelNames(owner, repo, ctx.token),
+        milestones: () => fetchMilestoneTitles(owner, repo, ctx.token),
+      });
+      if (next) {
+        lastRefresh = Date.now();
+        await tree.setFilter(next);
+      }
+    }),
+    vscode.commands.registerCommand('null.pulls.resetFilter', async () => {
+      lastRefresh = Date.now();
+      await tree.setFilter(DEFAULT_FILTER);
     }),
     vscode.commands.registerCommand('null.pulls.comment', (reply: vscode.CommentReply) => review.submit(reply)),
     // Nothing is fetched until the view is first shown, and nothing polls while it is hidden.

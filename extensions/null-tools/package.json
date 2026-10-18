@@ -258,7 +258,9 @@
       { "command": "null.pulls.checkout", "title": "Null: Check Out Pull Request", "icon": "$(git-branch)" },
       { "command": "null.pulls.openOnGitHub", "title": "Null: Open Pull Request on GitHub", "icon": "$(link-external)" },
       { "command": "null.pulls.openFileDiff", "title": "Null: Open Pull Request File Diff" },
-      { "command": "null.pulls.comment", "title": "Comment" }
+      { "command": "null.pulls.comment", "title": "Comment" },
+      { "command": "null.pulls.filter", "title": "Null: Filter Pull Requests", "icon": "$(filter)" },
+      { "command": "null.pulls.resetFilter", "title": "Null: Reset Pull Request Filters" }
     ],
     "viewsContainers": {
       "activitybar": [
@@ -307,7 +309,8 @@
       { "view": "null.pullsView", "contents": "The `origin` remote of the open folder is not on github.com.", "when": "null.pulls.state == no-repo" },
       { "view": "null.pullsView", "contents": "Sign in to GitHub to see this repository's pull requests.\n[Sign In](command:null.issues.signIn)", "when": "null.pulls.state == signed-out" },
       { "view": "null.pullsView", "contents": "Could not load pull requests.\n[Try Again](command:null.pulls.refresh)", "when": "null.pulls.state == error" },
-      { "view": "null.pullsView", "contents": "No open pull requests.", "when": "null.pulls.state == empty" }
+      { "view": "null.pullsView", "contents": "No open pull requests.", "when": "null.pulls.state == empty" },
+      { "view": "null.pullsView", "contents": "No pull requests match the filters.\n[Change Filters](command:null.pulls.filter)\n[Reset Filters](command:null.pulls.resetFilter)", "when": "null.pulls.state == empty-filtered" }
     ],
     "submenus": [
       { "id": "null.graph.resetMenu", "label": "Reset Current Branch To Here" }
@@ -382,7 +385,8 @@
         },
         { "command": "null.graph.open", "when": "view == null.graphView", "group": "navigation@1" },
         { "command": "null.graph.refresh", "when": "view == null.graphView", "group": "navigation@2" },
-        { "command": "null.pulls.refresh", "when": "view == null.pullsView", "group": "navigation" }
+        { "command": "null.pulls.filter", "when": "view == null.pullsView && null.pulls.state =~ /^(ready|empty|empty-filtered)$/", "group": "navigation@1" },
+        { "command": "null.pulls.refresh", "when": "view == null.pullsView", "group": "navigation@2" }
       ],
       "view/item/context": [
         {
@@ -492,6 +496,8 @@
         { "command": "null.issues.insertReference" },
         { "command": "null.pulls.openFileDiff", "when": "false" },
         { "command": "null.pulls.comment", "when": "false" },
+        { "command": "null.pulls.filter", "when": "false" },
+        { "command": "null.pulls.resetFilter", "when": "false" },
         { "command": "null.graph.checkout", "when": "false" },
         { "command": "null.graph.createBranch", "when": "false" },
         { "command": "null.graph.cherryPick", "when": "false" },
