@@ -39,7 +39,7 @@ Release builds run in GitHub Actions on `windows-2022`. **Do not try to build th
 5. Swaps in icons and injects `workbench/custom.css` and `splash.js`.
 6. Runs `npx gulp vscode-win32-x64`.
 7. Builds and signs the shell extension, stamps version info into `product.json`.
-8. Builds `setup/` with cargo, then packages `null-ide-win32-x64.zip` and `NullIDESetup-<version>.exe`.
+8. Builds `setup/` with cargo, then packages `null-ide-win32-x64-<tag>.zip` and `NullIDESetup-<version>.exe`.
 
 Releases come from pushing a `v*` tag, or **Actions → Build Null IDE → Run workflow**. The `upstream-check` workflow opens a PR on Mondays when VSCodium ships a new release; to bump by hand edit `VSCODIUM_TAG` and check that each patch still applies.
 

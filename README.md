@@ -58,7 +58,7 @@ The install is per-user (`%LOCALAPPDATA%\Programs\Null IDE` by default) and need
 
 Run the installer again, or use Settings → Apps → Null IDE, for **Modify**, **Repair** and **Uninstall**. Inside the IDE, **Null: Setup** opens the same window on Modify. Uninstall keeps `%APPDATA%\Null` (settings, extensions) unless you tick the box to delete it.
 
-A portable `null-ide-win32-x64.zip` (with a `.sha256`) is also attached to each release.
+A portable `null-ide-win32-x64-<tag>.zip` (with a `.sha256`) is also attached to each release.
 
 #### Coming from the Inno Setup installer (v1.0.17 and earlier)
 

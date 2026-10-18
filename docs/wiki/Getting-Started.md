@@ -18,7 +18,7 @@
 
    **Use recommended defaults** skips ahead.
 
-A portable `null-ide-win32-x64.zip` (with a `.sha256`) is also attached to each release.
+A portable `null-ide-win32-x64-<tag>.zip` (with a `.sha256`) is also attached to each release.
 
 ### Modify, repair, uninstall
 

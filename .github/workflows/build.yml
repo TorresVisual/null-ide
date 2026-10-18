@@ -761,10 +761,15 @@ jobs:
             Write-Error "Build output directory '$outDir' not found"
             exit 1
           }
-          Compress-Archive -Path "$outDir\*" -DestinationPath null-ide-win32-x64.zip -Force
-          Write-Host "Archive created: $((Get-Item null-ide-win32-x64.zip).Length / 1MB) MB"
-          $hash = Get-FileHash null-ide-win32-x64.zip -Algorithm SHA256
-          "$($hash.Hash.ToLower())  null-ide-win32-x64.zip" | Set-Content null-ide-win32-x64.zip.sha256 -Encoding ASCII -NoNewline
+          $version = '${{ github.ref_name }}'
+          if ('${{ github.ref_type }}' -ne 'tag') {
+            $version = '${{ steps.tag.outputs.tag }}'
+          }
+          $zip = "null-ide-win32-x64-$version.zip"
+          Compress-Archive -Path "$outDir\*" -DestinationPath $zip -Force
+          Write-Host "Archive created: $((Get-Item $zip).Length / 1MB) MB"
+          $hash = Get-FileHash $zip -Algorithm SHA256
+          "$($hash.Hash.ToLower())  $zip" | Set-Content "$zip.sha256" -Encoding ASCII -NoNewline
           Write-Host "Checksum written: $($hash.Hash.ToLower())"
 
       - name: Stage the setup stub
@@ -789,8 +794,8 @@ jobs:
         with:
           body_path: ${{ runner.temp }}/release-notes.md
           files: |
-            null-ide-win32-x64.zip
-            null-ide-win32-x64.zip.sha256
+            null-ide-win32-x64-*.zip
+            null-ide-win32-x64-*.zip.sha256
             builtins.json
             NullIDESetup-*.exe
             null-reh-linux-*.tar.gz
@@ -801,8 +806,8 @@ jobs:
         with:
           name: null-ide-win32-x64-${{ steps.tag.outputs.tag }}
           path: |
-            null-ide-win32-x64.zip
-            null-ide-win32-x64.zip.sha256
+            null-ide-win32-x64-*.zip
+            null-ide-win32-x64-*.zip.sha256
             builtins.json
             NullIDESetup-*.exe
             null-reh-linux-*.tar.gz

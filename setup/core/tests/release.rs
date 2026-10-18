@@ -92,3 +92,18 @@ fn resolve_latest_asks_the_latest_endpoint_and_reports_a_missing_release() {
     assert_eq!(resolve_latest(&http, &srv.base, "o/r").unwrap().release.tag, "v2");
     assert!(matches!(resolve_latest(&http, &srv.base, "o/other"), Err(Error::Http { status: 404, .. })));
 }
+
+#[test]
+fn a_versioned_windows_zip_is_found_among_the_linux_assets() {
+    let v = json!({ "tag_name": "v2", "assets": [
+        { "name": "null-ide-linux-x64-v2.tar.gz", "browser_download_url": "http://h/tgz", "size": 9 },
+        { "name": "null-ide-linux-x64-v2.tar.gz.sha256", "browser_download_url": "http://h/tgz.sha256", "size": 90 },
+        { "name": "null-ide-linux-x64-v2.deb", "browser_download_url": "http://h/deb", "size": 9 },
+        { "name": "null-ide-win32-x64-v2.zip", "browser_download_url": "http://h/zip", "size": 1234 },
+        { "name": "null-ide-win32-x64-v2.zip.sha256", "browser_download_url": "http://h/zip.sha256", "size": 90 }
+    ]});
+    let r = from_json(&v, "v2").unwrap();
+    assert_eq!((r.zip_name.as_str(), r.zip_size), ("null-ide-win32-x64-v2.zip", 1234));
+    assert_eq!(r.zip_url, "http://h/zip");
+    assert_eq!(r.sha256_url, "http://h/zip.sha256");
+}

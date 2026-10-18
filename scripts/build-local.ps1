@@ -808,10 +808,11 @@ Copy-Item (Join-Path $RepoRoot "setup/target/release/null-setup.exe") $setupDir 
 # ============================================================
 
 Write-Step "Creating zip archive"
-$zipPath = Join-Path $WorkspaceDir "null-ide-win32-x64.zip"
+$zipName = "null-ide-win32-x64-$buildVersion.zip"
+$zipPath = Join-Path $WorkspaceDir $zipName
 Compress-Archive -Path "$OutDir\*" -DestinationPath $zipPath -Force
 $hash = Get-FileHash $zipPath -Algorithm SHA256
-"$($hash.Hash.ToLower())  null-ide-win32-x64.zip" | Set-Content "$zipPath.sha256" -Encoding ASCII -NoNewline
+"$($hash.Hash.ToLower())  $zipName" | Set-Content "$zipPath.sha256" -Encoding ASCII -NoNewline
 Write-Host "Archive: $zipPath ($([math]::Round((Get-Item $zipPath).Length / 1MB, 1)) MB)"
 
 # The Rust setup stub is the downloadable installer (NullIDESetup-<version>.exe).

@@ -20,7 +20,7 @@ if (!zip || !tag) {
   process.exit(2);
 }
 
-const name = 'null-ide-win32-x64.zip';
+const name = `null-ide-win32-x64-${tag}.zip`;
 const size = fs.statSync(zip).size;
 const sha = crypto.createHash('sha256').update(fs.readFileSync(zip)).digest('hex');
 const base = `http://127.0.0.1:${port}`;
