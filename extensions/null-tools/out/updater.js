@@ -178,10 +178,6 @@ async function requestJson(url, retries = 2) {
 async function getLatestRelease(repo) {
     return requestJson(`https://api.github.com/repos/${repo}/releases/latest`);
 }
-function hasWindowsPackage(release) {
-    return Array.isArray(release.assets) &&
-        release.assets.some(a => /^null-ide-win32-x64(-[^/\\]+)?\.zip$/i.test(a.name));
-}
 /** The remembered update, or undefined once the running version is already at or past it. */
 function getAvailableUpdate(context) {
     const update = context.globalState.get('null.availableUpdate');
@@ -198,6 +194,8 @@ function getAvailableUpdate(context) {
 let prefetching; // version being downloaded by this window's null-setup
 /** Downloads and verifies the release in the background; installing only ever starts from the user's click. */
 function startPrefetch(context, update) {
+    if (!(0, updateStatus_1.canSelfUpdate)(process.platform))
+        return;
     const staged = context.globalState.get('null.stagedUpdate');
     if (prefetching === update.latest || (staged?.version === update.latest && staged.verified))
         return;
@@ -249,8 +247,8 @@ async function checkForUpdate(context, silent) {
     output.appendLine(`Checking for updates from ${repo}. Current version: ${current}`);
     const release = await getLatestRelease(repo);
     const latest = String(release.tag_name || '');
-    const hasPackage = hasWindowsPackage(release);
-    output.appendLine(`Latest release: ${latest || '(none)'}. Windows package: ${hasPackage ? 'yes' : 'no'}`);
+    const hasPackage = (0, updateStatus_1.hasPlatformPackage)(process.platform, release.assets);
+    output.appendLine(`Latest release: ${latest || '(none)'}. Package for ${process.platform}: ${hasPackage ? 'yes' : 'no'}`);
     if (!latest || !hasPackage || (0, versionComparison_1.compareVersionTags)(latest, current) <= 0) {
         await context.globalState.update('null.availableUpdate', undefined);
         await context.globalState.update('null.stagedUpdate', undefined);
@@ -258,7 +256,7 @@ async function checkForUpdate(context, silent) {
         latestProgress = undefined;
         exports.onStagedUpdateChanged.fire();
         if (!silent) {
-            const packageNote = hasPackage ? '' : ' No Windows package was found on the latest release.';
+            const packageNote = hasPackage ? '' : ' No package for this platform was found on the latest release.';
             vscode.window.showInformationMessage(`Null IDE is up to date (${current}; latest ${latest || 'unknown'}).${packageNote}`);
         }
         return null;
@@ -281,8 +279,11 @@ function truncateReleaseNotes(notes) {
     return notes.length > 600 ? notes.slice(0, 600) + '…' : notes;
 }
 async function promptForUpdate(update) {
-    const action = await vscode.window.showInformationMessage(`Null IDE ${update.latest} is available. You are running ${update.current}.`, { detail: truncateReleaseNotes(update.releaseNotes) }, 'Update Now', 'Release Notes', 'Later');
-    if (action === 'Update Now') {
+    const buttons = (0, updateStatus_1.canSelfUpdate)(process.platform)
+        ? ['Update Now', 'Release Notes', 'Later']
+        : ['Open Release Page', 'Later'];
+    const action = await vscode.window.showInformationMessage(`Null IDE ${update.latest} is available. You are running ${update.current}.`, { detail: truncateReleaseNotes(update.releaseNotes) }, ...buttons);
+    if (action === 'Update Now' || action === 'Open Release Page') {
         await vscode.commands.executeCommand('null.installUpdate');
     }
     else if (action === 'Release Notes' && update.url) {
@@ -293,6 +294,11 @@ async function installUpdate(context) {
     const update = getAvailableUpdate(context) || await checkForUpdate(context, false);
     if (!update)
         return;
+    if (!(0, updateStatus_1.canSelfUpdate)(process.platform)) {
+        if (update.url)
+            await vscode.env.openExternal(vscode.Uri.parse(update.url));
+        return;
+    }
     const install = findInstall(context);
     if (!install) {
         vscode.window.showErrorMessage('Null IDE: null-setup.exe was not found in this installation, so it cannot update itself. Reinstall from the latest release.');

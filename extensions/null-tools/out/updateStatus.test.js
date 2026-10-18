@@ -59,4 +59,26 @@ const updateStatus_1 = require("./updateStatus");
     node_assert_1.default.ok(!(0, updateStatus_1.isStillAvailable)('v1.0.18', 'v1.1.0'));
     node_assert_1.default.ok((0, updateStatus_1.isStillAvailable)('v1.0.18', 'local'));
 });
+const assets = (...names) => names.map(name => ({ name }));
+(0, node_test_1.default)('hasPlatformPackage picks each platform\'s own package, never a sidecar or the deb', () => {
+    const release = assets('null-ide-win32-x64-v2.zip', 'null-ide-win32-x64-v2.zip.sha256', 'null-ide-linux-x64-v2.tar.gz', 'null-ide-linux-x64-v2.tar.gz.sha256', 'null-ide-linux-x64-v2.deb');
+    node_assert_1.default.strictEqual((0, updateStatus_1.hasPlatformPackage)('win32', release), true);
+    node_assert_1.default.strictEqual((0, updateStatus_1.hasPlatformPackage)('linux', release), true);
+    node_assert_1.default.strictEqual((0, updateStatus_1.hasPlatformPackage)('win32', assets('null-ide-win32-x64.zip')), true);
+    node_assert_1.default.strictEqual((0, updateStatus_1.hasPlatformPackage)('win32', assets('null-ide-win32-x64-v2.zip.sha256', 'null-ide-linux-x64-v2.tar.gz')), false);
+    node_assert_1.default.strictEqual((0, updateStatus_1.hasPlatformPackage)('linux', assets('null-ide-linux-x64-v2.tar.gz.sha256', 'null-ide-linux-x64-v2.deb', 'null-ide-win32-x64-v2.zip')), false);
+});
+(0, node_test_1.default)('hasPlatformPackage is false for unknown platforms and missing asset lists', () => {
+    node_assert_1.default.strictEqual((0, updateStatus_1.hasPlatformPackage)('darwin', assets('null-ide-win32-x64-v2.zip')), false);
+    node_assert_1.default.strictEqual((0, updateStatus_1.hasPlatformPackage)('linux', undefined), false);
+});
+(0, node_test_1.default)('only Windows installs can replace themselves', () => {
+    node_assert_1.default.strictEqual((0, updateStatus_1.canSelfUpdate)('win32'), true);
+    node_assert_1.default.strictEqual((0, updateStatus_1.canSelfUpdate)('linux'), false);
+});
+(0, node_test_1.default)('the Linux status button points at the release page', () => {
+    const view = (0, updateStatus_1.releasePageStatus)('v2');
+    node_assert_1.default.match(view.text, /v2/);
+    node_assert_1.default.match(view.tooltip, /release page/);
+});
 //# sourceMappingURL=updateStatus.test.js.map

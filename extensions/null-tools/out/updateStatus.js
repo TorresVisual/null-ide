@@ -6,6 +6,9 @@ exports.statusFor = statusFor;
 exports.isSafeTag = isSafeTag;
 exports.shouldAcknowledge = shouldAcknowledge;
 exports.isStillAvailable = isStillAvailable;
+exports.hasPlatformPackage = hasPlatformPackage;
+exports.canSelfUpdate = canSelfUpdate;
+exports.releasePageStatus = releasePageStatus;
 const versionComparison_1 = require("./versionComparison");
 const PLAIN = new Set(['checking', 'verifying', 'preparing', 'installing', 'restarting', 'upToDate', 'ready', 'busy', 'needsReapproval']);
 function parseProgressLine(line) {
@@ -76,5 +79,22 @@ function shouldAcknowledge(journalText) {
 /** The remembered "update available" is stale once the running version has caught up (e.g. right after updating). */
 function isStillAvailable(latest, current) {
     return (0, versionComparison_1.compareVersionTags)(latest, current) > 0;
+}
+const PACKAGE_ASSETS = {
+    win32: /^null-ide-win32-x64(-[^/\\]+)?\.zip$/i,
+    linux: /^null-ide-linux-x64(-[^/\\]+)?\.tar\.gz$/i,
+};
+/** Whether a release carries the package this platform installs (the Linux .deb is a convenience, not what the updater checks). */
+function hasPlatformPackage(platform, assets) {
+    const pattern = PACKAGE_ASSETS[platform];
+    return !!pattern && Array.isArray(assets) && assets.some(a => pattern.test(a.name));
+}
+/** Only the Windows install ships null-setup, so only it can download, swap and restart itself. */
+function canSelfUpdate(platform) {
+    return platform === 'win32';
+}
+/** Linux installs update by hand, so the status button just points at the release. */
+function releasePageStatus(version) {
+    return { text: `$(cloud-download) ${version}`, tooltip: `Null IDE ${version} is available. Click to open the release page.` };
 }
 //# sourceMappingURL=updateStatus.js.map

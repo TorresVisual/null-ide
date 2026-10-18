@@ -50,7 +50,9 @@ function registerUpdaterFeature(context) {
         }
         const staged = context.globalState.get('null.stagedUpdate');
         const isReady = staged?.version === update.latest && staged.verified;
-        const view = (0, updateStatus_1.statusFor)(update.latest, (0, updater_1.getUpdateProgress)(), isReady);
+        const view = (0, updateStatus_1.canSelfUpdate)(process.platform)
+            ? (0, updateStatus_1.statusFor)(update.latest, (0, updater_1.getUpdateProgress)(), isReady)
+            : (0, updateStatus_1.releasePageStatus)(update.latest);
         updateBar.text = view.text;
         updateBar.tooltip = view.tooltip;
         updateBar.show();
