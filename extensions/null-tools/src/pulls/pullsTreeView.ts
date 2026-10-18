@@ -6,7 +6,8 @@ import { getGithubSession } from '../github/githubAuth';
 import { getWorkspaceGithubRepo } from '../github/githubRemote';
 import { classifyWorkspace } from '../graph/graphMessages';
 import { makeRunGit } from '../graph/gitRun';
-import { fetchMergeBase, fetchPullFiles, fetchReviewThreads, listOpenPulls } from './pullApi';
+import { DEFAULT_FILTER } from './pullFilter';
+import { fetchMergeBase, fetchPullFiles, fetchReviewThreads, listPulls } from './pullApi';
 import { PullDetail, PullFile, PullSummary, describeFailure, pinCurrent, pullBranch, threadCount } from './pullModel';
 import { PullReview } from './pullReview';
 
@@ -47,7 +48,7 @@ export class PullsTreeProvider implements vscode.TreeDataProvider<PullNode> {
     this.state = await this.resolveState();
     if (this.state === 'ready') {
       try {
-        this.pulls = pinCurrent(await listOpenPulls(this.repo!.owner, this.repo!.repo, this.token), this.current);
+        this.pulls = pinCurrent(await listPulls(this.repo!.owner, this.repo!.repo, DEFAULT_FILTER, this.token), this.current);
         this.state = this.pulls.length === 0 ? 'empty' : 'ready';
       } catch (err) {
         this.state = 'error';

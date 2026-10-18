@@ -1,14 +1,15 @@
 'use strict';
 
 import { requestGraphql, requestJson } from '../github/githubApi';
+import { PullFilter, pullsQuery } from './pullFilter';
 import {
   LIST_PULLS, ListPullsData, PullFile, PullSummary, REVIEW_THREADS, RestComment, RestFile, ReviewComment, ReviewThread,
-  ThreadsData, commentFromRest, mapFiles, mapPulls, mapThreads, openPullsQuery,
+  ThreadsData, commentFromRest, mapFiles, mapPulls, mapThreads,
 } from './pullModel';
 
-// ponytail: the 50 most recently updated open PRs; add cursor paging (like the issues list) if a repo has more.
-export async function listOpenPulls(owner: string, repo: string, token: string | null): Promise<PullSummary[]> {
-  return mapPulls(await requestGraphql<ListPullsData>(LIST_PULLS, { q: openPullsQuery(owner, repo), first: 50 }, token));
+// ponytail: the first 50 matches; add cursor paging (like the issues list) if a repo has more.
+export async function listPulls(owner: string, repo: string, filter: PullFilter, token: string | null): Promise<PullSummary[]> {
+  return mapPulls(await requestGraphql<ListPullsData>(LIST_PULLS, { q: pullsQuery(owner, repo, filter), first: 50 }, token));
 }
 
 /** All changed files. GitHub caps a PR at 3000 files, i.e. 30 pages of 100. */

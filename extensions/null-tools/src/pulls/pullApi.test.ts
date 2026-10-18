@@ -4,7 +4,8 @@ import assert from 'node:assert';
 import { EventEmitter } from 'node:events';
 import https from 'node:https';
 import test, { afterEach, mock } from 'node:test';
-import { createLineComment, fetchMergeBase, fetchPullFiles, fetchReviewThreads, listOpenPulls, replyToComment } from './pullApi';
+import { createLineComment, fetchMergeBase, fetchPullFiles, fetchReviewThreads, listPulls, replyToComment } from './pullApi';
+import { DEFAULT_FILTER } from './pullFilter';
 
 afterEach(() => mock.restoreAll());
 
@@ -33,11 +34,14 @@ function stub(responses: unknown[]): Call[] {
 
 const restFile = (i: number) => ({ filename: `f${i}.ts`, status: 'modified', additions: 1, deletions: 0 });
 
-test('listOpenPulls asks for this repo\'s open PRs', async () => {
-  const calls = stub([{ data: { search: { nodes: [] } } }]);
-  assert.deepStrictEqual(await listOpenPulls('o', 'r', 't'), []);
+test('listPulls sends the filter as the search query', async () => {
+  const empty = { data: { search: { nodes: [] } } };
+  const calls = stub([empty, empty]);
+  assert.deepStrictEqual(await listPulls('o', 'r', DEFAULT_FILTER, 't'), []);
   assert.strictEqual(calls[0].url, 'https://api.github.com/graphql');
   assert.strictEqual(calls[0].body.variables.q, 'repo:o/r is:pr is:open sort:updated-desc');
+  await listPulls('o', 'r', { ...DEFAULT_FILTER, state: 'merged', mine: true }, 't');
+  assert.strictEqual(calls[1].body.variables.q, 'repo:o/r is:pr is:merged author:@me sort:updated-desc');
 });
 
 test('fetchPullFiles pages until a short page, so a PR with more than 100 files is not cut off', async () => {

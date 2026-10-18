@@ -4,11 +4,13 @@ import { ApiError } from '../github/githubApi';
 
 export type CheckState = 'success' | 'failure' | 'pending' | 'none';
 export type ReviewState = 'approved' | 'changes' | 'required' | 'none';
+export type PullState = 'open' | 'closed' | 'merged';
 
 export interface PullSummary {
   number: number;
   title: string;
   url: string;
+  state: PullState;
   draft: boolean;
   author: string;
   /** The head branch lives in another repository. */
@@ -58,7 +60,7 @@ export const LIST_PULLS = `
 query ListPulls($q: String!, $first: Int!) {
   search(query: $q, type: ISSUE, first: $first) {
     nodes { ... on PullRequest {
-      number title url isDraft updatedAt isCrossRepository headRefName baseRefName headRefOid baseRefOid reviewDecision
+      number title url state isDraft updatedAt isCrossRepository headRefName baseRefName headRefOid baseRefOid reviewDecision
       author { login }
       commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
     } }
@@ -77,11 +79,9 @@ query ReviewThreads($owner: String!, $name: String!, $number: Int!) {
   }
 }`;
 
-export const openPullsQuery = (owner: string, repo: string): string => `repo:${owner}/${repo} is:pr is:open sort:updated-desc`;
-
 interface GqlUser { login: string; avatarUrl: string }
 interface GqlPull {
-  number: number; title: string; url: string; isDraft: boolean; updatedAt: string; isCrossRepository: boolean;
+  number: number; title: string; url: string; state: string; isDraft: boolean; updatedAt: string; isCrossRepository: boolean;
   headRefName: string; baseRefName: string; headRefOid: string; baseRefOid: string;
   reviewDecision: string | null;
   author: { login: string } | null;
@@ -94,6 +94,9 @@ const CHECKS: Record<string, CheckState> = {
 };
 const REVIEWS: Record<string, ReviewState> = { APPROVED: 'approved', CHANGES_REQUESTED: 'changes', REVIEW_REQUIRED: 'required' };
 
+export const pullStateOf = (s: string): PullState => (s === 'MERGED' ? 'merged' : s === 'CLOSED' ? 'closed' : 'open');
+export const checkStateOf = (s: string | undefined): CheckState => CHECKS[s ?? ''] ?? 'none';
+
 export function mapPulls(data: ListPullsData): PullSummary[] {
   return data.search.nodes
     .filter((n): n is GqlPull => typeof (n as GqlPull).number === 'number')
@@ -101,6 +104,7 @@ export function mapPulls(data: ListPullsData): PullSummary[] {
       number: n.number,
       title: n.title,
       url: n.url,
+      state: pullStateOf(n.state),
       draft: n.isDraft,
       author: n.author?.login ?? 'ghost',
       fork: n.isCrossRepository,
@@ -109,7 +113,7 @@ export function mapPulls(data: ListPullsData): PullSummary[] {
       headSha: n.headRefOid,
       baseSha: n.baseRefOid,
       updatedAt: n.updatedAt,
-      checks: CHECKS[n.commits.nodes[0]?.commit.statusCheckRollup?.state ?? ''] ?? 'none',
+      checks: checkStateOf(n.commits.nodes[0]?.commit.statusCheckRollup?.state),
       review: REVIEWS[n.reviewDecision ?? ''] ?? 'none',
     }));
 }

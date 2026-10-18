@@ -4,7 +4,7 @@ import assert from 'node:assert';
 import test from 'node:test';
 import { ApiError } from '../github/githubApi';
 import {
-  ListPullsData, PullSummary, ThreadsData, commentFromRest, describeFailure, leftPath, mapFiles, mapPulls, mapThreads, openPullsQuery,
+  ListPullsData, PullSummary, ThreadsData, commentFromRest, describeFailure, leftPath, mapFiles, mapPulls, mapThreads,
   pinCurrent, pullBranch, threadCount,
 } from './pullModel';
 
@@ -12,7 +12,7 @@ const A = 'a'.repeat(40);
 const B = 'b'.repeat(40);
 
 const pullNode = (over: Record<string, unknown> = {}) => ({
-  number: 12, title: 'Add x', url: 'https://github.com/o/r/pull/12', isDraft: false, updatedAt: '2026-10-02T10:00:00Z',
+  number: 12, title: 'Add x', url: 'https://github.com/o/r/pull/12', state: 'OPEN', isDraft: false, updatedAt: '2026-10-02T10:00:00Z',
   isCrossRepository: false,
   headRefName: 'feat/x', baseRefName: 'main', headRefOid: A, baseRefOid: B, reviewDecision: 'APPROVED',
   author: { login: 'octocat' }, commits: { nodes: [{ commit: { statusCheckRollup: { state: 'SUCCESS' } } }] },
@@ -20,15 +20,11 @@ const pullNode = (over: Record<string, unknown> = {}) => ({
 });
 const list = (nodes: unknown[]): ListPullsData => ({ search: { nodes } } as ListPullsData);
 
-test('openPullsQuery searches open PRs of one repo, newest update first', () => {
-  assert.strictEqual(openPullsQuery('o', 'r'), 'repo:o/r is:pr is:open sort:updated-desc');
-});
-
 test('mapPulls maps a PR and skips non-PR search nodes', () => {
   const [pull, ...rest] = mapPulls(list([pullNode(), {}]));
   assert.strictEqual(rest.length, 0);
   assert.deepStrictEqual(pull, {
-    number: 12, title: 'Add x', url: 'https://github.com/o/r/pull/12', draft: false, author: 'octocat', fork: false,
+    number: 12, title: 'Add x', url: 'https://github.com/o/r/pull/12', state: 'open', draft: false, author: 'octocat', fork: false,
     headRef: 'feat/x', baseRef: 'main', headSha: A, baseSha: B, updatedAt: '2026-10-02T10:00:00Z',
     checks: 'success', review: 'approved',
   });
@@ -110,6 +106,14 @@ test('threadCount counts the threads of one file', () => {
   const { threads: all } = mapThreads(threads([thread(), thread(), thread({ path: 'b.ts' })]));
   assert.strictEqual(threadCount(all, 'src/a.ts'), 2);
   assert.strictEqual(threadCount(all, 'none.ts'), 0);
+});
+
+test('mapPulls: merged and closed PRs keep their state, anything unknown counts as open', () => {
+  const state = (s: string) => mapPulls(list([pullNode({ state: s })]))[0].state;
+  assert.strictEqual(state('MERGED'), 'merged');
+  assert.strictEqual(state('CLOSED'), 'closed');
+  assert.strictEqual(state('OPEN'), 'open');
+  assert.strictEqual(state('SOMETHING_NEW'), 'open');
 });
 
 const summary = (over: Partial<PullSummary>): PullSummary => ({ ...mapPulls(list([pullNode()]))[0], ...over });
