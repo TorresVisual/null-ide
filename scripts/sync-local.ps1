@@ -635,20 +635,6 @@ foreach ($installFullPath in $targets) {
 
     Write-Step "Syncing null-setup"
 
-    $updaterDir =
-        Join-Path $app "null-updater"
-
-    New-Item `
-        -ItemType Directory `
-        -Path $updaterDir `
-        -Force |
-        Out-Null
-
-    Copy-Item `
-        (Join-Path $repoRoot "scripts\install-null-ide.ps1") `
-        $updaterDir `
-        -Force
-
     if (Test-Path $nullSetupExe) {
 
         $setupDir =
@@ -665,10 +651,9 @@ foreach ($installFullPath in $targets) {
             $setupDir `
             -Force
 
-        Write-Host "  [ok] registration script + setup\null-setup.exe"
+        Write-Host "  [ok] setup\null-setup.exe"
     }
     else {
-        Write-Host "  [ok] registration script"
         Write-Warning `
             "null-setup.exe not built: $nullSetupExe"
     }
@@ -721,7 +706,7 @@ foreach ($installFullPath in $targets) {
         # ----------------------------------------------------
 
         $manifest =
-            Join-Path $repoRoot "installer\Null.VisualElementsManifest.xml"
+            Join-Path $repoRoot "icons\Null.VisualElementsManifest.xml"
 
         if (Test-Path $manifest) {
 

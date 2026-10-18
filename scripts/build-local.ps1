@@ -5,7 +5,7 @@
 
 .DESCRIPTION
     Use this for changes that scripts/sync-local.ps1 can't exercise: build.yml
-    itself, shell-ext/, installer/null-ide.iss, or the VSCodium/VS Code
+    itself, shell-ext/, setup/, or the VSCodium/VS Code
     patch/merge steps. For ordinary extensions/workbench iteration against an
     already-installed Null IDE, use sync-local.ps1 instead - it's minutes
     faster because it skips the VS Code source build entirely.
@@ -39,9 +39,6 @@
 .PARAMETER SkipShellExt
     Skip building/signing the Win11 shell extension APPX.
 
-.PARAMETER SkipInstaller
-    Skip the Inno Setup installer step (still produces the zip).
-
 .PARAMETER PublishRelease
     After building, tag the current commit -Version (creating and pushing it
     if it doesn't already exist) and publish the zip/checksum/installer to a
@@ -59,7 +56,6 @@
       - CMake
       - Visual Studio 2022 with the "Desktop development with C++" workload
         (provides MSVC, the Windows SDK, signtool.exe and makeappx.exe)
-      - Inno Setup 6 (skip with -SkipInstaller if not installed)
       - git, with core.longpaths enabled - if not, this script warns rather
         than changing system git config for you; run once as admin:
           git config --global core.longpaths true
@@ -75,7 +71,6 @@ param(
     [string]$Version,
     [switch]$Clean,
     [switch]$SkipShellExt,
-    [switch]$SkipInstaller,
     [switch]$PublishRelease
 )
 
@@ -200,27 +195,9 @@ if ($longPaths -ne "true") {
     Write-Warning "Run once (as admin): git config --global core.longpaths true"
 }
 
-$iscc = @(
-    "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
-    "${env:ProgramFiles}\Inno Setup 6\ISCC.exe",
-    "${env:LOCALAPPDATA}\Programs\Inno Setup 6\ISCC.exe"
-) | Where-Object { Test-Path $_ } | Select-Object -First 1
-
-if (-not $iscc) {
-    $isccCmd = Get-Command ISCC.exe -ErrorAction SilentlyContinue
-    if ($isccCmd) { $iscc = $isccCmd.Source }
-}
-
-if (-not $SkipInstaller -and -not $iscc) {
-    throw "Inno Setup 6 (ISCC.exe) not found under Program Files, Program Files (x86), %LOCALAPPDATA%\Programs, or PATH. Install it, or pass -SkipInstaller."
-}
-
 if ($PublishRelease) {
     if (-not $Version) {
         throw "-PublishRelease requires -Version (e.g. -Version v1.2.3) so the release isn't tagged with the upstream VSCodium version by accident."
-    }
-    if ($SkipInstaller) {
-        throw "-PublishRelease and -SkipInstaller can't be combined; the installer is one of the published release assets."
     }
     if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
         throw "-PublishRelease requires the GitHub CLI (gh) on PATH."
@@ -650,7 +627,7 @@ foreach ($name in @("null", "code", "codium", "vscodium")) {
 }
 Copy-Item (Join-Path $RepoRoot "icons/icon_150x150.png") "$outWin32/code_150x150.png" -Force
 Copy-Item (Join-Path $RepoRoot "icons/icon_70x70.png")   "$outWin32/code_70x70.png"   -Force
-Copy-Item (Join-Path $RepoRoot "installer/Null.VisualElementsManifest.xml") (Join-Path $OutDir "Null.VisualElementsManifest.xml") -Force
+Copy-Item (Join-Path $RepoRoot "icons/Null.VisualElementsManifest.xml") (Join-Path $OutDir "Null.VisualElementsManifest.xml") -Force
 
 $outMedia = Join-Path $OutDir "resources/app/out/media"
 foreach ($variant in @("letterpress-dark", "letterpress-hcDark")) {
@@ -808,11 +785,7 @@ finally {
     Pop-Location
 }
 
-Write-Step "Preparing installer payload"
-$payloadDir = Join-Path $OutDir "resources/app/null-updater"
-New-Item -ItemType Directory -Path $payloadDir -Force | Out-Null
-Copy-Item (Join-Path $RepoRoot "scripts/install-null-ide.ps1") $payloadDir -Force
-
+Write-Step "Preparing release payload"
 $builtinsJson = Join-Path $OutDir "builtins.json"
 node (Join-Path $RepoRoot "scripts/gen-builtins.mjs") $builtinsJson
 if ($LASTEXITCODE -ne 0) { throw "gen-builtins failed" }
@@ -839,23 +812,7 @@ $hash = Get-FileHash $zipPath -Algorithm SHA256
 "$($hash.Hash.ToLower())  null-ide-win32-x64.zip" | Set-Content "$zipPath.sha256" -Encoding ASCII -NoNewline
 Write-Host "Archive: $zipPath ($([math]::Round((Get-Item $zipPath).Length / 1MB, 1)) MB)"
 
-if (-not $SkipInstaller) {
-    Write-Step "Building Windows installer"
-    Invoke-Native "ISCC.exe" {
-        & $iscc (Join-Path $RepoRoot "installer/null-ide.iss") `
-            /DSourceDir="$OutDir" /DAppVersion="$buildVersion" /O"$WorkspaceDir"
-    }
-    $installer = Get-ChildItem $WorkspaceDir -Filter "NullIDEInno*.exe" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-    if (-not $installer) {
-        throw "Inno Setup completed, but no NullIDEInno*.exe was found in $WorkspaceDir"
-    }
-    Write-Host "Installer: $($installer.FullName)"
-}
-else {
-    Write-Host "Skipping installer (-SkipInstaller)"
-}
-
-# The Rust setup stub is the downloadable installer (NullIDESetup-<version>.exe); Inno stays as NullIDEInno-<version>.exe until 2c-3.
+# The Rust setup stub is the downloadable installer (NullIDESetup-<version>.exe).
 $stubSource = Join-Path $RepoRoot "setup/target/release/null-setup.exe"
 $stub = $null
 if (Test-Path $stubSource) {
@@ -871,7 +828,7 @@ if (Test-Path $stubSource) {
 if ($PublishRelease) {
     Write-Step "Publishing GitHub release $buildVersion"
 
-    $releaseFiles = @($zipPath, "$zipPath.sha256", $builtinsJson, $installer.FullName, $stub, (Join-Path $RepoRoot "scripts/install-null-ide.ps1")) | Where-Object { $_ }
+    $releaseFiles = @($zipPath, "$zipPath.sha256", $builtinsJson, $stub) | Where-Object { $_ }
 
     $tagExists = (git tag --list $buildVersion)
     Write-Host ""

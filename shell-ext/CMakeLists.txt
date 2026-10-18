@@ -27,7 +27,7 @@ target_compile_definitions(null_explorer_command PRIVATE
     # COM class GUID — must match AppxManifest.xml <com:Class Id>
     DLL_UUID="A72D088B-AC8B-4AB5-ABFE-49C5CE37A466"
     # Preview handler COM class GUID — registered via classic registry
-    # (scripts/install-null-ide.ps1), not AppxManifest.xml. See
+    # (null-setup, setup/core/src/shell/), not AppxManifest.xml. See
     # docs/specs/explorer-preview-integration-design.md
     PREVIEW_HANDLER_UUID="58F3B583-5D67-489A-9069-97FD45B2569B"
     # Executable name (case-sensitive on some APIs)
