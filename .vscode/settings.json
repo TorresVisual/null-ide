@@ -10,6 +10,7 @@
       "background": "none",
       "saveAll": false,
       "focus": true,
+      "onBusy": "ask",
       "priority": 0
     },
     {
@@ -21,6 +22,7 @@
       "background": "none",
       "saveAll": false,
       "focus": false,
+      "onBusy": "ask",
       "priority": 0
     },
     {
@@ -33,6 +35,7 @@
       "cwd": "${workspaceFolder}",
       "saveAll": false,
       "focus": true,
+      "onBusy": "ask",
       "priority": 0
     },
     {
@@ -44,6 +47,7 @@
       "background": "none",
       "saveAll": false,
       "focus": true,
+      "onBusy": "ask",
       "priority": 0
     },
     {
@@ -55,6 +59,20 @@
       "background": "none",
       "saveAll": false,
       "focus": true,
+      "onBusy": "ask",
+      "priority": 0
+    },
+    {
+      "id": "button-1792343034587",
+      "label": "Build Setup",
+      "type": "terminal",
+      "command": "cargo build --release",
+      "color": "#dfa0a6",
+      "background": "none",
+      "cwd": "${workspaceFolder}\\setup",
+      "saveAll": false,
+      "focus": true,
+      "onBusy": "ask",
       "priority": 0
     }
   ]
