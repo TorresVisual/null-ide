@@ -4,6 +4,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import {
+  normalizeRecentProjectPath,
   readRecentProjects,
   removeRecentProject,
   setRecentProjectPinned,
@@ -76,3 +77,10 @@ test('writes atomically without leaving a temporary file', () => withStore((file
   assert.equal(writeRecentProjects(file, [{ path: 'C:\\App', label: 'App', isWorkspaceFile: false, timestamp: 1, pinned: false }]), true);
   assert.deepEqual(fs.readdirSync(dir).filter(name => name.endsWith('.tmp')), []);
 }));
+
+test('paths differing only in case are the same project on Windows but not on Linux', () => {
+  const a = path.resolve('Work', 'App');
+  const b = path.resolve('work', 'app');
+  assert.equal(normalizeRecentProjectPath(a, 'win32'), normalizeRecentProjectPath(b, 'win32'));
+  assert.notEqual(normalizeRecentProjectPath(a, 'linux'), normalizeRecentProjectPath(b, 'linux'));
+});

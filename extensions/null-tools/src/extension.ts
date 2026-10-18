@@ -25,6 +25,7 @@ import { registerWhyIsThisHereFeature } from './whyIsThisHereIntegration';
 import { registerRecoveryFeature } from './recovery/recoveryIntegration';
 import { registerFirstRunFeature } from './firstRunIntegration';
 import { registerSetupFeature } from './setupIntegration';
+import { nullDataDir } from './dataDir';
 
 // ── Activation ─────────────────────────────────────────────────────────────
 
@@ -87,9 +88,9 @@ export function activate(context: vscode.ExtensionContext): void {
   }));
 
   context.subscriptions.push(vscode.commands.registerCommand('null.clearWebviewCache', async () => {
-    const appData = process.env.APPDATA;
-    if (!appData) { vscode.window.showErrorMessage('Null: cannot locate %APPDATA%.'); return; }
-    const userDataDir = path.join(appData, 'Null');
+    let userDataDir: string;
+    try { userDataDir = nullDataDir(); }
+    catch (err) { vscode.window.showErrorMessage(`Null: ${(err as Error).message}`); return; }
     const targets = ['Cache', 'CachedData', 'Code Cache', 'WebStorage'];
     const cleared: string[] = [], failed: string[] = [];
     for (const name of targets) {

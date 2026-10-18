@@ -2,6 +2,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { nullDataDir } from './dataDir';
 
 export interface RecentProjectEntry {
   path: string;
@@ -17,13 +18,13 @@ export interface RecentProjectEntry {
 type StoredEntry = Omit<RecentProjectEntry, 'pinned'> & { pinned?: boolean };
 
 export function getRecentProjectsFilePath(): string {
-  const appData = process.env.APPDATA;
-  if (!appData) { throw new Error('Cannot locate %APPDATA%.'); }
-  return path.join(appData, 'Null', 'null-recent-projects.json');
+  return path.join(nullDataDir(), 'null-recent-projects.json');
 }
 
-export function normalizeRecentProjectPath(value: string): string {
-  return path.resolve(value).toLowerCase();
+// Windows paths are case-insensitive, so 'Work' and 'work' name one project there; Linux paths are not.
+export function normalizeRecentProjectPath(value: string, platform: NodeJS.Platform = process.platform): string {
+  const resolved = path.resolve(value);
+  return platform === 'win32' ? resolved.toLowerCase() : resolved;
 }
 
 function readEntry(value: unknown): RecentProjectEntry | undefined {
