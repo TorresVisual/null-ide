@@ -93,9 +93,7 @@ guard is inert — null-activity's git-stats gate is the only one.
 ## Important Entry Points
 - `extensions/*/src/extension.ts` (activate), mostly `onStartupFinished`.
 - `extensions/null-tools/src/*Integration.ts` — per-feature wiring.
-- `scripts/install-null-ide.ps1` — install, PATH, shortcuts, file assoc,
-  preview handler, seeds `%APPDATA%\Null\User\settings.json`.
-- `installer/null-ide.iss` — wraps the PS installer.
+- `setup/` — `null-setup` (Rust + Tauri): installer wizard, repair/modify/uninstall, updater.
 
 ## Important Services
 - Project detection: `null-cpp/src/projectDetection*.ts`,
@@ -107,24 +105,11 @@ guard is inert — null-activity's git-stats gate is the only one.
   runs **once at startup only** and swallows errors silently (found
   2026-10-11, commented on #120).
 
-## Updater (native EXE + TS orchestration)
-Previously undocumented — a full rewrite (`docs/specs/native-updater-design.md`,
-`docs/plans/native-updater-fix.md`, commits `ff51581`..`ac4b54e`, 2026-09-19)
-replaced the old PowerShell-only flow. Confirmed live in code as of this audit:
-- `updater/` — standalone CMake C++17 project (`updater/src/main.cpp`, bundled
-  `miniz` for zip extraction), built by CI (`build.yml` "Build null-updater")
-  into `resources/app/null-updater/null-updater.exe`. WinHTTP download,
-  BCrypt SHA256 verification, Win32 TaskDialog progress UI with Retry/Close
-  buttons on failure, rollback-to-backup (`.null-ide-bak-*`) if the swap
-  fails partway, and a post-swap call into
-  `install-null-ide.ps1 -ReapplyRegistrations` to refresh context-menu/
-  file-assoc/preview-handler/default-settings.
-- `null-tools/src/updater.ts` resolves and invokes the EXE (passing
-  `--zip-path`/`--version` when it has already background-downloaded and
-  SHA256-verified the release zip via `stageUpdateInBackground`), only
-  falling back to the old `update-null-ide.ps1` PowerShell launcher if the
-  EXE truly isn't found. `versionComparison.ts` (extracted, unit-tested)
-  fixes a prerelease-suffix comparison bug (`v1.2.0-beta` vs `v1.2.0`).
+## Updater (`null-setup` + TS orchestration)
+The C++ `updater/` and the PowerShell launchers are gone; `null-setup` (`setup/`, Rust) does everything natively:
+- `null-setup prefetch` downloads the release zip and verifies its `.sha256` sidecar into `%LOCALAPPDATA%\Null\updates\<tag>\`.
+- `null-setup update` relocates itself out of the install dir, closes the IDE, swaps the install with a journal and rollback, re-applies the shell registrations natively (`setup/core/src/shell/`), and waits for the new IDE's `.null-ready` marker.
+- `null-tools/src/updater.ts` finds `setup\null-setup.exe` and spawns those two modes; `versionComparison.ts` (unit-tested) handles prerelease suffixes.
 - `updaterIntegration.ts` status bar distinguishes "downloading" vs
   "restart to update" (staged + verified) states.
 - `build.yml` publishes a `.sha256` sidecar alongside the release zip.

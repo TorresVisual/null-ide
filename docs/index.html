@@ -318,7 +318,8 @@
 
     .install-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: minmax(0, 480px);
+      justify-content: center;
       gap: 20px;
     }
 
@@ -617,18 +618,6 @@
             </svg>
             Installs per-user to %LOCALAPPDATA%\Programs\Null IDE
           </p>
-        </div>
-      </div>
-
-      <!-- PowerShell -->
-      <div class="install-card">
-        <div class="install-head">
-          <div class="install-head-title">PowerShell</div>
-          <div class="install-head-sub">From the repository</div>
-        </div>
-        <div class="install-body">
-          <div class="codeblock"><span class="cb-kw">powershell</span> <span class="cb-flag">-ExecutionPolicy Bypass</span> <span class="cb-cont">`</span>
-  <span class="cb-flag">-File</span> scripts\install-null-ide.ps1</div>
         </div>
       </div>
 

@@ -7,7 +7,7 @@
 **A minimal, opinionated code editor for Windows.**
 Fully assembled out of the box, with zero telemetry.
 
-VSCodium · Electron · TypeScript · C++ · Inno Setup
+VSCodium · Electron · TypeScript · C++ · Rust
 
 [Website](https://torresvisual.github.io/null-ide/) · [Releases](https://github.com/TorresVisual/null-ide/releases/latest)
 
@@ -15,11 +15,7 @@ VSCodium · Electron · TypeScript · C++ · Inno Setup
 
 Null IDE is built on [VSCodium](https://vscodium.com) and ships with a dark theme, icon pack, GitHub Issues, formatters, C++ navigation, and native Explorer integration already in place.
 
-```powershell
-irm https://github.com/TorresVisual/null-ide/releases/latest/download/install-null-ide.ps1 | iex
-```
-
-Or download `NullIDESetup-<version>.exe` from the [latest release](https://github.com/TorresVisual/null-ide/releases/latest).
+Download `NullIDESetup-<version>.exe` from the [latest release](https://github.com/TorresVisual/null-ide/releases/latest) and run it. The installer is not code-signed, so Windows SmartScreen may ask you to confirm; the SHA256 check only guards against a corrupted or truncated download, not against a compromised release.
 
 > Null IDE is a personal daily-driver editor developed in the open. It is Windows-only (x64) and tracks upstream VSCodium via an automated release pipeline.
 
@@ -54,30 +50,23 @@ Or download `NullIDESetup-<version>.exe` from the [latest release](https://githu
 
 ## Install
 
-### Installer (recommended)
+### Installer
 
-Run `NullIDESetup-<version>.exe` from the [latest release](https://github.com/TorresVisual/null-ide/releases/latest).
+Run `NullIDESetup-<version>.exe` from the [latest release](https://github.com/TorresVisual/null-ide/releases/latest). The wizard downloads the newest release and lets you pick the install folder, shortcuts, `PATH` entry, Explorer context menu, file associations, which built-in extensions to keep and a few starting settings (theme, font, auto save, format on save, update check, menu bar). **Use recommended defaults** skips ahead.
 
-The install is per-user (`%LOCALAPPDATA%\Programs\Null IDE`) and needs no administrator rights. It registers the context menu, adds `null` to your `PATH`, creates shortcuts, and seeds default settings.
+The install is per-user (`%LOCALAPPDATA%\Programs\Null IDE` by default) and needs no administrator rights, apart from one optional approval for the Windows 11 context-menu certificate. It needs the WebView2 runtime (part of Windows 11; Windows 10 22H2 ships it too).
 
-### PowerShell
-
-```powershell
-# Latest release
-powershell -ExecutionPolicy Bypass -File scripts\install-null-ide.ps1
-
-# From a ZIP you already downloaded
-powershell -ExecutionPolicy Bypass -File scripts\install-null-ide.ps1 -ZipPath .\null-ide-win32-x64.zip
-
-# To a custom location
-powershell -ExecutionPolicy Bypass -File scripts\install-null-ide.ps1 -InstallDir "D:\Tools\NullIDE"
-```
+Run the installer again, or use Settings → Apps → Null IDE, for **Modify**, **Repair** and **Uninstall**. Inside the IDE, **Null: Setup** opens the same window on Modify. Uninstall keeps `%APPDATA%\Null` (settings, extensions) unless you tick the box to delete it.
 
 A portable `null-ide-win32-x64.zip` (with a `.sha256`) is also attached to each release.
 
+#### Coming from the Inno Setup installer (v1.0.17 and earlier)
+
+Uninstall the old copy first (Settings → Apps → Null IDE); the new installer refuses a folder that is not empty. Your settings and extensions in `%APPDATA%\Null` are not touched by that uninstall. Those older versions cannot update themselves to this one.
+
 ### Updating
 
-A status-bar button appears when a new release is available (checked on startup, at most every 6 hours). Click it and the IDE closes, updates, and reopens. You can also run **Null: Check for Updates** from the command palette. Installs from before the `null-setup` updater cannot update themselves once: install that release by hand from the Releases page.
+A status-bar button appears when a new release is available (checked on startup, at most every 6 hours). Click it and the IDE closes, updates, and reopens. You can also run **Null: Check for Updates** from the command palette.
 
 ---
 
@@ -123,7 +112,7 @@ Suggested on first launch: `llvm-vs-code-extensions.vscode-clangd`, `twxs.cmake`
 
 Release builds run in GitHub Actions on a `windows-2022` runner. Don't try to build the full editor locally.
 
-The pipeline clones VSCodium and the matching VS Code source at the pinned `VSCODIUM_TAG`, applies VSCodium's patches and those in [`patches/`](patches/), merges the [`product.json`](product.json) overlay, compiles and copies the built-in extensions, swaps in icons and workbench assets, builds with `npx gulp vscode-win32-x64`, builds and signs the shell extension, then packages the ZIP and Inno Setup installer.
+The pipeline clones VSCodium and the matching VS Code source at the pinned `VSCODIUM_TAG`, applies VSCodium's patches and those in [`patches/`](patches/), merges the [`product.json`](product.json) overlay, compiles and copies the built-in extensions, swaps in icons and workbench assets, builds with `npx gulp vscode-win32-x64`, builds and signs the shell extension, then packages the ZIP and the setup stub (`NullIDESetup-<version>.exe`).
 
 ```powershell
 git tag v1.2.3
@@ -138,8 +127,8 @@ Or run **Actions → Build Null IDE → Run workflow** manually. A scheduled job
 extensions/        Built-in extensions (TypeScript sources in src/, compiled to out/ in CI)
 shell-ext/         Win11 IExplorerCommand DLL + sparse APPX manifest (CMake + MSVC)
 patches/           Patches against the VS Code source tree
-installer/         Inno Setup script
-scripts/           Install/update scripts and local dev helpers
+setup/             null-setup: installer, wizard and updater (Rust + Tauri)
+scripts/           Local dev helpers and build scripts
 workbench/         custom.css and splash.js injected into workbench.html
 icons/             Source icons
 docs/              GitHub Pages site, roadmap, design specs
@@ -152,7 +141,7 @@ Day-to-day extension and workbench work doesn't need the full build:
 | Script | Use for |
 |---|---|
 | `scripts/sync-local.ps1` | Sync compiled extensions and workbench assets into an installed Null IDE, then reload the window |
-| `scripts/build-local.ps1` | Mirror the CI build to iterate on `build.yml`, `shell-ext/`, `installer/`, or patches. Slow (tens of minutes); needs Node, Rust, CMake, VS2022, Inno Setup 6 |
+| `scripts/build-local.ps1` | Mirror the CI build to iterate on `build.yml`, `shell-ext/`, `setup/`, or patches. Slow (tens of minutes); needs Node, Rust, CMake and VS2022 |
 
 Extensions are compiled with `npm ci && npm run compile` in each extension directory. Edit the TypeScript in `src/`, not the generated `out/` files.
 

@@ -4,11 +4,11 @@
 
 | Capability | Status | Location | Notes |
 |---|---|---|---|
-| Installer (Inno + portable ZIP) | Implemented | installer/, scripts/install-null-ide.ps1 | per-user, no elevation |
+| Installer (null-setup wizard + portable ZIP) | Implemented | setup/ | per-user, no elevation |
 | Package managers (winget/scoop/choco) | Missing | — | #13 #14 #15 |
-| In-app updater | Partial | null-tools/src/updater.ts, updater/src/main.cpp | native EXE, checksum, rollback; but check is startup-only and silent on failure (#120, #12) |
+| In-app updater | Partial | null-tools/src/updater.ts, setup/ | native EXE, checksum, rollback; but check is startup-only and silent on failure (#120, #12) |
 | Explorer context menu (Win11) | Implemented | shell-ext/ | sparse APPX |
-| File associations + preview handler | Implemented | install-null-ide.ps1 | |
+| File associations + preview handler | Implemented | setup/core/src/shell/ | |
 | Import from VS Code/Cursor | Missing | — | #90 |
 | Companion extension/toolchain check | Missing | — | #89 |
 | Settings sync | Missing | — | #23 |
