@@ -129,11 +129,21 @@ fn check_tag(tag: &str) -> Result<()> {
     }
 }
 
-/// Only a missing folder or a listable empty one counts as empty; anything unreadable must not look empty,
-/// because the swap would rename it aside and delete it.
+/// Only a missing folder or a listable folder holding nothing but a `data` profile counts as empty; anything
+/// unreadable must not look empty, because the swap would rename it aside and delete it. The swap carries
+/// `data\` over, so an uninstall that kept the profile leaves a folder a reinstall can use.
 pub fn is_empty_target(dir: &Path) -> Result<bool> {
     match fs::read_dir(dir) {
-        Ok(mut r) => Ok(r.next().is_none()),
+        Ok(r) => {
+            for entry in r {
+                let entry = entry.map_err(|source| Error::Io { context: format!("read {}", dir.display()), source })?;
+                let profile = entry.file_name().eq_ignore_ascii_case("data") && entry.path().is_dir();
+                if !profile {
+                    return Ok(false);
+                }
+            }
+            Ok(true)
+        }
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(true),
         Err(e) if dir.exists() && !dir.is_dir() => {
             Err(Error::Other(format!("{} is not a folder ({e})", dir.display())))

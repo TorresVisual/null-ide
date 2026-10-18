@@ -259,6 +259,19 @@ fn install_refuses_a_folder_that_is_not_empty_and_not_ours() {
 }
 
 #[test]
+fn install_accepts_a_folder_that_only_holds_a_kept_profile() {
+    let w = with_builtins();
+    let srv = serve_release(w.zip.clone(), sha(&w.zip), Arc::new(AtomicUsize::new(0)));
+    let o = install_opts(&w, &srv.base, InstallConfig::default());
+    let t = fresh_target(&w);
+    fs::create_dir_all(t.join("data").join("user")).unwrap();
+    fs::write(t.join("data").join("user").join("settings.json"), "{}").unwrap();
+    run(|c| update(&o, c)).0.unwrap();
+    assert!(t.join("new.txt").exists());
+    assert!(t.join("data").join("user").join("settings.json").exists());
+}
+
+#[test]
 fn install_refuses_an_existing_install() {
     let w = with_builtins();
     let srv = serve_release(w.zip.clone(), sha(&w.zip), Arc::new(AtomicUsize::new(0)));
