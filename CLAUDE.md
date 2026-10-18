@@ -50,7 +50,7 @@ The entire build runs in GitHub Actions on a `windows-2022` runner — do **not*
 2. Apply VSCodium's own patches, then every `patches/*.patch` in name order (`git apply --ignore-whitespace`).
 3. Deep-merge `product.json` overlay into `vscode-src/product.json`.
 4. `npm ci --prefix extensions/null-markdown` and `npm run build` in it (esbuild bundles the Markdown Editor webview); `npm ci && npm run compile` in each other TS extension (`null-tools`, `null-cpp`, `null-actions`, `null-accounts`, `null-format`, `null-music`, `null-activity`, `null-startup`, `null-env`, `null-sync`).
-5. Copy all thirteen built-in extensions into `vscode-src/extensions/`; bundle Code Spell Checker from `CSPELL_TAG`.
+5. Copy all thirteen built-in extensions into `vscode-src/extensions/` (their `CLAUDE.md` files are deleted after the copy); bundle Code Spell Checker from `CSPELL_TAG`.
 6. Replace upstream icons with files from `icons/`.
 7. Copy `workbench/custom.css` → `null-custom.css` and `workbench/splash.js` → `null-splash.js` into the source tree; inject `<link>` / `<script>` tags into `workbench.html`.
 8. `npm ci && npx gulp vscode-win32-x64` produces `VSCode-win32-x64/`.

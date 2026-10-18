@@ -356,6 +356,8 @@ Write-Step "Copying built-in extensions"
 foreach ($ext in @("null-theme", "null-tools", "null-icons", "null-markdown", "null-cpp", "null-actions", "null-accounts", "null-format", "null-music", "null-activity", "null-startup", "null-env", "null-sync")) {
     Copy-Item -Recurse -Force (Join-Path $RepoRoot "extensions/$ext") (Join-Path $VscodeSrc "extensions/")
 }
+# CLAUDE.md files are agent notes, not extension content
+Get-ChildItem (Join-Path $VscodeSrc "extensions/null-*/CLAUDE.md") | Remove-Item -Force
 
 # ============================================================
 # BUNDLE CODE SPELL CHECKER

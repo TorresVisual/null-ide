@@ -243,6 +243,8 @@ jobs:
           Copy-Item -Recurse -Force ide-overlay/extensions/null-startup    vscode-src/extensions/
           Copy-Item -Recurse -Force ide-overlay/extensions/null-env        vscode-src/extensions/
           Copy-Item -Recurse -Force ide-overlay/extensions/null-sync       vscode-src/extensions/
+          # CLAUDE.md files are agent notes, not extension content
+          Get-ChildItem vscode-src/extensions/null-*/CLAUDE.md | Remove-Item -Force
 
       - name: Bundle Code Spell Checker as built-in extension
         shell: pwsh
