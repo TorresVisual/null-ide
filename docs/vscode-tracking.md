@@ -4,7 +4,7 @@ Null IDE builds on VSCodium, which trails VS Code by several releases. This list
 catches VS Code features early so we can backport or adapt them now instead of
 waiting for the VSCodium bump (#115).
 
-**Last reviewed: 1.141** (backfilled 1.129–1.135, already in the 1.135 build, so those rows are ticked as reconciled)
+**Last reviewed: 1.142** (backfilled 1.129–1.135, already in the 1.135 build, so those rows are ticked as reconciled)
 
 The `upstream-check` workflow opens a *Review VS Code 1.x release notes* issue for
 every stable release after the version above; `/vscode-watch` works through them
@@ -27,6 +27,13 @@ against the real upstream feature, then tick **Reconciled**.
 
 | Feature | VS Code | Status | Null issue | Reconciled |
 |---|---:|---|---|---|
+| Markdown editor: paste images from the clipboard | 1.142 | Adapt | #138 | |
+| Markdown editor: Outline view and breadcrumbs integration | 1.142 | Adapt | #139 | |
+| Markdown editor: hover copy button on code blocks | 1.142 | Adapt | #140 | |
+| Markdown editor: Rename Symbol (F2) on file links; needs a rename round-trip from the webview to the language server | 1.142 | Wait | — | |
+| Markdown editor: editing mode shows each source line on its own visual line; Null's caret-reveal markers are a deliberate difference | 1.142 | Wait | — | |
+| `editor.occurrencesHighlightFromAllProviders`: merge document highlights from all providers instead of only the top-priority one | 1.142 | Wait | — | |
+| N/A: Copilot harness as default, canvases, moving chats between folders/worktrees, Agents window layout scope / panel alignment, harness name in chat titles, stopping background shells, BYOK `statefulResponses`, Windows sandboxing deprecation, redesigned model picker, enterprise policy routing / permission modes / DWORD policies, Python Environments fixes (extension not bundled), GitHub Pull Requests 0.170 stacked PRs on by default (not bundled) | 1.142 | N/A | — | |
 | Spreading block paste: with `editor.multiCursorPaste: spread`, pasting a copied block at a single cursor distributes its rows across successive lines (`full` pastes the whole block) | 1.141 | Wait | — | |
 | Modern UI polish (frosted glass overlays `workbench.modernUIFrostedGlass`, `connected`/`pill` tab styles); only with experimental `workbench.experimental.modernUI` | 1.141 | Wait | — | |
 | Compact layout density now also applies to editor windows via `window.density.layout` (continues the 1.136 row) | 1.141 | Wait | — | |
