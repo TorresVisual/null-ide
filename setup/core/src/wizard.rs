@@ -49,13 +49,17 @@ fn same(a: &Path, b: &Path) -> bool {
 
 /// `given`: `--install-dir` from the command line. `registered`: the folder in Add/Remove Programs.
 pub fn decide(intent: Intent, given: Option<PathBuf>, registered: Option<PathBuf>, is_ours: &dyn Fn(&Path) -> bool, default_dir: PathBuf) -> Result<Plan> {
+    // Installs from before the Add/Remove Programs entry existed have no registration, so the default folder counts too.
+    let found = |d: &PathBuf| given.is_none() && is_ours(d);
     if intent == Intent::Auto {
-        if let Some(d) = given.as_ref().or(registered.as_ref()).filter(|d| is_ours(d)) {
+        if let Some(d) = given.as_ref().or(registered.as_ref()).filter(|d| is_ours(d)).or(Some(&default_dir).filter(|d| found(d))) {
             return Ok(Plan { page: Page::Maintenance, install_dir: d.clone() });
         }
         return Ok(Plan { page: Page::Install, install_dir: given.unwrap_or(default_dir) });
     }
     let dir = given
+        .or_else(|| registered.clone().filter(|d| is_ours(d)))
+        .or_else(|| Some(default_dir.clone()).filter(|d| is_ours(d)))
         .or_else(|| registered.clone())
         .ok_or_else(|| Error::Other("no Null IDE install found".into()))?;
     if is_ours(&dir) {

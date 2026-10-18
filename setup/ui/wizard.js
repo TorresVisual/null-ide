@@ -262,7 +262,8 @@ function run(kind) {
   S.phase = 'running'; S.progress = { state: 'checking' }; S.locked = null;
   render();
   invoke('wizard_start', { job }).catch((e) => {
-    S.phase = 'failed'; S.progress = { state: 'failed', message: String(e), log: null };
+    const f = startFailure(kind, String(e));
+    S.phase = f.phase; S.note = f.note; S.progress = { state: 'failed', message: f.note, log: null };
     render();
   });
 }

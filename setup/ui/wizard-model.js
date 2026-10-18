@@ -105,3 +105,8 @@ function summaryLines(s) {
   }
   return lines;
 }
+
+/** What the page does when the backend refuses a job before it starts: install and modify keep the person's choices. */
+function startFailure(kind, message) {
+  return { phase: kind === 'install' || kind === 'modify' ? 'wizard' : 'failed', note: message };
+}

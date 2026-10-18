@@ -97,3 +97,10 @@ test('every config key the page offers exists on the Rust InstallConfig', () => 
     assert.ok(rust.includes(`pub ${snake}: bool`), `${key} is not an InstallConfig field`);
   }
 });
+
+test('a job the backend refuses keeps install and modify on the wizard with the reason', () => {
+  assert.deepEqual(plain(ctx.startFailure('install', 'x is not empty')), { phase: 'wizard', note: 'x is not empty' });
+  assert.deepEqual(plain(ctx.startFailure('modify', 'bad choice')), { phase: 'wizard', note: 'bad choice' });
+  assert.deepEqual(plain(ctx.startFailure('repair', 'no install')), { phase: 'failed', note: 'no install' });
+  assert.deepEqual(plain(ctx.startFailure('uninstall', 'no install')), { phase: 'failed', note: 'no install' });
+});

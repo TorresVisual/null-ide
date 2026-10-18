@@ -2,7 +2,7 @@ use std::{env, fs, path::Path, process::Command};
 
 use null_setup_core::{local_app_data, procs::is_under};
 
-use crate::args::Args;
+use crate::args::{Args, Mode};
 
 const FLAG: &str = "NULL_SETUP_RELOCATED";
 
@@ -10,10 +10,17 @@ pub fn needs_relocation(exe: &Path, install_dir: &Path, already: bool) -> bool {
     !already && is_under(exe, install_dir)
 }
 
+/// The wizard may act on an install other than the one in its arguments (the registered one), so a copy that lives in
+/// any install has to move out before the swap or the deletion.
+pub fn lives_in_an_install(exe: &Path) -> bool {
+    exe.ancestors().skip(1).any(|d| d.join(".null-ide-install.json").is_file())
+}
+
 /// The install directory is about to be renamed, so the running exe must not live in it.
 pub fn maybe_relocate(a: &Args) {
     let Ok(exe) = env::current_exe() else { return };
-    if !needs_relocation(&exe, &a.install_dir, env::var_os(FLAG).is_some()) {
+    let already = env::var_os(FLAG).is_some();
+    if !needs_relocation(&exe, &a.install_dir, already) && !(a.mode == Mode::Wizard && !already && lives_in_an_install(&exe)) {
         return;
     }
     let dir = local_app_data().join("Null").join("updates").join("run");
@@ -38,6 +45,18 @@ pub fn maybe_relocate(a: &Args) {
 mod tests {
     use super::*;
     use std::path::Path;
+
+    #[test]
+    fn a_wizard_started_from_inside_any_install_is_recognized() {
+        let tmp = tempfile::tempdir().unwrap();
+        let install = tmp.path().join("Null IDE");
+        let exe = install.join("setup").join("null-setup.exe");
+        std::fs::create_dir_all(exe.parent().unwrap()).unwrap();
+        assert!(!lives_in_an_install(&exe)); // no marker yet
+        std::fs::write(install.join(".null-ide-install.json"), "{}").unwrap();
+        assert!(lives_in_an_install(&exe));
+        assert!(!lives_in_an_install(&tmp.path().join("Downloads").join("null-setup.exe")));
+    }
 
     #[test]
     fn relocates_only_from_inside_the_install_dir_and_only_once() {

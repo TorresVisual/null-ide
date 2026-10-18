@@ -108,3 +108,15 @@ fn a_failing_manifest_download_is_an_error_not_a_silent_downgrade() {
     let down = support::serve(|_| (404, vec![], vec![]));
     assert!(matches!(fetch_install(&http(), &down.base, "o/r"), Err(Error::Http { status: 404, .. })));
 }
+
+#[test]
+fn an_install_in_the_default_folder_without_an_add_remove_entry_still_shows_maintenance() {
+    // installs from before the entry existed (and ones updated by the old updater) have no registration
+    let plan = decide(Intent::Auto, None, None, &ours(&[DEFAULT]), p(DEFAULT)).unwrap();
+    assert_eq!((plan.page, plan.install_dir), (Page::Maintenance, p(DEFAULT)));
+    let plan = decide(Intent::Uninstall, None, None, &ours(&[DEFAULT]), p(DEFAULT)).unwrap();
+    assert_eq!((plan.page, plan.install_dir), (Page::Uninstall, p(DEFAULT)));
+    // a registered install elsewhere still wins over the default folder
+    let plan = decide(Intent::Auto, None, Some(p(r"D:\Null")), &ours(&[r"D:\Null", DEFAULT]), p(DEFAULT)).unwrap();
+    assert_eq!(plan.install_dir, p(r"D:\Null"));
+}
