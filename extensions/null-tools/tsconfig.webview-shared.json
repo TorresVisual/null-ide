@@ -18,6 +18,8 @@
     "src/webview/shared/picker.ts",
     "src/webview/detailTypes.ts",
     "src/webview/detailHtml.ts",
+    "src/webview/pullDetailTypes.ts",
+    "src/webview/pullDetailHtml.ts",
     "src/webview/detailSidebarHtml.ts",
     "src/webview/composerText.ts",
     "src/webview/createFormHtml.ts",
