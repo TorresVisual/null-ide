@@ -57,7 +57,7 @@ The entire build runs in GitHub Actions on a `windows-2022` runner — do **not*
 9. Build Win11 shell extension: fetch WIL headers, compile DLL with CMake + MSVC, pack and sign sparse APPX (`null-shell-ext.appx`).
 10. Stamp version, commit hash, and server URL into the build output's `product.json`; replace letterpress SVGs; `rcedit` the icon into `null.exe`.
 11. Build `setup/` with cargo (`cargo test`, then `cargo build --release`); ship `null-setup.exe` as `setup/null-setup.exe`; `null-setup` registers natively.
-12. `Compress-Archive` → `null-ide-win32-x64.zip`; the setup stub → `NullIDESetup-<version>.exe`; all uploaded to the GitHub Release (tag builds) and as workflow artifacts.
+12. `Compress-Archive` → `null-ide-win32-x64.zip`; the setup stub → `NullIDESetup-<version>.exe`; all uploaded to the GitHub Release (tag builds) and as workflow artifacts. The release body comes from `scripts/release-notes.mjs` (highlights from `docs/specs/` + `docs/plans/` added since the previous `v*` tag, then commits grouped by Conventional Commit type); `node --test scripts/release-notes.test.mjs` covers its pure parts.
 
 ## Built-in Extensions
 Conventions for every extension with a `src/`:
