@@ -1,0 +1,90 @@
+'use strict';
+
+import assert from 'node:assert';
+import { EventEmitter } from 'node:events';
+import https from 'node:https';
+import test, { afterEach, mock } from 'node:test';
+import { createLineComment, fetchMergeBase, fetchPullFiles, fetchReviewThreads, listOpenPulls, replyToComment } from './pullApi';
+
+afterEach(() => mock.restoreAll());
+
+interface Call { url: string; method: string; body?: any }
+
+/** Answers each https.request with the next canned response (the last one repeats) and records what was asked. */
+function stub(responses: unknown[]): Call[] {
+  const calls: Call[] = [];
+  mock.method(https, 'request', (url: string, opts: { method: string }, onResponse: (res: unknown) => void) => {
+    const call: Call = { url, method: opts.method };
+    calls.push(call);
+    const next = responses[Math.min(calls.length - 1, responses.length - 1)];
+    return Object.assign(new EventEmitter(), {
+      setTimeout() {}, destroy() {},
+      write(payload: string) { call.body = JSON.parse(payload); },
+      end() {
+        const res = Object.assign(new EventEmitter(), { statusCode: 200, headers: {}, setEncoding() {} });
+        onResponse(res);
+        res.emit('data', JSON.stringify(next));
+        res.emit('end');
+      },
+    });
+  });
+  return calls;
+}
+
+const restFile = (i: number) => ({ filename: `f${i}.ts`, status: 'modified', additions: 1, deletions: 0 });
+
+test('listOpenPulls asks for this repo\'s open PRs', async () => {
+  const calls = stub([{ data: { search: { nodes: [] } } }]);
+  assert.deepStrictEqual(await listOpenPulls('o', 'r', 't'), []);
+  assert.strictEqual(calls[0].url, 'https://api.github.com/graphql');
+  assert.strictEqual(calls[0].body.variables.q, 'repo:o/r is:pr is:open sort:updated-desc');
+});
+
+test('fetchPullFiles pages until a short page, so a PR with more than 100 files is not cut off', async () => {
+  const page1 = Array.from({ length: 100 }, (_, i) => restFile(i));
+  const calls = stub([page1, [restFile(100)]]);
+  const files = await fetchPullFiles('o', 'r', 5, 't');
+  assert.strictEqual(files.length, 101);
+  assert.deepStrictEqual(calls.map(c => c.url), [
+    'https://api.github.com/repos/o/r/pulls/5/files?per_page=100&page=1',
+    'https://api.github.com/repos/o/r/pulls/5/files?per_page=100&page=2',
+  ]);
+});
+
+test('fetchMergeBase returns the merge-base commit of base...head', async () => {
+  const calls = stub([{ merge_base_commit: { sha: 'c'.repeat(40) } }]);
+  assert.strictEqual(await fetchMergeBase('o', 'r', 'a'.repeat(40), 'b'.repeat(40), 't'), 'c'.repeat(40));
+  assert.strictEqual(calls[0].url, `https://api.github.com/repos/o/r/compare/${'a'.repeat(40)}...${'b'.repeat(40)}?per_page=1`);
+});
+
+test('fetchReviewThreads sends owner, name and number', async () => {
+  const calls = stub([{ data: { repository: { pullRequest: { reviewThreads: { nodes: [] } } } } }]);
+  assert.deepStrictEqual(await fetchReviewThreads('o', 'r', 5, 't'), { threads: [], outdated: 0 });
+  assert.deepStrictEqual(calls[0].body.variables, { owner: 'o', name: 'r', number: 5 });
+});
+
+const posted = { id: 9, body: 'ok', created_at: '2026-10-01T10:00:00Z', user: { login: 'me', avatar_url: 'u' } };
+
+test('createLineComment posts a single-line review comment on the head commit', async () => {
+  const calls = stub([posted]);
+  const c = await createLineComment('o', 'r', 5, { body: 'ok', commitId: 'b'.repeat(40), path: 'a.ts', line: 3, side: 'RIGHT' }, 't');
+  assert.strictEqual(c.id, 9);
+  assert.strictEqual(calls[0].method, 'POST');
+  assert.strictEqual(calls[0].url, 'https://api.github.com/repos/o/r/pulls/5/comments');
+  assert.deepStrictEqual(calls[0].body, { body: 'ok', commit_id: 'b'.repeat(40), path: 'a.ts', line: 3, side: 'RIGHT' });
+});
+
+test('createLineComment sends start_line / start_side for a multi-line range on one side', async () => {
+  const calls = stub([posted]);
+  await createLineComment('o', 'r', 5, { body: 'ok', commitId: 'b'.repeat(40), path: 'a.ts', startLine: 3, line: 6, side: 'LEFT' }, 't');
+  assert.deepStrictEqual(calls[0].body, {
+    body: 'ok', commit_id: 'b'.repeat(40), path: 'a.ts', start_line: 3, start_side: 'LEFT', line: 6, side: 'LEFT',
+  });
+});
+
+test('replyToComment posts to the thread\'s first comment', async () => {
+  const calls = stub([posted]);
+  await replyToComment('o', 'r', 5, 101, 'thanks', 't');
+  assert.strictEqual(calls[0].url, 'https://api.github.com/repos/o/r/pulls/5/comments/101/replies');
+  assert.deepStrictEqual(calls[0].body, { body: 'thanks' });
+});
