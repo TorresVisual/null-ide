@@ -24,3 +24,16 @@ Run on Windows 11 and Windows 10 22H2, from a copy of `null-setup.exe` outside a
 | 18 | Kill the window during "Installing" (Task Manager) | Next start: `recover` completes or rolls back (see the engine runbook) |
 | 19 | Rename `msedgewebview2` runtime away / machine without WebView2 | Native dialog with the download link, no window |
 | 20 | Double-click Install quickly | One job only |
+| 21 | Installed IDE (stub install): Command Palette → **Null: Setup**; also Features view → Null Setup | Wizard opens on Modify, pre-filled with the install's choices, IDE keeps running |
+| 22 | Same, change only the Start Menu shortcut, apply | Shortcut changes; IDE did not close; no "still running" panel |
+| 23 | Same, in a folder `C:\Users\<you>\Zoë B\Null IDE` (install there first) | Window opens on that install; Apply works |
+| 24 | Extract `null-ide-win32-x64.zip` by hand, run `null.exe`, **Null: Setup** | Opens Modify for that copy, or the wizard's own "not installed" message; no hang, no crash. Record which. |
+| 25 | Dev checkout (`sync-local` is not used): Extension Development Host → **Null: Setup** | One information message, no error |
+| 26 | Modify with the IDE running: tick/untick a built-in, Apply | "Null IDE is still running" panel (row 12 behavior); **Close Null IDE** applies the change and offers Launch |
+| 27 | Machine with an Inno-installed v1.0.17: run the stub, default folder | Install is refused ("not empty"/"already installed") with a sentence; nothing changed |
+| 28 | Same machine: Settings → Apps → uninstall old, then run the stub, then check `%APPDATA%\Null` | Old uninstall keeps `%APPDATA%\Null`; the stub installs; settings/extensions are still there |
+| 29 | Install with the Win11 context-menu feature on a machine where the sparse package cannot register, with a preset (font size 16) | Finish page shows the registration warning **and** `first-run.json` exists with `editor.fontSize` (Task 1) |
+
+Row 29: make the sparse package fail to register, for example by ticking the Windows 11 context-menu feature on a Windows 10 VM, where it is unsupported. If that is not possible, mark the row "not run" with the reason; the unit test `cli::tests::merge_reports_each_outcome_and_both_when_both_failed` is then the only evidence.
+
+Matrix for sub-project 2c-3: rows 1-29 on Windows 11 with a release build (`cargo build --release` copy of `null-setup.exe`, `scripts/fake-release.mjs`); rows 1-2, 11-17 and 21-22 on Windows 10 22H2. Record date, OS build, build used, and rows skipped with the reason in the header note. Not yet run.
