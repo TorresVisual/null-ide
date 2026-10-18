@@ -1,0 +1,15 @@
+diff --git a/build/lib/nodeCompileCache.ts b/build/lib/nodeCompileCache.ts
+index 988dc11a..74e95eee 100644
+--- a/build/lib/nodeCompileCache.ts
++++ b/build/lib/nodeCompileCache.ts
+@@ -82,7 +82,9 @@ export async function generateNodeCompileCache(platform: string, outputDirectory
+ 		const totalCacheEntryCount = await validateNodeCompileCache(paths.cacheDirectory, process.arch);
+ 		console.log(`Generated ${totalCacheEntryCount} total Node.js compile cache entries in ${paths.cacheDirectory}.`);
+ 	} finally {
+-		await fs.promises.rm(portableDirectory, { recursive: true, force: true });
++		// Null IDE: the extension host can outlive the main process by a moment and still hold
++		// exthost.log open, so on Windows the first unlink fails with EBUSY.
++		await fs.promises.rm(portableDirectory, { recursive: true, force: true, maxRetries: 10, retryDelay: 500 });
+ 	}
+ }
+ 

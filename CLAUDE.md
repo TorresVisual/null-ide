@@ -136,6 +136,7 @@ Workbench chrome customisations (CSS/JS injection, icon swaps) are handled by di
 - `008-git-commit-message-check.patch` — `smartCommit` calls `null.commitMessage.check` (null-tools) and aborts with its reason; no-op when null-tools is absent
 - `009-safe-mode.patch` — `--safe-mode`: the enablement check disables user extensions and Null-owned built-ins (`isDisabledInSafeMode`); core status bar item, `[Safe Mode]` title suffix and Restart in Safe Mode / Restart Normally commands; `reload({ safeMode })`; main-process failed-start counter (`safe-mode-state.json`, offers safe mode after 3 failed starts). Pure parts have `node --test patches/test/*.test.mjs`. Design `docs/specs/safe-mode-design.md`
 - `010-startup-snapshot.patch` — stamps extension activations (`activationStartedAt` / `activationEndedAt`) and registers the internal command `_null.startup.snapshot` for null-startup; the pure builder is covered by `node --test patches/test/*.test.mjs`
+- `011-compile-cache-rm-retries.patch` — retries the temp-dir cleanup in `build/lib/nodeCompileCache.ts` (VS Code 1.140+ launches the built app to generate the Node compile cache; on Windows the extension host still holds `exthost.log`, so the first `rm` fails with EBUSY and fails the whole gulp build)
 
 To add a patch against the VS Code source:
 ```bash
