@@ -13,6 +13,7 @@ import { registerWorktreesFeature } from './worktreesIntegration';
 import { registerGraphFeature } from './graph/graphIntegration';
 import { registerDiscordPresenceFeature } from './discordPresenceIntegration';
 import { registerIssuesPanelFeature } from './issuesPanelIntegration';
+import { registerPullsFeature } from './pulls/pullsIntegration';
 import { getStagedDiff, getChangedFiles, heuristicMessage, runClaude } from './commitMessage';
 import { registerUpdaterFeature } from './updaterIntegration';
 import { registerCommitValidationFeature } from './commitValidationIntegration';
@@ -135,6 +136,7 @@ export function activate(context: vscode.ExtensionContext): void {
   registerWorktreesFeature(context);
   registerGraphFeature(context);
   registerIssuesPanelFeature(context);
+  registerPullsFeature(context);
   registerDiscordPresenceFeature(context);
   registerOpenInNullNotesFeature(context);
   registerClaudeTabFeature(context);

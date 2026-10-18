@@ -25,7 +25,7 @@ test('the real manifests declare exactly the agreed launcher entries', () => {
   assert.deepStrictEqual(
     result.map(c => [c.id, c.features.map(f => f.label)]),
     [
-      ['develop', ['Dashboard', 'GitHub Issues', 'Commit Graph', 'Music Player']],
+      ['develop', ['Dashboard', 'GitHub Issues', 'Pull Requests', 'Commit Graph', 'Music Player']],
       ['insights', ['Activity Dashboard', 'Startup Report']],
       ['account', ['Accounts', 'Sync Status']],
       ['setup', ['Null Setup', 'Environment Check', 'Actions Settings', 'Formatting Settings']],

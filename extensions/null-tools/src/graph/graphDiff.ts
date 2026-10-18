@@ -14,10 +14,15 @@ export function registerEmptyDocument(context: vscode.ExtensionContext): void {
   );
 }
 
+/** URI of the empty document standing in for the missing side of an added or deleted file. */
+export function emptyDocUri(filePath: string): vscode.Uri {
+  return vscode.Uri.from({ scheme: EMPTY_SCHEME, path: `/${filePath}` });
+}
+
 /** Opens a native diff of `file` between `parent` and `sha` (no parent = root commit). */
 export async function openFileDiff(root: string, sha: string, parent: string | undefined, file: GraphFile): Promise<void> {
   const api = await getGitApi();
-  const empty = vscode.Uri.from({ scheme: EMPTY_SCHEME, path: `/${file.path}` });
+  const empty = emptyDocUri(file.path);
   const left = !parent || file.status === 'A'
     ? empty
     : api.toGitUri(vscode.Uri.file(path.join(root, file.oldPath ?? file.path)), parent);

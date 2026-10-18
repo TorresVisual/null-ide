@@ -38,7 +38,9 @@
       { "id": "graph", "label": "Commit Graph", "category": "develop", "icon": "git-commit",
         "command": "null.graph.open", "description": "Browse and act on git history", "order": 30 },
       { "id": "setup", "label": "Null Setup", "category": "setup", "icon": "settings-gear",
-        "command": "null.setup.open", "description": "Shortcuts, built-ins, uninstall", "order": 5 }
+        "command": "null.setup.open", "description": "Shortcuts, built-ins, uninstall", "order": 5 },
+      { "id": "pulls", "label": "Pull Requests", "category": "develop", "icon": "git-pull-request",
+        "command": "null.pulls.open", "description": "Review pull requests in the editor", "order": 25 }
     ]
   },
   "contributes": {
@@ -250,7 +252,13 @@
       { "command": "null.graph.copySha", "title": "Copy SHA" },
       { "command": "null.graph.continue", "title": "Null: Continue Git Operation" },
       { "command": "null.graph.skip", "title": "Null: Skip Git Operation Step" },
-      { "command": "null.graph.abort", "title": "Null: Abort Git Operation" }
+      { "command": "null.graph.abort", "title": "Null: Abort Git Operation" },
+      { "command": "null.pulls.open", "title": "Null: Show Pull Requests" },
+      { "command": "null.pulls.refresh", "title": "Null: Refresh Pull Requests", "icon": "$(refresh)" },
+      { "command": "null.pulls.checkout", "title": "Null: Check Out Pull Request", "icon": "$(git-branch)" },
+      { "command": "null.pulls.openOnGitHub", "title": "Null: Open Pull Request on GitHub", "icon": "$(link-external)" },
+      { "command": "null.pulls.openFileDiff", "title": "Null: Open Pull Request File Diff" },
+      { "command": "null.pulls.comment", "title": "Comment" }
     ],
     "viewsContainers": {
       "activitybar": [
@@ -261,7 +269,7 @@
         },
         {
           "id": "null-issues",
-          "title": "GitHub Issues",
+          "title": "GitHub",
           "icon": "media/github-issues.svg"
         }
       ]
@@ -281,7 +289,8 @@
           "id": "null.issuesView",
           "name": "GitHub Issues",
           "visibility": "visible"
-        }
+        },
+        { "id": "null.pullsView", "name": "Pull Requests", "visibility": "collapsed" }
       ]
     },
     "viewsWelcome": [
@@ -289,7 +298,16 @@
       { "view": "null.graphView", "contents": "Git was not found. Install Git and reload the window.", "when": "null.graph.state == no-git" },
       { "view": "null.graphView", "contents": "Commit Graph isn't available in remote windows yet.", "when": "null.graph.state == remote" },
       { "view": "null.graphView", "contents": "Commit Graph doesn't run in an untrusted workspace.\n[Manage Workspace Trust](command:workbench.trust.manage)", "when": "null.graph.state == untrusted" },
-      { "view": "null.graphView", "contents": "Open a folder to see its commit history.\n[Open Folder](command:workbench.action.files.openFolder)", "when": "null.graph.state == no-folder" }
+      { "view": "null.graphView", "contents": "Open a folder to see its commit history.\n[Open Folder](command:workbench.action.files.openFolder)", "when": "null.graph.state == no-folder" },
+      { "view": "null.pullsView", "contents": "Open a folder to see its pull requests.\n[Open Folder](command:workbench.action.files.openFolder)", "when": "null.pulls.state == no-folder" },
+      { "view": "null.pullsView", "contents": "Pull Requests aren't available in remote windows yet.", "when": "null.pulls.state == remote" },
+      { "view": "null.pullsView", "contents": "Pull Requests don't run in an untrusted workspace.\n[Manage Workspace Trust](command:workbench.trust.manage)", "when": "null.pulls.state == untrusted" },
+      { "view": "null.pullsView", "contents": "The open folder is not a Git repository.\n[Initialize Repository](command:git.init)", "when": "null.pulls.state == not-a-repo" },
+      { "view": "null.pullsView", "contents": "Git was not found. Install Git and reload the window.", "when": "null.pulls.state == no-git" },
+      { "view": "null.pullsView", "contents": "The `origin` remote of the open folder is not on github.com.", "when": "null.pulls.state == no-repo" },
+      { "view": "null.pullsView", "contents": "Sign in to GitHub to see this repository's pull requests.\n[Sign In](command:null.issues.signIn)", "when": "null.pulls.state == signed-out" },
+      { "view": "null.pullsView", "contents": "Could not load pull requests.\n[Try Again](command:null.pulls.refresh)", "when": "null.pulls.state == error" },
+      { "view": "null.pullsView", "contents": "No open pull requests.", "when": "null.pulls.state == empty" }
     ],
     "submenus": [
       { "id": "null.graph.resetMenu", "label": "Reset Current Branch To Here" }
@@ -363,7 +381,8 @@
           "group": "navigation"
         },
         { "command": "null.graph.open", "when": "view == null.graphView", "group": "navigation@1" },
-        { "command": "null.graph.refresh", "when": "view == null.graphView", "group": "navigation@2" }
+        { "command": "null.graph.refresh", "when": "view == null.graphView", "group": "navigation@2" },
+        { "command": "null.pulls.refresh", "when": "view == null.pullsView", "group": "navigation" }
       ],
       "view/item/context": [
         {
@@ -429,7 +448,14 @@
         { "command": "null.graph.cherryPick", "when": "view == null.graphView && viewItem == graphCommit && !null.graph.operationInProgress", "group": "2_edit@1" },
         { "command": "null.graph.revert", "when": "view == null.graphView && viewItem == graphCommit && !null.graph.operationInProgress", "group": "2_edit@2" },
         { "submenu": "null.graph.resetMenu", "when": "view == null.graphView && viewItem == graphCommit && !null.graph.operationInProgress", "group": "2_edit@3" },
-        { "command": "null.graph.copySha", "when": "view == null.graphView && viewItem == graphCommit", "group": "3_copy@1" }
+        { "command": "null.graph.copySha", "when": "view == null.graphView && viewItem == graphCommit", "group": "3_copy@1" },
+        { "command": "null.pulls.checkout", "when": "view == null.pullsView && viewItem == pull", "group": "inline@1" },
+        { "command": "null.pulls.openOnGitHub", "when": "view == null.pullsView && viewItem == pull", "group": "inline@2" },
+        { "command": "null.pulls.checkout", "when": "view == null.pullsView && viewItem == pull", "group": "1_pull@1" },
+        { "command": "null.pulls.openOnGitHub", "when": "view == null.pullsView && viewItem == pull", "group": "1_pull@2" }
+      ],
+      "comments/commentThread/context": [
+        { "command": "null.pulls.comment", "when": "commentController == null.pulls", "group": "inline" }
       ],
       "commandPalette": [
         { "command": "null.checkForUpdates" },
@@ -464,6 +490,8 @@
         { "command": "null.issues.markRead" },
         { "command": "null.issues.linkFromCommitMessage" },
         { "command": "null.issues.insertReference" },
+        { "command": "null.pulls.openFileDiff", "when": "false" },
+        { "command": "null.pulls.comment", "when": "false" },
         { "command": "null.graph.checkout", "when": "false" },
         { "command": "null.graph.createBranch", "when": "false" },
         { "command": "null.graph.cherryPick", "when": "false" },
