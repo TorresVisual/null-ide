@@ -73,8 +73,7 @@ impl System for WinSystem {
     }
 
     fn restart_explorer(&self) {
-        // Windows starts Explorer again by itself; the install's DLL is released while it is down.
-        let _ = Command::new("taskkill").args(["/F", "/IM", "explorer.exe"]).creation_flags(NO_WINDOW).status();
+        crate::shellext::restart_explorer();
     }
 
     // ponytail: three PowerShell cmdlets for APPX; replace with the WinRT PackageManager if PowerShell startup time ever matters.
