@@ -10,6 +10,7 @@
 	"win32AppId": "{d2eaa286-2608-4e70-a8f5-8592d61ad8cf}",
 	"win32x64AppId": "{f40e5a45-4bd1-428a-aa94-34d9eaf09dc5}",
 	"darwinBundleIdentifier": "com.nullide.app",
+	"linuxDesktopName": "null",
 	"linuxIconName": "null",
 
 	"reportIssueUrl": "https://github.com/TorresVisual/null-ide/issues/new",

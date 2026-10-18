@@ -75,7 +75,7 @@ if grep -qi "^Maintainer:.*microsoft" "$ctl/control"; then fail "the deb's maint
 step "install / remove / purge"
 sudo apt-get install -y "$deb"
 [ -x /usr/bin/null ] || fail "/usr/bin/null missing after install"
-[ -f /usr/share/applications/null.desktop ] || fail "desktop entry missing"
+[ -f /usr/share/applications/null.desktop ] || { ls /usr/share/applications >&2; fail "desktop entry missing"; }
 files=$(dpkg -L null-ide)
 grep -q "pixmaps/null.png" <<<"$files" || fail "icon missing"
 /usr/bin/null --version >/dev/null || fail "the installed null --version failed"
