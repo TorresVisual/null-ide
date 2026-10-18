@@ -1,6 +1,6 @@
 # Linux build and release (#119)
 
-Status: design, awaiting review. Issue: https://github.com/TorresVisual/null-ide/issues/119
+Status: implemented (see docs/plans/linux-build.md); manual verification in docs/linux-verification.md. Issue: https://github.com/TorresVisual/null-ide/issues/119
 
 ## Goal
 

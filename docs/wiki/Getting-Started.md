@@ -2,6 +2,8 @@
 
 ## Requirements
 
+On Linux, see [Linux](Linux) for the `.deb` and tarball instead.
+
 - Windows 10 22H2 or Windows 11, x64.
 - The WebView2 runtime (part of Windows 11; Windows 10 22H2 ships it too). The installer window needs it.
 - No administrator rights, apart from one optional approval for the Windows 11 context-menu certificate.

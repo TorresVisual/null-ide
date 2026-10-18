@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Project Overview
 
-**Null IDE** is a custom Windows desktop code editor built on VSCodium (itself a fork of VS Code with Microsoft telemetry removed). It ships with its own binary name, branding, built-in extensions, and an automated GitHub Actions release pipeline.
+**Null IDE** is a custom desktop code editor (Windows, plus a Linux x64 tar.gz/deb) built on VSCodium (itself a fork of VS Code with Microsoft telemetry removed). It ships with its own binary name, branding, built-in extensions, and an automated GitHub Actions release pipeline.
 
 Key characteristics:
 - Binary name: `null.exe` — accessible from the terminal as `null .`
@@ -12,7 +12,7 @@ Key characteristics:
 - Thirteen built-in extensions bundled at build time: `null-theme`, `null-icons`, `null-tools`, `null-markdown`, `null-cpp`, `null-actions`, `null-accounts`, `null-format`, `null-music`, `null-activity`, `null-startup`, `null-env`, `null-sync`
 - **Code Spell Checker** (`streetsidesoftware.code-spell-checker`) bundled as a fourteenth built-in extension; version pinned via `CSPELL_TAG` env var in `build.yml`
 - **Remote development** (#85): `jeanp413.open-remote-wsl` / `open-remote-ssh` bundled as built-ins (Open VSX VSIXes, versions pinned via `OPEN_REMOTE_*_VERSION` in `build.yml`, mirrored in `build-local.ps1`). They connect to a Null-repacked VSCodium REH server: CI appends the workspace-side built-ins (`null-env`, `null-cpp`, `null-format`, `null-actions`, `null-markdown`, Code Spell Checker) to the stock tarball via `tar @archive` (keeps exec bits) and publishes `null-reh-linux-{x64,arm64}.tar.gz` on the Null release; `release` in the stamped `product.json` is that release's tag. `serverApplicationName` stays `codium-server` (the launcher script inside the tarball), `serverDataFolderName` is `.null-server`. The remote caches a server per VSCodium commit, so a built-in change without a VSCodium bump needs `~/.null-server/bin/<commit>` deleted. Machine-local extensions (`null-tools`, `null-accounts`, `null-music`, `null-startup`, `null-activity`, `null-sync`) declare `extensionKind: ["ui"]`. Not yet verified end to end in a CI-built package; non-tag builds publish no server
-- CI builds on `windows-2022`; the developer authors source changes locally
+- CI builds on `windows-2022` (and `ubuntu-22.04` for Linux); the developer authors source changes locally
 - Releases publish a portable ZIP and the setup stub (`NullIDESetup-<version>.exe`) to GitHub Releases
 - The in-app updater (`null-tools`) checks GitHub Releases on startup and can self-update
 - Win11 Explorer context menu provided by a native IExplorerCommand DLL (`shell-ext/`) built with CMake + MSVC
@@ -32,7 +32,7 @@ Key characteristics:
 │   └── AppxManifest.xml       # Sparse APPX manifest (ExternalLocation install)
 ├── icons/                     # Source icons used by the build (icon.svg is the master); also Null.VisualElementsManifest.xml (Win10 tile metadata)
 ├── patches/                   # Git-format patches applied against the VS Code source tree
-├── scripts/                   # fake-release.mjs, gen-builtins.mjs, merge-json.js, convert-icons.js, build-local.ps1 (CI mirror), sync-local.ps1 + reload-local.ps1 (fast local iteration)
+├── scripts/                   # fake-release.mjs, gen-builtins.mjs, merge-json.js, convert-icons.js, linux-deb-metadata.mjs (Debian template rewrite), linux-smoke.sh (Linux artifact smoke test), build-local.ps1 (CI mirror), sync-local.ps1 + reload-local.ps1 (fast local iteration)
 ├── workbench/
 │   ├── custom.css             # Injected as null-custom.css into workbench.html
 │   ├── splash.js              # Runs in <head> before the workbench (no Node/AMD)
@@ -58,6 +58,14 @@ The entire build runs in GitHub Actions on a `windows-2022` runner — do **not*
 10. Stamp version, commit hash, and server URL into the build output's `product.json`; replace letterpress SVGs; `rcedit` the icon into `null.exe`.
 11. Build `setup/` with cargo (`cargo test`, then `cargo build --release`); ship `null-setup.exe` as `setup/null-setup.exe`; `null-setup` registers natively.
 12. `Compress-Archive` → `null-ide-win32-x64-<tag>.zip`; the setup stub → `NullIDESetup-<version>.exe`; all uploaded to the GitHub Release (tag builds) and as workflow artifacts. The release body comes from `scripts/release-notes.mjs` (highlights from `docs/specs/` + `docs/plans/` added since the previous `v*` tag, then commits grouped by Conventional Commit type); `node --test scripts/release-notes.test.mjs` covers its pure parts.
+
+### Linux (`build-linux` job)
+
+- Runs on `ubuntu-22.04`, parallel to `build-windows`; a Linux failure never blocks the Windows release. `workflow_dispatch` input `build_linux` (default true); tag pushes always build it.
+- Applies `patches/` plus VSCodium's `patches/linux/` and `patches/linux/client/` (with `!!PLACEHOLDER!!` values substituted by `sed`), then the overlay `patches/`.
+- Packages with VS Code's own `gulp vscode-linux-x64` and the `vscode-linux-x64-prepare-deb` / `-build-deb` tasks. `scripts/linux-deb-metadata.mjs` rewrites the Debian templates so the deb never registers Microsoft's apt repository; it throws on upstream drift.
+- `scripts/linux-smoke.sh` installs, launches and removes both artifacts before publishing.
+- Assets: `null-ide-linux-x64-<tag>.tar.gz` (+ `.sha256`) and `null-ide-linux-x64-<tag>.deb`. Windows assets are `null-ide-win32-x64-<tag>.zip` (+ `.sha256`). Only x64; no rpm, AppImage, arm64 or Linux self-update.
 
 ## Built-in Extensions
 Conventions for every extension with a `src/`:

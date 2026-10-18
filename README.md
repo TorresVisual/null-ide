@@ -68,6 +68,18 @@ Uninstall the old copy first (Settings → Apps → Null IDE); the new installer
 
 A status-bar button appears when a new release is available (checked on startup, at most every 6 hours). Click it and the IDE closes, updates, and reopens. You can also run **Null: Check for Updates** from the command palette.
 
+### Linux
+
+Linux x64 packages are attached to each release: a `.deb` and a `.tar.gz`. Full notes, including runtime dependencies and limitations, are in [docs/wiki/Linux.md](docs/wiki/Linux.md).
+
+```bash
+sudo apt install ./null-ide-linux-x64-<tag>.deb          # installs the null command
+# or, without installing:
+mkdir null-ide && tar -xzf null-ide-linux-x64-<tag>.tar.gz -C null-ide && ./null-ide/null
+```
+
+Linux installs update manually: the status-bar button opens the release page.
+
 ---
 
 ## Usage

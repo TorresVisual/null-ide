@@ -45,6 +45,10 @@ Releases come from pushing a `v*` tag, or **Actions → Build Null IDE → Run w
 
 `scripts/build-local.ps1` mirrors the CI job for iterating on `build.yml`, `shell-ext/`, `setup/` or patches. It is slow and only worth running for those.
 
+### Linux build
+
+The `build-linux` job runs on `ubuntu-22.04` next to `build-windows` and produces `null-ide-linux-x64-<tag>.tar.gz` (with `.sha256`) and `null-ide-linux-x64-<tag>.deb`. It uses VS Code's own `gulp vscode-linux-x64` and deb tasks. `scripts/linux-deb-metadata.mjs` rewrites Microsoft's Debian templates so the package never registers Microsoft's apt repository, and `scripts/linux-smoke.sh` installs, launches and removes both artifacts before they are published. Dispatch the workflow with `build_linux` set to false to skip it; tag pushes always build it. A Linux failure never blocks the Windows release. Manual checks: [docs/linux-verification.md](https://github.com/TorresVisual/null-ide/blob/main/docs/linux-verification.md).
+
 ## Extensions
 
 Each extension in `extensions/<name>/` has `src/` (edit this) and a **tracked** `out/` (never hand-edit).

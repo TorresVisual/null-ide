@@ -4,6 +4,7 @@
 - [Features](Features)
 - [Configuration](Configuration)
 - [Extensions](Extensions)
+- [Linux](Linux)
 - [Troubleshooting](Troubleshooting)
 - [Development](Development)
 - [Contributing](Contributing)
