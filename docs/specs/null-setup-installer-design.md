@@ -128,7 +128,7 @@ Removes the app, registrations, the PATH entry and the Add/Remove Programs entry
 - **2b registrations in Rust** (`docs/plans/null-setup-registrations.md`, done; real-machine runbook `docs/specs/null-setup-registrations-runbook.md`): the `shell` module replaces `install-null-ide.ps1`.
 - **2c wizard and first run**, split in three plans:
   - **2c-1 first-run data path** (`docs/plans/null-setup-first-run.md`): the `settings` / `marketplace` tables in `builtins.json`, `install --first-run`, the `first-run.json` writer in `core` and its null-tools consumer, `null.updates.check`.
-  - **2c-2 wizard and stub installer**: the wizard UI (default mode with no install found, `modify` pre-filled, uninstall page), the Add/Remove Programs entry, publishing `NullIDESetup-<version>.exe` as the stub.
+  - **2c-2 wizard and stub installer** (`docs/plans/null-setup-wizard.md`): the wizard UI (default mode with no install found, `modify` pre-filled, uninstall page), the Add/Remove Programs entry, publishing `NullIDESetup-<version>.exe` as the stub.
   - **2c-3 `Null: Setup` and retirement**: the in-IDE page that shows and edits the saved choices, then deleting Inno Setup, `scripts/install-null-ide.ps1`, `scripts/update-null-ide.ps1`, `updater/` and updating the README and `build-local.ps1`; the Windows 10 22H2 matrix.
 
 Each sub-project and slice gets its own implementation plan.
