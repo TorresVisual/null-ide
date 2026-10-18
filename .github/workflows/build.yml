@@ -712,6 +712,10 @@ jobs:
         working-directory: ide-overlay/setup
         run: cargo test --locked -p null-setup-core -p null-setup
 
+      - name: Test setup UI rules
+        shell: pwsh
+        run: node --test ide-overlay/setup/ui-tests/wizard-model.test.mjs
+
       - name: Build null-setup
         shell: pwsh
         working-directory: ide-overlay/setup
@@ -778,13 +782,13 @@ jobs:
           $sourceDir = (Resolve-Path VSCode-win32-x64).Path
           & $iscc ide-overlay/installer/null-ide.iss /DSourceDir="$sourceDir" /DAppVersion="$version" /O"$PWD"
 
-          $expected = Join-Path $PWD "NullIDESetup-$version.exe"
-          $installer = Get-ChildItem -Path . -Recurse -Filter "NullIDESetup*.exe" |
+          $expected = Join-Path $PWD "NullIDEInno-$version.exe"
+          $installer = Get-ChildItem -Path . -Recurse -Filter "NullIDEInno*.exe" |
             Sort-Object LastWriteTime -Descending |
             Select-Object -First 1
 
           if (-not $installer) {
-            Write-Error "Inno Setup completed, but no NullIDESetup*.exe was found."
+            Write-Error "Inno Setup completed, but no NullIDEInno*.exe was found."
             exit 1
           }
 
@@ -799,6 +803,17 @@ jobs:
 
           Write-Host "Installer created: $expected"
 
+      - name: Stage the setup stub
+        shell: pwsh
+        run: |
+          $version = '${{ github.ref_name }}'
+          if ('${{ github.ref_type }}' -ne 'tag') {
+            $version = '${{ steps.tag.outputs.tag }}'
+          }
+          # The same binary that ships inside the zip is the downloadable installer: with no install it shows the wizard.
+          Copy-Item ide-overlay/setup/target/release/null-setup.exe "NullIDESetup-$version.exe" -Force
+          Write-Host "Setup stub: NullIDESetup-$version.exe"
+
       - name: Publish release asset
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
@@ -808,6 +823,7 @@ jobs:
             null-ide-win32-x64.zip.sha256
             builtins.json
             NullIDESetup-*.exe
+            NullIDEInno-*.exe
             null-reh-linux-*.tar.gz
             ide-overlay/scripts/install-null-ide.ps1
           fail_on_unmatched_files: true
@@ -821,6 +837,7 @@ jobs:
             null-ide-win32-x64.zip.sha256
             builtins.json
             NullIDESetup-*.exe
+            NullIDEInno-*.exe
             null-reh-linux-*.tar.gz
             ide-overlay/scripts/install-null-ide.ps1
           if-no-files-found: error

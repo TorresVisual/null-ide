@@ -1,5 +1,5 @@
 // Local stand-in for the GitHub Releases API, for the manual update matrix.
-//   node scripts/fake-release.mjs --zip <file> --tag v9.9.9 [--port 8787] [--throttle <KB/s>] [--cut-after <bytes>]
+//   node scripts/fake-release.mjs --zip <file> --tag v9.9.9 [--port 8787] [--throttle <KB/s>] [--cut-after <bytes>] [--builtins <file>]
 // Start Null IDE from a terminal with NULL_SETUP_API_BASE=http://127.0.0.1:<port> to point the updater at it.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -14,8 +14,9 @@ const tag = arg('tag');
 const port = Number(arg('port', 8787));
 const throttle = Number(arg('throttle', 0));
 let cutAfter = Number(arg('cut-after', 0));
+const builtinsFile = arg('builtins');
 if (!zip || !tag) {
-  console.error('usage: --zip <file> --tag <tag> [--port n] [--throttle KB/s] [--cut-after bytes]');
+  console.error('usage: --zip <file> --tag <tag> [--port n] [--throttle KB/s] [--cut-after bytes] [--builtins file]');
   process.exit(2);
 }
 
@@ -26,17 +27,18 @@ const base = `http://127.0.0.1:${port}`;
 
 http.createServer((req, res) => {
   console.log(req.method, req.url, req.headers.range ?? '');
-  if (/^\/repos\/[^/]+\/[^/]+\/releases\/tags\//.test(req.url)) {
-    if (!req.url.endsWith(`/releases/tags/${tag}`)) { res.statusCode = 404; return res.end('{}'); }
+  const isLatest = /^\/repos\/[^/]+\/[^/]+\/releases\/latest$/.test(req.url);
+  if (isLatest || /^\/repos\/[^/]+\/[^/]+\/releases\/tags\//.test(req.url)) {
+    if (!isLatest && !req.url.endsWith(`/releases/tags/${tag}`)) { res.statusCode = 404; return res.end('{}'); }
     res.setHeader('content-type', 'application/json');
-    return res.end(JSON.stringify({
-      tag_name: tag, html_url: base, body: 'fake release',
-      assets: [
-        { name, browser_download_url: `${base}/zip`, size },
-        { name: `${name}.sha256`, browser_download_url: `${base}/zip.sha256`, size: 64 },
-      ],
-    }));
+    const assets = [
+      { name, browser_download_url: `${base}/zip`, size },
+      { name: `${name}.sha256`, browser_download_url: `${base}/zip.sha256`, size: 64 },
+    ];
+    if (builtinsFile) assets.push({ name: 'builtins.json', browser_download_url: `${base}/builtins.json`, size: fs.statSync(builtinsFile).size });
+    return res.end(JSON.stringify({ tag_name: tag, html_url: base, body: 'fake release', assets }));
   }
+  if (req.url === '/builtins.json' && builtinsFile) return res.end(fs.readFileSync(builtinsFile));
   if (req.url === '/zip.sha256') return res.end(`${sha}  ${name}`);
   if (req.url === '/zip') {
     const m = /^bytes=(\d+)-$/.exec(req.headers.range ?? '');

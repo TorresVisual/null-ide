@@ -845,14 +845,23 @@ if (-not $SkipInstaller) {
         & $iscc (Join-Path $RepoRoot "installer/null-ide.iss") `
             /DSourceDir="$OutDir" /DAppVersion="$buildVersion" /O"$WorkspaceDir"
     }
-    $installer = Get-ChildItem $WorkspaceDir -Filter "NullIDESetup*.exe" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    $installer = Get-ChildItem $WorkspaceDir -Filter "NullIDEInno*.exe" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
     if (-not $installer) {
-        throw "Inno Setup completed, but no NullIDESetup*.exe was found in $WorkspaceDir"
+        throw "Inno Setup completed, but no NullIDEInno*.exe was found in $WorkspaceDir"
     }
     Write-Host "Installer: $($installer.FullName)"
 }
 else {
     Write-Host "Skipping installer (-SkipInstaller)"
+}
+
+# The Rust setup stub is the downloadable installer (NullIDESetup-<version>.exe); Inno stays as NullIDEInno-<version>.exe until 2c-3.
+$stubSource = Join-Path $RepoRoot "setup/target/release/null-setup.exe"
+$stub = $null
+if (Test-Path $stubSource) {
+    $stub = Join-Path $WorkspaceDir "NullIDESetup-$buildVersion.exe"
+    Copy-Item $stubSource $stub -Force
+    Write-Host "Setup stub: $stub"
 }
 
 # ============================================================
@@ -862,7 +871,7 @@ else {
 if ($PublishRelease) {
     Write-Step "Publishing GitHub release $buildVersion"
 
-    $releaseFiles = @($zipPath, "$zipPath.sha256", $builtinsJson, $installer.FullName,(Join-Path $RepoRoot "scripts/install-null-ide.ps1"))
+    $releaseFiles = @($zipPath, "$zipPath.sha256", $builtinsJson, $installer.FullName, $stub, (Join-Path $RepoRoot "scripts/install-null-ide.ps1")) | Where-Object { $_ }
 
     $tagExists = (git tag --list $buildVersion)
     Write-Host ""
