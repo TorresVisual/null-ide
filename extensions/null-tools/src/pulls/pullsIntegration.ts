@@ -10,6 +10,7 @@ import { PULL_SCHEME } from './pullDocs';
 import { openPullFileDiff } from './pullDiff';
 import { DEFAULT_FILTER } from './pullFilter';
 import { editFilter } from './pullFilterMenu';
+import { PullDetailPanel } from './pullDetailPanel';
 import { PullReview } from './pullReview';
 import { PullNode, PullsTreeProvider } from './pullsTreeView';
 
@@ -77,6 +78,10 @@ export function registerPullsFeature(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('null.pulls.resetFilter', async () => {
       lastRefresh = Date.now();
       await tree.setFilter(DEFAULT_FILTER);
+    }),
+    vscode.commands.registerCommand('null.pulls.openDetail', (node: PullNode) => {
+      const ctx = tree.context();
+      if (node.kind === 'pull' && ctx) PullDetailPanel.show(context.extensionUri, ctx.repo, node.pull);
     }),
     vscode.commands.registerCommand('null.pulls.comment', (reply: vscode.CommentReply) => review.submit(reply)),
     // Nothing is fetched until the view is first shown, and nothing polls while it is hidden.
