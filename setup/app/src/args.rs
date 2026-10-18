@@ -1,7 +1,9 @@
 use std::path::PathBuf;
 
+use null_setup_core::wizard::Intent;
+
 #[derive(Debug, PartialEq, Clone, Copy)]
-pub enum Mode { Prefetch, Update, Recover, Install, Modify, Repair, Uninstall, TrustCert }
+pub enum Mode { Prefetch, Update, Recover, Install, Modify, Repair, Uninstall, TrustCert, Wizard }
 
 #[derive(Debug)]
 pub struct Args {
@@ -14,6 +16,8 @@ pub struct Args {
     pub force_close: bool,
     pub delete_data: bool,
     pub first_run: Option<PathBuf>,
+    pub intent: Intent,
+    pub install_dir_given: bool,
 }
 
 use null_setup_core::update::safe_tag;
@@ -22,6 +26,22 @@ use null_setup_core::update::safe_tag;
 fn safe_repo(r: &str) -> bool {
     let ok = |part: &str| !part.is_empty() && part.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_'));
     matches!(r.split_once('/'), Some((o, n)) if ok(o) && ok(n) && o != ".." && n != "..")
+}
+
+/// Rules for a folder Null IDE will be installed into; used for `--install-dir` and for the wizard's text field.
+pub fn check_install_dir(install_dir: PathBuf) -> Result<PathBuf, String> {
+    let raw = install_dir.to_string_lossy().into_owned();
+    // ';' would split the user PATH entry and '%' would be expanded in it (REG_EXPAND_SZ).
+    if raw.contains([';', '%']) {
+        return Err("the install folder may not contain ';' or '%'".into());
+    }
+    // A trailing backslash would swallow the closing quote when the path is passed on to the elevated process.
+    let install_dir = if install_dir.parent().is_some() { PathBuf::from(raw.trim_end_matches('\\')) } else { install_dir };
+    // The working directory is changed before the work starts, so a relative path would mean something else than the caller meant.
+    if !install_dir.is_absolute() || install_dir.parent().is_none() {
+        return Err("the install folder must be an absolute path to a folder (not a drive root)".into());
+    }
+    Ok(install_dir)
 }
 
 pub fn parse<I: IntoIterator<Item = String>>(it: I) -> Result<Args, String> {
@@ -35,15 +55,16 @@ pub fn parse<I: IntoIterator<Item = String>>(it: I) -> Result<Args, String> {
         Some("repair") => Mode::Repair,
         Some("uninstall") => Mode::Uninstall,
         Some("trust-cert") => Mode::TrustCert,
+        None | Some("wizard") => Mode::Wizard,
         other => {
             return Err(format!(
-                "unknown or missing mode: {other:?} (expected prefetch, update, recover, install, modify, repair, uninstall or trust-cert)"
+                "unknown mode: {other:?} (expected wizard, prefetch, update, recover, install, modify, repair, uninstall or trust-cert)"
             ))
         }
     };
     let (mut repo, mut tag, mut install_dir, mut launch) = ("TorresVisual/null-ide".to_string(), String::new(), None, false);
     let (mut config, mut force_close, mut delete_data) = (None, false, false);
-    let mut first_run = None;
+    let (mut first_run, mut intent) = (None, None);
     while let Some(flag) = it.next() {
         let mut value = |name: &str| it.next().ok_or_else(|| format!("{name} needs a value"));
         match flag.as_str() {
@@ -52,6 +73,7 @@ pub fn parse<I: IntoIterator<Item = String>>(it: I) -> Result<Args, String> {
             "--install-dir" => install_dir = Some(PathBuf::from(value("--install-dir")?)),
             "--config" => config = Some(PathBuf::from(value("--config")?)),
             "--first-run" => first_run = Some(PathBuf::from(value("--first-run")?)),
+            "--intent" => intent = Some(value("--intent")?),
             "--launch" => launch = true,
             "--force-close" => force_close = true,
             "--delete-data" => delete_data = true,
@@ -61,17 +83,21 @@ pub fn parse<I: IntoIterator<Item = String>>(it: I) -> Result<Args, String> {
     if !safe_repo(&repo) {
         return Err("--repo must look like owner/name".into());
     }
-    let install_dir = install_dir.ok_or("--install-dir is required")?;
-    let raw = install_dir.to_string_lossy();
-    // ';' would split the user PATH entry and '%' would be expanded in it (REG_EXPAND_SZ).
-    if raw.contains([';', '%']) {
-        return Err("--install-dir may not contain ';' or '%'".into());
-    }
-    // A trailing backslash would swallow the closing quote when the path is passed on to the elevated process.
-    let install_dir = if install_dir.parent().is_some() { PathBuf::from(raw.trim_end_matches('\\')) } else { install_dir.clone() };
-    // The working directory is changed before the work starts, so a relative path would mean something else than the caller meant.
-    if !install_dir.is_absolute() || install_dir.parent().is_none() {
-        return Err("--install-dir must be an absolute path to a folder (not a drive root)".into());
+    let (install_dir, install_dir_given) = match (install_dir, mode) {
+        (Some(d), _) => (check_install_dir(d).map_err(|e| format!("--install-dir: {e}"))?, true),
+        // The wizard asks for the folder itself; the default is trusted, the typed one is checked when the job starts.
+        (None, Mode::Wizard) => (null_setup_core::local_app_data().join("Programs").join("Null IDE"), false),
+        (None, _) => return Err("--install-dir is required".into()),
+    };
+    let intent_given = intent.is_some();
+    let intent = match intent.as_deref() {
+        None | Some("auto") => Intent::Auto,
+        Some("modify") => Intent::Modify,
+        Some("uninstall") => Intent::Uninstall,
+        Some(o) => return Err(format!("--intent must be auto, modify or uninstall, not {o:?}")),
+    };
+    if intent_given && mode != Mode::Wizard {
+        return Err("--intent only applies to wizard".into());
     }
     if config.as_deref().is_some_and(|c| !c.is_absolute()) {
         return Err("--config must be an absolute path".into());
@@ -90,7 +116,7 @@ pub fn parse<I: IntoIterator<Item = String>>(it: I) -> Result<Args, String> {
     if mode == Mode::Modify && config.is_none() {
         return Err("modify needs --config <file>".into());
     }
-    Ok(Args { mode, repo, tag, install_dir, launch, config, force_close, delete_data, first_run })
+    Ok(Args { mode, repo, tag, install_dir, launch, config, force_close, delete_data, first_run, intent, install_dir_given })
 }
 
 #[cfg(test)]
@@ -202,5 +228,30 @@ mod tests {
     fn install_dir_may_contain_spaces_when_passed_as_one_argument() {
         let a = parse(["update", "--version", "v1", "--install-dir", "C:\\Null IDE ünï"].map(String::from)).unwrap();
         assert_eq!(a.install_dir.to_string_lossy(), "C:\\Null IDE ünï");
+    }
+
+    #[test]
+    fn no_arguments_mean_the_wizard_in_the_default_folder() {
+        let a = parse(std::iter::empty()).unwrap();
+        assert_eq!((a.mode, a.intent, a.install_dir_given), (Mode::Wizard, Intent::Auto, false));
+        assert!(a.install_dir.ends_with(r"Programs\Null IDE"));
+    }
+
+    #[test]
+    fn the_wizard_takes_an_intent_and_an_optional_folder() {
+        let a = p("wizard --install-dir C:\\x --intent uninstall").unwrap();
+        assert_eq!((a.mode, a.intent, a.install_dir_given), (Mode::Wizard, Intent::Uninstall, true));
+        assert_eq!(p("wizard --intent modify").unwrap().intent, Intent::Modify);
+        assert!(p("wizard --intent bogus").is_err());
+        assert!(p("wizard --install-dir C:\\a;b").is_err()); // a given folder is validated like everywhere else
+        assert!(p("repair --install-dir C:\\x --intent modify").is_err()); // wizard only
+    }
+
+    #[test]
+    fn check_install_dir_is_what_the_wizard_applies_to_a_typed_path() {
+        assert_eq!(check_install_dir(PathBuf::from("C:\\Null IDE ünï\\")).unwrap().to_string_lossy(), "C:\\Null IDE ünï");
+        for bad in ["Null", "C:\\", "C:\\a;b", "C:\\%TEMP%", ""] {
+            assert!(check_install_dir(PathBuf::from(bad)).is_err(), "{bad:?}");
+        }
     }
 }

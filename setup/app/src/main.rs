@@ -26,6 +26,7 @@ fn main() {
             relocate::maybe_relocate(&args);
             window::run_update(args)
         }
+        Mode::Wizard => unreachable!("Task 5"),
         Mode::Install | Mode::Modify | Mode::Repair | Mode::Uninstall => {
             let _ = std::env::set_current_dir(null_setup_core::local_app_data());
             relocate::maybe_relocate(&args); // a copy under <install>\setup would block the swap or the deletion
