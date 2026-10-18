@@ -38,7 +38,7 @@ Key characteristics:
 │   ├── splash.js              # Runs in <head> before the workbench (no Node/AMD)
 │   ├── letterpress-dark.svg   # Empty-editor watermark — dark variant (∅ symbol)
 │   └── letterpress-light.svg  # Empty-editor watermark — light variant
-├── docs/                      # specs/, plans/, ROADMAP.md; index.html is the GitHub Pages homepage
+├── docs/                      # specs/, plans/, ROADMAP.md; wiki/ is the GitHub Wiki source (publish with /wiki-sync); index.html is the GitHub Pages homepage
 └── product.json               # Deep-merged into vscode/product.json before build
 ```
 

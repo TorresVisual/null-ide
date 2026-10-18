@@ -9,7 +9,7 @@ Fully assembled out of the box, with zero telemetry.
 
 VSCodium · Electron · TypeScript · C++ · Rust
 
-[Website](https://torresvisual.github.io/null-ide/) · [Releases](https://github.com/TorresVisual/null-ide/releases/latest)
+[Website](https://torresvisual.github.io/null-ide/) · [Wiki](https://github.com/TorresVisual/null-ide/wiki) · [Releases](https://github.com/TorresVisual/null-ide/releases/latest)
 
 </div>
 
@@ -145,4 +145,4 @@ Day-to-day extension and workbench work doesn't need the full build:
 
 Extensions are compiled with `npm ci && npm run compile` in each extension directory. Edit the TypeScript in `src/`, not the generated `out/` files.
 
-See [CLAUDE.md](CLAUDE.md) for a deeper tour of the architecture and [docs/ROADMAP.md](docs/ROADMAP.md) for planned work such as the C++ development layer.
+Full documentation is on the [wiki](https://github.com/TorresVisual/null-ide/wiki) (source in [docs/wiki/](docs/wiki/); `/wiki-sync` keeps it current). See [CLAUDE.md](CLAUDE.md) for a deeper tour of the architecture and [docs/ROADMAP.md](docs/ROADMAP.md) for planned work such as the C++ development layer.
