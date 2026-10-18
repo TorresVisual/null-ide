@@ -1217,6 +1217,13 @@ jobs:
           cp ide-overlay/workbench/custom.css "$wb/null-custom.css"
           cp ide-overlay/workbench/splash.js  "$wb/null-splash.js"
 
+      - name: Remove musl-only native packages from the build output
+        shell: bash
+        run: |
+          # npm pulls in prebuilt musl variants (e.g. @parcel/watcher-linux-x64-musl) that dpkg-shlibdeps cannot
+          # resolve on glibc. Null only runs on glibc, so they are dead weight; remove them before the deb is computed.
+          find VSCode-linux-x64/resources/app -type d -name '*-linux-*-musl' -path '*node_modules*' -print -exec rm -rf {} +
+
       - name: Test and apply Debian template rewrite
         shell: bash
         run: |
