@@ -116,6 +116,10 @@ mod handles {
 
     /// Closes every handle value in this process that points inside `dir`; returns the paths it closed.
     pub fn close_under(dir: &std::path::Path) -> Vec<PathBuf> {
+        // Handle paths come back in long form; `dir` may be an 8.3 short path (e.g. `RUNNER~1` on CI).
+        let long = std::fs::canonicalize(dir).unwrap_or_else(|_| dir.to_path_buf());
+        let stripped = long.to_string_lossy().strip_prefix(r"\\?\").map(PathBuf::from);
+        let dir = stripped.as_deref().unwrap_or(&long);
         let mut closed = Vec::new();
         for v in (4..0x40000usize).step_by(4) {
             let h = v as Handle;
