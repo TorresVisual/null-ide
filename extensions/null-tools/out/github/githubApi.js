@@ -33,9 +33,10 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ApiError = void 0;
+exports.TooLargeError = exports.ApiError = void 0;
 exports.formatApiError = formatApiError;
 exports.rateLimitRetryAt = rateLimitRetryAt;
+exports.requestJson = requestJson;
 exports.requestGraphql = requestGraphql;
 exports.renderMarkdown = renderMarkdown;
 exports.fetchIssues = fetchIssues;
@@ -76,6 +77,10 @@ class ApiError extends Error {
     }
 }
 exports.ApiError = ApiError;
+/** A download past its size cap (`fetchBytes`). Callers that can show a placeholder match this type, not the message. */
+class TooLargeError extends Error {
+}
+exports.TooLargeError = TooLargeError;
 /** When a rate-limited request may be retried: `Retry-After` wins, else the primary limit's reset time. */
 function rateLimitRetryAt(headers, now = Date.now()) {
     const retryAfter = Number(headers['retry-after']);
@@ -194,7 +199,7 @@ function fetchBytes(url, token, accept, maxBytes, hop = 0) {
             }
             const tooBig = () => {
                 res.destroy();
-                reject(new Error(`Image is larger than ${Math.round(maxBytes / (1024 * 1024))} MB`));
+                reject(new TooLargeError(`Image is larger than ${Math.round(maxBytes / (1024 * 1024))} MB`));
             };
             if (Number(res.headers['content-length']) > maxBytes) {
                 tooBig();

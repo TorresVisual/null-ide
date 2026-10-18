@@ -35,6 +35,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.registerEmptyDocument = registerEmptyDocument;
+exports.emptyDocUri = emptyDocUri;
 exports.openFileDiff = openFileDiff;
 const path = __importStar(require("path"));
 const vscode = __importStar(require("vscode"));
@@ -44,10 +45,14 @@ const EMPTY_SCHEME = 'null-graph-empty';
 function registerEmptyDocument(context) {
     context.subscriptions.push(vscode.workspace.registerTextDocumentContentProvider(EMPTY_SCHEME, { provideTextDocumentContent: () => '' }));
 }
+/** URI of the empty document standing in for the missing side of an added or deleted file. */
+function emptyDocUri(filePath) {
+    return vscode.Uri.from({ scheme: EMPTY_SCHEME, path: `/${filePath}` });
+}
 /** Opens a native diff of `file` between `parent` and `sha` (no parent = root commit). */
 async function openFileDiff(root, sha, parent, file) {
     const api = await (0, gitApi_1.getGitApi)();
-    const empty = vscode.Uri.from({ scheme: EMPTY_SCHEME, path: `/${file.path}` });
+    const empty = emptyDocUri(file.path);
     const left = !parent || file.status === 'A'
         ? empty
         : api.toGitUri(vscode.Uri.file(path.join(root, file.oldPath ?? file.path)), parent);

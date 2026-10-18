@@ -48,6 +48,7 @@ const worktreesIntegration_1 = require("./worktreesIntegration");
 const graphIntegration_1 = require("./graph/graphIntegration");
 const discordPresenceIntegration_1 = require("./discordPresenceIntegration");
 const issuesPanelIntegration_1 = require("./issuesPanelIntegration");
+const pullsIntegration_1 = require("./pulls/pullsIntegration");
 const commitMessage_1 = require("./commitMessage");
 const updaterIntegration_1 = require("./updaterIntegration");
 const commitValidationIntegration_1 = require("./commitValidationIntegration");
@@ -175,6 +176,7 @@ function activate(context) {
     (0, worktreesIntegration_1.registerWorktreesFeature)(context);
     (0, graphIntegration_1.registerGraphFeature)(context);
     (0, issuesPanelIntegration_1.registerIssuesPanelFeature)(context);
+    (0, pullsIntegration_1.registerPullsFeature)(context);
     (0, discordPresenceIntegration_1.registerDiscordPresenceFeature)(context);
     (0, nullNotes_1.registerOpenInNullNotesFeature)(context);
     (0, claudeTabIntegration_1.registerClaudeTabFeature)(context);
