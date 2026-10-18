@@ -46,9 +46,17 @@ step "launch under xvfb"
 mkdir "$work/ud" "$work/ext" "$work/project"
 xvfb-run -a "$app/null" --no-sandbox --disable-gpu --user-data-dir "$work/ud" --extensions-dir "$work/ext" "$work/project" &
 app_pid=$!
-sleep 25
-kill -0 "$app_pid" 2>/dev/null || fail "the app exited within 25 seconds"
-[ -d "$work/ud/logs" ] || fail "the app wrote no logs"
+for _ in $(seq 60); do
+  [ -d "$work/ud/logs" ] && break
+  kill -0 "$app_pid" 2>/dev/null || break
+  sleep 1
+done
+if [ ! -d "$work/ud/logs" ]; then
+  find "$work/ud" -maxdepth 3 >&2 || true
+  fail "the app wrote no logs within 60 seconds (user-data-dir contents above)"
+fi
+sleep 25 # let extensions activate
+kill -0 "$app_pid" 2>/dev/null || fail "the app exited during startup"
 if grep -rE "Activating extension '[^']+' failed" "$work/ud/logs"; then fail "an extension failed to activate (lines above)"; fi
 kill "$app_pid" 2>/dev/null || true; app_pid=
 pkill -f "$app/null" 2>/dev/null || true
