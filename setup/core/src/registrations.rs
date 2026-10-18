@@ -3,7 +3,7 @@ use std::{path::Path, sync::Arc};
 use crate::{
     install_config::Feature,
     progress::Ctx,
-    shell::{self, sys::WinSystem, Locations},
+    shell::{self, arp, sys::WinSystem, Locations},
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -11,6 +11,9 @@ pub enum Registration { Done, NeedsReapproval, Warning(String), Skipped }
 
 pub trait Registrar: Send + Sync {
     fn apply(&self, install: &Path, register: &[Feature], unregister: &[Feature], allow_elevate: bool, ctx: &Ctx) -> Registration;
+
+    /// Add/Remove Programs entry: `Some(version)` writes or refreshes it, `None` removes it. Never fails the caller.
+    fn arp(&self, _install: &Path, _version: Option<&str>, _ctx: &Ctx) {}
 }
 
 pub struct ShellRegistrar;
@@ -25,6 +28,16 @@ impl Registrar for ShellRegistrar {
             Err(e) => return Registration::Warning(e.to_string()),
         };
         shell::apply_with(&loc, &WinSystem, install, register, unregister, allow_elevate, &|m| ctx.log.line(&format!("registrations: {m}")))
+    }
+
+    fn arp(&self, install: &Path, version: Option<&str>, ctx: &Ctx) {
+        let done = Locations::real().and_then(|loc| match version {
+            Some(v) => arp::register(&loc, install, v),
+            None => arp::unregister(&loc),
+        });
+        if let Err(e) = done {
+            ctx.log.line(&format!("registrations: Add/Remove Programs entry: {e}"));
+        }
     }
 }
 

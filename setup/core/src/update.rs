@@ -261,6 +261,9 @@ fn register(o: &Opts, before: &InstallConfig, cfg: &InstallConfig, ctx: &Ctx) ->
 
 fn finish(o: &Opts, plan: &Plan, before: &InstallConfig, cfg: &InstallConfig, ctx: &Ctx) -> Result<Outcome> {
     let registration = if o.reapply { register(o, before, cfg, ctx) } else { Registration::Skipped };
+    if o.reapply {
+        o.registrar.arp(&o.install_dir, Some(&o.tag), ctx);
+    }
     if o.launch {
         ctx.emit(Progress::Restarting);
         let started = launch_ide(&o.install_dir)

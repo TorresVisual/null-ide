@@ -8,6 +8,7 @@ use crate::{
     registrations::Registration,
 };
 
+pub mod arp;
 pub mod assoc;
 pub mod classes;
 pub mod path;

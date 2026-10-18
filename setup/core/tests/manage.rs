@@ -172,3 +172,27 @@ fn modify_in_place_does_not_save_the_config_when_a_registration_fails() {
     assert!(e.contains("boom"), "{e}");
     assert!(!dir.join("install-config.json").exists());
 }
+
+#[test]
+fn uninstall_removes_the_add_remove_entry_after_the_files() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = install_in(tmp.path());
+    let rec = support::Recorder::new(Registration::Done);
+    let mut o = opts(&dir, false, &tmp.path().join("Null"));
+    o.registrar = rec.clone();
+    run(|c| uninstall(&o, c)).unwrap();
+    assert!(!dir.join(".null-ide-install.json").exists());
+    assert_eq!(*rec.arp.lock().unwrap(), vec![None]);
+}
+
+#[test]
+fn a_foreign_folder_keeps_the_add_remove_entry() {
+    let tmp = tempfile::tempdir().unwrap();
+    let foreign = tmp.path().join("other");
+    fs::create_dir_all(&foreign).unwrap();
+    let rec = support::Recorder::new(Registration::Done);
+    let mut o = opts(&foreign, false, &tmp.path().join("Null"));
+    o.registrar = rec.clone();
+    assert!(run(|c| uninstall(&o, c)).is_err());
+    assert!(rec.arp.lock().unwrap().is_empty());
+}

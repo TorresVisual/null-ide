@@ -105,6 +105,8 @@ fn uninstall_inner(o: &UninstallOpts, ctx: &Ctx) -> Result<()> {
         ctx.log.line(&format!("some registrations could not be removed: {w}"));
     }
     remove_install(&o.install_dir, !o.delete_user_data)?;
+    // Last on purpose: if a file above could not be removed, the entry must stay so "Uninstall" can be run again.
+    o.registrar.arp(&o.install_dir, None, ctx);
     if o.delete_user_data && o.user_data_dir.is_dir() {
         fs::remove_dir_all(&o.user_data_dir).ctx("remove user data")?;
     }

@@ -59,16 +59,20 @@ use null_setup_core::{
 pub struct Call { pub register: Vec<Feature>, pub unregister: Vec<Feature>, pub allow_elevate: bool }
 
 /// Stands in for the real registrar so no test writes the registry, PATH or Start Menu.
-pub struct Recorder { pub calls: Mutex<Vec<Call>>, pub result: Registration }
+pub struct Recorder { pub calls: Mutex<Vec<Call>>, pub arp: Mutex<Vec<Option<String>>>, pub result: Registration }
 
 impl Recorder {
-    pub fn new(result: Registration) -> Arc<Recorder> { Arc::new(Recorder { calls: Mutex::new(vec![]), result }) }
+    pub fn new(result: Registration) -> Arc<Recorder> { Arc::new(Recorder { calls: Mutex::new(vec![]), arp: Mutex::new(vec![]), result }) }
 }
 
 impl Registrar for Recorder {
     fn apply(&self, _: &std::path::Path, register: &[Feature], unregister: &[Feature], allow_elevate: bool, _: &Ctx) -> Registration {
         self.calls.lock().unwrap().push(Call { register: register.to_vec(), unregister: unregister.to_vec(), allow_elevate });
         self.result.clone()
+    }
+
+    fn arp(&self, _: &std::path::Path, version: Option<&str>, _: &Ctx) {
+        self.arp.lock().unwrap().push(version.map(str::to_string));
     }
 }
 

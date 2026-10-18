@@ -360,3 +360,15 @@ fn a_fresh_install_whose_first_launch_fails_stays_installed() {
     let t = fresh_target(&w);
     assert!(t.join("new.txt").exists() && t.join(".null-ide-install.json").exists());
 }
+
+#[test]
+fn an_update_refreshes_the_add_remove_entry_with_the_new_version() {
+    let w = world(&[]);
+    let srv = serve_release(w.zip.clone(), sha(&w.zip), Arc::new(AtomicUsize::new(0)));
+    let rec = support::Recorder::new(null_setup_core::registrations::Registration::Done);
+    let mut o = opts(&w, &srv.base);
+    o.reapply = true;
+    o.registrar = rec.clone();
+    run(|c| update(&o, c)).0.unwrap();
+    assert_eq!(*rec.arp.lock().unwrap(), vec![Some("v2".to_string())]);
+}
