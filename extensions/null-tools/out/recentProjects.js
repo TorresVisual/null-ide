@@ -46,15 +46,14 @@ exports.findCurrentRecentProject = findCurrentRecentProject;
 exports.relocateRecentProject = relocateRecentProject;
 const fs = __importStar(require("node:fs"));
 const path = __importStar(require("node:path"));
+const dataDir_1 = require("./dataDir");
 function getRecentProjectsFilePath() {
-    const appData = process.env.APPDATA;
-    if (!appData) {
-        throw new Error('Cannot locate %APPDATA%.');
-    }
-    return path.join(appData, 'Null', 'null-recent-projects.json');
+    return path.join((0, dataDir_1.nullDataDir)(), 'null-recent-projects.json');
 }
-function normalizeRecentProjectPath(value) {
-    return path.resolve(value).toLowerCase();
+// Windows paths are case-insensitive, so 'Work' and 'work' name one project there; Linux paths are not.
+function normalizeRecentProjectPath(value, platform = process.platform) {
+    const resolved = path.resolve(value);
+    return platform === 'win32' ? resolved.toLowerCase() : resolved;
 }
 function readEntry(value) {
     if (!value || typeof value !== 'object')

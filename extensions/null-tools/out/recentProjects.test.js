@@ -99,4 +99,10 @@ function withStore(run) {
     assert.equal((0, recentProjects_1.writeRecentProjects)(file, [{ path: 'C:\\App', label: 'App', isWorkspaceFile: false, timestamp: 1, pinned: false }]), true);
     assert.deepEqual(fs.readdirSync(dir).filter(name => name.endsWith('.tmp')), []);
 }));
+(0, node_test_1.test)('paths differing only in case are the same project on Windows but not on Linux', () => {
+    const a = path.resolve('Work', 'App');
+    const b = path.resolve('work', 'app');
+    assert.equal((0, recentProjects_1.normalizeRecentProjectPath)(a, 'win32'), (0, recentProjects_1.normalizeRecentProjectPath)(b, 'win32'));
+    assert.notEqual((0, recentProjects_1.normalizeRecentProjectPath)(a, 'linux'), (0, recentProjects_1.normalizeRecentProjectPath)(b, 'linux'));
+});
 //# sourceMappingURL=recentProjects.test.js.map

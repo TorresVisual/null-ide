@@ -60,6 +60,7 @@ const whyIsThisHereIntegration_1 = require("./whyIsThisHereIntegration");
 const recoveryIntegration_1 = require("./recovery/recoveryIntegration");
 const firstRunIntegration_1 = require("./firstRunIntegration");
 const setupIntegration_1 = require("./setupIntegration");
+const dataDir_1 = require("./dataDir");
 // ── Activation ─────────────────────────────────────────────────────────────
 async function ensureWindowTitleFormat() {
     try {
@@ -127,12 +128,14 @@ function activate(context) {
         }
     }));
     context.subscriptions.push(vscode.commands.registerCommand('null.clearWebviewCache', async () => {
-        const appData = process.env.APPDATA;
-        if (!appData) {
-            vscode.window.showErrorMessage('Null: cannot locate %APPDATA%.');
+        let userDataDir;
+        try {
+            userDataDir = (0, dataDir_1.nullDataDir)();
+        }
+        catch (err) {
+            vscode.window.showErrorMessage(`Null: ${err.message}`);
             return;
         }
-        const userDataDir = path.join(appData, 'Null');
         const targets = ['Cache', 'CachedData', 'Code Cache', 'WebStorage'];
         const cleared = [], failed = [];
         for (const name of targets) {
