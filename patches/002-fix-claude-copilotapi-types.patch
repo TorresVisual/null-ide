@@ -1,16 +1,16 @@
 diff --git a/src/vs/platform/agentHost/node/shared/copilotApiService.ts b/src/vs/platform/agentHost/node/shared/copilotApiService.ts
-index 2dc3ee3..7735f9c 100644
+index 4800f4d5..a0022479 100644
 --- a/src/vs/platform/agentHost/node/shared/copilotApiService.ts
 +++ b/src/vs/platform/agentHost/node/shared/copilotApiService.ts
 @@ -3,6 +3,7 @@
   *  Licensed under the MIT License. See License.txt in the project root for license information.
   *--------------------------------------------------------------------------------------------*/
-
+ 
 +import type Anthropic from '@anthropic-ai/sdk';
  import { CAPIClient, RequestType, type CCAModel, type IExtensionInformation } from '@vscode/copilot-api';
  import { generateUuid } from '../../../../base/common/uuid.js';
- import { getDevDeviceId, getMachineId } from '../../../../base/node/id.js';
-@@ -246,7 +247,7 @@ export class CopilotApiError extends Error {
+ import { Disposable, toDisposable } from '../../../../base/common/lifecycle.js';
+@@ -257,7 +258,7 @@ export class CopilotApiError extends Error {
  	 */
  	constructor(
  		readonly status: number,
@@ -19,7 +19,7 @@ index 2dc3ee3..7735f9c 100644
  		message?: string,
  	) {
  		super(message ?? envelope.error.message);
-@@ -266,7 +267,7 @@ export class CopilotApiError extends Error {
+@@ -277,7 +278,7 @@ export class CopilotApiError extends Error {
   * `messages`); pass `"CAPI models request failed"` for the `models()` path.
   */
  function buildCopilotApiHttpError(status: number, statusText: string, bodyText: string, prefix = 'CAPI request failed'): CopilotApiError {
@@ -28,7 +28,7 @@ index 2dc3ee3..7735f9c 100644
  	if (bodyText) {
  		try {
  			const parsed = JSON.parse(bodyText) as unknown;
-@@ -280,7 +281,7 @@ function buildCopilotApiHttpError(status: number, statusText: string, bodyText:
+@@ -291,7 +292,7 @@ function buildCopilotApiHttpError(status: number, statusText: string, bodyText:
  					&& typeof (err as { type?: unknown }).type === 'string'
  					&& typeof (err as { message?: unknown }).message === 'string'
  				) {
@@ -37,7 +37,7 @@ index 2dc3ee3..7735f9c 100644
  				}
  			}
  		} catch {
-@@ -415,9 +416,9 @@ export interface ICopilotApiService {
+@@ -426,9 +427,9 @@ export interface ICopilotApiService {
  	 */
  	messages(
  		githubToken: string,
@@ -46,10 +46,10 @@ index 2dc3ee3..7735f9c 100644
  		options?: ICopilotApiServiceRequestOptions,
 -	): AsyncGenerator<any>;
 +	): AsyncGenerator<Anthropic.MessageStreamEvent>;
-
+ 
  	/**
  	 * Send a chat completion and return the full aggregated response.
-@@ -425,9 +426,9 @@ export interface ICopilotApiService {
+@@ -436,9 +437,9 @@ export interface ICopilotApiService {
  	 */
  	messages(
  		githubToken: string,
@@ -58,10 +58,10 @@ index 2dc3ee3..7735f9c 100644
  		options?: ICopilotApiServiceRequestOptions,
 -	): Promise<any>;
 +	): Promise<Anthropic.Message>;
-
+ 
  	/**
  	 * Count tokens for a hypothetical request.
-@@ -437,9 +438,9 @@ export interface ICopilotApiService {
+@@ -448,9 +449,9 @@ export interface ICopilotApiService {
  	 */
  	countTokens(
  		githubToken: string,
@@ -70,11 +70,11 @@ index 2dc3ee3..7735f9c 100644
  		options?: ICopilotApiServiceRequestOptions,
 -	): Promise<any>;
 +	): Promise<Anthropic.MessageTokensCount>;
-
+ 
  	/**
  	 * List models available to the GitHub user.
-@@ -535,19 +536,19 @@ export class CopilotApiService implements ICopilotApiService {
-
+@@ -555,19 +556,19 @@ export class CopilotApiService extends Disposable implements ICopilotApiService
+ 
  	messages(
  		githubToken: string,
 -		request: any,
@@ -99,8 +99,8 @@ index 2dc3ee3..7735f9c 100644
  		if (request.stream) {
  			return this._messagesStreaming(githubToken, request, options);
  		}
-@@ -556,9 +557,9 @@ export class CopilotApiService implements ICopilotApiService {
-
+@@ -576,9 +577,9 @@ export class CopilotApiService extends Disposable implements ICopilotApiService
+ 
  	async countTokens(
  		_githubToken: string,
 -		_req: any,
@@ -110,9 +110,9 @@ index 2dc3ee3..7735f9c 100644
 +	): Promise<Anthropic.MessageTokensCount> {
  		throw new Error('countTokens not supported by CAPI');
  	}
-
-@@ -741,9 +742,9 @@ export class CopilotApiService implements ICopilotApiService {
-
+ 
+@@ -753,9 +754,9 @@ export class CopilotApiService extends Disposable implements ICopilotApiService
+ 
  	private async *_messagesStreaming(
  		githubToken: string,
 -		request: any,
@@ -121,10 +121,10 @@ index 2dc3ee3..7735f9c 100644
 -	): AsyncGenerator<any> {
 +	): AsyncGenerator<Anthropic.MessageStreamEvent> {
  		const response = await this._sendRequest(githubToken, request, true, options);
-
+ 
  		if (!response.body) {
-@@ -759,11 +760,11 @@ export class CopilotApiService implements ICopilotApiService {
-
+@@ -771,11 +772,11 @@ export class CopilotApiService extends Disposable implements ICopilotApiService
+ 
  	private async _messagesNonStreaming(
  		githubToken: string,
 -		request: any,
@@ -136,10 +136,10 @@ index 2dc3ee3..7735f9c 100644
 -		return response.json() as Promise<any>;
 +		return response.json() as Promise<Anthropic.Message>;
  	}
-
+ 
  	// #endregion
-@@ -772,7 +773,7 @@ export class CopilotApiService implements ICopilotApiService {
-
+@@ -784,7 +785,7 @@ export class CopilotApiService extends Disposable implements ICopilotApiService
+ 
  	private async _sendRequest(
  		githubToken: string,
 -		request: any,
@@ -147,16 +147,16 @@ index 2dc3ee3..7735f9c 100644
  		stream: boolean,
  		options?: ICopilotApiServiceRequestOptions,
  	): Promise<Response> {
-@@ -1008,7 +1009,7 @@ export class CopilotApiService implements ICopilotApiService {
-
+@@ -1088,7 +1089,7 @@ export class CopilotApiService extends Disposable implements ICopilotApiService
+ 
  	// #region SSE Parsing
-
+ 
 -	private async *_readSSE(body: ReadableStream<Uint8Array>): AsyncGenerator<any> {
 +	private async *_readSSE(body: ReadableStream<Uint8Array>): AsyncGenerator<Anthropic.MessageStreamEvent> {
  		const reader = body.getReader();
  		const decoder = new TextDecoder();
  		let buffer = '';
-@@ -1062,7 +1063,7 @@ export class CopilotApiService implements ICopilotApiService {
+@@ -1142,7 +1143,7 @@ export class CopilotApiService extends Disposable implements ICopilotApiService
  	 * @returns the parsed stream event, or `undefined` to skip the line.
  	 * @throws on `error` events from the server.
  	 */
@@ -165,7 +165,7 @@ index 2dc3ee3..7735f9c 100644
  		if (!line.startsWith('data: ')) {
  			return undefined;
  		}
-@@ -1093,13 +1094,13 @@ export class CopilotApiService implements ICopilotApiService {
+@@ -1173,13 +1174,13 @@ export class CopilotApiService extends Disposable implements ICopilotApiService
  			// passthrough proxy). Fall back to a clean api_error synthesis
  			// when fields are missing or `error` is unstructured.
  			const rawError = (parsed as { error?: unknown }).error;
@@ -181,12 +181,12 @@ index 2dc3ee3..7735f9c 100644
  			} else {
  				let errorMessage: string;
  				if (typeof rawError === 'string') {
-@@ -1122,7 +1123,7 @@ export class CopilotApiService implements ICopilotApiService {
+@@ -1202,7 +1203,7 @@ export class CopilotApiService extends Disposable implements ICopilotApiService
  			return undefined;
  		}
-
+ 
 -		return parsed as any;
 +		return parsed as Anthropic.MessageStreamEvent;
  	}
-
+ 
  	// #endregion

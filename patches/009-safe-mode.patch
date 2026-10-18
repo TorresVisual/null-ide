@@ -1,5 +1,5 @@
 diff --git a/src/vs/code/electron-main/main.ts b/src/vs/code/electron-main/main.ts
-index df40f720..93e121b7 100644
+index ecfcdfbb..815e3ab9 100644
 --- a/src/vs/code/electron-main/main.ts
 +++ b/src/vs/code/electron-main/main.ts
 @@ -26,6 +26,7 @@ import { ProxyChannel } from '../../base/parts/ipc/common/ipc.js';
@@ -10,7 +10,7 @@ index df40f720..93e121b7 100644
  import { localize } from '../../nls.js';
  import { IConfigurationService } from '../../platform/configuration/common/configuration.js';
  import { ConfigurationService } from '../../platform/configuration/common/configurationService.js';
-@@ -141,12 +142,14 @@ class CodeMain {
+@@ -145,14 +146,44 @@ class CodeMain {
  
  				// Delay creation of spdlog for perf reasons (https://github.com/microsoft/vscode/issues/72906)
  				bufferLogger.logger = loggerService.createLogger('main', { name: localize('mainLog', "Main") });
@@ -23,11 +23,6 @@ index df40f720..93e121b7 100644
  					evt.join('instanceLockfile', promises.unlink(environmentMainService.mainLockfile).catch(() => { /* ignored */ }));
 +					evt.join('safeModeState', writeAttempts(safeModeStateFile, 0).catch(() => { /* ignored */ }));
  				});
- 
- 				// Check if Inno Setup is running. Briefly wait for the updating mutex to be released before refusing to launch.
-@@ -157,6 +160,34 @@ class CodeMain {
- 					return;
- 				}
  
 +				// Safe mode: offer it after repeated failed starts, and count this start
 +				const safeMode = !!environmentMainService.args['safe-mode'];
@@ -111,10 +106,10 @@ index 00000000..b01f1202
 +	await promises.rename(tmp, file);
 +}
 diff --git a/src/vs/platform/environment/common/argv.ts b/src/vs/platform/environment/common/argv.ts
-index 00e12e78..d2573b76 100644
+index f6108fb1..04b6c59e 100644
 --- a/src/vs/platform/environment/common/argv.ts
 +++ b/src/vs/platform/environment/common/argv.ts
-@@ -95,6 +95,7 @@ export interface NativeParsedArgs {
+@@ -96,6 +96,7 @@ export interface NativeParsedArgs {
  	'inspect-brk-sharedprocess'?: string;
  	'disable-extensions'?: boolean;
  	'disable-extension'?: string[]; // undefined or array of 1 or more
@@ -174,10 +169,10 @@ index 00000000..172539fb
 +		|| NULL_BUNDLED_EXTENSION_IDS.includes(extension.identifier.id.toLowerCase());
 +}
 diff --git a/src/vs/platform/environment/node/argv.ts b/src/vs/platform/environment/node/argv.ts
-index 8a36a25a..c80819eb 100644
+index a523d915..3bb8bd58 100644
 --- a/src/vs/platform/environment/node/argv.ts
 +++ b/src/vs/platform/environment/node/argv.ts
-@@ -147,6 +147,7 @@ export const OPTIONS: OptionDescriptions<Required<NativeParsedArgs>> = {
+@@ -148,6 +148,7 @@ export const OPTIONS: OptionDescriptions<Required<NativeParsedArgs>> = {
  	'prof-v8-extensions': { type: 'boolean' },
  	'disable-extensions': { type: 'boolean', deprecates: ['disableExtensions'], cat: 't', description: localize('disableExtensions', "Disable all installed extensions. This option is not persisted and is effective only when the command opens a new window.") },
  	'disable-extension': { type: 'string[]', cat: 't', args: 'ext-id', description: localize('disableExtension', "Disable the provided extension. This option is not persisted and is effective only when the command opens a new window.") },
@@ -186,10 +181,10 @@ index 8a36a25a..c80819eb 100644
  
  	'inspect-extensions': { type: 'string', allowEmptyValue: true, deprecates: ['debugPluginHost'], args: 'port', cat: 't', description: localize('inspect-extensions', "Allow debugging and profiling of extensions. Check the developer tools for the connection URI.") },
 diff --git a/src/vs/platform/native/common/native.ts b/src/vs/platform/native/common/native.ts
-index f148a678..5051b0f2 100644
+index d1ef3435..63d02287 100644
 --- a/src/vs/platform/native/common/native.ts
 +++ b/src/vs/platform/native/common/native.ts
-@@ -353,7 +353,7 @@ export interface ICommonNativeHostService {
+@@ -391,7 +391,7 @@ export interface ICommonNativeHostService {
  	// Lifecycle
  	notifyReady(): Promise<void>;
  	relaunch(options?: { addArgs?: string[]; removeArgs?: string[] }): Promise<void>;
@@ -199,10 +194,10 @@ index f148a678..5051b0f2 100644
  	quit(): Promise<void>;
  	exit(code: number): Promise<void>;
 diff --git a/src/vs/platform/native/electron-main/nativeHostMainService.ts b/src/vs/platform/native/electron-main/nativeHostMainService.ts
-index e7a42ceb..65fcd360 100644
+index 56829a97..9dd17a2c 100644
 --- a/src/vs/platform/native/electron-main/nativeHostMainService.ts
 +++ b/src/vs/platform/native/electron-main/nativeHostMainService.ts
-@@ -1085,7 +1085,7 @@ export class NativeHostMainService extends Disposable implements INativeHostMain
+@@ -1091,7 +1091,7 @@ export class NativeHostMainService extends Disposable implements INativeHostMain
  		return this.lifecycleMainService.relaunch(options);
  	}
  
@@ -211,7 +206,7 @@ index e7a42ceb..65fcd360 100644
  		const window = this.codeWindowById(windowId);
  		if (window) {
  
-@@ -1104,6 +1104,12 @@ export class NativeHostMainService extends Disposable implements INativeHostMain
+@@ -1110,6 +1110,12 @@ export class NativeHostMainService extends Disposable implements INativeHostMain
  				}
  			}
  
@@ -225,10 +220,10 @@ index e7a42ceb..65fcd360 100644
  			return this.lifecycleMainService.reload(window, options?.disableExtensions !== undefined ? { _: [], 'disable-extensions': options.disableExtensions } : undefined);
  		}
 diff --git a/src/vs/platform/windows/electron-main/windowImpl.ts b/src/vs/platform/windows/electron-main/windowImpl.ts
-index 4a51cc55..c3e8b836 100644
+index 4a4172f5..f1ca5ced 100644
 --- a/src/vs/platform/windows/electron-main/windowImpl.ts
 +++ b/src/vs/platform/windows/electron-main/windowImpl.ts
-@@ -1319,6 +1319,11 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
+@@ -1401,6 +1401,11 @@ export class CodeWindow extends BaseWindow implements ICodeWindow {
  			configuration['extensions-dir'] = cli['extensions-dir'];
  		}
  
@@ -407,10 +402,10 @@ index 86a3d521..a1b85c40 100644
  	}
  
 diff --git a/src/vs/workbench/workbench.desktop.main.ts b/src/vs/workbench/workbench.desktop.main.ts
-index 9bc4dbca..7482cc6f 100644
+index 60a967c2..93d7eecf 100644
 --- a/src/vs/workbench/workbench.desktop.main.ts
 +++ b/src/vs/workbench/workbench.desktop.main.ts
-@@ -132,6 +132,7 @@ import './contrib/extensions/electron-browser/devtoolsExtensionHost.contribution
+@@ -138,6 +138,7 @@ import './contrib/extensions/electron-browser/devtoolsExtensionHost.contribution
  
  // Issues
  import './contrib/issue/electron-browser/issue.contribution.js';

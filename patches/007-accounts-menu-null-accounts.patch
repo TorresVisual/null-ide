@@ -1,5 +1,5 @@
 diff --git a/src/vs/workbench/browser/parts/globalCompositeBar.ts b/src/vs/workbench/browser/parts/globalCompositeBar.ts
-index 6aec4cf9..cc6bb913 100644
+index df905d0d..83eb5ad6 100644
 --- a/src/vs/workbench/browser/parts/globalCompositeBar.ts
 +++ b/src/vs/workbench/browser/parts/globalCompositeBar.ts
 @@ -17,7 +17,7 @@ import { CompositeBarActionViewItem, CompositeBarAction, IActivityHoverOptions,
@@ -8,10 +8,10 @@ index 6aec4cf9..cc6bb913 100644
  import { registerIcon } from '../../../platform/theme/common/iconRegistry.js';
 -import { Action, IAction, Separator, SubmenuAction, toAction } from '../../../base/common/actions.js';
 +import { Action, IAction, Separator, toAction } from '../../../base/common/actions.js';
+ import { Emitter } from '../../../base/common/event.js';
  import { IMenu, IMenuService, MenuId } from '../../../platform/actions/common/actions.js';
  import { addDisposableListener, EventType, append, clearNode, hide, show, EventHelper, $, runWhenWindowIdle, getWindow } from '../../../base/browser/dom.js';
- import { StandardKeyboardEvent } from '../../../base/browser/keyboardEvent.js';
-@@ -34,7 +34,7 @@ import { ILogService } from '../../../platform/log/common/log.js';
+@@ -35,7 +35,7 @@ import { ILogService } from '../../../platform/log/common/log.js';
  import { IProductService } from '../../../platform/product/common/productService.js';
  import { ISecretStorageService } from '../../../platform/secrets/common/secrets.js';
  import { AuthenticationSessionInfo, getCurrentAuthenticationSessionInfo } from '../../services/authentication/browser/authenticationService.js';
@@ -20,7 +20,7 @@ index 6aec4cf9..cc6bb913 100644
  import { IWorkbenchEnvironmentService } from '../../services/environment/common/environmentService.js';
  import { IHoverService } from '../../../platform/hover/browser/hover.js';
  import { ILifecycleService, LifecyclePhase } from '../../services/lifecycle/common/lifecycle.js';
-@@ -49,7 +49,8 @@ import { IBaseActionViewItemOptions } from '../../../base/browser/ui/actionbar/a
+@@ -50,7 +50,8 @@ import { IBaseActionViewItemOptions } from '../../../base/browser/ui/actionbar/a
  import { ICommandService } from '../../../platform/commands/common/commands.js';
  import { IDefaultAccountService } from '../../../platform/defaultAccount/common/defaultAccount.js';
  import { WORKBENCH_MENU_MOTION_CLASS, workbenchMenuCloseAnimation } from '../actions/menuMotion.js';
@@ -30,7 +30,7 @@ index 6aec4cf9..cc6bb913 100644
  
  export class GlobalCompositeBar extends Disposable {
  
-@@ -169,7 +170,7 @@ abstract class AbstractGlobalActivityActionViewItem extends CompositeBarActionVi
+@@ -180,7 +181,7 @@ abstract class AbstractGlobalActivityActionViewItem extends CompositeBarActionVi
  		@IHoverService hoverService: IHoverService,
  		@IMenuService private readonly menuService: IMenuService,
  		@IContextMenuService private readonly contextMenuService: IContextMenuService,
@@ -39,7 +39,7 @@ index 6aec4cf9..cc6bb913 100644
  		@IConfigurationService protected override readonly configurationService: IConfigurationService,
  		@IKeybindingService keybindingService: IKeybindingService,
  		@IActivityService private readonly activityService: IActivityService,
-@@ -261,6 +262,40 @@ abstract class AbstractGlobalActivityActionViewItem extends CompositeBarActionVi
+@@ -272,6 +273,40 @@ abstract class AbstractGlobalActivityActionViewItem extends CompositeBarActionVi
  	}
  }
  
@@ -80,7 +80,7 @@ index 6aec4cf9..cc6bb913 100644
  export class AccountsActivityActionViewItem extends AbstractGlobalActivityActionViewItem {
  
  	static readonly ACCOUNTS_VISIBILITY_PREFERENCE_KEY = 'workbench.activity.showAccounts';
-@@ -268,7 +303,6 @@ export class AccountsActivityActionViewItem extends AbstractGlobalActivityAction
+@@ -279,7 +314,6 @@ export class AccountsActivityActionViewItem extends AbstractGlobalActivityAction
  	private readonly groupedAccounts: Map<string, (AuthenticationSessionAccount & { canSignOut: boolean })[]> = new Map();
  	private readonly problematicProviders: Set<string> = new Set();
  
@@ -88,7 +88,7 @@ index 6aec4cf9..cc6bb913 100644
  	private sessionFromEmbedder = new Lazy<Promise<AuthenticationSessionInfo | undefined>>(() => getCurrentAuthenticationSessionInfo(this.secretStorageService, this.productService));
  	private avatarImg: HTMLImageElement | undefined;
  
-@@ -293,7 +327,7 @@ export class AccountsActivityActionViewItem extends AbstractGlobalActivityAction
+@@ -304,7 +338,7 @@ export class AccountsActivityActionViewItem extends AbstractGlobalActivityAction
  		@IActivityService activityService: IActivityService,
  		@IInstantiationService instantiationService: IInstantiationService,
  		@ICommandService private readonly commandService: ICommandService,
@@ -97,7 +97,7 @@ index 6aec4cf9..cc6bb913 100644
  		@IDefaultAccountService private readonly defaultAccountService: IDefaultAccountService,
  	) {
  		const action = instantiationService.createInstance(CompositeBarAction, {
-@@ -372,7 +406,6 @@ export class AccountsActivityActionViewItem extends AbstractGlobalActivityAction
+@@ -383,7 +417,6 @@ export class AccountsActivityActionViewItem extends AbstractGlobalActivityAction
  			}
  		}
  
@@ -105,7 +105,7 @@ index 6aec4cf9..cc6bb913 100644
  		this.updateAvatar();
  	}
  
-@@ -391,6 +424,12 @@ export class AccountsActivityActionViewItem extends AbstractGlobalActivityAction
+@@ -402,6 +435,12 @@ export class AccountsActivityActionViewItem extends AbstractGlobalActivityAction
  		};
  		append(this.label, this.avatarImg);
  
@@ -118,7 +118,7 @@ index 6aec4cf9..cc6bb913 100644
  		this.updateAvatar();
  	}
  
-@@ -399,8 +438,10 @@ export class AccountsActivityActionViewItem extends AbstractGlobalActivityAction
+@@ -410,8 +449,10 @@ export class AccountsActivityActionViewItem extends AbstractGlobalActivityAction
  			return;
  		}
  
@@ -130,7 +130,7 @@ index 6aec4cf9..cc6bb913 100644
  			avatarIcon = this.getDefaultAccountAvatarIcon();
  			if (!avatarIcon) {
  				for (const accounts of this.groupedAccounts.values()) {
-@@ -417,8 +458,8 @@ export class AccountsActivityActionViewItem extends AbstractGlobalActivityAction
+@@ -428,8 +469,8 @@ export class AccountsActivityActionViewItem extends AbstractGlobalActivityAction
  			}
  		}
  
@@ -141,7 +141,7 @@ index 6aec4cf9..cc6bb913 100644
  			this.avatarImg.style.display = '';
  			this.label.classList.add('has-avatar');
  		} else {
-@@ -443,150 +484,54 @@ export class AccountsActivityActionViewItem extends AbstractGlobalActivityAction
+@@ -454,150 +495,54 @@ export class AccountsActivityActionViewItem extends AbstractGlobalActivityAction
  	protected override async resolveMainMenuActions(accountsMenu: IMenu, disposables: DisposableStore): Promise<IAction[]> {
  		await super.resolveMainMenuActions(accountsMenu, disposables);
  
