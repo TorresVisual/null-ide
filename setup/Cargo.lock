@@ -1949,9 +1949,11 @@ name = "null-setup"
 version = "0.1.0"
 dependencies = [
  "null-setup-core",
+ "serde",
  "serde_json",
  "tauri",
  "tauri-build",
+ "tempfile",
 ]
 
 [[package]]

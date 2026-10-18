@@ -16,12 +16,12 @@ use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::args::Args;
 
-static FINISHED: AtomicBool = AtomicBool::new(false);
+pub static FINISHED: AtomicBool = AtomicBool::new(false);
 /// From "Installing" on, closing the window would leave a half-installed app; before that it just abandons the update.
-static SWAPPING: AtomicBool = AtomicBool::new(false);
+pub static SWAPPING: AtomicBool = AtomicBool::new(false);
 
-enum Action { Retry, ForceClose, Cancel }
-struct Channel(Mutex<mpsc::Sender<Action>>);
+pub enum Action { Retry, ForceClose, Cancel }
+pub struct Channel(pub Mutex<mpsc::Sender<Action>>);
 struct Ready(Mutex<mpsc::Sender<()>>);
 
 /// The page has registered its event listeners; earlier events would be dropped.
@@ -29,18 +29,18 @@ struct Ready(Mutex<mpsc::Sender<()>>);
 fn ui_ready(r: State<Ready>) { let _ = r.0.lock().unwrap().send(()); }
 
 #[tauri::command]
-fn action(name: String, ch: State<Channel>) {
+pub fn action(name: String, ch: State<Channel>) {
     let a = match name.as_str() { "retry" => Action::Retry, "force" => Action::ForceClose, _ => Action::Cancel };
     let _ = ch.0.lock().unwrap().send(a);
 }
 
 #[tauri::command]
-fn diagnostics(log: State<Arc<Logger>>) -> String { log.tail(80) }
+pub fn diagnostics(log: State<Arc<Logger>>) -> String { log.tail(80) }
 
 #[tauri::command]
-fn quit(app: AppHandle) { app.exit(0) }
+pub fn quit(app: AppHandle) { app.exit(0) }
 
-struct UiInteract<'a> { app: &'a AppHandle, rx: &'a mpsc::Receiver<Action> }
+pub struct UiInteract<'a> { pub app: &'a AppHandle, pub rx: &'a mpsc::Receiver<Action> }
 
 impl Interact for UiInteract<'_> {
     fn locked(&self, running: &[Running]) -> LockedChoice {
@@ -50,6 +50,15 @@ impl Interact for UiInteract<'_> {
             Ok(Action::Retry) => LockedChoice::Retry,
             Ok(Action::ForceClose) => LockedChoice::ForceClose,
             _ => LockedChoice::Cancel,
+        }
+    }
+}
+
+/// From "Installing" on, closing the window would leave a half-installed app.
+pub fn guard_close(_: &tauri::Window, ev: &tauri::WindowEvent) {
+    if let tauri::WindowEvent::CloseRequested { api, .. } = ev {
+        if SWAPPING.load(Ordering::SeqCst) && !FINISHED.load(Ordering::SeqCst) {
+            api.prevent_close();
         }
     }
 }
@@ -95,13 +104,7 @@ pub fn run_update(args: Args) -> i32 {
         .manage(Ready(Mutex::new(ready_tx)))
         .manage(log)
         .invoke_handler(tauri::generate_handler![action, diagnostics, quit, ui_ready])
-        .on_window_event(|_, ev| {
-            if let tauri::WindowEvent::CloseRequested { api, .. } = ev {
-                if SWAPPING.load(Ordering::SeqCst) && !FINISHED.load(Ordering::SeqCst) {
-                    api.prevent_close();
-                }
-            }
-        })
+        .on_window_event(guard_close)
         .setup(move |app| {
             let handle = app.handle().clone();
             if let Some(w) = app.get_webview_window("main") {

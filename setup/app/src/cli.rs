@@ -43,6 +43,12 @@ pub fn run(a: &Args) -> i32 {
     }
 }
 
+/// The install itself worked; only something after it did not (registrations, saving the first-run choices).
+/// The wizard reports these on the finish page instead of as a failure.
+pub fn is_partial(e: &Error) -> bool {
+    matches!(e, Error::Other(m) if m.starts_with("installed, but"))
+}
+
 fn load_config(a: &Args) -> Result<Option<InstallConfig>> {
     a.config.as_deref().map(install_config::read_file).transpose()
 }
@@ -64,7 +70,7 @@ fn deploy(a: &Args, kind: Kind, tag: String, cfg: Option<InstallConfig>, ctx: &C
     }
 }
 
-fn dispatch(a: &Args, ctx: &Ctx) -> Result<()> {
+pub(crate) fn dispatch(a: &Args, ctx: &Ctx) -> Result<()> {
     match a.mode {
         Mode::Install => {
             let cfg = load_config(a)?.unwrap_or_default();
@@ -92,5 +98,18 @@ fn dispatch(a: &Args, ctx: &Ctx) -> Result<()> {
             manage::uninstall(&UninstallOpts::standard(a.install_dir.clone(), a.delete_data, user_data), ctx)
         }
         Mode::Prefetch | Mode::Update | Mode::Recover | Mode::TrustCert | Mode::Wizard => unreachable!("handled in main"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn only_the_installed_but_messages_count_as_partial_success() {
+        assert!(is_partial(&Error::Other("installed, but some registrations failed: x".into())));
+        assert!(is_partial(&Error::Other("installed, but the first-run choices were not saved: x".into())));
+        assert!(!is_partial(&Error::Other("registrations failed, the saved choices were not changed: x".into())));
+        assert!(!is_partial(&Error::Busy));
     }
 }

@@ -5,6 +5,7 @@ mod cli;
 mod headless;
 mod relocate;
 mod window;
+mod wizard;
 
 use args::Mode;
 
@@ -23,10 +24,22 @@ fn main() {
         Mode::Update => {
             // Never keep a handle on the install dir (inherited cwd): the swap renames it.
             let _ = std::env::set_current_dir(null_setup_core::local_app_data());
+            if !null_setup_core::webview2::installed() {
+                null_setup_core::webview2::show_missing();
+                std::process::exit(1);
+            }
             relocate::maybe_relocate(&args);
             window::run_update(args)
         }
-        Mode::Wizard => unreachable!("Task 5"),
+        Mode::Wizard => {
+            if !null_setup_core::webview2::installed() {
+                null_setup_core::webview2::show_missing();
+                std::process::exit(1);
+            }
+            let _ = std::env::set_current_dir(null_setup_core::local_app_data());
+            relocate::maybe_relocate(&args); // started from <install>\setup (Add/Remove Programs): the swap or the deletion would hit our own exe
+            wizard::run(args)
+        }
         Mode::Install | Mode::Modify | Mode::Repair | Mode::Uninstall => {
             let _ = std::env::set_current_dir(null_setup_core::local_app_data());
             relocate::maybe_relocate(&args); // a copy under <install>\setup would block the swap or the deletion

@@ -79,7 +79,7 @@ pub fn valid_extension_id(id: &str) -> bool {
     matches!(id.split_once('.'), Some((a, b)) if part(a) && part(b))
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Manifest {
     pub schema: u32,
     pub builtins: Vec<Builtin>,
