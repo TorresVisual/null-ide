@@ -50,14 +50,18 @@ pub struct Opts {
     pub registrar: Arc<dyn Registrar>,
 }
 
+/// Test seam for scripts/fake-release.mjs; a local attacker who controls the environment already owns the user.
+pub fn api_base() -> String {
+    std::env::var("NULL_SETUP_API_BASE").unwrap_or_else(|_| "https://api.github.com".into())
+}
+
 impl Opts {
     pub fn standard(repo: String, tag: String, install_dir: PathBuf) -> Opts {
         Opts {
             repo,
             tag,
             install_dir,
-            // Test seam for scripts/fake-release.mjs; a local attacker who controls the environment already owns the user.
-            api_base: std::env::var("NULL_SETUP_API_BASE").unwrap_or_else(|_| "https://api.github.com".into()),
+            api_base: api_base(),
             cache: Cache::standard(),
             http: Http::standard(),
             timing: Timing::STANDARD,

@@ -45,6 +45,31 @@ pub fn from_json(v: &Value, tag: &str) -> Result<Release> {
     })
 }
 
+/// The newest stable release plus its `builtins.json` asset (releases from before 2a have none).
+#[derive(Clone, Debug, PartialEq)]
+pub struct Latest {
+    pub release: Release,
+    pub builtins_url: Option<String>,
+}
+
+pub fn resolve_latest(http: &Http, api_base: &str, repo: &str) -> Result<Latest> {
+    let v = http.get_json(&format!("{api_base}/repos/{repo}/releases/latest"))?;
+    latest_from_json(&v)
+}
+
+pub fn latest_from_json(v: &Value) -> Result<Latest> {
+    let tag = v["tag_name"]
+        .as_str()
+        .filter(|t| crate::update::safe_tag(t))
+        .ok_or_else(|| Error::Package("the latest release has no usable tag".into()))?;
+    let builtins_url = v["assets"]
+        .as_array()
+        .and_then(|a| a.iter().find(|x| x["name"].as_str() == Some("builtins.json")))
+        .and_then(|x| x["browser_download_url"].as_str())
+        .map(str::to_string);
+    Ok(Latest { release: from_json(v, tag)?, builtins_url })
+}
+
 pub fn parse_sha256(text: &str) -> Result<String> {
     let token = text.split_whitespace().next().unwrap_or_default().to_ascii_lowercase();
     if token.len() == 64 && token.chars().all(|c| c.is_ascii_hexdigit()) {
