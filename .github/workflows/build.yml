@@ -140,6 +140,7 @@ jobs:
           foreach ($p in $patches) {
             Write-Host "Applying overlay patch: $($p.Name)"
             git apply --ignore-whitespace $p.FullName
+            if ($LASTEXITCODE -ne 0) { throw "Overlay patch $($p.Name) does not apply" }
           }
 
       - name: Merge product.json overlay
