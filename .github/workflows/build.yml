@@ -1077,8 +1077,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # build/ has its own dependencies; libcxx-fetcher.ts, which setup-env.sh runs, imports them
+          (cd build && npm ci)
           # setup-env.sh downloads the sysroot and exports the CC/CXX/LDFLAGS the native modules need
           source ./build/azure-pipelines/linux/setup-env.sh
+          # as upstream: patch v8 headers for native modules before the root install
+          node build/npm/preinstall.ts
           npm ci --prefer-offline --no-audit --fund=false
 
       - name: Save VS Code node_modules cache
