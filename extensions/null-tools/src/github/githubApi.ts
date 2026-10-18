@@ -34,6 +34,9 @@ export class ApiError extends Error {
   }
 }
 
+/** A download past its size cap (`fetchBytes`). Callers that can show a placeholder match this type, not the message. */
+export class TooLargeError extends Error {}
+
 /** When a rate-limited request may be retried: `Retry-After` wins, else the primary limit's reset time. */
 export function rateLimitRetryAt(headers: IncomingHttpHeaders, now: number = Date.now()): number | null {
   const retryAfter = Number(headers['retry-after']);
@@ -184,7 +187,7 @@ export function fetchBytes(url: string, token: string | null, accept: string, ma
       }
       const tooBig = (): void => {
         res.destroy();
-        reject(new Error(`Image is larger than ${Math.round(maxBytes / (1024 * 1024))} MB`));
+        reject(new TooLargeError(`Image is larger than ${Math.round(maxBytes / (1024 * 1024))} MB`));
       };
       if (Number(res.headers['content-length']) > maxBytes) {
         tooBig();
