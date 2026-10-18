@@ -43,21 +43,23 @@ step "CLI"
 "$app/bin/null" --version || fail "null --version failed"
 
 step "launch under xvfb"
-mkdir "$work/ud" "$work/ext" "$work/project"
-xvfb-run -a "$app/null" --no-sandbox --disable-gpu --user-data-dir "$work/ud" --extensions-dir "$work/ext" "$work/project" &
+mkdir "$work/ud" "$work/ext" "$work/project" "$work/logs"
+xvfb-run -a "$app/null" --no-sandbox --disable-gpu --user-data-dir "$work/ud" --logsPath "$work/logs" --extensions-dir "$work/ext" "$work/project" &
 app_pid=$!
+# VSCodium's linux patch moves default logs to the XDG state dir, so pin them (#119)
+has_logs() { [ -n "$(find "$work/logs" -name "*.log" -print -quit)" ]; }
 for _ in $(seq 60); do
-  [ -d "$work/ud/logs" ] && break
+  has_logs && break
   kill -0 "$app_pid" 2>/dev/null || break
   sleep 1
 done
-if [ ! -d "$work/ud/logs" ]; then
-  find "$work/ud" -maxdepth 3 >&2 || true
-  fail "the app wrote no logs within 60 seconds (user-data-dir contents above)"
+if ! has_logs; then
+  find "$work/ud" "$work/logs" -maxdepth 3 >&2 || true
+  fail "the app wrote no logs within 60 seconds (directory contents above)"
 fi
 sleep 25 # let extensions activate
 kill -0 "$app_pid" 2>/dev/null || fail "the app exited during startup"
-if grep -rE "Activating extension '[^']+' failed" "$work/ud/logs"; then fail "an extension failed to activate (lines above)"; fi
+if grep -rE "Activating extension '[^']+' failed" "$work/logs"; then fail "an extension failed to activate (lines above)"; fi
 kill "$app_pid" 2>/dev/null || true; app_pid=
 pkill -f "$app/null" 2>/dev/null || true
 
