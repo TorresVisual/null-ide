@@ -5,17 +5,44 @@ import * as vscode from 'vscode';
 import { fetchRepoFile } from '../github/githubApi';
 import { getAccountsApi } from '../github/githubAuth';
 import { resolveGithubSession } from '../github/githubSession';
+import { getGitApi } from '../graph/gitApi';
 import { describeFailure } from '../pulls/pullModel';
-import { WfNode } from './workflowsModel';
+import { editFilter } from './workflowFilterMenu';
+import { POLL_FAST_MS, RunFilter, WfNode, isWorkflowFile } from './workflowsModel';
 import { WorkflowsTreeProvider } from './workflowsTreeView';
 
 const MAX_WORKFLOW_FILE_BYTES = 256 * 1024;
+const FOCUS_REFRESH_MIN_MS = 60_000;
 
 export function registerWorkflowsFeature(context: vscode.ExtensionContext): void {
   const tree = new WorkflowsTreeProvider(context.workspaceState);
   const view = vscode.window.createTreeView<WfNode>('null.workflowsView', { treeDataProvider: tree });
   tree.onMessage = message => { view.message = message; };
-  const refresh = async (): Promise<void> => { await tree.refresh(); };
+  let lastRefresh = 0;
+  const refresh = async (): Promise<void> => { lastRefresh = Date.now(); await tree.refresh(); };
+
+  // One shared timer, only while the view is visible, only while some run is in play.
+  let timer: NodeJS.Timeout | undefined;
+  const stop = (): void => { if (timer) { clearTimeout(timer); timer = undefined; } };
+  const schedule = (ms: number | null): void => {
+    stop();
+    if (ms !== null && view.visible) timer = setTimeout(() => void tick(), ms);
+  };
+  const tick = async (): Promise<void> => {
+    timer = undefined;
+    schedule(await tree.poll());
+  };
+  const rearm = (): void => { if (!timer && view.visible && tree.hasActiveRuns()) schedule(POLL_FAST_MS); };
+
+  const workflowFiles = (): Array<{ file: string; name: string }> => {
+    const seen = new Map<string, string>();
+    for (const s of tree.slots()) for (const w of s.workflows) seen.set(path.posix.basename(w.path), w.name);
+    return [...seen].map(([file, name]) => ({ file, name }));
+  };
+  async function applyFilter(next: RunFilter): Promise<void> {
+    lastRefresh = Date.now();
+    await tree.setFilter(next);
+  }
 
   async function signIn(node: WfNode): Promise<void> {
     const slot = tree.slot(node.repo.key);
@@ -70,17 +97,44 @@ export function registerWorkflowsFeature(context: vscode.ExtensionContext): void
         void vscode.window.showInformationMessage('Create .github/workflows/ in this folder and add a YAML workflow file to it.');
       }
     }),
+    vscode.commands.registerCommand('null.workflows.filter', async () => {
+      if (tree.state !== 'ready') {
+        void vscode.window.showInformationMessage('Open the GitHub Actions view of a folder with a GitHub remote first.');
+        return;
+      }
+      const next = await editFilter(tree.filter, workflowFiles);
+      if (next) await applyFilter(next);
+    }),
+    vscode.commands.registerCommand('null.workflows.filterByWorkflow', async (node: WfNode) => {
+      if (node.kind === 'workflow') {
+        const file = path.posix.basename(node.workflow.path);
+        if (isWorkflowFile(file)) await applyFilter({ ...tree.filter, workflow: file });
+      }
+    }),
     // Test seam for the integration spec (like _null.pulls.snapshot): the view's state and per-repo counts.
     vscode.commands.registerCommand('_null.workflows.snapshot', async () => {
       await tree.ensureLoaded();
       return tree.snapshot();
     }),
+    tree.onDidLoad(rearm),
     // Nothing is fetched until the view is first shown.
     view.onDidChangeVisibility(e => { if (e.visible && !tree.loaded) void refresh(); }),
+    view.onDidChangeVisibility(e => { if (e.visible) rearm(); else stop(); }),
+    { dispose: stop },
+    // Coming back to the window picks up new runs, at most once a minute and only while the view is shown.
+    vscode.window.onDidChangeWindowState(e => {
+      if (e.focused && tree.loaded && view.visible && Date.now() - lastRefresh > FOCUS_REFRESH_MIN_MS) void refresh();
+    }),
   );
   if (view.visible) void refresh();
 
   // Binding or importing an account must show up without a manual refresh, but never wakes a view nobody opened.
   const accountsChanged = getAccountsApi()?.onDidChange(() => { if (tree.loaded) void refresh(); });
   if (accountsChanged) context.subscriptions.push(accountsChanged);
+
+  // The branch marker follows vscode.git: one cheap `symbolic-ref` per repo, and a redraw only when a branch really changed.
+  void getGitApi().then(git => {
+    const subs = git.repositories.map(r => r.state.onDidChange(() => { if (view.visible && tree.loaded) void tree.refreshBranches(); }));
+    context.subscriptions.push(...subs);
+  }, () => undefined);
 }

@@ -276,7 +276,9 @@
       { "command": "null.workflows.loadMore", "title": "Null: Load More Workflow Runs" },
       { "command": "null.workflows.openOnGitHub", "title": "Open on GitHub", "icon": "$(link-external)" },
       { "command": "null.workflows.openWorkflowFile", "title": "Open Workflow File", "icon": "$(go-to-file)" },
-      { "command": "null.workflows.createWorkflow", "title": "Create Workflow" }
+      { "command": "null.workflows.createWorkflow", "title": "Create Workflow" },
+      { "command": "null.workflows.filter", "title": "Null: Filter GitHub Actions Runs", "icon": "$(filter)" },
+      { "command": "null.workflows.filterByWorkflow", "title": "Filter Runs by This Workflow", "icon": "$(filter)" }
     ],
     "viewsContainers": {
       "activitybar": [
@@ -428,7 +430,8 @@
         { "command": "null.graph.refresh", "when": "view == null.graphView", "group": "navigation@2" },
         { "command": "null.pulls.filter", "when": "view == null.pullsView && null.pulls.state =~ /^(ready|empty|empty-filtered)$/", "group": "navigation@1" },
         { "command": "null.pulls.refresh", "when": "view == null.pullsView", "group": "navigation@2" },
-        { "command": "null.workflows.refresh", "when": "view == null.workflowsView", "group": "navigation@2" }
+        { "command": "null.workflows.refresh", "when": "view == null.workflowsView", "group": "navigation@2" },
+        { "command": "null.workflows.filter", "when": "view == null.workflowsView && null.workflows.state == ready", "group": "navigation@1" }
       ],
       "view/item/context": [
         {
@@ -504,7 +507,8 @@
         { "command": "null.pulls.finishReview", "when": "view == null.pullsView && viewItem == pull", "group": "1_pull@3" },
         { "command": "null.workflows.openOnGitHub", "when": "view == null.workflowsView && viewItem =~ /^(run|job|workflow|repo)/", "group": "inline@9" },
         { "command": "null.workflows.openOnGitHub", "when": "view == null.workflowsView && viewItem =~ /^(run|job|workflow|repo)/", "group": "9_github@0" },
-        { "command": "null.workflows.openWorkflowFile", "when": "view == null.workflowsView && viewItem =~ /^workflow/", "group": "1_workflow@0" }
+        { "command": "null.workflows.openWorkflowFile", "when": "view == null.workflowsView && viewItem =~ /^workflow/", "group": "1_workflow@0" },
+        { "command": "null.workflows.filterByWorkflow", "when": "view == null.workflowsView && viewItem =~ /^workflow/", "group": "1_workflow@1" }
       ],
       "comments/commentThread/context": [
         { "command": "null.pulls.addToReview", "when": "commentController == null.pulls", "group": "inline@0" },
@@ -560,6 +564,7 @@
         { "command": "null.workflows.openOnGitHub", "when": "false" },
         { "command": "null.workflows.openWorkflowFile", "when": "false" },
         { "command": "null.workflows.createWorkflow", "when": "false" },
+        { "command": "null.workflows.filterByWorkflow", "when": "false" },
         { "command": "null.pulls.finishReview", "when": "false" },
         { "command": "null.graph.checkout", "when": "false" },
         { "command": "null.graph.createBranch", "when": "false" },

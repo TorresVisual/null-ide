@@ -12,7 +12,7 @@ import { parseDispatch } from './dispatchInputs';
 import * as api from './workflowsApi';
 import {
   RepoRef, RunFilter, WfNode, Workflow, WorkflowJob, WorkflowRun, dedupeRepos, describeFilter, describeNode, isActive,
-  isDefaultFilter, mapLimit, mergeRuns, nodeId, parseFilter,
+  isDefaultFilter, mapLimit, mergeRuns, nodeId, parseFilter, pollDelay,
 } from './workflowsModel';
 
 /** What the view shows; every value except `ready` has a welcome message in package.json (`null.workflows.state`). */
@@ -239,6 +239,25 @@ export class WorkflowsTreeProvider implements vscode.TreeDataProvider<WfNode> {
   }
 
   hasActiveRuns(): boolean { return this.all.some(s => s.token !== null && s.runs.some(isActive)); }
+
+  /**
+   * One polling tick: re-fetch the repos that have a run in play (and are not rate-limited), then say when to come back.
+   * null = nothing is active, stop the timer.
+   */
+  async poll(): Promise<number | null> {
+    const now = Date.now();
+    const live = this.all.filter(s => s.token !== null && s.runs.some(isActive));
+    if (live.length === 0) return null;
+    await Promise.all(live.filter(s => (s.retryAt ?? 0) <= now).map(s => this.reloadRuns(s)));
+    const stillLive = this.all.filter(s => s.token !== null && s.runs.some(isActive));
+    if (stillLive.length === 0) return null;
+    const since = Math.min(...stillLive.flatMap(s => s.runs.filter(isActive).map(r => Date.parse(r.startedAt ?? r.updatedAt) || now)));
+    const retryAt = stillLive.reduce<number | null>((m, s) => (s.retryAt !== null && (m === null || s.retryAt > m) ? s.retryAt : m), null);
+    return pollDelay({
+      oldestActiveSince: Number.isFinite(since) ? since : null, now: Date.now(),
+      failures: Math.max(...stillLive.map(s => s.failures)), retryAt,
+    });
+  }
 
   /** Shows `run` under a "Pinned" position of its repo until the next refresh (used by Reveal from the PR tab). */
   pin(slot: RepoSlot, run: WorkflowRun): void {

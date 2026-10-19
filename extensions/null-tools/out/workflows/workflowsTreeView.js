@@ -258,6 +258,26 @@ class WorkflowsTreeProvider {
             this.emitter.fire(undefined);
     }
     hasActiveRuns() { return this.all.some(s => s.token !== null && s.runs.some(workflowsModel_1.isActive)); }
+    /**
+     * One polling tick: re-fetch the repos that have a run in play (and are not rate-limited), then say when to come back.
+     * null = nothing is active, stop the timer.
+     */
+    async poll() {
+        const now = Date.now();
+        const live = this.all.filter(s => s.token !== null && s.runs.some(workflowsModel_1.isActive));
+        if (live.length === 0)
+            return null;
+        await Promise.all(live.filter(s => (s.retryAt ?? 0) <= now).map(s => this.reloadRuns(s)));
+        const stillLive = this.all.filter(s => s.token !== null && s.runs.some(workflowsModel_1.isActive));
+        if (stillLive.length === 0)
+            return null;
+        const since = Math.min(...stillLive.flatMap(s => s.runs.filter(workflowsModel_1.isActive).map(r => Date.parse(r.startedAt ?? r.updatedAt) || now)));
+        const retryAt = stillLive.reduce((m, s) => (s.retryAt !== null && (m === null || s.retryAt > m) ? s.retryAt : m), null);
+        return (0, workflowsModel_1.pollDelay)({
+            oldestActiveSince: Number.isFinite(since) ? since : null, now: Date.now(),
+            failures: Math.max(...stillLive.map(s => s.failures)), retryAt,
+        });
+    }
     /** Shows `run` under a "Pinned" position of its repo until the next refresh (used by Reveal from the PR tab). */
     pin(slot, run) {
         if (!slot.runs.some(r => r.id === run.id))
