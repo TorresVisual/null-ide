@@ -6,7 +6,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { cherryPick, checkout, createBranch, reset, resetImpact, resumeOperation, revert } from './gitActions';
+import { cherryPick, checkout, createBranch, pull, reset, resetImpact, resumeOperation, revert } from './gitActions';
 import { GitGraphService } from './gitGraphService';
 import { makeRunGit } from './gitRun';
 
@@ -216,4 +216,78 @@ test('resetImpact counts what leaves the branch, what is left on no other ref, a
   writeFileSync(path.join(dir, 'a.txt'), 'dirty');
   writeFileSync(path.join(dir, 'untracked.txt'), 'u');
   assert.deepStrictEqual(expectOk(await resetImpact(run, c1)), { branch: 'main', leaving: 2, orphaned: 0, trackedChanges: 1 });
+});
+
+// Fake git: `answers` maps the joined args to stdout; a missing key throws like a failing git.
+function fakeGit(answers: Record<string, string>, calls: string[][] = []) {
+  return async (args: string[]) => {
+    calls.push(args);
+    const key = args.join(' ');
+    if (key in answers) return answers[key];
+    throw new Error(`fatal: unexpected ${key}`);
+  };
+}
+
+test('pull reports noUpstream when the branch tracks nothing, and runs no pull', async () => {
+  const calls: string[][] = [];
+  assert.deepStrictEqual(await pull(fakeGit({}, calls)), { ok: true, value: { kind: 'noUpstream' } });
+  assert.strictEqual(calls.some((a) => a[0] === 'pull'), false);
+});
+
+test('pull reports upToDate when HEAD already contains the upstream', async () => {
+  const git = fakeGit({
+    'rev-parse --abbrev-ref --symbolic-full-name @{u}': 'origin/main\n',
+    'rev-list --count HEAD..@{u}': '0\n',
+    'pull --ff-only': 'Already up to date.\n',
+  });
+  assert.deepStrictEqual(await pull(git), { ok: true, value: { kind: 'upToDate' } });
+});
+
+test('pull reports diverged and does not pull when local and upstream both have commits', async () => {
+  const calls: string[][] = [];
+  const git = fakeGit({
+    'rev-parse --abbrev-ref --symbolic-full-name @{u}': 'origin/main\n',
+    'rev-list --count HEAD..@{u}': '2\n',
+    'rev-list --count @{u}..HEAD': '1\n',
+  }, calls);
+  assert.deepStrictEqual(await pull(git), { ok: true, value: { kind: 'diverged' } });
+  assert.strictEqual(calls.some((a) => a[0] === 'pull'), false);
+});
+
+test('pull fast-forwards and counts the commits that came in', async () => {
+  const git = fakeGit({
+    'rev-parse --abbrev-ref --symbolic-full-name @{u}': 'origin/main\n',
+    'rev-list --count HEAD..@{u}': '3\n',
+    'rev-list --count @{u}..HEAD': '0\n',
+    'pull --ff-only': 'Fast-forward\n',
+  });
+  assert.deepStrictEqual(await pull(git), { ok: true, value: { kind: 'fastForwarded', commits: 3 } });
+});
+
+test('pull returns git refusal text as a failure, e.g. a dirty tree', async () => {
+  const git = async (args: string[]) => {
+    const key = args.join(' ');
+    if (key.startsWith('rev-parse')) return 'origin/main\n';
+    if (key === 'rev-list --count HEAD..@{u}') return '1\n';
+    if (key === 'rev-list --count @{u}..HEAD') return '0\n';
+    throw new Error('error: Your local changes to the following files would be overwritten by merge');
+  };
+  assert.deepStrictEqual(await pull(git), {
+    ok: false,
+    message: 'error: Your local changes to the following files would be overwritten by merge',
+  });
+});
+
+test('pull passes an offline or no-credentials failure through unchanged', async () => {
+  const git = async (args: string[]) => {
+    const key = args.join(' ');
+    if (key.startsWith('rev-parse')) return 'origin/main\n';
+    if (key === 'rev-list --count HEAD..@{u}') return '1\n';
+    if (key === 'rev-list --count @{u}..HEAD') return '0\n';
+    throw new Error("fatal: could not read Username for 'https://github.com': terminal prompts disabled");
+  };
+  assert.deepStrictEqual(await pull(git), {
+    ok: false,
+    message: "fatal: could not read Username for 'https://github.com': terminal prompts disabled",
+  });
 });

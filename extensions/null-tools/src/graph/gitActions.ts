@@ -114,3 +114,30 @@ export async function resetImpact(git: RunGit, sha: string): Promise<Result<Rese
     return fail(messageOf(err));
   }
 }
+
+export type PullOutcome =
+  | { kind: 'upToDate' }
+  | { kind: 'fastForwarded'; commits: number }
+  | { kind: 'noUpstream' }
+  | { kind: 'diverged' };
+
+/** Fast-forward only: a diverged branch is reported and left alone, so no merge commit and no conflict can appear. */
+export async function pull(git: RunGit): Promise<Result<PullOutcome>> {
+  try {
+    let upstream: string;
+    try {
+      upstream = (await git(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}'])).trim();
+    } catch {
+      return ok({ kind: 'noUpstream' });
+    }
+    if (!upstream) return ok({ kind: 'noUpstream' });
+    const behind = await count(git, ['rev-list', '--count', 'HEAD..@{u}']);
+    if (behind === 0) return ok({ kind: 'upToDate' });
+    const ahead = await count(git, ['rev-list', '--count', '@{u}..HEAD']);
+    if (ahead > 0) return ok({ kind: 'diverged' });
+    await git(['pull', '--ff-only']);
+    return ok({ kind: 'fastForwarded', commits: behind });
+  } catch (err) {
+    return fail(messageOf(err));
+  }
+}
