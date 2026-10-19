@@ -16,11 +16,11 @@ Leave every box below unchecked. The executing skill resolves them with your hum
 
 **Execution Target:**
 - [ ] Current branch (no isolation)
-- [ ] New feature branch (no worktree)
+- [x] New feature branch (no worktree)
 - [ ] Worktree (superpowers:using-git-worktrees)
 
 **Execution Mode:**
-- [ ] Inline execution (superpowers:executing-plans)
+- [x] Inline execution (superpowers:executing-plans)
 - [ ] Subagent-driven execution (superpowers:subagent-driven-development)
 
 ## Global Constraints
