@@ -1234,6 +1234,10 @@ jobs:
       - name: Build the deb
         shell: bash
         working-directory: vscode-src
+        env:
+          # prepare-deb resolves the sysroot via the GitHub releases API; unauthenticated
+          # lookups get 403 on shared runners. Basic auth, so it must be user:token.
+          GITHUB_TOKEN: x-access-token:${{ secrets.GITHUB_TOKEN }}
         run: |
           npx gulp vscode-linux-x64-prepare-deb
           npx gulp vscode-linux-x64-build-deb
