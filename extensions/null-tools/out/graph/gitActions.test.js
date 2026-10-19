@@ -213,6 +213,7 @@ function fakeGit(answers, calls = []) {
 (0, node_test_1.default)('pull reports upToDate when HEAD already contains the upstream', async () => {
     const git = fakeGit({
         'rev-parse --abbrev-ref --symbolic-full-name @{u}': 'origin/main\n',
+        'fetch': '',
         'rev-list --count HEAD..@{u}': '0\n',
         'pull --ff-only': 'Already up to date.\n',
     });
@@ -224,6 +225,7 @@ function fakeGit(answers, calls = []) {
         'rev-parse --abbrev-ref --symbolic-full-name @{u}': 'origin/main\n',
         'rev-list --count HEAD..@{u}': '2\n',
         'rev-list --count @{u}..HEAD': '1\n',
+        'fetch': '',
     }, calls);
     node_assert_1.default.deepStrictEqual(await (0, gitActions_1.pull)(git), { ok: true, value: { kind: 'diverged' } });
     node_assert_1.default.strictEqual(calls.some((a) => a[0] === 'pull'), false);
@@ -233,13 +235,29 @@ function fakeGit(answers, calls = []) {
         'rev-parse --abbrev-ref --symbolic-full-name @{u}': 'origin/main\n',
         'rev-list --count HEAD..@{u}': '3\n',
         'rev-list --count @{u}..HEAD': '0\n',
+        'fetch': '',
         'pull --ff-only': 'Fast-forward\n',
     });
     node_assert_1.default.deepStrictEqual(await (0, gitActions_1.pull)(git), { ok: true, value: { kind: 'fastForwarded', commits: 3 } });
 });
+(0, node_test_1.default)('pull fetches before it counts, so an upstream that moved on the remote is seen', async () => {
+    const calls = [];
+    const git = fakeGit({
+        'fetch': '',
+        'rev-parse --abbrev-ref --symbolic-full-name @{u}': 'origin/main\n',
+        'rev-list --count HEAD..@{u}': '1\n',
+        'rev-list --count @{u}..HEAD': '0\n',
+        'pull --ff-only': 'Fast-forward\n',
+    }, calls);
+    node_assert_1.default.deepStrictEqual(await (0, gitActions_1.pull)(git), { ok: true, value: { kind: 'fastForwarded', commits: 1 } });
+    const keys = calls.map((a) => a.join(' '));
+    node_assert_1.default.ok(keys.indexOf('fetch') >= 0 && keys.indexOf('fetch') < keys.indexOf('rev-list --count HEAD..@{u}'), keys.join(' | '));
+});
 (0, node_test_1.default)('pull returns git refusal text as a failure, e.g. a dirty tree', async () => {
     const git = async (args) => {
         const key = args.join(' ');
+        if (key === 'fetch')
+            return '';
         if (key.startsWith('rev-parse'))
             return 'origin/main\n';
         if (key === 'rev-list --count HEAD..@{u}')
@@ -254,19 +272,24 @@ function fakeGit(answers, calls = []) {
     });
 });
 (0, node_test_1.default)('pull passes an offline or no-credentials failure through unchanged', async () => {
+    const calls = [];
     const git = async (args) => {
+        calls.push(args);
         const key = args.join(' ');
         if (key.startsWith('rev-parse'))
             return 'origin/main\n';
+        if (key === 'fetch')
+            throw new Error("fatal: could not read Username for 'https://github.com': terminal prompts disabled");
         if (key === 'rev-list --count HEAD..@{u}')
             return '1\n';
         if (key === 'rev-list --count @{u}..HEAD')
             return '0\n';
-        throw new Error("fatal: could not read Username for 'https://github.com': terminal prompts disabled");
+        throw new Error(`fatal: unexpected ${key}`);
     };
     node_assert_1.default.deepStrictEqual(await (0, gitActions_1.pull)(git), {
         ok: false,
         message: "fatal: could not read Username for 'https://github.com': terminal prompts disabled",
     });
+    node_assert_1.default.strictEqual(calls.some((a) => a[0] === 'pull'), false);
 });
 //# sourceMappingURL=gitActions.test.js.map
