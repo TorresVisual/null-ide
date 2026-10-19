@@ -4,7 +4,7 @@
 import * as vscode from 'vscode';
 import { Result } from '../worktrees';
 import {
-  CheckoutTarget, PullOutcome, StoppedInfo, checkout, cherryPick, createBranch, pull, reset, resetImpact, resumeOperation, revert,
+  CheckoutTarget, IntegrateStrategy, PullOutcome, StoppedInfo, checkout, cherryPick, createBranch, integrateUpstream, pull, reset, resetImpact, resumeOperation, revert,
 } from './gitActions';
 import { GitGraphService } from './gitGraphService';
 import { CommitGraphPanel } from './commitGraphPanel';
@@ -114,20 +114,45 @@ async function resetFlow(session: GraphSession, sha: string, mode: 'soft' | 'mix
   report(await session.runAction((a) => reset(a.act, mode, sha)));
 }
 
+type SettledPull = Exclude<PullOutcome, { kind: 'diverged' }>;
+
 /** One line per outcome. A refused pull is named, never silent. */
-function pullMessage(outcome: PullOutcome): void {
+function pullMessage(outcome: SettledPull): void {
   switch (outcome.kind) {
     case 'upToDate': void vscode.window.showInformationMessage('Already up to date.'); return;
     case 'fastForwarded': void vscode.window.showInformationMessage(`Pulled ${outcome.commits} ${outcome.commits === 1 ? 'commit' : 'commits'}.`); return;
     case 'noUpstream': void vscode.window.showWarningMessage('This branch has no upstream to pull from.'); return;
-    case 'diverged': void vscode.window.showWarningMessage('This branch has diverged from its upstream. Pull was not run; merge or rebase by hand.'); return;
+  }
+}
+
+const commits = (n: number, adjective: string): string => `${n} ${adjective} ${n === 1 ? 'commit' : 'commits'}`;
+
+/** Pull never merges or rebases on its own: a diverged branch asks, and a dismissed prompt changes nothing. */
+async function divergedFlow(session: GraphSession, ahead: number, behind: number): Promise<void> {
+  const choice = await vscode.window.showWarningMessage(
+    `This branch has diverged from its upstream: ${commits(ahead, 'local')}, ${commits(behind, 'incoming')}.`,
+    {
+      modal: true,
+      detail: 'Rebase puts your local commits on top of the incoming ones and keeps history linear; your local commits get new hashes. '
+        + 'Merge keeps every commit as it is and adds a merge commit. Either can stop on conflicts: the Commit Graph then offers Continue, Skip and Abort.',
+    },
+    'Rebase', 'Merge',
+  );
+  if (choice !== 'Rebase' && choice !== 'Merge') return;
+  const strategy: IntegrateStrategy = choice === 'Rebase' ? 'rebase' : 'merge';
+  const result = await session.runAction((a) => integrateUpstream(a.act, () => a.service.inProgress(), strategy));
+  await reportOperation(result, choice);
+  if (result.ok && !result.value.stopped) {
+    void vscode.window.showInformationMessage(strategy === 'rebase' ? 'Rebased onto the upstream.' : 'Merged the upstream.');
   }
 }
 
 async function pullFlow(session: GraphSession): Promise<void> {
   const result = await session.runAction((a) => pull(a.act));
   if (!result.ok) { report(result); return; }
-  pullMessage(result.value);
+  const outcome = result.value;
+  if (outcome.kind === 'diverged') { await divergedFlow(session, outcome.ahead, outcome.behind); return; }
+  pullMessage(outcome);
 }
 
 export function registerGraphCommands(context: vscode.ExtensionContext, session: GraphSession, panel: CommitGraphPanel): void {
