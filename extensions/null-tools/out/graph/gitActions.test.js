@@ -449,4 +449,49 @@ function configGit(config, branch = 'main') {
             delete process.env[key];
     }
 });
+(0, node_test_1.default)('rememberPullStrategy writes pull.rebase into the repo and pullPreference reads it back', async () => {
+    const isolated = { GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: node_path_1.default.join((0, node_fs_1.mkdtempSync)(node_path_1.default.join((0, node_os_1.tmpdir)(), 'graph-cfg-')), 'none') };
+    Object.assign(process.env, isolated);
+    try {
+        const clone = divergedClone(['l.txt', 'local'], ['o.txt', 'remote']);
+        const { run } = tools(clone);
+        expectOk(await (0, gitActions_1.rememberPullStrategy)(run, 'rebase'));
+        node_assert_1.default.strictEqual(git(clone, 'config', '--local', '--get', 'pull.rebase'), 'true');
+        node_assert_1.default.strictEqual(await (0, gitActions_1.pullPreference)(run), 'rebase');
+        expectOk(await (0, gitActions_1.rememberPullStrategy)(run, 'merge'));
+        node_assert_1.default.strictEqual(git(clone, 'config', '--local', '--get', 'pull.rebase'), 'false');
+        node_assert_1.default.strictEqual(await (0, gitActions_1.pullPreference)(run), 'merge');
+    }
+    finally {
+        for (const key of Object.keys(isolated))
+            delete process.env[key];
+    }
+});
+(0, node_test_1.default)('rememberPullStrategy overwrites a branch setting Null cannot read, since that key wins', async () => {
+    const clone = divergedClone(['l.txt', 'local'], ['o.txt', 'remote']);
+    const { run } = tools(clone);
+    const branch = git(clone, 'symbolic-ref', '--short', 'HEAD');
+    git(clone, 'config', `branch.${branch}.rebase`, 'merges');
+    node_assert_1.default.strictEqual(await (0, gitActions_1.pullPreference)(run), 'ask');
+    expectOk(await (0, gitActions_1.rememberPullStrategy)(run, 'merge'));
+    node_assert_1.default.strictEqual(git(clone, 'config', '--local', '--get', `branch.${branch}.rebase`), 'false');
+    node_assert_1.default.strictEqual(await (0, gitActions_1.pullPreference)(run), 'merge');
+});
+(0, node_test_1.default)('rememberPullStrategy never writes outside the repository config', async () => {
+    const clone = divergedClone(['l.txt', 'local'], ['o.txt', 'remote']);
+    // Git for Windows ships pull.rebase=false in its system config, so compare before and after rather than expecting the key to be absent.
+    const outside = () => ['--system', '--global'].map(scope => { try {
+        return git(clone, 'config', scope, '--get', 'pull.rebase');
+    }
+    catch {
+        return '';
+    } });
+    const before = outside();
+    expectOk(await (0, gitActions_1.rememberPullStrategy)(tools(clone).run, 'rebase'));
+    node_assert_1.default.deepStrictEqual(outside(), before);
+});
+(0, node_test_1.default)('rememberPullStrategy returns git failures as a result and does not throw', async () => {
+    const broken = async () => { throw new Error('error: could not lock config file'); };
+    node_assert_1.default.deepStrictEqual(await (0, gitActions_1.rememberPullStrategy)(broken, 'rebase'), { ok: false, message: 'error: could not lock config file' });
+});
 //# sourceMappingURL=gitActions.test.js.map

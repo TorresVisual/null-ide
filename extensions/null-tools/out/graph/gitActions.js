@@ -11,6 +11,7 @@ exports.resetImpact = resetImpact;
 exports.pull = pull;
 exports.integrateUpstream = integrateUpstream;
 exports.pullPreference = pullPreference;
+exports.rememberPullStrategy = rememberPullStrategy;
 const ok = (value) => ({ ok: true, value });
 const fail = (message) => ({ ok: false, message });
 const messageOf = (err) => (err instanceof Error ? err.message : String(err));
@@ -171,5 +172,22 @@ async function pullPreference(git) {
     if (ff === 'only')
         return 'ff-only';
     return ['false', 'no', 'off', '0'].includes(ff) ? 'merge' : 'ask';
+}
+/**
+ * Saves a Rebase / Merge answer so `pullPreference` stops asking. Repo-local only.
+ * A `branch.<name>.rebase` value beats `pull.rebase`, so when one exists (it is one Null cannot act on, or we would not be asking) it is the key to overwrite.
+ */
+async function rememberPullStrategy(git, strategy) {
+    try {
+        const branch = (await git(['symbolic-ref', '--quiet', '--short', 'HEAD'])).trim();
+        const scoped = await configValue(git, `branch.${branch}.rebase`);
+        if (scoped === null)
+            return fail('Could not read the git config.');
+        await git(['config', '--local', scoped ? `branch.${branch}.rebase` : 'pull.rebase', strategy === 'rebase' ? 'true' : 'false']);
+        return ok(null);
+    }
+    catch (err) {
+        return fail(messageOf(err));
+    }
 }
 //# sourceMappingURL=gitActions.js.map

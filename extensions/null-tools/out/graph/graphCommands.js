@@ -154,17 +154,21 @@ function pullMessage(outcome) {
     }
 }
 const commits = (n, adjective) => `${n} ${adjective} ${n === 1 ? 'commit' : 'commits'}`;
-/** The modal for a user whose git config does not say. A dismissed prompt returns null and changes nothing. */
+/** The modal for a user whose git config does not say. `remember` saves the answer; a dismissed prompt returns null and changes nothing. */
 async function askStrategy(ahead, behind) {
     const choice = await vscode.window.showWarningMessage(`This branch has diverged from its upstream: ${commits(ahead, 'local')}, ${commits(behind, 'incoming')}.`, {
         modal: true,
         detail: 'Rebase puts your local commits on top of the incoming ones and keeps history linear; your local commits get new hashes. '
             + 'Merge keeps every commit as it is and adds a merge commit. Either can stop on conflicts: the Commit Graph then offers Continue, Skip and Abort. '
-            + 'Set pull.rebase in your git config to stop being asked.',
-    }, 'Rebase', 'Merge');
-    if (choice === 'Rebase')
-        return 'rebase';
-    return choice === 'Merge' ? 'merge' : null;
+            + 'Always Rebase and Always Merge save the answer as pull.rebase in this repository\'s git config, so you are not asked again.',
+    }, 'Rebase', 'Merge', 'Always Rebase', 'Always Merge');
+    switch (choice) {
+        case 'Rebase': return { strategy: 'rebase', remember: false };
+        case 'Merge': return { strategy: 'merge', remember: false };
+        case 'Always Rebase': return { strategy: 'rebase', remember: true };
+        case 'Always Merge': return { strategy: 'merge', remember: true };
+        default: return null;
+    }
 }
 /** Pull never merges or rebases unprompted unless the user's git config (pull.rebase, branch.<name>.rebase, pull.ff) already says to. */
 async function divergedFlow(session, ahead, behind) {
@@ -176,9 +180,19 @@ async function divergedFlow(session, ahead, behind) {
         void vscode.window.showWarningMessage(`This branch has diverged from its upstream (${commits(ahead, 'local')}, ${commits(behind, 'incoming')}) and pull.ff is "only", so nothing was pulled. Rebase or merge it yourself, or change pull.ff.`);
         return;
     }
-    const strategy = preference === 'ask' ? await askStrategy(ahead, behind) : preference;
-    if (!strategy)
-        return;
+    let strategy;
+    if (preference === 'ask') {
+        const answer = await askStrategy(ahead, behind);
+        if (!answer)
+            return;
+        strategy = answer.strategy;
+        // Saved before the operation: a stopped rebase blocks further actions until it is resolved, and the answer is already given.
+        if (answer.remember)
+            report(await (0, gitActions_1.rememberPullStrategy)(availability.act, strategy));
+    }
+    else {
+        strategy = preference;
+    }
     const label = strategy === 'rebase' ? 'Rebase' : 'Merge';
     const result = await session.runAction((a) => (0, gitActions_1.integrateUpstream)(a.act, () => a.service.inProgress(), strategy));
     await reportOperation(result, label);
