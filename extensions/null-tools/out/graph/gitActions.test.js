@@ -227,7 +227,7 @@ function fakeGit(answers, calls = []) {
         'rev-list --count @{u}..HEAD': '1\n',
         'fetch': '',
     }, calls);
-    node_assert_1.default.deepStrictEqual(await (0, gitActions_1.pull)(git), { ok: true, value: { kind: 'diverged' } });
+    node_assert_1.default.deepStrictEqual(await (0, gitActions_1.pull)(git), { ok: true, value: { kind: 'diverged', ahead: 1, behind: 2 } });
     node_assert_1.default.strictEqual(calls.some((a) => a[0] === 'pull'), false);
 });
 (0, node_test_1.default)('pull fast-forwards and counts the commits that came in', async () => {
@@ -291,5 +291,72 @@ function fakeGit(answers, calls = []) {
         message: "fatal: could not read Username for 'https://github.com': terminal prompts disabled",
     });
     node_assert_1.default.strictEqual(calls.some((a) => a[0] === 'pull'), false);
+});
+// A clone whose branch has one local commit while origin has one new commit: ahead 1, behind 1, upstream already fetched.
+function divergedClone(local, remote) {
+    const origin = initRepo();
+    commit(origin, 'a.txt', 'base', 'base');
+    const clone = node_path_1.default.join((0, node_fs_1.mkdtempSync)(node_path_1.default.join((0, node_os_1.tmpdir)(), 'graph-pull-')), 'c');
+    (0, node_child_process_1.execFileSync)('git', ['clone', '-q', origin, clone]);
+    for (const [key, value] of [['user.email', 'test@example.com'], ['user.name', 'Test'], ['commit.gpgsign', 'false'], ['core.autocrlf', 'false']]) {
+        git(clone, 'config', key, value);
+    }
+    commit(clone, local[0], local[1], 'local change');
+    commit(origin, remote[0], remote[1], 'remote change');
+    git(clone, 'fetch', '-q');
+    return clone;
+}
+(0, node_test_1.default)('integrateUpstream rebase puts the local commit on top of the upstream with no merge commit', async () => {
+    const clone = divergedClone(['l.txt', 'local'], ['o.txt', 'remote']);
+    const { run, inProgress } = tools(clone);
+    node_assert_1.default.strictEqual(expectOk(await (0, gitActions_1.integrateUpstream)(run, inProgress, 'rebase')).stopped, false);
+    node_assert_1.default.strictEqual(git(clone, 'log', '--format=%s'), 'local change\nremote change\nbase');
+    node_assert_1.default.strictEqual(git(clone, 'rev-list', '--merges', '--count', 'HEAD'), '0');
+    node_assert_1.default.strictEqual(await inProgress(), null);
+});
+(0, node_test_1.default)('integrateUpstream merge adds one merge commit that keeps both histories', async () => {
+    const clone = divergedClone(['l.txt', 'local'], ['o.txt', 'remote']);
+    const { run, inProgress } = tools(clone);
+    node_assert_1.default.strictEqual(expectOk(await (0, gitActions_1.integrateUpstream)(run, inProgress, 'merge')).stopped, false);
+    node_assert_1.default.strictEqual(git(clone, 'rev-list', '--parents', '-n1', 'HEAD').split(' ').length, 3, 'a merge commit has two parents');
+    node_assert_1.default.strictEqual(await inProgress(), null);
+});
+(0, node_test_1.default)('a conflicting rebase or merge is a stop, and Abort puts the branch back on the same commit', async () => {
+    for (const strategy of ['rebase', 'merge']) {
+        const clone = divergedClone(['a.txt', 'local'], ['a.txt', 'remote']);
+        const { run, inProgress } = tools(clone);
+        const before = git(clone, 'rev-parse', 'HEAD');
+        node_assert_1.default.strictEqual(expectOk(await (0, gitActions_1.integrateUpstream)(run, inProgress, strategy)).stopped, true, strategy);
+        node_assert_1.default.deepStrictEqual(await inProgress(), { kind: strategy }, strategy);
+        expectOk(await (0, gitActions_1.resumeOperation)(run, inProgress, 'abort'));
+        node_assert_1.default.strictEqual(git(clone, 'rev-parse', 'HEAD'), before, `${strategy}: HEAD restored`);
+        node_assert_1.default.strictEqual(await inProgress(), null, strategy);
+        node_assert_1.default.strictEqual((0, node_fs_1.readFileSync)(node_path_1.default.join(clone, 'a.txt'), 'utf8'), 'local', `${strategy}: file restored`);
+    }
+});
+(0, node_test_1.default)('integrateUpstream is refused on a dirty tree, with the tree and HEAD untouched and no operation started', async () => {
+    // Rebase refuses any unstaged change; merge refuses when the change overlaps what comes in.
+    const cases = [
+        { strategy: 'rebase', remote: ['o.txt', 'remote'] },
+        { strategy: 'merge', remote: ['a.txt', 'remote'] },
+    ];
+    for (const { strategy, remote } of cases) {
+        const clone = divergedClone(['l.txt', 'local'], [remote[0], remote[1]]);
+        const { run, inProgress } = tools(clone);
+        const before = git(clone, 'rev-parse', 'HEAD');
+        (0, node_fs_1.writeFileSync)(node_path_1.default.join(clone, 'a.txt'), 'dirty');
+        const result = await (0, gitActions_1.integrateUpstream)(run, inProgress, strategy);
+        node_assert_1.default.strictEqual(result.ok, false, strategy);
+        node_assert_1.default.strictEqual(git(clone, 'rev-parse', 'HEAD'), before, `${strategy}: HEAD`);
+        node_assert_1.default.strictEqual((0, node_fs_1.readFileSync)(node_path_1.default.join(clone, 'a.txt'), 'utf8'), 'dirty', `${strategy}: file`);
+        node_assert_1.default.strictEqual(await inProgress(), null, strategy);
+    }
+});
+(0, node_test_1.default)('integrateUpstream rebase drops a local commit whose patch the upstream already has', async () => {
+    // The upstream was amended or squashed: the same change exists on both sides under different hashes.
+    const clone = divergedClone(['o.txt', 'same'], ['o.txt', 'same']);
+    const { run, inProgress } = tools(clone);
+    node_assert_1.default.strictEqual(expectOk(await (0, gitActions_1.integrateUpstream)(run, inProgress, 'rebase')).stopped, false);
+    node_assert_1.default.strictEqual(git(clone, 'rev-parse', 'HEAD'), git(clone, 'rev-parse', '@{u}'), 'no duplicate commit is left');
 });
 //# sourceMappingURL=gitActions.test.js.map

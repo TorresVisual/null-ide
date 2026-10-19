@@ -9,6 +9,7 @@ exports.resumeOperation = resumeOperation;
 exports.reset = reset;
 exports.resetImpact = resetImpact;
 exports.pull = pull;
+exports.integrateUpstream = integrateUpstream;
 const ok = (value) => ({ ok: true, value });
 const fail = (message) => ({ ok: false, message });
 const messageOf = (err) => (err instanceof Error ? err.message : String(err));
@@ -114,12 +115,19 @@ async function pull(git) {
             return ok({ kind: 'upToDate' });
         const ahead = await count(git, ['rev-list', '--count', '@{u}..HEAD']);
         if (ahead > 0)
-            return ok({ kind: 'diverged' });
+            return ok({ kind: 'diverged', ahead, behind });
         await git(['pull', '--ff-only']);
         return ok({ kind: 'fastForwarded', commits: behind });
     }
     catch (err) {
         return fail(messageOf(err));
     }
+}
+/**
+ * Brings a diverged branch level with its upstream. The caller has fetched already, so this never touches the network.
+ * No --autostash: a dirty tree is refused by git and its message comes back as a failure.
+ */
+function integrateUpstream(git, inProgress, strategy) {
+    return sequencer(git, inProgress, strategy === 'rebase' ? ['rebase', '@{u}'] : ['merge', '--no-edit', '@{u}']);
 }
 //# sourceMappingURL=gitActions.js.map

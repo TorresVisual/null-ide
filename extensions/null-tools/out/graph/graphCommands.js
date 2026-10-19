@@ -151,9 +151,23 @@ function pullMessage(outcome) {
         case 'noUpstream':
             void vscode.window.showWarningMessage('This branch has no upstream to pull from.');
             return;
-        case 'diverged':
-            void vscode.window.showWarningMessage('This branch has diverged from its upstream. Pull was not run; merge or rebase by hand.');
-            return;
+    }
+}
+const commits = (n, adjective) => `${n} ${adjective} ${n === 1 ? 'commit' : 'commits'}`;
+/** Pull never merges or rebases on its own: a diverged branch asks, and a dismissed prompt changes nothing. */
+async function divergedFlow(session, ahead, behind) {
+    const choice = await vscode.window.showWarningMessage(`This branch has diverged from its upstream: ${commits(ahead, 'local')}, ${commits(behind, 'incoming')}.`, {
+        modal: true,
+        detail: 'Rebase puts your local commits on top of the incoming ones and keeps history linear; your local commits get new hashes. '
+            + 'Merge keeps every commit as it is and adds a merge commit. Either can stop on conflicts: the Commit Graph then offers Continue, Skip and Abort.',
+    }, 'Rebase', 'Merge');
+    if (choice !== 'Rebase' && choice !== 'Merge')
+        return;
+    const strategy = choice === 'Rebase' ? 'rebase' : 'merge';
+    const result = await session.runAction((a) => (0, gitActions_1.integrateUpstream)(a.act, () => a.service.inProgress(), strategy));
+    await reportOperation(result, choice);
+    if (result.ok && !result.value.stopped) {
+        void vscode.window.showInformationMessage(strategy === 'rebase' ? 'Rebased onto the upstream.' : 'Merged the upstream.');
     }
 }
 async function pullFlow(session) {
@@ -162,7 +176,12 @@ async function pullFlow(session) {
         report(result);
         return;
     }
-    pullMessage(result.value);
+    const outcome = result.value;
+    if (outcome.kind === 'diverged') {
+        await divergedFlow(session, outcome.ahead, outcome.behind);
+        return;
+    }
+    pullMessage(outcome);
 }
 function registerGraphCommands(context, session, panel) {
     const register = (id, handler) => context.subscriptions.push(vscode.commands.registerCommand(id, handler));
