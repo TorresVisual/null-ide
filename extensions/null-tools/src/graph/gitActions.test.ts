@@ -237,6 +237,7 @@ test('pull reports noUpstream when the branch tracks nothing, and runs no pull',
 test('pull reports upToDate when HEAD already contains the upstream', async () => {
   const git = fakeGit({
     'rev-parse --abbrev-ref --symbolic-full-name @{u}': 'origin/main\n',
+    'fetch': '',
     'rev-list --count HEAD..@{u}': '0\n',
     'pull --ff-only': 'Already up to date.\n',
   });
@@ -249,6 +250,7 @@ test('pull reports diverged and does not pull when local and upstream both have 
     'rev-parse --abbrev-ref --symbolic-full-name @{u}': 'origin/main\n',
     'rev-list --count HEAD..@{u}': '2\n',
     'rev-list --count @{u}..HEAD': '1\n',
+    'fetch': '',
   }, calls);
   assert.deepStrictEqual(await pull(git), { ok: true, value: { kind: 'diverged' } });
   assert.strictEqual(calls.some((a) => a[0] === 'pull'), false);
@@ -259,14 +261,30 @@ test('pull fast-forwards and counts the commits that came in', async () => {
     'rev-parse --abbrev-ref --symbolic-full-name @{u}': 'origin/main\n',
     'rev-list --count HEAD..@{u}': '3\n',
     'rev-list --count @{u}..HEAD': '0\n',
+    'fetch': '',
     'pull --ff-only': 'Fast-forward\n',
   });
   assert.deepStrictEqual(await pull(git), { ok: true, value: { kind: 'fastForwarded', commits: 3 } });
 });
 
+test('pull fetches before it counts, so an upstream that moved on the remote is seen', async () => {
+  const calls: string[][] = [];
+  const git = fakeGit({
+    'fetch': '',
+    'rev-parse --abbrev-ref --symbolic-full-name @{u}': 'origin/main\n',
+    'rev-list --count HEAD..@{u}': '1\n',
+    'rev-list --count @{u}..HEAD': '0\n',
+    'pull --ff-only': 'Fast-forward\n',
+  }, calls);
+  assert.deepStrictEqual(await pull(git), { ok: true, value: { kind: 'fastForwarded', commits: 1 } });
+  const keys = calls.map((a) => a.join(' '));
+  assert.ok(keys.indexOf('fetch') >= 0 && keys.indexOf('fetch') < keys.indexOf('rev-list --count HEAD..@{u}'), keys.join(' | '));
+});
+
 test('pull returns git refusal text as a failure, e.g. a dirty tree', async () => {
   const git = async (args: string[]) => {
     const key = args.join(' ');
+    if (key === 'fetch') return '';
     if (key.startsWith('rev-parse')) return 'origin/main\n';
     if (key === 'rev-list --count HEAD..@{u}') return '1\n';
     if (key === 'rev-list --count @{u}..HEAD') return '0\n';
@@ -279,15 +297,19 @@ test('pull returns git refusal text as a failure, e.g. a dirty tree', async () =
 });
 
 test('pull passes an offline or no-credentials failure through unchanged', async () => {
+  const calls: string[][] = [];
   const git = async (args: string[]) => {
+    calls.push(args);
     const key = args.join(' ');
     if (key.startsWith('rev-parse')) return 'origin/main\n';
+    if (key === 'fetch') throw new Error("fatal: could not read Username for 'https://github.com': terminal prompts disabled");
     if (key === 'rev-list --count HEAD..@{u}') return '1\n';
     if (key === 'rev-list --count @{u}..HEAD') return '0\n';
-    throw new Error("fatal: could not read Username for 'https://github.com': terminal prompts disabled");
+    throw new Error(`fatal: unexpected ${key}`);
   };
   assert.deepStrictEqual(await pull(git), {
     ok: false,
     message: "fatal: could not read Username for 'https://github.com': terminal prompts disabled",
   });
+  assert.strictEqual(calls.some((a) => a[0] === 'pull'), false);
 });

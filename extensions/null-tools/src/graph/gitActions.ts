@@ -131,6 +131,8 @@ export async function pull(git: RunGit): Promise<Result<PullOutcome>> {
       return ok({ kind: 'noUpstream' });
     }
     if (!upstream) return ok({ kind: 'noUpstream' });
+    // The counts read the remote-tracking ref, which only a fetch moves; without this a pull never sees new commits.
+    await git(['fetch']);
     const behind = await count(git, ['rev-list', '--count', 'HEAD..@{u}']);
     if (behind === 0) return ok({ kind: 'upToDate' });
     const ahead = await count(git, ['rev-list', '--count', '@{u}..HEAD']);
