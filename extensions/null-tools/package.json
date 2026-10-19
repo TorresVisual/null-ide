@@ -259,7 +259,10 @@
       { "command": "null.pulls.openOnGitHub", "title": "Null: Open Pull Request on GitHub", "icon": "$(link-external)" },
       { "command": "null.pulls.openDetail", "title": "Null: Open Pull Request Details", "icon": "$(open-preview)" },
       { "command": "null.pulls.openFileDiff", "title": "Null: Open Pull Request File Diff" },
-      { "command": "null.pulls.comment", "title": "Comment" },
+      { "command": "null.pulls.comment", "title": "Comment Now" },
+      { "command": "null.pulls.addToReview", "title": "Add Review Comment" },
+      { "command": "null.pulls.resolveThread", "title": "Resolve Thread", "icon": "$(check)" },
+      { "command": "null.pulls.unresolveThread", "title": "Unresolve Thread", "icon": "$(discard)" },
       { "command": "null.pulls.filter", "title": "Null: Filter Pull Requests", "icon": "$(filter)" },
       { "command": "null.pulls.resetFilter", "title": "Null: Reset Pull Request Filters" }
     ],
@@ -462,7 +465,12 @@
         { "command": "null.pulls.openOnGitHub", "when": "view == null.pullsView && viewItem == pull", "group": "1_pull@2" }
       ],
       "comments/commentThread/context": [
-        { "command": "null.pulls.comment", "when": "commentController == null.pulls", "group": "inline" }
+        { "command": "null.pulls.addToReview", "when": "commentController == null.pulls", "group": "inline@0" },
+        { "command": "null.pulls.comment", "when": "commentController == null.pulls", "group": "inline@1" }
+      ],
+      "comments/commentThread/title": [
+        { "command": "null.pulls.resolveThread", "when": "commentController == null.pulls && commentThread == resolvable", "group": "inline@0" },
+        { "command": "null.pulls.unresolveThread", "when": "commentController == null.pulls && commentThread == unresolvable", "group": "inline@0" }
       ],
       "commandPalette": [
         { "command": "null.checkForUpdates" },
@@ -499,6 +507,9 @@
         { "command": "null.issues.insertReference" },
         { "command": "null.pulls.openFileDiff", "when": "false" },
         { "command": "null.pulls.comment", "when": "false" },
+        { "command": "null.pulls.addToReview", "when": "false" },
+        { "command": "null.pulls.resolveThread", "when": "false" },
+        { "command": "null.pulls.unresolveThread", "when": "false" },
         { "command": "null.pulls.filter", "when": "false" },
         { "command": "null.pulls.resetFilter", "when": "false" },
         { "command": "null.pulls.openDetail", "when": "false" },

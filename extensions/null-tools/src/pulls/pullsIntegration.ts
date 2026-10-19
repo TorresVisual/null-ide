@@ -84,6 +84,9 @@ export function registerPullsFeature(context: vscode.ExtensionContext): void {
       if (node.kind === 'pull' && ctx) PullDetailPanel.show(context.extensionUri, ctx.repo, node.pull);
     }),
     vscode.commands.registerCommand('null.pulls.comment', (reply: vscode.CommentReply) => review.submit(reply)),
+    vscode.commands.registerCommand('null.pulls.addToReview', (reply: vscode.CommentReply) => review.addToReview(reply)),
+    vscode.commands.registerCommand('null.pulls.resolveThread', (thread: vscode.CommentThread) => review.setResolved(thread, true)),
+    vscode.commands.registerCommand('null.pulls.unresolveThread', (thread: vscode.CommentThread) => review.setResolved(thread, false)),
     // Nothing is fetched until the view is first shown, and nothing polls while it is hidden.
     view.onDidChangeVisibility(e => { if (e.visible && !tree.loaded) void refresh(); }),
   );
