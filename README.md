@@ -1,10 +1,10 @@
 <a id="readme-top"></a>
 
 <p align="center">
-  <a href="release-url"><img src="release-shield" alt="Release"></a>
-  <a href="stars-url"><img src="stars-shield" alt="Stargazers"></a>
-  <a href="forks-url"><img src="forks-shield" alt="Forks"></a>
-  <a href="issues-url"><img src="issues-shield" alt="Issues"></a>
+  <a href="https://github.com/TorresVisual/null-ide/releases/latest"><img src="https://img.shields.io/github/v/release/TorresVisual/null-ide?style=for-the-badge" alt="Release"></a>
+  <a href="https://github.com/TorresVisual/null-ide/stargazers"><img src="https://img.shields.io/github/stars/TorresVisual/null-ide.svg?style=for-the-badge" alt="Stargazers"></a>
+  <a href="https://github.com/TorresVisual/null-ide/network/members"><img src="https://img.shields.io/github/forks/TorresVisual/null-ide.svg?style=for-the-badge" alt="Forks"></a>
+  <a href="https://github.com/TorresVisual/null-ide/issues"><img src="https://img.shields.io/github/issues/TorresVisual/null-ide.svg?style=for-the-badge" alt="Issues"></a>
 </p>
 
 <br />
