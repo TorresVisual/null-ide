@@ -14,6 +14,7 @@ import { registerGraphFeature } from './graph/graphIntegration';
 import { registerDiscordPresenceFeature } from './discordPresenceIntegration';
 import { registerIssuesPanelFeature } from './issuesPanelIntegration';
 import { registerPullsFeature } from './pulls/pullsIntegration';
+import { registerWorkflowsFeature } from './workflows/workflowsIntegration';
 import { getStagedDiff, getChangedFiles, heuristicMessage, runClaude } from './commitMessage';
 import { registerUpdaterFeature } from './updaterIntegration';
 import { registerCommitValidationFeature } from './commitValidationIntegration';
@@ -137,6 +138,7 @@ export function activate(context: vscode.ExtensionContext): void {
   registerGraphFeature(context);
   registerIssuesPanelFeature(context);
   registerPullsFeature(context);
+  registerWorkflowsFeature(context);
   registerDiscordPresenceFeature(context);
   registerOpenInNullNotesFeature(context);
   registerClaudeTabFeature(context);

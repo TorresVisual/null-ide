@@ -58,7 +58,7 @@ function readManifests() {
     const result = (0, featureRegistry_1.collectFeatures)(readManifests(), m => warnings.push(m));
     node_assert_1.default.deepStrictEqual(warnings, []);
     node_assert_1.default.deepStrictEqual(result.map(c => [c.id, c.features.map(f => f.label)]), [
-        ['develop', ['Dashboard', 'GitHub Issues', 'Pull Requests', 'Commit Graph', 'Music Player']],
+        ['develop', ['Dashboard', 'GitHub Issues', 'Pull Requests', 'GitHub Actions', 'Commit Graph', 'Music Player']],
         ['insights', ['Activity Dashboard', 'Startup Report']],
         ['account', ['Accounts', 'Sync Status']],
         ['setup', ['Null Setup', 'Environment Check', 'Actions Settings', 'Formatting Settings']],

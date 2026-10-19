@@ -41,7 +41,9 @@
       { "id": "setup", "label": "Null Setup", "category": "setup", "icon": "settings-gear",
         "command": "null.setup.open", "description": "Shortcuts, built-ins, uninstall", "order": 5 },
       { "id": "pulls", "label": "Pull Requests", "category": "develop", "icon": "git-pull-request",
-        "command": "null.pulls.open", "description": "Review pull requests in the editor", "order": 25 }
+        "command": "null.pulls.open", "description": "Review pull requests in the editor", "order": 25 },
+      { "id": "workflows", "label": "GitHub Actions", "category": "develop", "icon": "play-circle",
+        "command": "null.workflows.open", "description": "Browse workflow runs, logs and actions", "order": 27 }
     ]
   },
   "contributes": {
@@ -267,7 +269,14 @@
       { "command": "null.pulls.resolveThread", "title": "Resolve Thread", "icon": "$(check)" },
       { "command": "null.pulls.unresolveThread", "title": "Unresolve Thread", "icon": "$(discard)" },
       { "command": "null.pulls.filter", "title": "Null: Filter Pull Requests", "icon": "$(filter)" },
-      { "command": "null.pulls.resetFilter", "title": "Null: Reset Pull Request Filters" }
+      { "command": "null.pulls.resetFilter", "title": "Null: Reset Pull Request Filters" },
+      { "command": "null.workflows.open", "title": "Null: Show GitHub Actions" },
+      { "command": "null.workflows.refresh", "title": "Null: Refresh GitHub Actions", "icon": "$(refresh)" },
+      { "command": "null.workflows.signIn", "title": "Null: Sign in to GitHub for GitHub Actions" },
+      { "command": "null.workflows.loadMore", "title": "Null: Load More Workflow Runs" },
+      { "command": "null.workflows.openOnGitHub", "title": "Open on GitHub", "icon": "$(link-external)" },
+      { "command": "null.workflows.openWorkflowFile", "title": "Open Workflow File", "icon": "$(go-to-file)" },
+      { "command": "null.workflows.createWorkflow", "title": "Create Workflow" }
     ],
     "viewsContainers": {
       "activitybar": [
@@ -280,6 +289,11 @@
           "id": "null-issues",
           "title": "GitHub",
           "icon": "media/github-issues.svg"
+        },
+        {
+          "id": "null-workflows",
+          "title": "GitHub Actions",
+          "icon": "media/github-actions.svg"
         }
       ]
     },
@@ -300,6 +314,9 @@
           "visibility": "visible"
         },
         { "id": "null.pullsView", "name": "Pull Requests", "visibility": "collapsed" }
+      ],
+      "null-workflows": [
+        { "id": "null.workflowsView", "name": "GitHub Actions", "visibility": "visible" }
       ]
     },
     "viewsWelcome": [
@@ -307,6 +324,13 @@
       { "view": "null.graphView", "contents": "Git was not found. Install Git and reload the window.", "when": "null.graph.state == no-git" },
       { "view": "null.graphView", "contents": "Commit Graph isn't available in remote windows yet.", "when": "null.graph.state == remote" },
       { "view": "null.graphView", "contents": "Commit Graph doesn't run in an untrusted workspace.\n[Manage Workspace Trust](command:workbench.trust.manage)", "when": "null.graph.state == untrusted" },
+      { "view": "null.workflowsView", "contents": "Open a folder to see its GitHub Actions.\n[Open Folder](command:workbench.action.files.openFolder)", "when": "null.workflows.state == no-folder" },
+      { "view": "null.workflowsView", "contents": "GitHub Actions isn't available in remote windows yet.", "when": "null.workflows.state == remote" },
+      { "view": "null.workflowsView", "contents": "GitHub Actions doesn't run in an untrusted workspace.\n[Manage Workspace Trust](command:workbench.trust.manage)", "when": "null.workflows.state == untrusted" },
+      { "view": "null.workflowsView", "contents": "The open folder is not a Git repository.\n[Initialize Repository](command:git.init)", "when": "null.workflows.state == not-a-repo" },
+      { "view": "null.workflowsView", "contents": "Git was not found. Install Git and reload the window.", "when": "null.workflows.state == no-git" },
+      { "view": "null.workflowsView", "contents": "No open folder has an `origin` remote on github.com.", "when": "null.workflows.state == no-repo" },
+      { "view": "null.workflowsView", "contents": "Could not load GitHub Actions.\n[Try Again](command:null.workflows.refresh)", "when": "null.workflows.state == error" },
       { "view": "null.graphView", "contents": "Open a folder to see its commit history.\n[Open Folder](command:workbench.action.files.openFolder)", "when": "null.graph.state == no-folder" },
       { "view": "null.pullsView", "contents": "Open a folder to see its pull requests.\n[Open Folder](command:workbench.action.files.openFolder)", "when": "null.pulls.state == no-folder" },
       { "view": "null.pullsView", "contents": "Pull Requests aren't available in remote windows yet.", "when": "null.pulls.state == remote" },
@@ -403,7 +427,8 @@
         { "command": "null.graph.open", "when": "view == null.graphView", "group": "navigation@1" },
         { "command": "null.graph.refresh", "when": "view == null.graphView", "group": "navigation@2" },
         { "command": "null.pulls.filter", "when": "view == null.pullsView && null.pulls.state =~ /^(ready|empty|empty-filtered)$/", "group": "navigation@1" },
-        { "command": "null.pulls.refresh", "when": "view == null.pullsView", "group": "navigation@2" }
+        { "command": "null.pulls.refresh", "when": "view == null.pullsView", "group": "navigation@2" },
+        { "command": "null.workflows.refresh", "when": "view == null.workflowsView", "group": "navigation@2" }
       ],
       "view/item/context": [
         {
@@ -476,7 +501,10 @@
         { "command": "null.pulls.openOnGitHub", "when": "view == null.pullsView && viewItem == pull", "group": "inline@2" },
         { "command": "null.pulls.checkout", "when": "view == null.pullsView && viewItem == pull", "group": "1_pull@1" },
         { "command": "null.pulls.openOnGitHub", "when": "view == null.pullsView && viewItem == pull", "group": "1_pull@2" },
-        { "command": "null.pulls.finishReview", "when": "view == null.pullsView && viewItem == pull", "group": "1_pull@3" }
+        { "command": "null.pulls.finishReview", "when": "view == null.pullsView && viewItem == pull", "group": "1_pull@3" },
+        { "command": "null.workflows.openOnGitHub", "when": "view == null.workflowsView && viewItem =~ /^(run|job|workflow|repo)/", "group": "inline@9" },
+        { "command": "null.workflows.openOnGitHub", "when": "view == null.workflowsView && viewItem =~ /^(run|job|workflow|repo)/", "group": "9_github@0" },
+        { "command": "null.workflows.openWorkflowFile", "when": "view == null.workflowsView && viewItem =~ /^workflow/", "group": "1_workflow@0" }
       ],
       "comments/commentThread/context": [
         { "command": "null.pulls.addToReview", "when": "commentController == null.pulls", "group": "inline@0" },
@@ -527,6 +555,11 @@
         { "command": "null.pulls.filter", "when": "false" },
         { "command": "null.pulls.resetFilter", "when": "false" },
         { "command": "null.pulls.openDetail", "when": "false" },
+        { "command": "null.workflows.signIn", "when": "false" },
+        { "command": "null.workflows.loadMore", "when": "false" },
+        { "command": "null.workflows.openOnGitHub", "when": "false" },
+        { "command": "null.workflows.openWorkflowFile", "when": "false" },
+        { "command": "null.workflows.createWorkflow", "when": "false" },
         { "command": "null.pulls.finishReview", "when": "false" },
         { "command": "null.graph.checkout", "when": "false" },
         { "command": "null.graph.createBranch", "when": "false" },
