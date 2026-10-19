@@ -10,6 +10,7 @@ import { PULL_SCHEME } from './pullDocs';
 import { openPullFileDiff } from './pullDiff';
 import { DEFAULT_FILTER } from './pullFilter';
 import { editFilter } from './pullFilterMenu';
+import { finishReview } from './pullActions';
 import { PullDetailPanel } from './pullDetailPanel';
 import { PullReview } from './pullReview';
 import { PullNode, PullsTreeProvider } from './pullsTreeView';
@@ -82,6 +83,11 @@ export function registerPullsFeature(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('null.pulls.openDetail', (node: PullNode) => {
       const ctx = tree.context();
       if (node.kind === 'pull' && ctx) PullDetailPanel.show(context.extensionUri, ctx.repo, node.pull);
+    }),
+    vscode.commands.registerCommand('null.pulls.finishReview', async (node: PullNode) => {
+      const ctx = tree.context();
+      if (node.kind !== 'pull' || !ctx) return;
+      if (await finishReview({ ...ctx.repo, number: node.pull.number }) !== 'cancelled') await refresh();
     }),
     vscode.commands.registerCommand('null.pulls.comment', (reply: vscode.CommentReply) => review.submit(reply)),
     vscode.commands.registerCommand('null.pulls.addToReview', (reply: vscode.CommentReply) => review.addToReview(reply)),

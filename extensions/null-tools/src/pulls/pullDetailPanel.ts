@@ -3,6 +3,7 @@
 import * as vscode from 'vscode';
 import { getGithubSession } from '../github/githubAuth';
 import { getNonce } from '../webviewUtils';
+import { PAGE_ACTIONS, PageAction, runAction } from './pullActions';
 import { fetchPullPage, rerunFailedRuns } from './pullDetailApi';
 import { PullPage, failedRunIds, safeExternalUrl } from './pullDetailModel';
 import { PullSummary, describeFailure } from './pullModel';
@@ -12,6 +13,7 @@ type InboundMessage =
   | { type: 'refresh' }
   | { type: 'checkout' }
   | { type: 'rerun' }
+  | { type: PageAction }
   | { type: 'openExternal'; url: string };
 
 /** A tab that regains focus after this long reloads its pull request. */
@@ -33,6 +35,7 @@ export class PullDetailPanel {
   private page: PullPage | null = null;
   private loadedAt = 0;
   private disposed = false;
+  private busy = false;
 
   private constructor(
     private readonly extensionUri: vscode.Uri,
@@ -93,6 +96,23 @@ export class PullDetailPanel {
     await this.load(); // also re-enables the button
   }
 
+  /** One write at a time: a second click (or a second button) while a dialog or request is open is dropped. */
+  private async act(action: PageAction): Promise<void> {
+    if (this.busy || !this.page) return;
+    this.busy = true;
+    try {
+      const outcome = await runAction(action, { ...this.repo, number: this.pull.number }, this.page);
+      if (outcome === 'cancelled') {
+        this.post({ type: 'page', page: this.page }); // same page again: re-enables the buttons
+      } else {
+        await this.load(); // a refusal can mean the PR changed (moved head, closed elsewhere): show it as it is now
+        void vscode.commands.executeCommand('null.pulls.refresh'); // state icon, merged PRs leave the Open list
+      }
+    } finally {
+      this.busy = false;
+    }
+  }
+
   private async handle(msg: InboundMessage): Promise<void> {
     switch (msg.type) {
       case 'ready':
@@ -105,6 +125,9 @@ export class PullDetailPanel {
         break;
       case 'rerun':
         await this.rerun();
+        break;
+      case 'review': case 'merge': case 'close': case 'reopen': case 'ready': case 'draft':
+        if (PAGE_ACTIONS.has(msg.type)) await this.act(msg.type);
         break;
       case 'openExternal': {
         const url = safeExternalUrl(msg.url);
