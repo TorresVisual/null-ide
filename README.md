@@ -1,10 +1,10 @@
 <a id="readme-top"></a>
 
 <p align="center">
-  <a href="RELEASE_URL"><img src="RELEASE_SHIELD" alt="Release"></a>
-  <a href="STARS_URL"><img src="STARS_SHIELD" alt="Stargazers"></a>
-  <a href="FORKS_URL"><img src="FORKS_SHIELD" alt="Forks"></a>
-  <a href="ISSUES_URL"><img src="ISSUES_SHIELD" alt="Issues"></a>
+  <a href="https://github.com/OWNER/REPO/releases"><img src="RELEASE_SHIELD_URL" alt="Release"></a>
+  <a href="https://github.com/OWNER/REPO/stargazers"><img src="STARS_SHIELD_URL" alt="Stargazers"></a>
+  <a href="https://github.com/OWNER/REPO/forks"><img src="FORKS_SHIELD_URL" alt="Forks"></a>
+  <a href="https://github.com/OWNER/REPO/issues"><img src="ISSUES_SHIELD_URL" alt="Issues"></a>
 </p>
 
 <br />
