@@ -43,7 +43,7 @@ suite('null-tools pull requests', () => {
         (0, child_process_1.execFileSync)('git', ['init', '-q', '--initial-branch=main'], { cwd: folder });
         await vscode.extensions.getExtension('null.null-tools').activate();
         const commands = await vscode.commands.getCommands(true);
-        for (const id of ['null.pulls.refresh', 'null.pulls.open', 'null.pulls.checkout', 'null.pulls.openOnGitHub', 'null.pulls.filter', 'null.pulls.resetFilter', 'null.pulls.openDetail']) {
+        for (const id of ['null.pulls.refresh', 'null.pulls.open', 'null.pulls.checkout', 'null.pulls.openOnGitHub', 'null.pulls.filter', 'null.pulls.resetFilter', 'null.pulls.openDetail', 'null.pulls.addToReview', 'null.pulls.resolveThread', 'null.pulls.unresolveThread', 'null.pulls.finishReview']) {
             assert.ok(commands.includes(id), `${id} is registered`);
         }
         const snapshot = await vscode.commands.executeCommand('_null.pulls.snapshot');

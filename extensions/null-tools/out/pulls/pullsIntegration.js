@@ -44,6 +44,7 @@ const pullDocs_1 = require("./pullDocs");
 const pullDiff_1 = require("./pullDiff");
 const pullFilter_1 = require("./pullFilter");
 const pullFilterMenu_1 = require("./pullFilterMenu");
+const pullActions_1 = require("./pullActions");
 const pullDetailPanel_1 = require("./pullDetailPanel");
 const pullReview_1 = require("./pullReview");
 const pullsTreeView_1 = require("./pullsTreeView");
@@ -107,7 +108,13 @@ function registerPullsFeature(context) {
         const ctx = tree.context();
         if (node.kind === 'pull' && ctx)
             pullDetailPanel_1.PullDetailPanel.show(context.extensionUri, ctx.repo, node.pull);
-    }), vscode.commands.registerCommand('null.pulls.comment', (reply) => review.submit(reply)), 
+    }), vscode.commands.registerCommand('null.pulls.finishReview', async (node) => {
+        const ctx = tree.context();
+        if (node.kind !== 'pull' || !ctx)
+            return;
+        if (await (0, pullActions_1.finishReview)({ ...ctx.repo, number: node.pull.number }) !== 'cancelled')
+            await refresh();
+    }), vscode.commands.registerCommand('null.pulls.comment', (reply) => review.submit(reply)), vscode.commands.registerCommand('null.pulls.addToReview', (reply) => review.addToReview(reply)), vscode.commands.registerCommand('null.pulls.resolveThread', (thread) => review.setResolved(thread, true)), vscode.commands.registerCommand('null.pulls.unresolveThread', (thread) => review.setResolved(thread, false)), 
     // Nothing is fetched until the view is first shown, and nothing polls while it is hidden.
     view.onDidChangeVisibility(e => { if (e.visible && !tree.loaded)
         void refresh(); }));

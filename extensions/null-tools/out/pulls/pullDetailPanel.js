@@ -37,6 +37,7 @@ exports.PullDetailPanel = void 0;
 const vscode = __importStar(require("vscode"));
 const githubAuth_1 = require("../github/githubAuth");
 const webviewUtils_1 = require("../webviewUtils");
+const pullActions_1 = require("./pullActions");
 const pullDetailApi_1 = require("./pullDetailApi");
 const pullDetailModel_1 = require("./pullDetailModel");
 const pullModel_1 = require("./pullModel");
@@ -60,6 +61,7 @@ class PullDetailPanel {
     page = null;
     loadedAt = 0;
     disposed = false;
+    busy = false;
     constructor(extensionUri, repo, pull) {
         this.extensionUri = extensionUri;
         this.repo = repo;
@@ -119,6 +121,25 @@ class PullDetailPanel {
         }
         await this.load(); // also re-enables the button
     }
+    /** One write at a time: a second click (or a second button) while a dialog or request is open is dropped. */
+    async act(action) {
+        if (this.busy || !this.page)
+            return;
+        this.busy = true;
+        try {
+            const outcome = await (0, pullActions_1.runAction)(action, { ...this.repo, number: this.pull.number }, this.page);
+            if (outcome === 'cancelled') {
+                this.post({ type: 'page', page: this.page }); // same page again: re-enables the buttons
+            }
+            else {
+                await this.load(); // a refusal can mean the PR changed (moved head, closed elsewhere): show it as it is now
+                void vscode.commands.executeCommand('null.pulls.refresh'); // state icon, merged PRs leave the Open list
+            }
+        }
+        finally {
+            this.busy = false;
+        }
+    }
     async handle(msg) {
         switch (msg.type) {
             case 'ready':
@@ -131,6 +152,15 @@ class PullDetailPanel {
                 break;
             case 'rerun':
                 await this.rerun();
+                break;
+            case 'review':
+            case 'merge':
+            case 'close':
+            case 'reopen':
+            case 'ready':
+            case 'draft':
+                if (pullActions_1.PAGE_ACTIONS.has(msg.type))
+                    await this.act(msg.type);
                 break;
             case 'openExternal': {
                 const url = (0, pullDetailModel_1.safeExternalUrl)(msg.url);

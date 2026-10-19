@@ -496,6 +496,24 @@ const pullPlural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 function pullStateKey(p) {
     return p.state === 'open' && p.draft ? 'draft' : p.state;
 }
+/** Review, merge, draft and close/reopen. The page only asks; the host re-checks `actions` before it writes anything. */
+function pullActionsHtml(p) {
+    const a = p.actions;
+    const button = (act, label, kind = 'secondary', disabled = false) => `<button type="button" class="btn btn-${kind}" data-act="${act}"${disabled ? ' disabled' : ''}>${label}</button>`;
+    const buttons = [];
+    if (a.review.available)
+        buttons.push(button('review', a.review.pending === null ? 'Review' : `Finish review (${a.review.pending})`));
+    if (p.state === 'open')
+        buttons.push(button('merge', 'Merge', 'primary', !a.merge.enabled));
+    if (a.draft)
+        buttons.push(button(a.draft, a.draft === 'ready' ? 'Ready for review' : 'Convert to draft'));
+    if (a.state)
+        buttons.push(button(a.state, a.state === 'close' ? 'Close' : 'Reopen'));
+    if (buttons.length === 0)
+        return '';
+    const hint = p.state === 'open' && a.merge.hint ? `<span class="muted">${escapeHtml(a.merge.hint)}</span>` : '';
+    return `<div class="pr-actions">${buttons.join('')}${hint}</div>`;
+}
 function pullHeaderHtml(p) {
     const key = pullStateKey(p);
     const verb = p.state === 'merged' ? 'merged' : p.state === 'closed' ? 'wanted to merge' : 'wants to merge';
@@ -511,7 +529,8 @@ function pullHeaderHtml(p) {
       <span class="state-badge ${PULL_STATE_TONE[key]}">${octicon(PULL_STATE_ICON[key], 'state-icon')} ${PULL_STATE_TEXT[key]}</span>
       <span><b>${escapeHtml(p.author.login)}</b> ${verb} <code>${escapeHtml(p.headRef)}</code>${p.fork ? ' (from a fork)' : ''} into <code>${escapeHtml(p.baseRef)}</code></span>
       <span>· ${pullPlural(p.changedFiles, 'file')} <span class="pr-add">+${p.additions}</span> <span class="pr-del">−${p.deletions}</span></span>
-    </div>`;
+    </div>
+    ${pullActionsHtml(p)}`;
 }
 /** A card with the author's avatar. `what` is fixed text from this file, never host data. */
 function pullPostHtml(author, what, at, bodyHTML, emptyHint) {
@@ -593,7 +612,7 @@ function pullPageHtml(p) {
     return `<div id="page">${pullHeaderHtml(p)}<div id="layout"><div id="main">
       ${pullPostHtml(p.author, 'opened this', p.createdAt, p.bodyHTML, 'No description provided.')}
       ${pullChecksHtml(p)}${pullCommitsHtml(p)}${p.timeline.map(pullEntryHtml).join('')}${cut}
-      <div class="muted pr-foot">Commenting, reviewing and merging happen on GitHub for now.
+      <div class="muted pr-foot">Conversation comments are written on GitHub for now.
         <button type="button" class="link-btn" data-act="open-github">Open on GitHub</button></div>
     </div><aside id="sidebar">${pullSidebarHtml(p)}</aside></div></div>`;
 }

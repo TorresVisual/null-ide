@@ -9,7 +9,10 @@ const pullDetailModel_1 = require("./pullDetailModel");
 const user = (login) => ({ login, avatarUrl: `https://avatars.githubusercontent.com/${login}` });
 const gqlPage = (over = {}) => ({
     repository: {
+        viewerPermission: 'WRITE', mergeCommitAllowed: true, squashMergeAllowed: true, rebaseMergeAllowed: false,
         pullRequest: {
+            id: 'PR_1', headRefOid: 'c'.repeat(40), mergeable: 'MERGEABLE', mergeStateStatus: 'CLEAN',
+            viewerCanUpdate: true, viewerDidAuthor: false, pendingReview: { nodes: [] },
             number: 12, title: 'Add x', url: 'https://github.com/o/r/pull/12', state: 'OPEN', isDraft: false,
             createdAt: '2026-10-01T10:00:00Z', bodyHTML: '<p>Hi</p>', headRefName: 'feat/x', baseRefName: 'main',
             isCrossRepository: false, additions: 10, deletions: 2, changedFiles: 3,
@@ -56,6 +59,19 @@ const gqlPage = (over = {}) => ({
 (0, node_test_1.default)('mapPullPage throws a readable error when the PR does not exist', () => {
     node_assert_1.default.throws(() => (0, pullDetailModel_1.mapPullPage)({ repository: { pullRequest: null } }), /Pull request not found/);
     node_assert_1.default.throws(() => (0, pullDetailModel_1.mapPullPage)({ repository: null }), /Pull request not found/);
+});
+(0, node_test_1.default)('mapPullPage keeps the ids for writes and derives the actions from the page', () => {
+    const p = (0, pullDetailModel_1.mapPullPage)(gqlPage());
+    node_assert_1.default.strictEqual(p.id, 'PR_1');
+    node_assert_1.default.strictEqual(p.headSha, 'c'.repeat(40));
+    node_assert_1.default.deepStrictEqual(p.actions, {
+        review: { available: true, canApprove: true, pending: null },
+        merge: { enabled: true, hint: 'Ready to merge.', methods: ['MERGE', 'SQUASH'] },
+        state: 'close', draft: 'draft',
+    });
+    const unsent = (0, pullDetailModel_1.mapPullPage)(gqlPage({ pendingReview: { nodes: [{ id: 'REV_1', comments: { totalCount: 3 } }] } }));
+    node_assert_1.default.strictEqual(unsent.actions.review.pending, 3);
+    node_assert_1.default.strictEqual((0, pullDetailModel_1.mapPullPage)(gqlPage({ viewerDidAuthor: true })).actions.review.canApprove, false);
 });
 (0, node_test_1.default)('mapTimeline: comments, reviews, events; PENDING reviews, unknown types and null nodes are skipped; deleted authors are ghost', () => {
     const nodes = [

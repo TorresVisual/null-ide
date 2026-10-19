@@ -40,6 +40,7 @@ const pullApi_1 = require("./pullApi");
 const githubAuth_1 = require("../github/githubAuth");
 const pullDocs_1 = require("./pullDocs");
 const pullModel_1 = require("./pullModel");
+const pullReviewApi_1 = require("./pullReviewApi");
 const pullDiff_1 = require("./pullDiff");
 const NOTICE_KEY = 'null.pulls.commentNoticeShown';
 function toComment(c) {
@@ -47,6 +48,7 @@ function toComment(c) {
         body: new vscode.MarkdownString(c.body),
         mode: vscode.CommentMode.Preview,
         author: { name: c.author, iconPath: c.avatar ? vscode.Uri.parse(c.avatar) : undefined },
+        label: c.pending ? 'Pending' : undefined,
     };
 }
 /** Review threads of the PRs the tree has opened, shown in the diff editors, plus posting new comments and replies. */
@@ -56,6 +58,8 @@ class PullReview {
     byPull = new Map();
     /** First comment of each existing thread: GitHub replies hang off it. */
     roots = new WeakMap();
+    /** GraphQL node id of each existing thread: resolving, and replies inside a pending review, need it. */
+    ids = new WeakMap();
     constructor(globalState) {
         this.globalState = globalState;
         this.controller.commentingRangeProvider = {
@@ -74,6 +78,8 @@ class PullReview {
             thread.state = t.resolved ? vscode.CommentThreadState.Resolved : vscode.CommentThreadState.Unresolved;
             thread.collapsibleState = t.resolved ? vscode.CommentThreadCollapsibleState.Collapsed : vscode.CommentThreadCollapsibleState.Expanded;
             this.roots.set(thread, t.comments[0].id);
+            this.ids.set(thread, t.id);
+            thread.contextValue = (0, pullModel_1.threadAction)(t);
             return thread;
         });
         this.byPull.set(detail.pull.number, shown);
@@ -112,6 +118,68 @@ class PullReview {
             void vscode.window.showErrorMessage(`Could not post the comment: ${(0, pullModel_1.describeFailure)(err)}`);
         }
     }
+    /** Command handler for *Add Review Comment*: into the viewer's pending review (started if needed), as a reply or a new thread. */
+    async addToReview(reply) {
+        const { thread, text } = reply;
+        const ref = (0, pullDocs_1.parseDocQuery)(thread.uri.path, thread.uri.query);
+        if (!ref || !text.trim())
+            return;
+        const session = await (0, githubAuth_1.getGithubSession)(true);
+        if (!session)
+            return;
+        try {
+            const token = session.accessToken;
+            const reviewId = await (0, pullReviewApi_1.ensureReview)(ref.owner, ref.repo, ref.pull, token);
+            const threadId = this.ids.get(thread);
+            let posted;
+            if (threadId !== undefined) {
+                posted = await (0, pullReviewApi_1.replyInReview)(reviewId, threadId, text, token);
+            }
+            else {
+                const created = await this.addThread(reviewId, ref, thread, text, token);
+                this.ids.set(thread, created.threadId);
+                this.roots.set(thread, created.comment.id);
+                thread.canReply = true;
+                posted = created.comment;
+            }
+            thread.comments = [...thread.comments, toComment(posted)];
+        }
+        catch (err) {
+            void vscode.window.showErrorMessage(`Could not add the review comment: ${(0, pullModel_1.describeFailure)(err)}`);
+        }
+    }
+    /** The selected range; when GitHub rejects it (it crosses hunks) the first line alone, like an immediate comment. */
+    async addThread(reviewId, ref, thread, body, token) {
+        const first = (thread.range?.start.line ?? 0) + 1;
+        const last = (thread.range?.end.line ?? 0) + 1;
+        const input = { reviewId, body, path: ref.path, side: ref.side };
+        try {
+            return await (0, pullReviewApi_1.addReviewThread)({ ...input, startLine: first, line: last }, token);
+        }
+        catch (err) {
+            if (first === last)
+                throw err;
+            return (0, pullReviewApi_1.addReviewThread)({ ...input, line: first }, token); // a GraphQL error carries no 422: any failure of a range retries once
+        }
+    }
+    /** Command handler for the thread-title buttons. GitHub decides whether the viewer may; its refusal is shown as is. */
+    async setResolved(thread, resolved) {
+        const id = this.ids.get(thread);
+        if (id === undefined)
+            return;
+        const session = await (0, githubAuth_1.getGithubSession)(true);
+        if (!session)
+            return;
+        try {
+            await (0, pullReviewApi_1.setThreadResolved)(id, resolved, session.accessToken);
+            thread.state = resolved ? vscode.CommentThreadState.Resolved : vscode.CommentThreadState.Unresolved;
+            thread.collapsibleState = resolved ? vscode.CommentThreadCollapsibleState.Collapsed : vscode.CommentThreadCollapsibleState.Expanded;
+            thread.contextValue = resolved ? 'unresolvable' : 'resolvable'; // the viewer just did one, so may undo it
+        }
+        catch (err) {
+            void vscode.window.showErrorMessage(`Could not ${resolved ? 'resolve' : 'reopen'} the thread: ${(0, pullModel_1.describeFailure)(err)}`);
+        }
+    }
     /** The selected range as one comment; when GitHub rejects the range (422: it crosses hunks) the first line alone. */
     async postNew(ref, thread, body, token) {
         const input = { body, commitId: ref.head, path: ref.path, side: ref.side };
@@ -132,7 +200,7 @@ class PullReview {
         if (this.globalState.get(NOTICE_KEY))
             return;
         void this.globalState.update(NOTICE_KEY, true);
-        void vscode.window.showInformationMessage('Pull request comments are posted immediately and notify the author. Editing or deleting one is done on GitHub.', 'Open on GitHub').then(choice => {
+        void vscode.window.showInformationMessage('Comment Now posts at once and notifies the author. To send several comments together, use Add Review Comment and finish the review from the pull request. Editing or deleting a comment is done on GitHub.', 'Open on GitHub').then(choice => {
             if (choice)
                 void vscode.env.openExternal(vscode.Uri.parse(`https://github.com/${ref.owner}/${ref.repo}/pull/${ref.pull}`));
         });

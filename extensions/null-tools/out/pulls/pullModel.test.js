@@ -63,10 +63,11 @@ const list = (nodes) => ({ search: { nodes } });
     node_assert_1.default.strictEqual((0, pullModel_1.leftPath)(files, 'unknown.ts'), 'unknown.ts');
 });
 const thread = (over = {}) => ({
-    isResolved: false, isOutdated: false, path: 'src/a.ts', line: 10, startLine: null, diffSide: 'RIGHT',
+    id: 'T1', isResolved: false, isOutdated: false, viewerCanResolve: true, viewerCanUnresolve: false,
+    path: 'src/a.ts', line: 10, startLine: null, diffSide: 'RIGHT',
     comments: { nodes: [
-            { databaseId: 101, body: 'Why?', createdAt: '2026-10-01T10:00:00Z', author: { login: 'rev', avatarUrl: 'https://x/a.png' } },
-            { databaseId: 102, body: 'Because.', createdAt: '2026-10-01T11:00:00Z', author: null },
+            { databaseId: 101, state: 'SUBMITTED', body: 'Why?', createdAt: '2026-10-01T10:00:00Z', author: { login: 'rev', avatarUrl: 'https://x/a.png' } },
+            { databaseId: 102, state: 'SUBMITTED', body: 'Because.', createdAt: '2026-10-01T11:00:00Z', author: null },
         ] },
     ...over,
 });
@@ -118,7 +119,29 @@ const summary = (over) => ({ ...(0, pullModel_1.mapPulls)(list([pullNode()]))[0]
     node_assert_1.default.deepStrictEqual((0, pullModel_1.pinCurrent)(pulls, null).map(p => p.number), [1, 2, 3]);
 });
 (0, node_test_1.default)('commentFromRest maps a REST review comment', () => {
-    node_assert_1.default.deepStrictEqual((0, pullModel_1.commentFromRest)({ id: 7, body: 'hi', created_at: '2026-10-01T10:00:00Z', user: { login: 'me', avatar_url: 'https://x/m.png' } }), { id: 7, body: 'hi', author: 'me', avatar: 'https://x/m.png', createdAt: '2026-10-01T10:00:00Z' });
+    node_assert_1.default.deepStrictEqual((0, pullModel_1.commentFromRest)({ id: 7, body: 'hi', created_at: '2026-10-01T10:00:00Z', user: { login: 'me', avatar_url: 'https://x/m.png' } }), { id: 7, body: 'hi', author: 'me', avatar: 'https://x/m.png', createdAt: '2026-10-01T10:00:00Z', pending: false });
+});
+(0, node_test_1.default)('mapThreads carries the thread id, the resolve rights and which comments are pending', () => {
+    const [t] = (0, pullModel_1.mapThreads)(threads([thread({ comments: { nodes: [
+                    { databaseId: 1, state: 'SUBMITTED', body: 'a', createdAt: '2026-10-01T10:00:00Z', author: null },
+                    { databaseId: 2, state: 'PENDING', body: 'b', createdAt: '2026-10-01T10:01:00Z', author: null },
+                ] } })])).threads;
+    node_assert_1.default.strictEqual(t.id, 'T1');
+    node_assert_1.default.strictEqual(t.canResolve, true);
+    node_assert_1.default.strictEqual(t.canUnresolve, false);
+    node_assert_1.default.deepStrictEqual(t.comments.map(c => c.pending), [false, true]);
+});
+(0, node_test_1.default)('commentFromGql maps one comment; an unknown state is not pending', () => {
+    const c = (0, pullModel_1.commentFromGql)({ databaseId: 5, state: 'SOMETHING_NEW', body: 'x', createdAt: '2026-10-01T10:00:00Z', author: { login: 'me', avatarUrl: 'https://x/m.png' } });
+    node_assert_1.default.deepStrictEqual(c, { id: 5, body: 'x', author: 'me', avatar: 'https://x/m.png', createdAt: '2026-10-01T10:00:00Z', pending: false });
+});
+(0, node_test_1.default)('threadAction: what the thread-title button offers', () => {
+    const t = (resolved, canResolve, canUnresolve) => ({ resolved, canResolve, canUnresolve });
+    node_assert_1.default.strictEqual((0, pullModel_1.threadAction)(t(false, true, false)), 'resolvable');
+    node_assert_1.default.strictEqual((0, pullModel_1.threadAction)(t(true, false, true)), 'unresolvable');
+    node_assert_1.default.strictEqual((0, pullModel_1.threadAction)(t(false, false, false)), undefined);
+    node_assert_1.default.strictEqual((0, pullModel_1.threadAction)(t(true, true, false)), undefined, 'resolved and you cannot reopen it');
+    node_assert_1.default.strictEqual((0, pullModel_1.threadAction)(t(false, false, true)), undefined, 'open: unresolve makes no sense');
 });
 (0, node_test_1.default)('describeFailure: a rate limit says when to retry, anything else keeps its own message', () => {
     const limited = new githubApi_1.ApiError('GitHub API 403: rate limit', 403, 1_000_000 + 5 * 60_000);

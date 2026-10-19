@@ -63,6 +63,8 @@ function stub(responses) {
     return calls;
 }
 const minimalPage = {
+    id: 'PR_1', headRefOid: 'c'.repeat(40), mergeable: 'UNKNOWN', mergeStateStatus: 'UNKNOWN', viewerCanUpdate: false, viewerDidAuthor: false,
+    pendingReview: { nodes: [] },
     number: 5, title: 'T', url: 'https://github.com/o/r/pull/5', state: 'MERGED', isDraft: false, createdAt: '2026-10-01T10:00:00Z',
     bodyHTML: '', headRefName: 'h', baseRefName: 'main', isCrossRepository: false, additions: 1, deletions: 0, changedFiles: 1,
     author: null, labels: { nodes: [] }, milestone: null, assignees: { nodes: [] }, reviewRequests: { nodes: [] },
@@ -70,7 +72,9 @@ const minimalPage = {
     lastCommit: { nodes: [] },
 };
 (0, node_test_1.default)('fetchPullPage asks GraphQL for one PR and maps it', async () => {
-    const calls = stub([{ body: { data: { repository: { pullRequest: minimalPage } } } }]);
+    const calls = stub([{ body: { data: { repository: {
+                        viewerPermission: null, mergeCommitAllowed: true, squashMergeAllowed: true, rebaseMergeAllowed: true, pullRequest: minimalPage,
+                    } } } }]);
     const page = await (0, pullDetailApi_1.fetchPullPage)('o', 'r', 5, 't');
     node_assert_1.default.strictEqual(calls[0].url, 'https://api.github.com/graphql');
     node_assert_1.default.deepStrictEqual(calls[0].body.variables, { owner: 'o', name: 'r', number: 5 });

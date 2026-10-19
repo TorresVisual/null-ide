@@ -9,13 +9,17 @@ exports.mapChecks = mapChecks;
 exports.failedRunIds = failedRunIds;
 exports.mapPullPage = mapPullPage;
 exports.safeExternalUrl = safeExternalUrl;
+const pullActionsModel_1 = require("./pullActionsModel");
 const pullModel_1 = require("./pullModel");
 // ponytail: first 100 commits, 100 conversation items, 100 checks (the page says when it is cut off); add paging
 // ("load more") if that turns out to be missed.
 exports.PULL_PAGE = `
 query PullPage($owner: String!, $name: String!, $number: Int!) {
   repository(owner: $owner, name: $name) {
+    viewerPermission mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed
     pullRequest(number: $number) {
+      id headRefOid mergeable mergeStateStatus viewerCanUpdate viewerDidAuthor
+      pendingReview: reviews(first: 1, states: [PENDING]) { nodes { id comments { totalCount } } }
       number title url state isDraft createdAt bodyHTML headRefName baseRefName isCrossRepository additions deletions changedFiles
       author { login avatarUrl }
       labels(first: 50) { nodes { name color } }
@@ -154,12 +158,15 @@ function failedRunIds(checks) {
     return [...ids];
 }
 function mapPullPage(data) {
-    const p = data.repository?.pullRequest;
-    if (!p)
+    const repo = data.repository;
+    const p = repo?.pullRequest;
+    if (!repo || !p)
         throw new Error('Pull request not found.');
     const rollup = p.lastCommit.nodes[0]?.commit.statusCheckRollup ?? null;
+    const unsent = p.pendingReview.nodes[0];
     return {
-        number: p.number, title: p.title, url: p.url, state: (0, pullModel_1.pullStateOf)(p.state), draft: p.isDraft,
+        number: p.number, id: p.id, headSha: p.headRefOid,
+        title: p.title, url: p.url, state: (0, pullModel_1.pullStateOf)(p.state), draft: p.isDraft,
         author: ghost(p.author), createdAt: p.createdAt, bodyHTML: p.bodyHTML,
         headRef: p.headRefName, baseRef: p.baseRefName, fork: p.isCrossRepository,
         additions: p.additions, deletions: p.deletions, changedFiles: p.changedFiles,
@@ -177,6 +184,12 @@ function mapPullPage(data) {
         checkState: (0, pullModel_1.checkStateOf)(rollup?.state),
         checks: mapChecks(rollup?.contexts.nodes ?? []),
         checksTotal: rollup?.contexts.totalCount ?? 0,
+        actions: (0, pullActionsModel_1.pageActions)({
+            state: (0, pullModel_1.pullStateOf)(p.state), draft: p.isDraft, mergeable: p.mergeable, mergeStateStatus: p.mergeStateStatus,
+            viewerCanUpdate: p.viewerCanUpdate, viewerDidAuthor: p.viewerDidAuthor, viewerPermission: repo.viewerPermission ?? '',
+            mergeCommitAllowed: repo.mergeCommitAllowed, squashMergeAllowed: repo.squashMergeAllowed, rebaseMergeAllowed: repo.rebaseMergeAllowed,
+            pendingComments: unsent ? unsent.comments.totalCount : null,
+        }),
     };
 }
 /** The only links the host opens for the webview: absolute https. Everything else (javascript:, relative, http:) is dropped. */
