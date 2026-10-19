@@ -474,7 +474,7 @@ function sidebarHtml(d, meta, viewer) {
         ? `<div>${octicon('milestone')} ${escapeHtml(d.milestone.title)}</div>`
             + `<div class="progress" title="${d.milestone.percent}% complete"><span style="width:${d.milestone.percent}%"></span></div>`
         : none('No milestone');
-    const prs = d.linkedPrs.map(pr => `<div class="sb-pr"><a href="${escapeHtml(pr.url)}">${pullRequestIcon(pr)} ${escapeHtml(pr.title)} <span class="muted">#${pr.number}</span></a></div>`).join('');
+    const prs = d.linkedPrs.map(pr => `<div class="sb-pr"><a href="${escapeHtml(pr.url)}">${pullRequestIcon(pr)} ${escapeHtml(pr.title)} <span class="muted">${escapeHtml(pr.ref)} by ${escapeHtml(pr.author)}</span></a></div>`).join('');
     const development = prs
         + `<div class="sb-dev-actions"><button type="button" class="link-btn" data-act="branch">${octicon('git-branch')} Create a branch</button>`
         + `<button type="button" class="link-btn" data-act="worktree">${octicon('git-branch')} Create a worktree</button></div>`;

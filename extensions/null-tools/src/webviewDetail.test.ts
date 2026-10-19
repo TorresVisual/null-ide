@@ -161,9 +161,10 @@ test('sidebarHtml shows edit gears and "assign yourself" only to someone who can
 
 test('sidebarHtml lists linked pull requests with their state and the empty states otherwise', () => {
   const out = html.sidebarHtml(detail({
-    linkedPrs: [{ number: 9, title: 'Fix <it>', state: 'merged', isDraft: false, url: 'https://github.com/o/r/pull/9' }],
+    linkedPrs: [{ number: 9, title: 'Fix <it>', state: 'merged', isDraft: false, url: 'https://github.com/o/r/pull/9', author: 'hub<ot>', ref: 'x/y#9' }],
   }), null, 'octocat');
   assert.ok(out.includes('pr-merged'));
+  assert.ok(out.includes('x/y#9 by hub&lt;ot&gt;'));
   assert.ok(out.includes('Fix &lt;it&gt;'));
   assert.ok(out.includes('No one'));
   assert.ok(out.includes('No milestone'));

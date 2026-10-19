@@ -30,7 +30,9 @@ interface SubIssue {
   id: string; number: number; title: string; state: 'open' | 'closed'; stateReason: string | null; url: string;
   assignees: GithubUser[];
 }
-interface LinkedPr { number: number; title: string; state: 'open' | 'closed' | 'merged'; isDraft: boolean; url: string; }
+interface LinkedPr {
+  number: number; title: string; state: 'open' | 'closed' | 'merged'; isDraft: boolean; url: string; author: string; ref: string;
+}
 
 interface DetailIssue {
   number: number; title: string; body: string; state: 'open' | 'closed'; state_reason?: string | null; html_url: string;

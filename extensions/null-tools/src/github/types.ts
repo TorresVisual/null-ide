@@ -130,6 +130,10 @@ export interface LinkedPr {
   state: 'open' | 'closed' | 'merged';
   isDraft: boolean;
   url: string;
+  /** Login ("ghost" for deleted accounts). */
+  author: string;
+  /** `#12` inside this repo, `owner/other#12` elsewhere. */
+  ref: string;
 }
 
 /** Everything the detail tab shows for one issue. `issue` is the same REST-shaped record the lists use. */

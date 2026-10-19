@@ -42,7 +42,9 @@ const detail = (over = {}) => ({ repository: { issue: issueNode(over) } });
     node_assert_1.default.deepStrictEqual(d.milestone, { number: 2, title: 'v1.0', percent: 33 });
     node_assert_1.default.deepStrictEqual(d.parent, { number: 3, title: 'Epic', url: 'https://github.com/o/r/issues/3' });
     node_assert_1.default.deepStrictEqual(d.subIssues.map(s => [s.id, s.number, s.state]), [['I_8', 8, 'open']]);
-    node_assert_1.default.deepStrictEqual(d.linkedPrs, [{ number: 9, title: 'Fix', state: 'merged', isDraft: false, url: 'https://github.com/o/r/pull/9' }]);
+    node_assert_1.default.deepStrictEqual(d.linkedPrs, [{
+            number: 9, title: 'Fix', state: 'merged', isDraft: false, url: 'https://github.com/o/r/pull/9', author: 'ghost', ref: '#9',
+        }]);
     node_assert_1.default.strictEqual(d.participants.length, 1);
     node_assert_1.default.strictEqual(d.post.id, 'I_7');
     node_assert_1.default.strictEqual(d.post.bodyHTML, '<p>It crashes</p>');
@@ -62,6 +64,22 @@ const detail = (over = {}) => ({ repository: { issue: issueNode(over) } });
     node_assert_1.default.strictEqual(d.parent, null);
     node_assert_1.default.deepStrictEqual(d.linkedPrs, []);
     node_assert_1.default.deepStrictEqual(d.subIssues, []);
+});
+(0, node_test_1.default)('linkedPrs lists closing PRs first, then PRs that only mention the issue, each once, with author and repo-aware ref', () => {
+    const pr = (number, repo = 'o/r', over = {}) => ({
+        number, title: `PR ${number}`, state: 'OPEN', isDraft: true, url: `https://github.com/${repo}/pull/${number}`,
+        author: user, repository: { nameWithOwner: repo }, ...over,
+    });
+    const d = (0, detailQueries_1.mapIssueDetail)(detail({
+        closedByPullRequestsReferences: { totalCount: 1, nodes: [pr(9)] },
+        prMentions: { nodes: [
+                { source: pr(9) }, // already a closing PR
+                { source: pr(11, 'x/y', { author: null }) },
+                { source: { __typename: 'Issue' } }, // an issue mentioning this one
+                { source: null },
+            ] },
+    }), 'o/r');
+    node_assert_1.default.deepStrictEqual(d.linkedPrs.map(p => [p.ref, p.author, p.state, p.isDraft]), [['#9', 'octocat', 'open', true], ['x/y#11', 'ghost', 'open', true]]);
 });
 (0, node_test_1.default)('mapIssueDetail throws when the issue does not exist (e.g. the number belongs to a pull request)', () => {
     node_assert_1.default.throws(() => (0, detailQueries_1.mapIssueDetail)({ repository: { issue: null } }, 'o/r'), /not found/);

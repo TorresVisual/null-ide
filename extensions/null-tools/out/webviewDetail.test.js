@@ -136,9 +136,10 @@ const detail = (over = {}) => ({
 });
 (0, node_test_1.default)('sidebarHtml lists linked pull requests with their state and the empty states otherwise', () => {
     const out = html.sidebarHtml(detail({
-        linkedPrs: [{ number: 9, title: 'Fix <it>', state: 'merged', isDraft: false, url: 'https://github.com/o/r/pull/9' }],
+        linkedPrs: [{ number: 9, title: 'Fix <it>', state: 'merged', isDraft: false, url: 'https://github.com/o/r/pull/9', author: 'hub<ot>', ref: 'x/y#9' }],
     }), null, 'octocat');
     node_assert_1.default.ok(out.includes('pr-merged'));
+    node_assert_1.default.ok(out.includes('x/y#9 by hub&lt;ot&gt;'));
     node_assert_1.default.ok(out.includes('Fix &lt;it&gt;'));
     node_assert_1.default.ok(out.includes('No one'));
     node_assert_1.default.ok(out.includes('No milestone'));

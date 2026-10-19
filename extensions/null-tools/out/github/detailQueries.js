@@ -15,6 +15,7 @@ exports.COMMENT_FIELDS = `
   author { login avatarUrl }
   ${REACTIONS}`;
 const ISSUE_OR_PR = '__typename ... on Issue { number title url repository { nameWithOwner } } ... on PullRequest { number title url repository { nameWithOwner } }';
+const PR_FIELDS = 'number title state url isDraft author { login } repository { nameWithOwner }';
 const TIMELINE_FIELDS = `
   pageInfo { hasNextPage endCursor }
   nodes {
@@ -58,7 +59,10 @@ query IssueDetail($owner: String!, $name: String!, $number: Int!) {
       parent { number title url }
       closedByPullRequestsReferences(first: 10, includeClosedPrs: true) {
         totalCount
-        nodes { number title state url isDraft }
+        nodes { ${PR_FIELDS} }
+      }
+      prMentions: timelineItems(first: 50, itemTypes: [CROSS_REFERENCED_EVENT]) {
+        nodes { ... on CrossReferencedEvent { source { __typename ... on PullRequest { ${PR_FIELDS} } } } }
       }
       participants(first: 10) { nodes { login avatarUrl } }
       ${REACTIONS}
@@ -175,9 +179,18 @@ const mapSubIssue = (s) => ({
     id: s.id, number: s.number, title: s.title, state: s.state === 'OPEN' ? 'open' : 'closed',
     stateReason: s.stateReason ? s.stateReason.toLowerCase() : null, url: s.url, assignees: s.assignees.nodes.map(githubQueries_1.toUser),
 });
-const mapLinkedPr = (p) => ({
+const mapLinkedPr = (p, repo) => ({
     number: p.number, title: p.title, state: p.state.toLowerCase(), isDraft: p.isDraft, url: p.url,
+    author: p.author?.login ?? 'ghost', ref: refText(p, repo),
 });
+/** PRs that will close the issue first, then PRs that merely mention it, each PR once. */
+function mapLinkedPrs(n, repo) {
+    const mentions = (n.prMentions?.nodes ?? []).map(m => m.source).filter((s) => typeof s?.number === 'number');
+    const seen = new Set();
+    return [...(n.closedByPullRequestsReferences?.nodes ?? []), ...mentions]
+        .filter(p => !seen.has(p.url) && seen.add(p.url))
+        .map(p => mapLinkedPr(p, repo));
+}
 /** `repo` is `owner/name`; it decides whether a referenced issue is shown as `#12` or `owner/other#12`. */
 function mapIssueDetail(data, repo) {
     const n = data.repository.issue;
@@ -198,7 +211,7 @@ function mapIssueDetail(data, repo) {
             ? { number: n.milestone.number, title: n.milestone.title, percent: Math.round(n.milestone.progressPercentage) } : null,
         parent: n.parent,
         subIssues: n.subIssues.nodes.map(mapSubIssue),
-        linkedPrs: (n.closedByPullRequestsReferences?.nodes ?? []).map(mapLinkedPr),
+        linkedPrs: mapLinkedPrs(n, repo),
         participants: n.participants.nodes.map(githubQueries_1.toUser),
         timeline: timeline.items,
         hasMoreTimeline: timeline.hasMore,

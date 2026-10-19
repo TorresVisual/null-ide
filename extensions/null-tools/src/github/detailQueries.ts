@@ -16,6 +16,8 @@ export const COMMENT_FIELDS = `
 
 const ISSUE_OR_PR = '__typename ... on Issue { number title url repository { nameWithOwner } } ... on PullRequest { number title url repository { nameWithOwner } }';
 
+const PR_FIELDS = 'number title state url isDraft author { login } repository { nameWithOwner }';
+
 const TIMELINE_FIELDS = `
   pageInfo { hasNextPage endCursor }
   nodes {
@@ -60,7 +62,10 @@ query IssueDetail($owner: String!, $name: String!, $number: Int!) {
       parent { number title url }
       closedByPullRequestsReferences(first: 10, includeClosedPrs: true) {
         totalCount
-        nodes { number title state url isDraft }
+        nodes { ${PR_FIELDS} }
+      }
+      prMentions: timelineItems(first: 50, itemTypes: [CROSS_REFERENCED_EVENT]) {
+        nodes { ... on CrossReferencedEvent { source { __typename ... on PullRequest { ${PR_FIELDS} } } } }
       }
       participants(first: 10) { nodes { login avatarUrl } }
       ${REACTIONS}
@@ -143,6 +148,10 @@ interface GqlSubIssue {
   id: string; number: number; title: string; state: 'OPEN' | 'CLOSED'; stateReason: string | null; url: string;
   assignees: { nodes: GqlUser[] };
 }
+interface GqlPr {
+  number: number; title: string; state: 'OPEN' | 'CLOSED' | 'MERGED'; url: string; isDraft: boolean;
+  author: { login: string } | null; repository: { nameWithOwner: string };
+}
 interface GqlDetailIssue extends GqlIssue {
   id: string; bodyHTML: string; lastEditedAt: string | null; authorAssociation: string | null; viewerCanUpdate: boolean;
   milestone: { number: number; title: string; progressPercentage: number } | null;
@@ -151,8 +160,10 @@ interface GqlDetailIssue extends GqlIssue {
   parent: { number: number; title: string; url: string } | null;
   closedByPullRequestsReferences: {
     totalCount: number;
-    nodes: Array<{ number: number; title: string; state: 'OPEN' | 'CLOSED' | 'MERGED'; url: string; isDraft: boolean }>;
+    nodes: GqlPr[];
   } | null;
+  /** `source` is an issue (no PR fields) for issue-to-issue mentions. */
+  prMentions: { nodes: Array<{ source?: Partial<GqlPr> | null }> } | null;
   participants: { nodes: GqlUser[] };
   reactionGroups: GqlReactionGroup[];
   timelineItems: GqlTimeline;
@@ -238,9 +249,19 @@ const mapSubIssue = (s: GqlSubIssue): SubIssue => ({
   stateReason: s.stateReason ? s.stateReason.toLowerCase() : null, url: s.url, assignees: s.assignees.nodes.map(toUser),
 });
 
-const mapLinkedPr = (p: { number: number; title: string; state: string; url: string; isDraft: boolean }): LinkedPr => ({
+const mapLinkedPr = (p: GqlPr, repo: string): LinkedPr => ({
   number: p.number, title: p.title, state: p.state.toLowerCase() as LinkedPr['state'], isDraft: p.isDraft, url: p.url,
+  author: p.author?.login ?? 'ghost', ref: refText(p, repo),
 });
+
+/** PRs that will close the issue first, then PRs that merely mention it, each PR once. */
+function mapLinkedPrs(n: GqlDetailIssue, repo: string): LinkedPr[] {
+  const mentions = (n.prMentions?.nodes ?? []).map(m => m.source).filter((s): s is GqlPr => typeof s?.number === 'number');
+  const seen = new Set<string>();
+  return [...(n.closedByPullRequestsReferences?.nodes ?? []), ...mentions]
+    .filter(p => !seen.has(p.url) && seen.add(p.url))
+    .map(p => mapLinkedPr(p, repo));
+}
 
 /** `repo` is `owner/name`; it decides whether a referenced issue is shown as `#12` or `owner/other#12`. */
 export function mapIssueDetail(data: IssueDetailData, repo: string): IssueDetail {
@@ -261,7 +282,7 @@ export function mapIssueDetail(data: IssueDetailData, repo: string): IssueDetail
       ? { number: n.milestone.number, title: n.milestone.title, percent: Math.round(n.milestone.progressPercentage) } : null,
     parent: n.parent,
     subIssues: n.subIssues.nodes.map(mapSubIssue),
-    linkedPrs: (n.closedByPullRequestsReferences?.nodes ?? []).map(mapLinkedPr),
+    linkedPrs: mapLinkedPrs(n, repo),
     participants: n.participants.nodes.map(toUser),
     timeline: timeline.items,
     hasMoreTimeline: timeline.hasMore,
