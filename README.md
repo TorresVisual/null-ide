@@ -283,7 +283,6 @@ Project Link: [https://github.com/TorresVisual/null-ide](https://github.com/Torr
 
 * [VSCodium](https://vscodium.com), the telemetry-free VS Code build Null IDE is based on
 * [Visual Studio Code](https://github.com/microsoft/vscode), the upstream editor
-* [Best-README-Template](https://github.com/othneildrew/Best-README-Template), the structure of this README
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
