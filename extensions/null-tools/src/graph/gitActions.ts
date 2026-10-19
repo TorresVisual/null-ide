@@ -144,17 +144,33 @@ export async function pull(git: RunGit): Promise<Result<PullOutcome>> {
   }
 }
 
-export type IntegrateStrategy = 'rebase' | 'merge';
+export type IntegrateStrategy = 'rebase' | 'merge' | 'rebase-merges';
 
 /**
  * Brings a diverged branch level with its upstream. The caller has fetched already, so this never touches the network.
+ * `rebase-merges` recreates local merge commits on top of the upstream instead of flattening them.
  * No --autostash: a dirty tree is refused by git and its message comes back as a failure.
  */
 export function integrateUpstream(git: RunGit, inProgress: InProgress, strategy: IntegrateStrategy): Promise<Result<StoppedInfo>> {
-  return sequencer(git, inProgress, strategy === 'rebase' ? ['rebase', '@{u}'] : ['merge', '--no-edit', '@{u}']);
+  const args = strategy === 'merge'
+    ? ['merge', '--no-edit', '@{u}']
+    : ['rebase', ...(strategy === 'rebase-merges' ? ['--rebase-merges'] : []), '@{u}'];
+  return sequencer(git, inProgress, args);
 }
 
-export type PullPreference = 'rebase' | 'merge' | 'ff-only' | 'ask';
+/** The word the operation banner and error messages use for a strategy. */
+export function integrateLabel(strategy: IntegrateStrategy): string {
+  return strategy === 'merge' ? 'Merge' : strategy === 'rebase' ? 'Rebase' : 'Rebase (keep merges)';
+}
+
+/** The information message shown after a clean (non-stopped) integrate. */
+export function integrateDoneText(strategy: IntegrateStrategy): string {
+  return strategy === 'merge' ? 'Merged the upstream.'
+    : strategy === 'rebase' ? 'Rebased onto the upstream.'
+      : 'Rebased onto the upstream, keeping merge commits.';
+}
+
+export type PullPreference = 'rebase' | 'merge' | 'rebase-merges' | 'ff-only' | 'ask';
 
 /** One `git config --get` value, lower-cased. '' when unset (git exits 1); null when the read failed for any other reason. */
 async function configValue(git: RunGit, key: string): Promise<string | null> {
@@ -164,7 +180,7 @@ async function configValue(git: RunGit, key: string): Promise<string | null> {
 /**
  * What the user's git config says a pull should do once the branch has diverged.
  * Same precedence as git: branch.<name>.rebase over pull.rebase; a rebase setting over pull.ff.
- * `merges` and `interactive` are not offered by Null, so they ask rather than silently rebase plainly.
+ * `merges` maps to `rebase-merges`; `interactive` is not offered by Null (it needs an editor), so it asks rather than silently rebase plainly.
  * Anything unset asks: that is what git itself does (it refuses and tells the user to choose).
  * A read that fails for any other reason also asks, and never falls through to a lower-precedence key.
  */
@@ -179,6 +195,7 @@ export async function pullPreference(git: RunGit): Promise<PullPreference> {
   const ff = await configValue(git, 'pull.ff');
   if (ff === null) return 'ask';
   if (['false', 'no', 'off', '0'].includes(rebase)) return ff === 'only' ? 'ff-only' : 'merge';
+  if (rebase === 'merges') return 'rebase-merges';
   if (rebase) return 'ask';
   if (ff === 'only') return 'ff-only';
   return ['false', 'no', 'off', '0'].includes(ff) ? 'merge' : 'ask';

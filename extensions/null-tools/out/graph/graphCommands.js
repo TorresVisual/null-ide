@@ -193,11 +193,11 @@ async function divergedFlow(session, ahead, behind) {
     else {
         strategy = preference;
     }
-    const label = strategy === 'rebase' ? 'Rebase' : 'Merge';
+    const label = (0, gitActions_1.integrateLabel)(strategy);
     const result = await session.runAction((a) => (0, gitActions_1.integrateUpstream)(a.act, () => a.service.inProgress(), strategy));
     await reportOperation(result, label);
     if (result.ok && !result.value.stopped) {
-        void vscode.window.showInformationMessage(strategy === 'rebase' ? 'Rebased onto the upstream.' : 'Merged the upstream.');
+        void vscode.window.showInformationMessage((0, gitActions_1.integrateDoneText)(strategy));
     }
 }
 async function pullFlow(session) {

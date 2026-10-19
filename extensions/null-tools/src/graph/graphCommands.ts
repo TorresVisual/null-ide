@@ -4,7 +4,7 @@
 import * as vscode from 'vscode';
 import { Result } from '../worktrees';
 import {
-  CheckoutTarget, IntegrateStrategy, PullOutcome, StoppedInfo, checkout, cherryPick, createBranch, integrateUpstream, pull, pullPreference, rememberPullStrategy, reset, resetImpact, resumeOperation, revert,
+  CheckoutTarget, IntegrateStrategy, PullOutcome, StoppedInfo, checkout, cherryPick, createBranch, integrateDoneText, integrateLabel, integrateUpstream, pull, pullPreference, rememberPullStrategy, reset, resetImpact, resumeOperation, revert,
 } from './gitActions';
 import { GitGraphService } from './gitGraphService';
 import { CommitGraphPanel } from './commitGraphPanel';
@@ -169,11 +169,11 @@ async function divergedFlow(session: GraphSession, ahead: number, behind: number
   } else {
     strategy = preference;
   }
-  const label = strategy === 'rebase' ? 'Rebase' : 'Merge';
+  const label = integrateLabel(strategy);
   const result = await session.runAction((a) => integrateUpstream(a.act, () => a.service.inProgress(), strategy));
   await reportOperation(result, label);
   if (result.ok && !result.value.stopped) {
-    void vscode.window.showInformationMessage(strategy === 'rebase' ? 'Rebased onto the upstream.' : 'Merged the upstream.');
+    void vscode.window.showInformationMessage(integrateDoneText(strategy));
   }
 }
 

@@ -6,7 +6,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { cherryPick, checkout, createBranch, integrateUpstream, pull, pullPreference, rememberPullStrategy, reset, resetImpact, resumeOperation, revert } from './gitActions';
+import { cherryPick, checkout, createBranch, integrateDoneText, integrateLabel, integrateUpstream, pull, pullPreference, rememberPullStrategy, reset, resetImpact, resumeOperation, revert } from './gitActions';
 import { GitGraphService } from './gitGraphService';
 import { makeRunGit } from './gitRun';
 
@@ -379,12 +379,60 @@ test('integrateUpstream is refused on a dirty tree, with the tree and HEAD untou
   }
 });
 
+test('integrateLabel and integrateDoneText name rebase-merges distinctly from rebase', () => {
+  assert.strictEqual(integrateLabel('rebase-merges'), 'Rebase (keep merges)');
+  assert.strictEqual(integrateLabel('rebase'), 'Rebase');
+  assert.strictEqual(integrateLabel('merge'), 'Merge');
+  assert.strictEqual(integrateDoneText('rebase-merges'), 'Rebased onto the upstream, keeping merge commits.');
+  assert.strictEqual(integrateDoneText('rebase'), 'Rebased onto the upstream.');
+  assert.strictEqual(integrateDoneText('merge'), 'Merged the upstream.');
+});
+
 test('integrateUpstream rebase drops a local commit whose patch the upstream already has', async () => {
   // The upstream was amended or squashed: the same change exists on both sides under different hashes.
   const clone = divergedClone(['o.txt', 'same'], ['o.txt', 'same']);
   const { run, inProgress } = tools(clone);
   assert.strictEqual(expectOk(await integrateUpstream(run, inProgress, 'rebase')).stopped, false);
   assert.strictEqual(git(clone, 'rev-parse', 'HEAD'), git(clone, 'rev-parse', '@{u}'), 'no duplicate commit is left');
+});
+
+test('integrateUpstream rebase-merges keeps a local merge commit and adds no merge to the upstream history', async () => {
+  const clone = divergedClone(['local.txt', 'local'], ['remote.txt', 'remote']);
+  const { run, inProgress } = tools(clone);
+  // Local side branch merged into main with a real merge commit (--no-ff), on top of the diverged history.
+  git(clone, 'checkout', '-b', 'side');
+  commit(clone, 'side.txt', 'side', 'side');
+  git(clone, 'checkout', 'main');
+  git(clone, 'merge', '--no-ff', '-m', 'merge side', 'side');
+
+  assert.strictEqual(expectOk(await integrateUpstream(run, inProgress, 'rebase-merges')).stopped, false);
+  assert.strictEqual(git(clone, 'rev-list', '--merges', '--count', '@{u}..HEAD'), '1');
+  assert.strictEqual(git(clone, 'rev-list', '--count', '@{u}..HEAD'), '3');
+});
+
+test('integrateUpstream rebase-merges on a linear branch gives the same history as a plain rebase', async () => {
+  const linear = divergedClone(['local.txt', 'local'], ['remote.txt', 'remote']);
+  const plain = divergedClone(['local.txt', 'local'], ['remote.txt', 'remote']);
+  expectOk(await integrateUpstream(tools(linear).run, tools(linear).inProgress, 'rebase-merges'));
+  expectOk(await integrateUpstream(tools(plain).run, tools(plain).inProgress, 'rebase'));
+  assert.strictEqual(git(linear, 'rev-list', '--merges', '--count', '@{u}..HEAD'), '0');
+  assert.strictEqual(git(linear, 'log', '--format=%s', '@{u}..HEAD'), git(plain, 'log', '--format=%s', '@{u}..HEAD'));
+});
+
+test('integrateUpstream rebase-merges that conflicts stops, and Abort restores the branch', async () => {
+  const clone = divergedClone(['a.txt', 'local'], ['a.txt', 'remote']);
+  const { run, inProgress } = tools(clone);
+  git(clone, 'checkout', '-b', 'side');
+  commit(clone, 'side.txt', 'side', 'side');
+  git(clone, 'checkout', 'main');
+  git(clone, 'merge', '--no-ff', '-m', 'merge side', 'side');
+  const before = git(clone, 'rev-parse', 'HEAD');
+
+  assert.strictEqual(expectOk(await integrateUpstream(run, inProgress, 'rebase-merges')).stopped, true);
+  assert.deepStrictEqual(await inProgress(), { kind: 'rebase' });
+  expectOk(await resumeOperation(run, inProgress, 'abort'));
+  assert.strictEqual(git(clone, 'rev-parse', 'HEAD'), before);
+  assert.strictEqual(await inProgress(), null);
 });
 
 // fakeGit answers only the keys given; an absent key throws, which is how `git config --get` reports "unset" (exit 1).
@@ -432,10 +480,20 @@ test('pullPreference maps git config to a strategy', async () => {
   }
 });
 
-test('pullPreference asks for the rebase modes Null cannot run', async () => {
-  for (const value of ['merges', 'interactive', 'preserve', 'nonsense']) {
+test('pullPreference asks only for the values Null cannot act on', async () => {
+  for (const value of ['interactive', 'preserve', 'nonsense']) {
     assert.strictEqual(await pullPreference(configGit({ 'pull.rebase': value })), 'ask', value);
   }
+});
+
+test('pullPreference maps merges to rebase-merges, scoped and unscoped', async () => {
+  assert.strictEqual(await pullPreference(configGit({ 'pull.rebase': 'merges' })), 'rebase-merges');
+  assert.strictEqual(await pullPreference(configGit({ 'pull.rebase': 'false', 'branch.main.rebase': 'MERGES' })), 'rebase-merges');
+  assert.strictEqual(await pullPreference(configGit({ 'pull.rebase': 'merges', 'pull.ff': 'only' })), 'rebase-merges');
+});
+
+test('pullPreference: detached HEAD with merges still returns rebase-merges, the flow reports the detached state', async () => {
+  assert.strictEqual(await pullPreference(configGit({ 'pull.rebase': 'merges' }, null)), 'rebase-merges');
 });
 
 test('pullPreference accepts every boolean spelling git does, in any case', async () => {
@@ -496,7 +554,7 @@ test('rememberPullStrategy overwrites a branch setting Null cannot read, since t
   const clone = divergedClone(['l.txt', 'local'], ['o.txt', 'remote']);
   const { run } = tools(clone);
   const branch = git(clone, 'symbolic-ref', '--short', 'HEAD');
-  git(clone, 'config', `branch.${branch}.rebase`, 'merges');
+  git(clone, 'config', `branch.${branch}.rebase`, 'interactive');
   assert.strictEqual(await pullPreference(run), 'ask');
   expectOk(await rememberPullStrategy(run, 'merge'));
   assert.strictEqual(git(clone, 'config', '--local', '--get', `branch.${branch}.rebase`), 'false');
