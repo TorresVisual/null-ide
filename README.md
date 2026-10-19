@@ -1,9 +1,11 @@
 <a id="readme-top"></a>
 
-[![Release][release-shield]][release-url]
-[![Stargazers][stars-shield]][stars-url]
-[![Forks][forks-shield]][forks-url]
-[![Issues][issues-shield]][issues-url]
+<p align="center">
+  <a href="release-url"><img src="release-shield" alt="Release"></a>
+  <a href="stars-url"><img src="stars-shield" alt="Stargazers"></a>
+  <a href="forks-url"><img src="forks-shield" alt="Forks"></a>
+  <a href="issues-url"><img src="issues-shield" alt="Issues"></a>
+</p>
 
 <br />
 <div align="center">
