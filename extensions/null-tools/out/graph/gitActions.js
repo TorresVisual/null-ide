@@ -131,20 +131,21 @@ async function pull(git) {
 function integrateUpstream(git, inProgress, strategy) {
     return sequencer(git, inProgress, strategy === 'rebase' ? ['rebase', '@{u}'] : ['merge', '--no-edit', '@{u}']);
 }
-/** One `git config --get` value, lower-cased; '' when unset or unreadable (git exits 1 for an unset key). */
+/** One `git config --get` value, lower-cased. '' when unset (git exits 1); null when the read failed for any other reason. */
 async function configValue(git, key) {
     try {
         return (await git(['config', '--get', key])).trim().toLowerCase();
     }
-    catch {
-        return '';
+    catch (err) {
+        return err.code === 1 ? '' : null;
     }
 }
 /**
  * What the user's git config says a pull should do once the branch has diverged.
  * Same precedence as git: branch.<name>.rebase over pull.rebase; a rebase setting over pull.ff.
  * `merges` and `interactive` are not offered by Null, so they ask rather than silently rebase plainly.
- * Anything unset or unreadable asks: that is what git itself does (it refuses and tells the user to choose).
+ * Anything unset asks: that is what git itself does (it refuses and tells the user to choose).
+ * A read that fails for any other reason also asks, and never falls through to a lower-precedence key.
  */
 async function pullPreference(git) {
     let branch = '';
@@ -152,10 +153,17 @@ async function pullPreference(git) {
         branch = (await git(['symbolic-ref', '--quiet', '--short', 'HEAD'])).trim();
     }
     catch { /* detached */ }
-    const rebase = (branch && await configValue(git, `branch.${branch}.rebase`)) || await configValue(git, 'pull.rebase');
+    const scoped = branch ? await configValue(git, `branch.${branch}.rebase`) : '';
+    if (scoped === null)
+        return 'ask';
+    const rebase = scoped || await configValue(git, 'pull.rebase');
+    if (rebase === null)
+        return 'ask';
     if (['true', 'yes', 'on', '1'].includes(rebase))
         return 'rebase';
     const ff = await configValue(git, 'pull.ff');
+    if (ff === null)
+        return 'ask';
     if (['false', 'no', 'off', '0'].includes(rebase))
         return ff === 'only' ? 'ff-only' : 'merge';
     if (rebase)
