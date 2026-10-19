@@ -392,8 +392,29 @@ function configGit(config: Record<string, string>, branch: string | null = 'main
   const answers: Record<string, string> = {};
   if (branch) answers['symbolic-ref --quiet --short HEAD'] = `${branch}\n`;
   for (const [key, value] of Object.entries(config)) answers[`config --get ${key}`] = `${value}\n`;
-  return fakeGit(answers);
+  const git = fakeGit(answers);
+  // git exits 1 for an unset key; any other failure is an unreadable config (see pullPreference).
+  return async (args: string[]) => {
+    try { return await git(args); } catch (err) {
+      if (args[0] === 'config') throw Object.assign(new Error('unset'), { code: 1 });
+      throw err;
+    }
+  };
 }
+
+test('pullPreference asks when a config read fails, instead of falling through to a lower key', async () => {
+  const git = configGit({ 'pull.rebase': 'true' });
+  const failing = async (args: string[]) => {
+    if (args.join(' ') === 'config --get branch.main.rebase') throw Object.assign(new Error('fatal: bad config line 3'), { code: 128 });
+    return git(args);
+  };
+  assert.strictEqual(await pullPreference(failing), 'ask');
+  const failingPullFf = async (args: string[]) => {
+    if (args.join(' ') === 'config --get pull.ff') throw Object.assign(new Error('fatal: bad config'), { code: 128 });
+    return configGit({ 'pull.rebase': 'false' })(args);
+  };
+  assert.strictEqual(await pullPreference(failingPullFf), 'ask');
+});
 
 test('pullPreference maps git config to a strategy', async () => {
   const cases: [Record<string, string>, string][] = [
