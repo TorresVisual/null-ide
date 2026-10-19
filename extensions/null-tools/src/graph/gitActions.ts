@@ -183,3 +183,19 @@ export async function pullPreference(git: RunGit): Promise<PullPreference> {
   if (ff === 'only') return 'ff-only';
   return ['false', 'no', 'off', '0'].includes(ff) ? 'merge' : 'ask';
 }
+
+/**
+ * Saves a Rebase / Merge answer so `pullPreference` stops asking. Repo-local only.
+ * A `branch.<name>.rebase` value beats `pull.rebase`, so when one exists (it is one Null cannot act on, or we would not be asking) it is the key to overwrite.
+ */
+export async function rememberPullStrategy(git: RunGit, strategy: IntegrateStrategy): Promise<Result<null>> {
+  try {
+    const branch = (await git(['symbolic-ref', '--quiet', '--short', 'HEAD'])).trim();
+    const scoped = await configValue(git, `branch.${branch}.rebase`);
+    if (scoped === null) return fail('Could not read the git config.');
+    await git(['config', '--local', scoped ? `branch.${branch}.rebase` : 'pull.rebase', strategy === 'rebase' ? 'true' : 'false']);
+    return ok(null);
+  } catch (err) {
+    return fail(messageOf(err));
+  }
+}
