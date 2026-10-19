@@ -76,7 +76,7 @@ query PullPage($owner: String!, $name: String!, $number: Int!) {
         __typename
         ... on User { login avatarUrl }
         ... on Mannequin { login avatarUrl }
-        ... on Team { name }
+        ... on Team { slug }
       } } }
       latestOpinionatedReviews(first: 30) { nodes { state author { login avatarUrl } } }
       commits(first: 100) { totalCount nodes { commit {
@@ -127,7 +127,7 @@ interface GqlPullPage {
   labels: { nodes: Array<{ name: string; color: string }> };
   milestone: { title: string } | null;
   assignees: { nodes: GqlUser[] };
-  reviewRequests: { nodes: Array<{ requestedReviewer: { __typename: string; login?: string; avatarUrl?: string; name?: string } | null } | null> };
+  reviewRequests: { nodes: Array<{ requestedReviewer: { __typename: string; login?: string; avatarUrl?: string; slug?: string } | null } | null> };
   latestOpinionatedReviews: { nodes: Array<{ state: string; author: GqlUser | null } | null> };
   commits: { totalCount: number; nodes: Array<{ commit: {
     oid: string; abbreviatedOid: string; messageHeadline: string; committedDate: string; url: string;
@@ -186,7 +186,7 @@ export function mapReviewers(p: Pick<GqlPullPage, 'latestOpinionatedReviews' | '
   }
   for (const req of p.reviewRequests.nodes) {
     const who = req?.requestedReviewer;
-    const login = who?.login ?? who?.name; // a team has a name, not a login
+    const login = who?.login ?? who?.slug; // a team has a slug, not a login; Team.name needs the read:org scope
     if (login) rows.set(login, { login, avatar: who?.avatarUrl ?? '', state: 'pending' });
   }
   return [...rows.values()];

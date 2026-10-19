@@ -114,7 +114,7 @@ test('mapReviewers: latest verdicts, a re-request wins over an old verdict, a te
     ] },
     reviewRequests: { nodes: [
       { requestedReviewer: { __typename: 'User', login: 'bob', avatarUrl: 'https://a/bob' } },
-      { requestedReviewer: { __typename: 'Team', name: 'core' } },
+      { requestedReviewer: { __typename: 'Team', slug: 'core' } },
       { requestedReviewer: null },
     ] },
   }));
