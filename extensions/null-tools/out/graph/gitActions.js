@@ -8,6 +8,7 @@ exports.revert = revert;
 exports.resumeOperation = resumeOperation;
 exports.reset = reset;
 exports.resetImpact = resetImpact;
+exports.pull = pull;
 const ok = (value) => ({ ok: true, value });
 const fail = (message) => ({ ok: false, message });
 const messageOf = (err) => (err instanceof Error ? err.message : String(err));
@@ -89,6 +90,31 @@ async function resetImpact(git, sha) {
         }
         catch { /* no commits */ }
         return ok({ branch, leaving, orphaned, trackedChanges });
+    }
+    catch (err) {
+        return fail(messageOf(err));
+    }
+}
+/** Fast-forward only: a diverged branch is reported and left alone, so no merge commit and no conflict can appear. */
+async function pull(git) {
+    try {
+        let upstream;
+        try {
+            upstream = (await git(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}'])).trim();
+        }
+        catch {
+            return ok({ kind: 'noUpstream' });
+        }
+        if (!upstream)
+            return ok({ kind: 'noUpstream' });
+        const behind = await count(git, ['rev-list', '--count', 'HEAD..@{u}']);
+        if (behind === 0)
+            return ok({ kind: 'upToDate' });
+        const ahead = await count(git, ['rev-list', '--count', '@{u}..HEAD']);
+        if (ahead > 0)
+            return ok({ kind: 'diverged' });
+        await git(['pull', '--ff-only']);
+        return ok({ kind: 'fastForwarded', commits: behind });
     }
     catch (err) {
         return fail(messageOf(err));

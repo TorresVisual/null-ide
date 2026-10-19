@@ -195,4 +195,78 @@ function divergent(dir) {
     (0, node_fs_1.writeFileSync)(node_path_1.default.join(dir, 'untracked.txt'), 'u');
     node_assert_1.default.deepStrictEqual(expectOk(await (0, gitActions_1.resetImpact)(run, c1)), { branch: 'main', leaving: 2, orphaned: 0, trackedChanges: 1 });
 });
+// Fake git: `answers` maps the joined args to stdout; a missing key throws like a failing git.
+function fakeGit(answers, calls = []) {
+    return async (args) => {
+        calls.push(args);
+        const key = args.join(' ');
+        if (key in answers)
+            return answers[key];
+        throw new Error(`fatal: unexpected ${key}`);
+    };
+}
+(0, node_test_1.default)('pull reports noUpstream when the branch tracks nothing, and runs no pull', async () => {
+    const calls = [];
+    node_assert_1.default.deepStrictEqual(await (0, gitActions_1.pull)(fakeGit({}, calls)), { ok: true, value: { kind: 'noUpstream' } });
+    node_assert_1.default.strictEqual(calls.some((a) => a[0] === 'pull'), false);
+});
+(0, node_test_1.default)('pull reports upToDate when HEAD already contains the upstream', async () => {
+    const git = fakeGit({
+        'rev-parse --abbrev-ref --symbolic-full-name @{u}': 'origin/main\n',
+        'rev-list --count HEAD..@{u}': '0\n',
+        'pull --ff-only': 'Already up to date.\n',
+    });
+    node_assert_1.default.deepStrictEqual(await (0, gitActions_1.pull)(git), { ok: true, value: { kind: 'upToDate' } });
+});
+(0, node_test_1.default)('pull reports diverged and does not pull when local and upstream both have commits', async () => {
+    const calls = [];
+    const git = fakeGit({
+        'rev-parse --abbrev-ref --symbolic-full-name @{u}': 'origin/main\n',
+        'rev-list --count HEAD..@{u}': '2\n',
+        'rev-list --count @{u}..HEAD': '1\n',
+    }, calls);
+    node_assert_1.default.deepStrictEqual(await (0, gitActions_1.pull)(git), { ok: true, value: { kind: 'diverged' } });
+    node_assert_1.default.strictEqual(calls.some((a) => a[0] === 'pull'), false);
+});
+(0, node_test_1.default)('pull fast-forwards and counts the commits that came in', async () => {
+    const git = fakeGit({
+        'rev-parse --abbrev-ref --symbolic-full-name @{u}': 'origin/main\n',
+        'rev-list --count HEAD..@{u}': '3\n',
+        'rev-list --count @{u}..HEAD': '0\n',
+        'pull --ff-only': 'Fast-forward\n',
+    });
+    node_assert_1.default.deepStrictEqual(await (0, gitActions_1.pull)(git), { ok: true, value: { kind: 'fastForwarded', commits: 3 } });
+});
+(0, node_test_1.default)('pull returns git refusal text as a failure, e.g. a dirty tree', async () => {
+    const git = async (args) => {
+        const key = args.join(' ');
+        if (key.startsWith('rev-parse'))
+            return 'origin/main\n';
+        if (key === 'rev-list --count HEAD..@{u}')
+            return '1\n';
+        if (key === 'rev-list --count @{u}..HEAD')
+            return '0\n';
+        throw new Error('error: Your local changes to the following files would be overwritten by merge');
+    };
+    node_assert_1.default.deepStrictEqual(await (0, gitActions_1.pull)(git), {
+        ok: false,
+        message: 'error: Your local changes to the following files would be overwritten by merge',
+    });
+});
+(0, node_test_1.default)('pull passes an offline or no-credentials failure through unchanged', async () => {
+    const git = async (args) => {
+        const key = args.join(' ');
+        if (key.startsWith('rev-parse'))
+            return 'origin/main\n';
+        if (key === 'rev-list --count HEAD..@{u}')
+            return '1\n';
+        if (key === 'rev-list --count @{u}..HEAD')
+            return '0\n';
+        throw new Error("fatal: could not read Username for 'https://github.com': terminal prompts disabled");
+    };
+    node_assert_1.default.deepStrictEqual(await (0, gitActions_1.pull)(git), {
+        ok: false,
+        message: "fatal: could not read Username for 'https://github.com': terminal prompts disabled",
+    });
+});
 //# sourceMappingURL=gitActions.test.js.map

@@ -139,6 +139,31 @@ async function resetFlow(session, sha, mode) {
     }
     report(await session.runAction((a) => (0, gitActions_1.reset)(a.act, mode, sha)));
 }
+/** One line per outcome. A refused pull is named, never silent. */
+function pullMessage(outcome) {
+    switch (outcome.kind) {
+        case 'upToDate':
+            void vscode.window.showInformationMessage('Already up to date.');
+            return;
+        case 'fastForwarded':
+            void vscode.window.showInformationMessage(`Pulled ${outcome.commits} ${outcome.commits === 1 ? 'commit' : 'commits'}.`);
+            return;
+        case 'noUpstream':
+            void vscode.window.showWarningMessage('This branch has no upstream to pull from.');
+            return;
+        case 'diverged':
+            void vscode.window.showWarningMessage('This branch has diverged from its upstream. Pull was not run; merge or rebase by hand.');
+            return;
+    }
+}
+async function pullFlow(session) {
+    const result = await session.runAction((a) => (0, gitActions_1.pull)(a.act));
+    if (!result.ok) {
+        report(result);
+        return;
+    }
+    pullMessage(result.value);
+}
 function registerGraphCommands(context, session, panel) {
     const register = (id, handler) => context.subscriptions.push(vscode.commands.registerCommand(id, handler));
     const withSha = (fn) => async (arg) => {
@@ -150,6 +175,7 @@ function registerGraphCommands(context, session, panel) {
     register('null.graph.refresh', () => session.invalidate());
     register('null.graph.copySha', withSha(async (sha) => { await vscode.env.clipboard.writeText(sha); }));
     register('null.graph.checkout', withSha((sha) => checkoutFlow(session, sha)));
+    register('null.graph.pull', () => pullFlow(session));
     register('null.graph.createBranch', withSha((sha) => createBranchFlow(session, sha)));
     register('null.graph.cherryPick', withSha((sha) => replayFlow(session, sha, 'cherry-pick')));
     register('null.graph.revert', withSha((sha) => replayFlow(session, sha, 'revert')));
