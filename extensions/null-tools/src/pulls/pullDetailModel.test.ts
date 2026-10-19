@@ -106,7 +106,7 @@ test('mapPullPage keeps the timeline total so the page can say it is cut off', (
   assert.strictEqual(p.commitTotal, 130);
 });
 
-test('mapReviewers: latest verdicts, a re-request wins over an old verdict, a team has a name instead of a login', () => {
+test('mapReviewers: latest verdicts, a re-request wins over an old verdict, a team request is skipped', () => {
   const p = mapPullPage(gqlPage({
     latestOpinionatedReviews: { nodes: [
       { state: 'APPROVED', author: user('ann') }, { state: 'CHANGES_REQUESTED', author: user('bob') },
@@ -114,11 +114,11 @@ test('mapReviewers: latest verdicts, a re-request wins over an old verdict, a te
     ] },
     reviewRequests: { nodes: [
       { requestedReviewer: { __typename: 'User', login: 'bob', avatarUrl: 'https://a/bob' } },
-      { requestedReviewer: { __typename: 'Team', slug: 'core' } },
+      { requestedReviewer: { __typename: 'Team' } },
       { requestedReviewer: null },
     ] },
   }));
-  assert.deepStrictEqual(p.reviewers.map(r => `${r.login}:${r.state}`), ['ann:approved', 'bob:pending', 'dee:dismissed', 'core:pending']);
+  assert.deepStrictEqual(p.reviewers.map(r => `${r.login}:${r.state}`), ['ann:approved', 'bob:pending', 'dee:dismissed']);
 });
 
 test('checkRowState / statusContextState', () => {
