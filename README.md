@@ -1,29 +1,97 @@
+<a id="readme-top"></a>
+
+[![Release][release-shield]][release-url]
+[![Stargazers][stars-shield]][stars-url]
+[![Forks][forks-shield]][forks-url]
+[![Issues][issues-shield]][issues-url]
+
+<br />
 <div align="center">
+  <a href="https://github.com/TorresVisual/null-ide">
+    <img src="icons/icon.png" alt="Null IDE" width="128" height="128">
+  </a>
 
-<img src="icons/icon.png" alt="Null IDE" width="128" />
+<h3 align="center">Null IDE</h3>
 
-# Null IDE
-
-**A minimal, opinionated code editor for Windows and Linux.**
-Fully assembled out of the box, with zero telemetry.
-
-VSCodium · Electron · TypeScript · C++ · Rust
-
-[Website](https://torresvisual.github.io/null-ide/) · [Wiki](https://github.com/TorresVisual/null-ide/wiki) · [Releases](https://github.com/TorresVisual/null-ide/releases/latest)
-
+  <p align="center">
+    A minimal, opinionated code editor for Windows and Linux.
+    <br />
+    Fully assembled out of the box, with zero telemetry.
+    <br />
+    <br />
+    <a href="https://github.com/TorresVisual/null-ide/wiki"><strong>Explore the wiki »</strong></a>
+    <br />
+    <br />
+    <a href="https://torresvisual.github.io/null-ide/">Website</a>
+    &middot;
+    <a href="https://github.com/TorresVisual/null-ide/releases/latest">Download</a>
+    &middot;
+    <a href="https://github.com/TorresVisual/null-ide/issues/new?template=bug_report.md">Report Bug</a>
+    &middot;
+    <a href="https://github.com/TorresVisual/null-ide/issues/new?template=feature_request.md">Request Feature</a>
+  </p>
 </div>
+
+<details>
+  <summary>Table of Contents</summary>
+  <ol>
+    <li>
+      <a href="#about-the-project">About The Project</a>
+      <ul>
+        <li><a href="#built-with">Built With</a></li>
+        <li><a href="#built-in-extensions">Built-in Extensions</a></li>
+        <li><a href="#highlights">Highlights</a></li>
+      </ul>
+    </li>
+    <li>
+      <a href="#getting-started">Getting Started</a>
+      <ul>
+        <li><a href="#prerequisites">Prerequisites</a></li>
+        <li><a href="#installation">Installation</a></li>
+        <li><a href="#updating">Updating</a></li>
+      </ul>
+    </li>
+    <li>
+      <a href="#usage">Usage</a>
+      <ul>
+        <li><a href="#extensions">Extensions</a></li>
+      </ul>
+    </li>
+    <li><a href="#privacy">Privacy</a></li>
+    <li>
+      <a href="#building">Building</a>
+      <ul>
+        <li><a href="#repository-layout">Repository Layout</a></li>
+        <li><a href="#local-development">Local Development</a></li>
+      </ul>
+    </li>
+    <li><a href="#roadmap">Roadmap</a></li>
+    <li><a href="#contributing">Contributing</a></li>
+    <li><a href="#contact">Contact</a></li>
+    <li><a href="#acknowledgments">Acknowledgments</a></li>
+  </ol>
+</details>
+
+## About The Project
 
 Null IDE is built on [VSCodium](https://vscodium.com) and ships with a dark theme, icon pack, GitHub Issues, formatters, C++ navigation, and native Explorer integration already in place.
 
-Download `NullIDESetup-<version>.exe` from the [latest release](https://github.com/TorresVisual/null-ide/releases/latest) and run it. The installer is not code-signed, so Windows SmartScreen may ask you to confirm; the SHA256 check only guards against a corrupted or truncated download, not against a compromised release.
-
 > Null IDE is a personal daily-driver editor developed in the open. It targets Windows x64, with a Linux x64 build, and tracks upstream VSCodium via an automated release pipeline.
 
----
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-## Features
+### Built With
 
-### Built-in extensions
+* [![VSCodium][VSCodium-badge]][VSCodium-url]
+* [![Electron][Electron-badge]][Electron-url]
+* [![TypeScript][TypeScript-badge]][TypeScript-url]
+* [![C++][Cpp-badge]][Cpp-url]
+* [![Rust][Rust-badge]][Rust-url]
+* [![Tauri][Tauri-badge]][Tauri-url]
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+### Built-in Extensions
 
 | Extension | What it does |
 |---|---|
@@ -42,6 +110,8 @@ Download `NullIDESetup-<version>.exe` from the [latest release](https://github.c
 | **null-sync** | Encrypted cross-device sync through one secret GitHub Gist (off by default) |
 | **Code Spell Checker** | Bundled [`streetsidesoftware.code-spell-checker`](https://marketplace.visualstudio.com/items?itemName=streetsidesoftware.code-spell-checker) |
 
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
 ### Highlights
 
 - **Project dashboard** opens on startup as a recent-project launcher: search, sort, pin and manage projects, with best-effort Git/type details alongside New Project, Clone Repo, and Open Folder.
@@ -53,31 +123,32 @@ Download `NullIDESetup-<version>.exe` from the [latest release](https://github.c
 - **"Open in Null"** in the Win11 Explorer context menu via a native `IExplorerCommand` shell extension.
 - **Self-updating**: checks GitHub Releases on startup and updates without elevation.
 
----
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-## Install
+## Getting Started
 
-### Installer
+### Prerequisites
 
-Run `NullIDESetup-<version>.exe` from the [latest release](https://github.com/TorresVisual/null-ide/releases/latest). The wizard downloads the newest release and lets you pick the install folder, shortcuts, `PATH` entry, Explorer context menu, file associations, which built-in extensions to keep and a few starting settings (theme, font, auto save, format on save, update check, menu bar). **Use recommended defaults** skips ahead.
+* **Windows 10 22H2 or Windows 11 (x64)**, with the WebView2 runtime (part of Windows 11; Windows 10 22H2 ships it too). No administrator rights are needed, apart from one optional approval for the Windows 11 context-menu certificate.
+* **Linux x64** (Debian/Ubuntu `.deb`, or any distro via the `.tar.gz`). See [docs/wiki/Linux.md](docs/wiki/Linux.md) for runtime dependencies and limitations.
 
-The install is per-user (`%LOCALAPPDATA%\Programs\Null IDE` by default) and needs no administrator rights, apart from one optional approval for the Windows 11 context-menu certificate. It needs the WebView2 runtime (part of Windows 11; Windows 10 22H2 ships it too).
+### Installation
+
+#### Windows installer
+
+1. Download `NullIDESetup-<version>.exe` from the [latest release](https://github.com/TorresVisual/null-ide/releases/latest) and run it. The installer is not code-signed, so Windows SmartScreen may ask you to confirm; the SHA256 check only guards against a corrupted or truncated download, not against a compromised release.
+2. The wizard downloads the newest release and lets you pick the install folder, shortcuts, `PATH` entry, Explorer context menu, file associations, which built-in extensions to keep and a few starting settings (theme, font, auto save, format on save, update check, menu bar). **Use recommended defaults** skips ahead.
+3. The install is per-user (`%LOCALAPPDATA%\Programs\Null IDE` by default).
 
 Run the installer again, or use Settings → Apps → Null IDE, for **Modify**, **Repair** and **Uninstall**. Inside the IDE, **Null: Setup** opens the same window on Modify. Uninstall keeps `%APPDATA%\Null` (settings, extensions) unless you tick the box to delete it.
 
 A portable `null-ide-win32-x64-<tag>.zip` (with a `.sha256`) is also attached to each release.
 
-#### Coming from the Inno Setup installer (v1.0.17 and earlier)
+**Coming from the Inno Setup installer (v1.0.17 and earlier)?** Uninstall the old copy first (Settings → Apps → Null IDE); the new installer refuses a folder that is not empty. Your settings and extensions in `%APPDATA%\Null` are not touched by that uninstall. Those older versions cannot update themselves to this one.
 
-Uninstall the old copy first (Settings → Apps → Null IDE); the new installer refuses a folder that is not empty. Your settings and extensions in `%APPDATA%\Null` are not touched by that uninstall. Those older versions cannot update themselves to this one.
+#### Linux
 
-### Updating
-
-A status-bar button appears when a new release is available (checked on startup, at most every 6 hours). Click it and the IDE closes, updates, and reopens. You can also run **Null: Check for Updates** from the command palette.
-
-### Linux
-
-Linux x64 packages are attached to each release: a `.deb` and a `.tar.gz`. Full notes, including runtime dependencies and limitations, are in [docs/wiki/Linux.md](docs/wiki/Linux.md).
+Linux x64 packages are attached to each release: a `.deb` and a `.tar.gz`.
 
 ```bash
 sudo apt install ./null-ide-linux-x64-<tag>.deb          # installs the null command
@@ -87,7 +158,11 @@ mkdir null-ide && tar -xzf null-ide-linux-x64-<tag>.tar.gz -C null-ide && ./null
 
 Linux installs update manually: the status-bar button opens the release page.
 
----
+### Updating
+
+A status-bar button appears when a new release is available (checked on startup, at most every 6 hours). Click it and the IDE closes, updates, and reopens. You can also run **Null: Check for Updates** from the command palette.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## Usage
 
@@ -114,7 +189,9 @@ Extensions are checked for updates at startup and every few hours, and update au
 
 Suggested on first launch: `llvm-vs-code-extensions.vscode-clangd`, `twxs.cmake`, `ms-python.python`.
 
----
+_For more, see the [wiki](https://github.com/TorresVisual/null-ide/wiki)._
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## Privacy
 
@@ -127,7 +204,7 @@ Suggested on first launch: `llvm-vs-code-extensions.vscode-clangd`, `twxs.cmake`
 - Sync and activity badges (GitHub Gists), only if you turn them on
 - Discord Rich Presence, only if enabled via `null.discord.*`
 
----
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## Building
 
@@ -142,7 +219,7 @@ git push origin v1.2.3     # builds and publishes a GitHub Release
 
 Or run **Actions → Build Null IDE → Run workflow** manually. A scheduled job (Mondays 06:00 UTC) opens a PR when VSCodium ships a new release; to bump by hand, edit [`VSCODIUM_TAG`](VSCODIUM_TAG).
 
-## Development
+### Repository Layout
 
 ```
 extensions/        Built-in extensions (TypeScript sources in src/, compiled to out/ in CI)
@@ -157,6 +234,8 @@ product.json       Branding/config overlay merged into VS Code's product.json
 archive/           Retired code, not built
 ```
 
+### Local Development
+
 Day-to-day extension and workbench work doesn't need the full build:
 
 | Script | Use for |
@@ -166,4 +245,65 @@ Day-to-day extension and workbench work doesn't need the full build:
 
 Extensions are compiled with `npm ci && npm run compile` in each extension directory. Edit the TypeScript in `src/`, not the generated `out/` files.
 
-Full documentation is on the [wiki](https://github.com/TorresVisual/null-ide/wiki) (source in [docs/wiki/](docs/wiki/); `/wiki-sync` keeps it current). See [CLAUDE.md](CLAUDE.md) for a deeper tour of the architecture and [docs/ROADMAP.md](docs/ROADMAP.md) for planned work such as the C++ development layer.
+See [CLAUDE.md](CLAUDE.md) for a deeper tour of the architecture.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+## Roadmap
+
+Planned work, such as the C++ development layer (CMake, toolchain and debugger orchestration on top of clangd), is tracked in [docs/ROADMAP.md](docs/ROADMAP.md).
+
+See the [open issues](https://github.com/TorresVisual/null-ide/issues) for a full list of proposed features (and known issues).
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+## Contributing
+
+Contributions are what make the open source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
+
+If you have a suggestion that would make this better, please fork the repo and create a pull request. You can also simply open an [issue](https://github.com/TorresVisual/null-ide/issues/new?template=feature_request.md) with the tag "enhancement".
+
+1. Fork the Project
+2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your Changes (`git commit -m 'feat: add some AmazingFeature'`)
+4. Push to the Branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+## Contact
+
+TorresVisual - [@TorresVisual](https://github.com/TorresVisual)
+
+Project Link: [https://github.com/TorresVisual/null-ide](https://github.com/TorresVisual/null-ide)
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+## Acknowledgments
+
+* [VSCodium](https://vscodium.com), the telemetry-free VS Code build Null IDE is based on
+* [Visual Studio Code](https://github.com/microsoft/vscode), the upstream editor
+* [Best-README-Template](https://github.com/othneildrew/Best-README-Template), the structure of this README
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+[release-shield]: https://img.shields.io/github/v/release/TorresVisual/null-ide?style=for-the-badge
+[release-url]: https://github.com/TorresVisual/null-ide/releases/latest
+[forks-shield]: https://img.shields.io/github/forks/TorresVisual/null-ide.svg?style=for-the-badge
+[forks-url]: https://github.com/TorresVisual/null-ide/network/members
+[stars-shield]: https://img.shields.io/github/stars/TorresVisual/null-ide.svg?style=for-the-badge
+[stars-url]: https://github.com/TorresVisual/null-ide/stargazers
+[issues-shield]: https://img.shields.io/github/issues/TorresVisual/null-ide.svg?style=for-the-badge
+[issues-url]: https://github.com/TorresVisual/null-ide/issues
+[VSCodium-badge]: https://img.shields.io/badge/VSCodium-2F80ED?style=for-the-badge&logo=vscodium&logoColor=white
+[VSCodium-url]: https://vscodium.com
+[Electron-badge]: https://img.shields.io/badge/Electron-2B2E3A?style=for-the-badge&logo=electron&logoColor=9FEAF9
+[Electron-url]: https://www.electronjs.org
+[TypeScript-badge]: https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white
+[TypeScript-url]: https://www.typescriptlang.org
+[Cpp-badge]: https://img.shields.io/badge/C%2B%2B-00599C?style=for-the-badge&logo=cplusplus&logoColor=white
+[Cpp-url]: https://isocpp.org
+[Rust-badge]: https://img.shields.io/badge/Rust-000000?style=for-the-badge&logo=rust&logoColor=white
+[Rust-url]: https://www.rust-lang.org
+[Tauri-badge]: https://img.shields.io/badge/Tauri-24C8D8?style=for-the-badge&logo=tauri&logoColor=white
+[Tauri-url]: https://tauri.app
