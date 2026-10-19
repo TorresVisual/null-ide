@@ -242,6 +242,7 @@
       },
       { "command": "null.graph.open", "title": "Null: Open Commit Graph", "icon": "$(git-commit)" },
       { "command": "null.graph.refresh", "title": "Null: Refresh Commit Graph", "icon": "$(refresh)" },
+      { "command": "null.graph.pull", "title": "Null: Pull", "icon": "$(repo-pull)" },
       { "command": "null.graph.checkout", "title": "Checkout…" },
       { "command": "null.graph.createBranch", "title": "Create Branch Here…" },
       { "command": "null.graph.cherryPick", "title": "Cherry-pick" },
@@ -358,6 +359,11 @@
         }
       ],
       "view/title": [
+        {
+          "command": "null.graph.pull",
+          "when": "view == null.graphView && !null.graph.operationInProgress",
+          "group": "navigation@1"
+        },
         {
           "command": "null.newScratchFile",
           "when": "view == null.scratchView",

@@ -4,7 +4,7 @@
 import * as vscode from 'vscode';
 import { Result } from '../worktrees';
 import {
-  CheckoutTarget, StoppedInfo, checkout, cherryPick, createBranch, reset, resetImpact, resumeOperation, revert,
+  CheckoutTarget, PullOutcome, StoppedInfo, checkout, cherryPick, createBranch, pull, reset, resetImpact, resumeOperation, revert,
 } from './gitActions';
 import { GitGraphService } from './gitGraphService';
 import { CommitGraphPanel } from './commitGraphPanel';
@@ -114,6 +114,22 @@ async function resetFlow(session: GraphSession, sha: string, mode: 'soft' | 'mix
   report(await session.runAction((a) => reset(a.act, mode, sha)));
 }
 
+/** One line per outcome. A refused pull is named, never silent. */
+function pullMessage(outcome: PullOutcome): void {
+  switch (outcome.kind) {
+    case 'upToDate': void vscode.window.showInformationMessage('Already up to date.'); return;
+    case 'fastForwarded': void vscode.window.showInformationMessage(`Pulled ${outcome.commits} ${outcome.commits === 1 ? 'commit' : 'commits'}.`); return;
+    case 'noUpstream': void vscode.window.showWarningMessage('This branch has no upstream to pull from.'); return;
+    case 'diverged': void vscode.window.showWarningMessage('This branch has diverged from its upstream. Pull was not run; merge or rebase by hand.'); return;
+  }
+}
+
+async function pullFlow(session: GraphSession): Promise<void> {
+  const result = await session.runAction((a) => pull(a.act));
+  if (!result.ok) { report(result); return; }
+  pullMessage(result.value);
+}
+
 export function registerGraphCommands(context: vscode.ExtensionContext, session: GraphSession, panel: CommitGraphPanel): void {
   const register = (id: string, handler: (...args: any[]) => unknown) => context.subscriptions.push(vscode.commands.registerCommand(id, handler));
   const withSha = (fn: (sha: string) => Promise<void>) => async (arg?: unknown) => {
@@ -125,6 +141,7 @@ export function registerGraphCommands(context: vscode.ExtensionContext, session:
   register('null.graph.refresh', () => session.invalidate());
   register('null.graph.copySha', withSha(async (sha) => { await vscode.env.clipboard.writeText(sha); }));
   register('null.graph.checkout', withSha((sha) => checkoutFlow(session, sha)));
+  register('null.graph.pull', () => pullFlow(session));
   register('null.graph.createBranch', withSha((sha) => createBranchFlow(session, sha)));
   register('null.graph.cherryPick', withSha((sha) => replayFlow(session, sha, 'cherry-pick')));
   register('null.graph.revert', withSha((sha) => replayFlow(session, sha, 'revert')));
