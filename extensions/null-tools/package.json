@@ -278,7 +278,13 @@
       { "command": "null.workflows.openWorkflowFile", "title": "Open Workflow File", "icon": "$(go-to-file)" },
       { "command": "null.workflows.createWorkflow", "title": "Create Workflow" },
       { "command": "null.workflows.filter", "title": "Null: Filter GitHub Actions Runs", "icon": "$(filter)" },
-      { "command": "null.workflows.filterByWorkflow", "title": "Filter Runs by This Workflow", "icon": "$(filter)" }
+      { "command": "null.workflows.filterByWorkflow", "title": "Filter Runs by This Workflow", "icon": "$(filter)" },
+      { "command": "null.workflows.rerunAll", "title": "Re-run All Jobs", "icon": "$(debug-rerun)" },
+      { "command": "null.workflows.rerunFailed", "title": "Re-run Failed Jobs" },
+      { "command": "null.workflows.rerunJob", "title": "Re-run Job", "icon": "$(debug-rerun)" },
+      { "command": "null.workflows.cancel", "title": "Cancel Run", "icon": "$(debug-stop)" },
+      { "command": "null.workflows.enable", "title": "Enable Workflow" },
+      { "command": "null.workflows.dispatch", "title": "Run Workflow…", "icon": "$(play)" }
     ],
     "viewsContainers": {
       "activitybar": [
@@ -508,7 +514,16 @@
         { "command": "null.workflows.openOnGitHub", "when": "view == null.workflowsView && viewItem =~ /^(run|job|workflow|repo)/", "group": "inline@9" },
         { "command": "null.workflows.openOnGitHub", "when": "view == null.workflowsView && viewItem =~ /^(run|job|workflow|repo)/", "group": "9_github@0" },
         { "command": "null.workflows.openWorkflowFile", "when": "view == null.workflowsView && viewItem =~ /^workflow/", "group": "1_workflow@0" },
-        { "command": "null.workflows.filterByWorkflow", "when": "view == null.workflowsView && viewItem =~ /^workflow/", "group": "1_workflow@1" }
+        { "command": "null.workflows.filterByWorkflow", "when": "view == null.workflowsView && viewItem =~ /^workflow/", "group": "1_workflow@1" },
+        { "command": "null.workflows.cancel", "when": "view == null.workflowsView && viewItem =~ /(^| )cancel( |$)/", "group": "inline@1" },
+        { "command": "null.workflows.rerunAll", "when": "view == null.workflowsView && viewItem =~ /(^| )rerunAll( |$)/", "group": "inline@2" },
+        { "command": "null.workflows.dispatch", "when": "view == null.workflowsView && viewItem =~ /(^| )dispatch( |$)/", "group": "inline@1" },
+        { "command": "null.workflows.cancel", "when": "view == null.workflowsView && viewItem =~ /(^| )cancel( |$)/", "group": "3_manage@0" },
+        { "command": "null.workflows.rerunAll", "when": "view == null.workflowsView && viewItem =~ /(^| )rerunAll( |$)/", "group": "3_manage@1" },
+        { "command": "null.workflows.rerunFailed", "when": "view == null.workflowsView && viewItem =~ /(^| )rerunFailed( |$)/", "group": "3_manage@2" },
+        { "command": "null.workflows.rerunJob", "when": "view == null.workflowsView && viewItem =~ /(^| )rerunJob( |$)/", "group": "3_manage@3" },
+        { "command": "null.workflows.dispatch", "when": "view == null.workflowsView && viewItem =~ /(^| )dispatch( |$)/", "group": "3_manage@4" },
+        { "command": "null.workflows.enable", "when": "view == null.workflowsView && viewItem =~ /(^| )enable( |$)/", "group": "3_manage@5" }
       ],
       "comments/commentThread/context": [
         { "command": "null.pulls.addToReview", "when": "commentController == null.pulls", "group": "inline@0" },
@@ -565,6 +580,12 @@
         { "command": "null.workflows.openWorkflowFile", "when": "false" },
         { "command": "null.workflows.createWorkflow", "when": "false" },
         { "command": "null.workflows.filterByWorkflow", "when": "false" },
+        { "command": "null.workflows.rerunAll", "when": "false" },
+        { "command": "null.workflows.rerunFailed", "when": "false" },
+        { "command": "null.workflows.rerunJob", "when": "false" },
+        { "command": "null.workflows.cancel", "when": "false" },
+        { "command": "null.workflows.enable", "when": "false" },
+        { "command": "null.workflows.dispatch", "when": "false" },
         { "command": "null.pulls.finishReview", "when": "false" },
         { "command": "null.graph.checkout", "when": "false" },
         { "command": "null.graph.createBranch", "when": "false" },

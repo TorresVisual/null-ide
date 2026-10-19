@@ -41,6 +41,7 @@ const githubAuth_1 = require("../github/githubAuth");
 const githubSession_1 = require("../github/githubSession");
 const gitApi_1 = require("../graph/gitApi");
 const pullModel_1 = require("../pulls/pullModel");
+const workflowActions_1 = require("./workflowActions");
 const workflowFilterMenu_1 = require("./workflowFilterMenu");
 const workflowsModel_1 = require("./workflowsModel");
 const workflowsTreeView_1 = require("./workflowsTreeView");
@@ -131,7 +132,7 @@ function registerWorkflowsFeature(context) {
         catch {
             void vscode.window.showInformationMessage('Create .github/workflows/ in this folder and add a YAML workflow file to it.');
         }
-    }), vscode.commands.registerCommand('null.workflows.filter', async () => {
+    }), vscode.commands.registerCommand('null.workflows.rerunAll', (node) => (0, workflowActions_1.runAction)(tree, node, 'rerunAll')), vscode.commands.registerCommand('null.workflows.rerunFailed', (node) => (0, workflowActions_1.runAction)(tree, node, 'rerunFailed')), vscode.commands.registerCommand('null.workflows.rerunJob', (node) => (0, workflowActions_1.runAction)(tree, node, 'rerunJob')), vscode.commands.registerCommand('null.workflows.cancel', (node) => (0, workflowActions_1.runAction)(tree, node, 'cancel')), vscode.commands.registerCommand('null.workflows.enable', (node) => (0, workflowActions_1.enable)(tree, node)), vscode.commands.registerCommand('null.workflows.dispatch', (node) => (0, workflowActions_1.dispatch)(tree, node)), vscode.commands.registerCommand('null.workflows.filter', async () => {
         if (tree.state !== 'ready') {
             void vscode.window.showInformationMessage('Open the GitHub Actions view of a folder with a GitHub remote first.');
             return;

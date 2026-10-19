@@ -7,6 +7,7 @@ import { getAccountsApi } from '../github/githubAuth';
 import { resolveGithubSession } from '../github/githubSession';
 import { getGitApi } from '../graph/gitApi';
 import { describeFailure } from '../pulls/pullModel';
+import { dispatch, enable, runAction } from './workflowActions';
 import { editFilter } from './workflowFilterMenu';
 import { POLL_FAST_MS, RunFilter, WfNode, isWorkflowFile } from './workflowsModel';
 import { WorkflowsTreeProvider } from './workflowsTreeView';
@@ -97,6 +98,12 @@ export function registerWorkflowsFeature(context: vscode.ExtensionContext): void
         void vscode.window.showInformationMessage('Create .github/workflows/ in this folder and add a YAML workflow file to it.');
       }
     }),
+    vscode.commands.registerCommand('null.workflows.rerunAll', (node: WfNode) => runAction(tree, node, 'rerunAll')),
+    vscode.commands.registerCommand('null.workflows.rerunFailed', (node: WfNode) => runAction(tree, node, 'rerunFailed')),
+    vscode.commands.registerCommand('null.workflows.rerunJob', (node: WfNode) => runAction(tree, node, 'rerunJob')),
+    vscode.commands.registerCommand('null.workflows.cancel', (node: WfNode) => runAction(tree, node, 'cancel')),
+    vscode.commands.registerCommand('null.workflows.enable', (node: WfNode) => enable(tree, node)),
+    vscode.commands.registerCommand('null.workflows.dispatch', (node: WfNode) => dispatch(tree, node)),
     vscode.commands.registerCommand('null.workflows.filter', async () => {
       if (tree.state !== 'ready') {
         void vscode.window.showInformationMessage('Open the GitHub Actions view of a folder with a GitHub remote first.');
