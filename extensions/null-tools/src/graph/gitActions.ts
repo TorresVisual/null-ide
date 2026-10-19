@@ -119,7 +119,7 @@ export type PullOutcome =
   | { kind: 'upToDate' }
   | { kind: 'fastForwarded'; commits: number }
   | { kind: 'noUpstream' }
-  | { kind: 'diverged' };
+  | { kind: 'diverged'; ahead: number; behind: number };
 
 /** Fast-forward only: a diverged branch is reported and left alone, so no merge commit and no conflict can appear. */
 export async function pull(git: RunGit): Promise<Result<PullOutcome>> {
@@ -136,10 +136,20 @@ export async function pull(git: RunGit): Promise<Result<PullOutcome>> {
     const behind = await count(git, ['rev-list', '--count', 'HEAD..@{u}']);
     if (behind === 0) return ok({ kind: 'upToDate' });
     const ahead = await count(git, ['rev-list', '--count', '@{u}..HEAD']);
-    if (ahead > 0) return ok({ kind: 'diverged' });
+    if (ahead > 0) return ok({ kind: 'diverged', ahead, behind });
     await git(['pull', '--ff-only']);
     return ok({ kind: 'fastForwarded', commits: behind });
   } catch (err) {
     return fail(messageOf(err));
   }
+}
+
+export type IntegrateStrategy = 'rebase' | 'merge';
+
+/**
+ * Brings a diverged branch level with its upstream. The caller has fetched already, so this never touches the network.
+ * No --autostash: a dirty tree is refused by git and its message comes back as a failure.
+ */
+export function integrateUpstream(git: RunGit, inProgress: InProgress, strategy: IntegrateStrategy): Promise<Result<StoppedInfo>> {
+  return sequencer(git, inProgress, strategy === 'rebase' ? ['rebase', '@{u}'] : ['merge', '--no-edit', '@{u}']);
 }

@@ -6,7 +6,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { cherryPick, checkout, createBranch, pull, reset, resetImpact, resumeOperation, revert } from './gitActions';
+import { cherryPick, checkout, createBranch, integrateUpstream, pull, reset, resetImpact, resumeOperation, revert } from './gitActions';
 import { GitGraphService } from './gitGraphService';
 import { makeRunGit } from './gitRun';
 
@@ -252,7 +252,7 @@ test('pull reports diverged and does not pull when local and upstream both have 
     'rev-list --count @{u}..HEAD': '1\n',
     'fetch': '',
   }, calls);
-  assert.deepStrictEqual(await pull(git), { ok: true, value: { kind: 'diverged' } });
+  assert.deepStrictEqual(await pull(git), { ok: true, value: { kind: 'diverged', ahead: 1, behind: 2 } });
   assert.strictEqual(calls.some((a) => a[0] === 'pull'), false);
 });
 
@@ -312,4 +312,77 @@ test('pull passes an offline or no-credentials failure through unchanged', async
     message: "fatal: could not read Username for 'https://github.com': terminal prompts disabled",
   });
   assert.strictEqual(calls.some((a) => a[0] === 'pull'), false);
+});
+
+// A clone whose branch has one local commit while origin has one new commit: ahead 1, behind 1, upstream already fetched.
+function divergedClone(local: [file: string, content: string], remote: [file: string, content: string]): string {
+  const origin = initRepo();
+  commit(origin, 'a.txt', 'base', 'base');
+  const clone = path.join(mkdtempSync(path.join(tmpdir(), 'graph-pull-')), 'c');
+  execFileSync('git', ['clone', '-q', origin, clone]);
+  for (const [key, value] of [['user.email', 'test@example.com'], ['user.name', 'Test'], ['commit.gpgsign', 'false'], ['core.autocrlf', 'false']]) {
+    git(clone, 'config', key, value);
+  }
+  commit(clone, local[0], local[1], 'local change');
+  commit(origin, remote[0], remote[1], 'remote change');
+  git(clone, 'fetch', '-q');
+  return clone;
+}
+
+test('integrateUpstream rebase puts the local commit on top of the upstream with no merge commit', async () => {
+  const clone = divergedClone(['l.txt', 'local'], ['o.txt', 'remote']);
+  const { run, inProgress } = tools(clone);
+  assert.strictEqual(expectOk(await integrateUpstream(run, inProgress, 'rebase')).stopped, false);
+  assert.strictEqual(git(clone, 'log', '--format=%s'), 'local change\nremote change\nbase');
+  assert.strictEqual(git(clone, 'rev-list', '--merges', '--count', 'HEAD'), '0');
+  assert.strictEqual(await inProgress(), null);
+});
+
+test('integrateUpstream merge adds one merge commit that keeps both histories', async () => {
+  const clone = divergedClone(['l.txt', 'local'], ['o.txt', 'remote']);
+  const { run, inProgress } = tools(clone);
+  assert.strictEqual(expectOk(await integrateUpstream(run, inProgress, 'merge')).stopped, false);
+  assert.strictEqual(git(clone, 'rev-list', '--parents', '-n1', 'HEAD').split(' ').length, 3, 'a merge commit has two parents');
+  assert.strictEqual(await inProgress(), null);
+});
+
+test('a conflicting rebase or merge is a stop, and Abort puts the branch back on the same commit', async () => {
+  for (const strategy of ['rebase', 'merge'] as const) {
+    const clone = divergedClone(['a.txt', 'local'], ['a.txt', 'remote']);
+    const { run, inProgress } = tools(clone);
+    const before = git(clone, 'rev-parse', 'HEAD');
+    assert.strictEqual(expectOk(await integrateUpstream(run, inProgress, strategy)).stopped, true, strategy);
+    assert.deepStrictEqual(await inProgress(), { kind: strategy }, strategy);
+    expectOk(await resumeOperation(run, inProgress, 'abort'));
+    assert.strictEqual(git(clone, 'rev-parse', 'HEAD'), before, `${strategy}: HEAD restored`);
+    assert.strictEqual(await inProgress(), null, strategy);
+    assert.strictEqual(readFileSync(path.join(clone, 'a.txt'), 'utf8'), 'local', `${strategy}: file restored`);
+  }
+});
+
+test('integrateUpstream is refused on a dirty tree, with the tree and HEAD untouched and no operation started', async () => {
+  // Rebase refuses any unstaged change; merge refuses when the change overlaps what comes in.
+  const cases = [
+    { strategy: 'rebase', remote: ['o.txt', 'remote'] },
+    { strategy: 'merge', remote: ['a.txt', 'remote'] },
+  ] as const;
+  for (const { strategy, remote } of cases) {
+    const clone = divergedClone(['l.txt', 'local'], [remote[0], remote[1]]);
+    const { run, inProgress } = tools(clone);
+    const before = git(clone, 'rev-parse', 'HEAD');
+    writeFileSync(path.join(clone, 'a.txt'), 'dirty');
+    const result = await integrateUpstream(run, inProgress, strategy);
+    assert.strictEqual(result.ok, false, strategy);
+    assert.strictEqual(git(clone, 'rev-parse', 'HEAD'), before, `${strategy}: HEAD`);
+    assert.strictEqual(readFileSync(path.join(clone, 'a.txt'), 'utf8'), 'dirty', `${strategy}: file`);
+    assert.strictEqual(await inProgress(), null, strategy);
+  }
+});
+
+test('integrateUpstream rebase drops a local commit whose patch the upstream already has', async () => {
+  // The upstream was amended or squashed: the same change exists on both sides under different hashes.
+  const clone = divergedClone(['o.txt', 'same'], ['o.txt', 'same']);
+  const { run, inProgress } = tools(clone);
+  assert.strictEqual(expectOk(await integrateUpstream(run, inProgress, 'rebase')).stopped, false);
+  assert.strictEqual(git(clone, 'rev-parse', 'HEAD'), git(clone, 'rev-parse', '@{u}'), 'no duplicate commit is left');
 });
