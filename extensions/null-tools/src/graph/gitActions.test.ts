@@ -6,7 +6,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { cherryPick, checkout, createBranch, integrateUpstream, pull, reset, resetImpact, resumeOperation, revert } from './gitActions';
+import { cherryPick, checkout, createBranch, integrateUpstream, pull, pullPreference, reset, resetImpact, resumeOperation, revert } from './gitActions';
 import { GitGraphService } from './gitGraphService';
 import { makeRunGit } from './gitRun';
 
@@ -385,4 +385,71 @@ test('integrateUpstream rebase drops a local commit whose patch the upstream alr
   const { run, inProgress } = tools(clone);
   assert.strictEqual(expectOk(await integrateUpstream(run, inProgress, 'rebase')).stopped, false);
   assert.strictEqual(git(clone, 'rev-parse', 'HEAD'), git(clone, 'rev-parse', '@{u}'), 'no duplicate commit is left');
+});
+
+// fakeGit answers only the keys given; an absent key throws, which is how `git config --get` reports "unset" (exit 1).
+function configGit(config: Record<string, string>, branch: string | null = 'main') {
+  const answers: Record<string, string> = {};
+  if (branch) answers['symbolic-ref --quiet --short HEAD'] = `${branch}\n`;
+  for (const [key, value] of Object.entries(config)) answers[`config --get ${key}`] = `${value}\n`;
+  return fakeGit(answers);
+}
+
+test('pullPreference maps git config to a strategy', async () => {
+  const cases: [Record<string, string>, string][] = [
+    [{}, 'ask'],
+    [{ 'pull.rebase': 'true' }, 'rebase'],
+    [{ 'pull.rebase': 'false' }, 'merge'],
+    [{ 'pull.ff': 'only' }, 'ff-only'],
+    [{ 'pull.ff': 'false' }, 'merge'],
+    [{ 'pull.ff': 'true' }, 'ask'],
+    [{ 'pull.ff': 'only', 'pull.rebase': 'true' }, 'rebase'],
+    [{ 'pull.ff': 'only', 'pull.rebase': 'false' }, 'ff-only'],
+  ];
+  for (const [config, expected] of cases) {
+    assert.strictEqual(await pullPreference(configGit(config)), expected, JSON.stringify(config));
+  }
+});
+
+test('pullPreference asks for the rebase modes Null cannot run', async () => {
+  for (const value of ['merges', 'interactive', 'preserve', 'nonsense']) {
+    assert.strictEqual(await pullPreference(configGit({ 'pull.rebase': value })), 'ask', value);
+  }
+});
+
+test('pullPreference accepts every boolean spelling git does, in any case', async () => {
+  for (const value of ['true', 'TRUE', 'yes', 'on', '1']) {
+    assert.strictEqual(await pullPreference(configGit({ 'pull.rebase': value })), 'rebase', value);
+  }
+  for (const value of ['false', 'No', 'off', '0']) {
+    assert.strictEqual(await pullPreference(configGit({ 'pull.rebase': value })), 'merge', value);
+  }
+});
+
+test('pullPreference: the branch setting beats pull.rebase', async () => {
+  assert.strictEqual(await pullPreference(configGit({ 'pull.rebase': 'false', 'branch.main.rebase': 'true' })), 'rebase');
+  assert.strictEqual(await pullPreference(configGit({ 'pull.rebase': 'true', 'branch.main.rebase': 'false' })), 'merge');
+});
+
+test('pullPreference on a detached HEAD uses pull.* only, and never throws when git fails', async () => {
+  assert.strictEqual(await pullPreference(configGit({ 'pull.rebase': 'true' }, null)), 'rebase');
+  const broken = async (): Promise<string> => { throw new Error('fatal: not a git repository'); };
+  assert.strictEqual(await pullPreference(broken), 'ask');
+});
+
+test('pullPreference reads the real repo config, branch setting first', async () => {
+  // Git for Windows ships pull.rebase=false in its system config; a local value cannot unset it, so ignore system and global config here.
+  const isolated = { GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: path.join(mkdtempSync(path.join(tmpdir(), 'graph-cfg-')), 'none') };
+  Object.assign(process.env, isolated);
+  try {
+    const clone = divergedClone(['l.txt', 'local'], ['o.txt', 'remote']);
+    const { run } = tools(clone);
+    assert.strictEqual(await pullPreference(run), 'ask');
+    git(clone, 'config', 'pull.rebase', 'true');
+    assert.strictEqual(await pullPreference(run), 'rebase');
+    git(clone, 'config', 'branch.main.rebase', 'false');
+    assert.strictEqual(await pullPreference(run), 'merge');
+  } finally {
+    for (const key of Object.keys(isolated)) delete process.env[key];
+  }
 });
