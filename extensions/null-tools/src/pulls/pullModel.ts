@@ -33,14 +33,22 @@ export interface PullFile {
   deletions: number;
 }
 
-export interface ReviewComment { id: number; body: string; author: string; avatar: string; createdAt: string }
+export interface ReviewComment {
+  id: number; body: string; author: string; avatar: string; createdAt: string;
+  /** In the viewer's unsent review: only they can see it. */
+  pending: boolean;
+}
 export interface ReviewThread {
+  /** GraphQL node id, for resolve/unresolve and for replies inside a pending review. */
+  id: string;
   path: string;
   line: number;
   /** First line of a multi-line thread; null for a single line. */
   startLine: number | null;
   side: 'LEFT' | 'RIGHT';
   resolved: boolean;
+  canResolve: boolean;
+  canUnresolve: boolean;
   comments: ReviewComment[];
 }
 
@@ -72,8 +80,8 @@ query ReviewThreads($owner: String!, $name: String!, $number: Int!) {
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
       reviewThreads(first: 100) { nodes {
-        isResolved isOutdated path line startLine diffSide
-        comments(first: 50) { nodes { databaseId body createdAt author { login avatarUrl } } }
+        id isResolved isOutdated viewerCanResolve viewerCanUnresolve path line startLine diffSide
+        comments(first: 50) { nodes { databaseId state body createdAt author { login avatarUrl } } }
       } }
     }
   }
@@ -135,12 +143,20 @@ export function leftPath(files: PullFile[], path: string): string {
   return files.find(f => f.path === path)?.oldPath ?? path;
 }
 
-interface GqlComment { databaseId: number; body: string; createdAt: string; author: GqlUser | null }
+export interface GqlComment { databaseId: number; state: string; body: string; createdAt: string; author: GqlUser | null }
 interface GqlThread {
-  isResolved: boolean; isOutdated: boolean; path: string; line: number | null; startLine: number | null; diffSide: 'LEFT' | 'RIGHT';
+  id: string; isResolved: boolean; isOutdated: boolean; viewerCanResolve: boolean; viewerCanUnresolve: boolean;
+  path: string; line: number | null; startLine: number | null; diffSide: 'LEFT' | 'RIGHT';
   comments: { nodes: GqlComment[] };
 }
 export interface ThreadsData { repository: { pullRequest: { reviewThreads: { nodes: GqlThread[] } } | null } }
+
+export function commentFromGql(c: GqlComment): ReviewComment {
+  return {
+    id: c.databaseId, body: c.body, author: c.author?.login ?? 'ghost', avatar: c.author?.avatarUrl ?? '',
+    createdAt: c.createdAt, pending: c.state === 'PENDING',
+  };
+}
 
 export function mapThreads(data: ThreadsData): { threads: ReviewThread[]; outdated: number } {
   const nodes = data.repository.pullRequest?.reviewThreads.nodes ?? [];
@@ -149,19 +165,26 @@ export function mapThreads(data: ThreadsData): { threads: ReviewThread[]; outdat
   const threads = nodes
     .filter(t => !t.isOutdated && t.line !== null && t.comments.nodes.length > 0)
     .map(t => ({
+      id: t.id,
       path: t.path,
       line: t.line as number,
       startLine: t.startLine,
       side: t.diffSide,
       resolved: t.isResolved,
-      comments: t.comments.nodes.map(c => ({
-        id: c.databaseId, body: c.body, author: c.author?.login ?? 'ghost', avatar: c.author?.avatarUrl ?? '', createdAt: c.createdAt,
-      })),
+      canResolve: t.viewerCanResolve,
+      canUnresolve: t.viewerCanUnresolve,
+      comments: t.comments.nodes.map(commentFromGql),
     }));
   return { threads, outdated: nodes.filter(t => t.isOutdated).length };
 }
 
 export const threadCount = (threads: ReviewThread[], path: string): number => threads.filter(t => t.path === path).length;
+
+/** The comment thread's `contextValue`: what the thread-title button (Resolve / Unresolve) may offer, if anything. */
+export function threadAction(t: Pick<ReviewThread, 'resolved' | 'canResolve' | 'canUnresolve'>): 'resolvable' | 'unresolvable' | undefined {
+  if (t.resolved) return t.canUnresolve ? 'unresolvable' : undefined;
+  return t.canResolve ? 'resolvable' : undefined;
+}
 
 /**
  * The local branch a PR is checked out as: its own head branch name for a same-repo PR, `pr/<n>` for a fork PR.
@@ -181,7 +204,7 @@ export function pinCurrent(pulls: PullSummary[], branch: string | null): PullSum
 export interface RestComment { id: number; body: string; created_at: string; user: { login: string; avatar_url: string } }
 
 export function commentFromRest(c: RestComment): ReviewComment {
-  return { id: c.id, body: c.body, author: c.user.login, avatar: c.user.avatar_url, createdAt: c.created_at };
+  return { id: c.id, body: c.body, author: c.user.login, avatar: c.user.avatar_url, createdAt: c.created_at, pending: false };
 }
 
 /** One line for the tree's status message: GitHub's own explanation, plus when a rate limit lifts. */
