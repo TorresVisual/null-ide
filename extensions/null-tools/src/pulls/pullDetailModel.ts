@@ -1,5 +1,6 @@
 'use strict';
 
+import { PageActions, pageActions } from './pullActionsModel';
 import { CheckState, PullState, checkStateOf, pullStateOf } from './pullModel';
 
 export interface PullUser { login: string; avatar: string }
@@ -27,6 +28,9 @@ export type PullTimelineItem =
  */
 export interface PullPage {
   number: number;
+  /** GraphQL node id and head commit: for the host's writes only, never rendered. */
+  id: string;
+  headSha: string;
   title: string;
   url: string;
   state: PullState;
@@ -51,6 +55,7 @@ export interface PullPage {
   checkState: CheckState;
   checks: CheckRow[];
   checksTotal: number;
+  actions: PageActions;
 }
 
 // ponytail: first 100 commits, 100 conversation items, 100 checks (the page says when it is cut off); add paging
@@ -58,7 +63,10 @@ export interface PullPage {
 export const PULL_PAGE = `
 query PullPage($owner: String!, $name: String!, $number: Int!) {
   repository(owner: $owner, name: $name) {
+    viewerPermission mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed
     pullRequest(number: $number) {
+      id headRefOid mergeable mergeStateStatus viewerCanUpdate viewerDidAuthor
+      pendingReview: reviews(first: 1, states: [PENDING]) { nodes { id comments { totalCount } } }
       number title url state isDraft createdAt bodyHTML headRefName baseRefName isCrossRepository additions deletions changedFiles
       author { login avatarUrl }
       labels(first: 50) { nodes { name color } }
@@ -111,6 +119,8 @@ interface GqlCheckNode {
   context?: string; state?: string; targetUrl?: string | null; description?: string | null;
 }
 interface GqlPullPage {
+  id: string; headRefOid: string; mergeable: string; mergeStateStatus: string; viewerCanUpdate: boolean; viewerDidAuthor: boolean;
+  pendingReview: { nodes: Array<{ id: string; comments: { totalCount: number } }> };
   number: number; title: string; url: string; state: string; isDraft: boolean; createdAt: string; bodyHTML: string;
   headRefName: string; baseRefName: string; isCrossRepository: boolean; additions: number; deletions: number; changedFiles: number;
   author: GqlUser | null;
@@ -126,7 +136,13 @@ interface GqlPullPage {
   timelineItems: { totalCount: number; nodes: Array<GqlTimelineNode | null> };
   lastCommit: { nodes: Array<{ commit: { statusCheckRollup: { state: string; contexts: { totalCount: number; nodes: Array<GqlCheckNode | null> } } | null } }> };
 }
-export interface PullPageData { repository: { pullRequest: GqlPullPage | null } | null }
+export interface PullPageData {
+  repository: {
+    viewerPermission: string | null;
+    mergeCommitAllowed: boolean; squashMergeAllowed: boolean; rebaseMergeAllowed: boolean;
+    pullRequest: GqlPullPage | null;
+  } | null;
+}
 
 const ghost = (u: GqlUser | null | undefined): PullUser => ({ login: u?.login ?? 'ghost', avatar: u?.avatarUrl ?? '' });
 const user = (u: GqlUser): PullUser => ({ login: u.login, avatar: u.avatarUrl });
@@ -222,11 +238,14 @@ export function failedRunIds(checks: CheckRow[]): number[] {
 }
 
 export function mapPullPage(data: PullPageData): PullPage {
-  const p = data.repository?.pullRequest;
-  if (!p) throw new Error('Pull request not found.');
+  const repo = data.repository;
+  const p = repo?.pullRequest;
+  if (!repo || !p) throw new Error('Pull request not found.');
   const rollup = p.lastCommit.nodes[0]?.commit.statusCheckRollup ?? null;
+  const unsent = p.pendingReview.nodes[0];
   return {
-    number: p.number, title: p.title, url: p.url, state: pullStateOf(p.state), draft: p.isDraft,
+    number: p.number, id: p.id, headSha: p.headRefOid,
+    title: p.title, url: p.url, state: pullStateOf(p.state), draft: p.isDraft,
     author: ghost(p.author), createdAt: p.createdAt, bodyHTML: p.bodyHTML,
     headRef: p.headRefName, baseRef: p.baseRefName, fork: p.isCrossRepository,
     additions: p.additions, deletions: p.deletions, changedFiles: p.changedFiles,
@@ -244,6 +263,12 @@ export function mapPullPage(data: PullPageData): PullPage {
     checkState: checkStateOf(rollup?.state),
     checks: mapChecks(rollup?.contexts.nodes ?? []),
     checksTotal: rollup?.contexts.totalCount ?? 0,
+    actions: pageActions({
+      state: pullStateOf(p.state), draft: p.isDraft, mergeable: p.mergeable, mergeStateStatus: p.mergeStateStatus,
+      viewerCanUpdate: p.viewerCanUpdate, viewerDidAuthor: p.viewerDidAuthor, viewerPermission: repo.viewerPermission ?? '',
+      mergeCommitAllowed: repo.mergeCommitAllowed, squashMergeAllowed: repo.squashMergeAllowed, rebaseMergeAllowed: repo.rebaseMergeAllowed,
+      pendingComments: unsent ? unsent.comments.totalCount : null,
+    }),
   };
 }
 

@@ -10,7 +10,10 @@ const user = (login: string) => ({ login, avatarUrl: `https://avatars.githubuser
 
 const gqlPage = (over: Record<string, unknown> = {}): PullPageData => ({
   repository: {
+    viewerPermission: 'WRITE', mergeCommitAllowed: true, squashMergeAllowed: true, rebaseMergeAllowed: false,
     pullRequest: {
+      id: 'PR_1', headRefOid: 'c'.repeat(40), mergeable: 'MERGEABLE', mergeStateStatus: 'CLEAN',
+      viewerCanUpdate: true, viewerDidAuthor: false, pendingReview: { nodes: [] },
       number: 12, title: 'Add x', url: 'https://github.com/o/r/pull/12', state: 'OPEN', isDraft: false,
       createdAt: '2026-10-01T10:00:00Z', bodyHTML: '<p>Hi</p>', headRefName: 'feat/x', baseRefName: 'main',
       isCrossRepository: false, additions: 10, deletions: 2, changedFiles: 3,
@@ -60,6 +63,20 @@ test('mapPullPage: merged, closed, a deleted author, a commit by a non-GitHub us
 test('mapPullPage throws a readable error when the PR does not exist', () => {
   assert.throws(() => mapPullPage({ repository: { pullRequest: null } } as PullPageData), /Pull request not found/);
   assert.throws(() => mapPullPage({ repository: null } as unknown as PullPageData), /Pull request not found/);
+});
+
+test('mapPullPage keeps the ids for writes and derives the actions from the page', () => {
+  const p = mapPullPage(gqlPage());
+  assert.strictEqual(p.id, 'PR_1');
+  assert.strictEqual(p.headSha, 'c'.repeat(40));
+  assert.deepStrictEqual(p.actions, {
+    review: { available: true, canApprove: true, pending: null },
+    merge: { enabled: true, hint: 'Ready to merge.', methods: ['MERGE', 'SQUASH'] },
+    state: 'close', draft: 'draft',
+  });
+  const unsent = mapPullPage(gqlPage({ pendingReview: { nodes: [{ id: 'REV_1', comments: { totalCount: 3 } }] } }));
+  assert.strictEqual(unsent.actions.review.pending, 3);
+  assert.strictEqual(mapPullPage(gqlPage({ viewerDidAuthor: true })).actions.review.canApprove, false);
 });
 
 test('mapTimeline: comments, reviews, events; PENDING reviews, unknown types and null nodes are skipped; deleted authors are ghost', () => {
