@@ -4,7 +4,7 @@
 
 # Null IDE
 
-**A minimal, opinionated code editor for Windows.**
+**A minimal, opinionated code editor for Windows and Linux.**
 Fully assembled out of the box, with zero telemetry.
 
 VSCodium · Electron · TypeScript · C++ · Rust
@@ -17,7 +17,7 @@ Null IDE is built on [VSCodium](https://vscodium.com) and ships with a dark them
 
 Download `NullIDESetup-<version>.exe` from the [latest release](https://github.com/TorresVisual/null-ide/releases/latest) and run it. The installer is not code-signed, so Windows SmartScreen may ask you to confirm; the SHA256 check only guards against a corrupted or truncated download, not against a compromised release.
 
-> Null IDE is a personal daily-driver editor developed in the open. It is Windows-only (x64) and tracks upstream VSCodium via an automated release pipeline.
+> Null IDE is a personal daily-driver editor developed in the open. It targets Windows x64, with a Linux x64 build, and tracks upstream VSCodium via an automated release pipeline.
 
 ---
 
@@ -29,17 +29,24 @@ Download `NullIDESetup-<version>.exe` from the [latest release](https://github.c
 |---|---|
 | **null-theme** | *Null Dark* color theme: deep navy backgrounds, teal and indigo accents, Geist Mono |
 | **null-icons** | File and folder icon theme |
-| **null-tools** | Project dashboard, GitHub Issues, commit message generation, worktrees, scratch files and notes, port manager, Discord Rich Presence, in-app updater |
+| **null-tools** | Project dashboard, GitHub Issues and pull requests, commit graph, commit message generation, worktrees, scratch files and notes, port manager, Discord Rich Presence, in-app updater |
 | **null-markdown** | Markdown preview with GFM, Mermaid, KaTeX math, and GitHub-style alerts |
 | **null-format** | Prettier (in-process), rustfmt, and clang-format; project config files win over built-in defaults |
 | **null-cpp** | Symbol-aware header/source switching (`Alt+O`), paired split editors, `.hpp`/`.cpp` class scaffolding, on top of clangd |
 | **null-actions** | Configurable status-bar buttons that run shell commands or VS Code commands |
+| **null-accounts** | GitHub, GitLab and SSH account manager; bind a folder to an account |
+| **null-env** | Environment check: finds missing companion extensions and CLI tools |
+| **null-music** | Local-file music player |
+| **null-activity** | Local-only activity tracking and dashboard |
+| **null-startup** | Startup profiler |
+| **null-sync** | Encrypted cross-device sync through one secret GitHub Gist (off by default) |
 | **Code Spell Checker** | Bundled [`streetsidesoftware.code-spell-checker`](https://marketplace.visualstudio.com/items?itemName=streetsidesoftware.code-spell-checker) |
 
 ### Highlights
 
 - **Project dashboard** opens on startup as a recent-project launcher: search, sort, pin and manage projects, with best-effort Git/type details alongside New Project, Clone Repo, and Open Folder.
 - **GitHub Issues** in its own activity-bar view and a full-width tab, with github.com-style search, filters, an issue detail tab, and issue creation and commenting. Sign in from the view.
+- **Pull requests** next to Issues: review changed files in a diff, comment, resolve threads, check out a PR and merge it.
 - **Commit messages** from your staged diff with `Ctrl+Shift+Alt+G` (uses the [`claude`](https://claude.com/claude-code) CLI, which must be installed separately).
 - **Git worktrees** view: create (including one per issue), open in a new window, merge back, prune.
 - **`null .`** opens the current folder from any terminal.
@@ -115,7 +122,9 @@ Suggested on first launch: `llvm-vs-code-extensions.vscode-clangd`, `twxs.cmake`
 
 - Extension gallery lookups (VS Marketplace), on user action
 - The GitHub Releases API for update checks
-- GitHub API calls from the Issues view, only after you sign in
+- GitHub API calls from the Issues and Pull Requests views, only after you sign in
+- GitHub and GitLab API calls from the account manager, only for accounts you add
+- Sync and activity badges (GitHub Gists), only if you turn them on
 - Discord Rich Presence, only if enabled via `null.discord.*`
 
 ---
