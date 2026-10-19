@@ -104,7 +104,7 @@ function clip(text, cap, alreadyCut = false) {
  * the token must never leave api.github.com).
  */
 async function fetchJobLog(owner, repo, jobId, token, cap = exports.LOG_CAP) {
-    const first = await (0, githubApi_1.requestRaw)(`${repoPath(owner, repo)}/actions/jobs/${jobId}/logs`, token, 'GET');
+    const first = await (0, githubApi_1.requestRaw)(`${repoPath(owner, repo)}/actions/jobs/${jobId}/logs`, token, 'GET', undefined, cap);
     if (first.status >= 300 && first.status < 400) {
         const location = first.headers.location;
         if (!location)
@@ -113,7 +113,7 @@ async function fetchJobLog(owner, repo, jobId, token, cap = exports.LOG_CAP) {
     }
     if (first.status < 200 || first.status >= 300)
         throw (0, githubApi_1.apiFailure)(first);
-    return clip(first.body, cap);
+    return clip(first.body, cap, first.truncated === true);
 }
 function fetchLogText(url, cap) {
     return new Promise((resolve, reject) => {

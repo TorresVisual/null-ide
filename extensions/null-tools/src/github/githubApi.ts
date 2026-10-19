@@ -45,10 +45,11 @@ export function rateLimitRetryAt(headers: IncomingHttpHeaders, now: number = Dat
   return headers['x-ratelimit-remaining'] === '0' && reset > 0 ? reset * 1000 : null;
 }
 
-export interface RawResponse { status: number; headers: IncomingHttpHeaders; body: string }
+export interface RawResponse { status: number; headers: IncomingHttpHeaders; body: string; truncated?: boolean }
 
+/** `maxBytes` (optional) stops reading at twice that size and keeps the tail; `truncated` says so. */
 function request(
-  path: string, token: string | null, method: 'GET' | 'PATCH' | 'POST' | 'PUT' | 'DELETE', body?: unknown,
+  path: string, token: string | null, method: 'GET' | 'PATCH' | 'POST' | 'PUT' | 'DELETE', body?: unknown, maxBytes?: number,
 ): Promise<RawResponse> {
   return new Promise((resolve, reject) => {
     const headers: Record<string, string> = {
@@ -63,7 +64,13 @@ function request(
     const req = https.request(`https://api.github.com${path}`, { method, headers }, res => {
       let data = '';
       res.setEncoding('utf8');
-      res.on('data', chunk => (data += chunk));
+      res.on('data', chunk => {
+        data += chunk;
+        if (maxBytes !== undefined && data.length > maxBytes * 2) { // stop reading a huge body; the tail is what callers keep
+          res.destroy();
+          resolve({ status: res.statusCode ?? 0, headers: res.headers, body: data.slice(-maxBytes), truncated: true });
+        }
+      });
       res.on('end', () => resolve({ status: res.statusCode ?? 0, headers: res.headers, body: data }));
     });
     req.on('error', reject);

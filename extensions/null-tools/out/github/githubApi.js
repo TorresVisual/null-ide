@@ -91,7 +91,8 @@ function rateLimitRetryAt(headers, now = Date.now()) {
     const reset = Number(headers['x-ratelimit-reset']);
     return headers['x-ratelimit-remaining'] === '0' && reset > 0 ? reset * 1000 : null;
 }
-function request(path, token, method, body) {
+/** `maxBytes` (optional) stops reading at twice that size and keeps the tail; `truncated` says so. */
+function request(path, token, method, body, maxBytes) {
     return new Promise((resolve, reject) => {
         const headers = {
             Accept: 'application/vnd.github+json',
@@ -106,7 +107,13 @@ function request(path, token, method, body) {
         const req = https.request(`https://api.github.com${path}`, { method, headers }, res => {
             let data = '';
             res.setEncoding('utf8');
-            res.on('data', chunk => (data += chunk));
+            res.on('data', chunk => {
+                data += chunk;
+                if (maxBytes !== undefined && data.length > maxBytes * 2) { // stop reading a huge body; the tail is what callers keep
+                    res.destroy();
+                    resolve({ status: res.statusCode ?? 0, headers: res.headers, body: data.slice(-maxBytes), truncated: true });
+                }
+            });
             res.on('end', () => resolve({ status: res.statusCode ?? 0, headers: res.headers, body: data }));
         });
         req.on('error', reject);

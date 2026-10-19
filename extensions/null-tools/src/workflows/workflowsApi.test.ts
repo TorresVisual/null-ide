@@ -1,6 +1,8 @@
 'use strict';
 
 import assert from 'node:assert';
+import { EventEmitter } from 'node:events';
+import https from 'node:https';
 import test, { afterEach, mock } from 'node:test';
 import { ApiError } from '../github/githubApi';
 import { stub } from '../pulls/httpStub';
@@ -109,4 +111,30 @@ test('fetchJobLog: bad redirects, missing logs and big logs end in a clear resul
 test('fetchJobLog accepts a log served directly with 200', async () => {
   stub([{ raw: 'direct\n' }]);
   assert.deepStrictEqual(await fetchJobLog('o', 'r', 9, 't'), { text: 'direct\n', truncated: false });
+});
+
+test('fetchJobLog stops reading an inline body past twice the cap', async () => {
+  const chunks = ['a'.repeat(1000), 'b'.repeat(1000), 'c'.repeat(1000), 'd'.repeat(1000)];
+  let consumed = 0;
+  let destroyed = false;
+  mock.method(https, 'request', (_url: string, _opts: unknown, onResponse: (res: unknown) => void) => {
+    const res = Object.assign(new EventEmitter(), { statusCode: 200, headers: {}, setEncoding() {}, destroy() { destroyed = true; } });
+    return Object.assign(new EventEmitter(), {
+      setTimeout() {}, destroy() {},
+      end() {
+        onResponse(res);
+        for (const c of chunks) {
+          if (destroyed) break;
+          consumed++;
+          res.emit('data', c);
+        }
+        res.emit('end');
+      },
+    });
+  });
+  const log = await fetchJobLog('o', 'r', 9, 't', 200);
+  assert.ok(destroyed, 'the body is cut off, not buffered whole');
+  assert.ok(consumed < chunks.length);
+  assert.strictEqual(log.truncated, true);
+  assert.ok(log.text.length <= 200);
 });

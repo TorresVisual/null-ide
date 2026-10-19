@@ -81,14 +81,14 @@ function clip(text: string, cap: number, alreadyCut = false): JobLog {
  * the token must never leave api.github.com).
  */
 export async function fetchJobLog(owner: string, repo: string, jobId: number, token: string | null, cap: number = LOG_CAP): Promise<JobLog> {
-  const first = await requestRaw(`${repoPath(owner, repo)}/actions/jobs/${jobId}/logs`, token, 'GET');
+  const first = await requestRaw(`${repoPath(owner, repo)}/actions/jobs/${jobId}/logs`, token, 'GET', undefined, cap);
   if (first.status >= 300 && first.status < 400) {
     const location = first.headers.location;
     if (!location) throw new ApiError('GitHub did not say where the log is.', first.status);
     return fetchLogText(location, cap);
   }
   if (first.status < 200 || first.status >= 300) throw apiFailure(first);
-  return clip(first.body, cap);
+  return clip(first.body, cap, first.truncated === true);
 }
 
 function fetchLogText(url: string, cap: number): Promise<JobLog> {

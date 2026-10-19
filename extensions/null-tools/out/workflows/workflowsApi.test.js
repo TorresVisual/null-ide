@@ -37,6 +37,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const node_assert_1 = __importDefault(require("node:assert"));
+const node_events_1 = require("node:events");
+const node_https_1 = __importDefault(require("node:https"));
 const node_test_1 = __importStar(require("node:test"));
 const githubApi_1 = require("../github/githubApi");
 const httpStub_1 = require("../pulls/httpStub");
@@ -129,5 +131,31 @@ const ctx = { branch: 'main', login: 'me' };
 (0, node_test_1.default)('fetchJobLog accepts a log served directly with 200', async () => {
     (0, httpStub_1.stub)([{ raw: 'direct\n' }]);
     node_assert_1.default.deepStrictEqual(await (0, workflowsApi_1.fetchJobLog)('o', 'r', 9, 't'), { text: 'direct\n', truncated: false });
+});
+(0, node_test_1.default)('fetchJobLog stops reading an inline body past twice the cap', async () => {
+    const chunks = ['a'.repeat(1000), 'b'.repeat(1000), 'c'.repeat(1000), 'd'.repeat(1000)];
+    let consumed = 0;
+    let destroyed = false;
+    node_test_1.mock.method(node_https_1.default, 'request', (_url, _opts, onResponse) => {
+        const res = Object.assign(new node_events_1.EventEmitter(), { statusCode: 200, headers: {}, setEncoding() { }, destroy() { destroyed = true; } });
+        return Object.assign(new node_events_1.EventEmitter(), {
+            setTimeout() { }, destroy() { },
+            end() {
+                onResponse(res);
+                for (const c of chunks) {
+                    if (destroyed)
+                        break;
+                    consumed++;
+                    res.emit('data', c);
+                }
+                res.emit('end');
+            },
+        });
+    });
+    const log = await (0, workflowsApi_1.fetchJobLog)('o', 'r', 9, 't', 200);
+    node_assert_1.default.ok(destroyed, 'the body is cut off, not buffered whole');
+    node_assert_1.default.ok(consumed < chunks.length);
+    node_assert_1.default.strictEqual(log.truncated, true);
+    node_assert_1.default.ok(log.text.length <= 200);
 });
 //# sourceMappingURL=workflowsApi.test.js.map
