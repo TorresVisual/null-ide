@@ -29,7 +29,6 @@ query PullPage($owner: String!, $name: String!, $number: Int!) {
         __typename
         ... on User { login avatarUrl }
         ... on Mannequin { login avatarUrl }
-        ... on Team { slug }
       } } }
       latestOpinionatedReviews(first: 30) { nodes { state author { login avatarUrl } } }
       commits(first: 100) { totalCount nodes { commit {
@@ -102,7 +101,7 @@ function mapReviewers(p) {
     }
     for (const req of p.reviewRequests.nodes) {
         const who = req?.requestedReviewer;
-        const login = who?.login ?? who?.slug; // a team has a slug, not a login; Team.name needs the read:org scope
+        const login = who?.login; // a Team has no readable field without read:org (name and slug both fail the query), so team requests are skipped
         if (login)
             rows.set(login, { login, avatar: who?.avatarUrl ?? '', state: 'pending' });
     }

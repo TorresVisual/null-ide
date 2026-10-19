@@ -98,7 +98,7 @@ const gqlPage = (over = {}) => ({
     node_assert_1.default.strictEqual(p.timelineTotal, 230);
     node_assert_1.default.strictEqual(p.commitTotal, 130);
 });
-(0, node_test_1.default)('mapReviewers: latest verdicts, a re-request wins over an old verdict, a team has a name instead of a login', () => {
+(0, node_test_1.default)('mapReviewers: latest verdicts, a re-request wins over an old verdict, a team request is skipped', () => {
     const p = (0, pullDetailModel_1.mapPullPage)(gqlPage({
         latestOpinionatedReviews: { nodes: [
                 { state: 'APPROVED', author: user('ann') }, { state: 'CHANGES_REQUESTED', author: user('bob') },
@@ -106,11 +106,11 @@ const gqlPage = (over = {}) => ({
             ] },
         reviewRequests: { nodes: [
                 { requestedReviewer: { __typename: 'User', login: 'bob', avatarUrl: 'https://a/bob' } },
-                { requestedReviewer: { __typename: 'Team', slug: 'core' } },
+                { requestedReviewer: { __typename: 'Team' } },
                 { requestedReviewer: null },
             ] },
     }));
-    node_assert_1.default.deepStrictEqual(p.reviewers.map(r => `${r.login}:${r.state}`), ['ann:approved', 'bob:pending', 'dee:dismissed', 'core:pending']);
+    node_assert_1.default.deepStrictEqual(p.reviewers.map(r => `${r.login}:${r.state}`), ['ann:approved', 'bob:pending', 'dee:dismissed']);
 });
 (0, node_test_1.default)('checkRowState / statusContextState', () => {
     node_assert_1.default.strictEqual((0, pullDetailModel_1.checkRowState)('COMPLETED', 'SUCCESS'), 'success');
