@@ -45,7 +45,7 @@ export function rateLimitRetryAt(headers: IncomingHttpHeaders, now: number = Dat
   return headers['x-ratelimit-remaining'] === '0' && reset > 0 ? reset * 1000 : null;
 }
 
-interface RawResponse { status: number; headers: IncomingHttpHeaders; body: string }
+export interface RawResponse { status: number; headers: IncomingHttpHeaders; body: string }
 
 function request(
   path: string, token: string | null, method: 'GET' | 'PATCH' | 'POST' | 'PUT' | 'DELETE', body?: unknown,
@@ -77,6 +77,9 @@ function failure(res: RawResponse): ApiError {
   const limited = res.status === 403 || res.status === 429;
   return new ApiError(formatApiError(res.status, res.body), res.status, limited ? rateLimitRetryAt(res.headers) : null);
 }
+
+/** For callers that must see the status and headers themselves (a redirect they follow by hand). */
+export { request as requestRaw, failure as apiFailure };
 
 export async function requestJson<T>(
   path: string, token: string | null, method: 'GET' | 'PATCH' | 'POST' | 'PUT' | 'DELETE' = 'GET', body?: unknown,

@@ -11,16 +11,18 @@ const node_test_1 = require("node:test");
 function stub(responses) {
     const calls = [];
     node_test_1.mock.method(node_https_1.default, 'request', (url, opts, onResponse) => {
-        const call = { url, method: opts.method };
+        const call = { url, method: opts.method, headers: opts.headers ?? {} };
         calls.push(call);
         const next = responses[Math.min(calls.length - 1, responses.length - 1)];
         return Object.assign(new node_events_1.EventEmitter(), {
             setTimeout() { }, destroy() { },
             write(payload) { call.body = JSON.parse(payload); },
             end() {
-                const res = Object.assign(new node_events_1.EventEmitter(), { statusCode: next.status ?? 200, headers: {}, setEncoding() { } });
+                const res = Object.assign(new node_events_1.EventEmitter(), { statusCode: next.status ?? 200, headers: next.headers ?? {}, setEncoding() { } });
                 onResponse(res);
-                res.emit('data', JSON.stringify(next.body));
+                const text = next.raw ?? JSON.stringify(next.body);
+                if (text)
+                    res.emit('data', text);
                 res.emit('end');
             },
         });

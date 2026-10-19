@@ -36,6 +36,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.TooLargeError = exports.ApiError = void 0;
 exports.formatApiError = formatApiError;
 exports.rateLimitRetryAt = rateLimitRetryAt;
+exports.requestRaw = request;
+exports.apiFailure = failure;
 exports.requestJson = requestJson;
 exports.requestGraphql = requestGraphql;
 exports.renderMarkdown = renderMarkdown;
