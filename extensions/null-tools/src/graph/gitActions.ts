@@ -153,3 +153,33 @@ export type IntegrateStrategy = 'rebase' | 'merge';
 export function integrateUpstream(git: RunGit, inProgress: InProgress, strategy: IntegrateStrategy): Promise<Result<StoppedInfo>> {
   return sequencer(git, inProgress, strategy === 'rebase' ? ['rebase', '@{u}'] : ['merge', '--no-edit', '@{u}']);
 }
+
+export type PullPreference = 'rebase' | 'merge' | 'ff-only' | 'ask';
+
+/** One `git config --get` value, lower-cased. '' when unset (git exits 1); null when the read failed for any other reason. */
+async function configValue(git: RunGit, key: string): Promise<string | null> {
+  try { return (await git(['config', '--get', key])).trim().toLowerCase(); } catch (err) { return (err as { code?: unknown }).code === 1 ? '' : null; }
+}
+
+/**
+ * What the user's git config says a pull should do once the branch has diverged.
+ * Same precedence as git: branch.<name>.rebase over pull.rebase; a rebase setting over pull.ff.
+ * `merges` and `interactive` are not offered by Null, so they ask rather than silently rebase plainly.
+ * Anything unset asks: that is what git itself does (it refuses and tells the user to choose).
+ * A read that fails for any other reason also asks, and never falls through to a lower-precedence key.
+ */
+export async function pullPreference(git: RunGit): Promise<PullPreference> {
+  let branch = '';
+  try { branch = (await git(['symbolic-ref', '--quiet', '--short', 'HEAD'])).trim(); } catch { /* detached */ }
+  const scoped = branch ? await configValue(git, `branch.${branch}.rebase`) : '';
+  if (scoped === null) return 'ask';
+  const rebase = scoped || await configValue(git, 'pull.rebase');
+  if (rebase === null) return 'ask';
+  if (['true', 'yes', 'on', '1'].includes(rebase)) return 'rebase';
+  const ff = await configValue(git, 'pull.ff');
+  if (ff === null) return 'ask';
+  if (['false', 'no', 'off', '0'].includes(rebase)) return ff === 'only' ? 'ff-only' : 'merge';
+  if (rebase) return 'ask';
+  if (ff === 'only') return 'ff-only';
+  return ['false', 'no', 'off', '0'].includes(ff) ? 'merge' : 'ask';
+}
