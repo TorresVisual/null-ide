@@ -62,7 +62,7 @@ Set `null.discord.clientId` to the Application ID from the Discord Developer Por
 
 ### GitHub Issues view asks me to sign in
 
-Sign-in is required for the Issues view; use **Null: Sign in to GitHub**. Nothing is sent to GitHub before you sign in.
+Sign-in is required for the Issues and Pull Requests views; use **Null: Sign in to GitHub**. Nothing is sent to GitHub before you sign in.
 
 ### A sideloaded extension stopped updating
 
@@ -78,7 +78,7 @@ The remote connects to a Null-repacked server published on the release. The remo
 
 ## Known limitations
 
-- Windows x64 only.
+- Windows x64 and Linux x64 only; Linux has [known limitations](Linux#known-limitations).
 - The installer is not code-signed.
 - The full editor build only runs in CI, not locally.
 - Not every VS Code feature newer than the pinned VSCodium release is available.

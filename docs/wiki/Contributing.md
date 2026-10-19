@@ -24,7 +24,7 @@ Search existing issues first. For a bug, try `null --safe-mode` and say whether 
 
 ## Scope
 
-- Null IDE is Windows x64 only, and favours a small, opinionated set of features over configurability.
+- Null IDE targets Windows x64 (plus a Linux x64 build), and favours a small, opinionated set of features over configurability.
 - Changes to VS Code's own source belong in `patches/` and must apply cleanly after VSCodium's patches. Prefer injection (CSS/JS) or an extension where it is enough.
 - Anything touching the installer, updater, shell extension or signing steps is security-sensitive; explain the threat model in the PR.
 

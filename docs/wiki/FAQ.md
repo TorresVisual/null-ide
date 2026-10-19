@@ -2,7 +2,7 @@
 
 ## What is Null IDE?
 
-A code editor for Windows built on VSCodium, with its own theme, icons, built-in tools and installer. See [Home](Home).
+A code editor built on VSCodium (Windows first, with a Linux build), with its own theme, icons, built-in tools and installer. See [Home](Home).
 
 ## Is it VS Code?
 
@@ -14,13 +14,14 @@ No telemetry (`enableTelemetry` is `false`). The only network calls are:
 
 - Extension gallery lookups (VS Marketplace), on user action
 - The GitHub Releases API for update checks
-- GitHub API calls from the Issues view, only after you sign in
+- GitHub API calls from the Issues and Pull Requests views, only after you sign in
+- GitHub and GitLab API calls from the account manager, only for accounts you add
 - Discord Rich Presence, only if you enable it
 - Sync and activity badges, only if you turn those on
 
 ## Which platforms are supported?
 
-Windows x64 only. Remote development to Linux hosts over WSL or SSH is supported through the bundled remote extensions.
+Windows x64 and Linux x64 (see [Linux](Linux)); Linux has no self-update and no Explorer integration. Remote development to Linux hosts over WSL or SSH is supported through the bundled remote extensions.
 
 ## Do I need Claude Code?
 

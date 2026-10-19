@@ -14,7 +14,8 @@ Everything below ships in the box as a built-in extension. For the extension lis
 | **Project dashboard** | Opens on startup as a recent-project launcher. Search, sort, pin and manage projects, with best-effort Git and project-type details. Also **New Project**, **Clone Repo**, **Open Folder**. Run **Null: Open Dashboard** any time. |
 | **GitHub Issues** | Its own activity-bar view and a full-width tab, with github.com-style search and filters, an issue detail tab, issue creation and commenting. Sign in from the view (**Null: Sign in to GitHub**). |
 | **Commit messages** | `Ctrl+Shift+Alt+G` generates a message from your staged diff. Uses the [`claude`](https://claude.com/claude-code) CLI, which you install separately. Messages can also be checked against Conventional Commits. |
-| **Commit graph** | **Null: Open Commit Graph**, with checkout, branch, cherry-pick, revert and reset from the context menu. |
+| **Pull requests** | **Null: Show Pull Requests** lists the open pull requests of a github.com repository in the GitHub view. Open a PR to see its changed files in a diff, read and write review comments, resolve threads, check out the PR branch, and merge, close, reopen or mark it draft from the detail tab. Filter by state, your own PRs, review requests, drafts, label and milestone. Sign in first; not available in remote windows. |
+| **Commit graph** | **Null: Open Commit Graph**, with checkout, branch, cherry-pick, revert, reset and **Null: Pull** from the toolbar and context menu. |
 | **Git worktrees** | Create (including one per issue), open in a new window, merge back, prune. |
 | **Accounts** | GitHub, GitLab and SSH identities. Bind a folder to an account and its repo-local Git config, credentials and SSH keys are wired up. Tokens live in SecretStorage, never in settings. |
 | **Auto-gitignore** | **Null: Auto-Scan & Update .gitignore** adds build artifacts it finds. |
@@ -36,8 +37,8 @@ Everything below ships in the box as a built-in extension. For the extension lis
 
 | Feature | What it does |
 |---|---|
-| **Explorer integration** | `null .` in any terminal, and **Open in Null** in the Windows 11 Explorer context menu. |
-| **Self-update** | Checks GitHub Releases on startup and updates without elevation. |
+| **Explorer integration** | `null .` in any terminal, and **Open in Null** in the Windows 11 Explorer context menu (Windows only). |
+| **Self-update** | Checks GitHub Releases on startup and updates without elevation. On Linux the status-bar button opens the release page instead. |
 | **Safe Mode** | `null --safe-mode` disables installed and Null-owned extensions without changing them. **Restart Normally** brings you back. Offered automatically after three failed starts in a row. |
 | **Crash recovery** | After an unexpected exit, offers to reopen the Claude Code conversations that were open. |
 | **Follow Along** | **Null: Toggle Follow Claude Code's Edits Live** reveals each file Claude Code edits. |
