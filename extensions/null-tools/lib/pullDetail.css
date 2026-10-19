@@ -33,3 +33,4 @@
 .rv { margin-left:auto; display:inline-flex; }
 .rv-approved { color:var(--gh-open); }
 .rv-changes { color:var(--vscode-charts-red); }
+.pr-actions { display:flex; align-items:center; gap:8px; margin:12px 0; flex-wrap:wrap; }

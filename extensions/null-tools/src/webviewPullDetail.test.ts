@@ -14,6 +14,7 @@ vm.runInContext(readFileSync(path.join(__dirname, 'webview-shared.js'), 'utf8'),
 type Obj = Record<string, any>;
 const html = sandbox as unknown as {
   pullPageHtml(p: Obj): string;
+  pullActionsHtml(p: Obj): string;
   withBodies(p: Obj, fn: (h: string) => string): Obj;
   checkSummary(checks: Obj[]): string;
 };
@@ -24,7 +25,14 @@ const page = (over: Obj = {}): Obj => ({
   createdAt: '2026-10-01T10:00:00Z', bodyHTML: '<p>Hello</p>', headRef: 'feat/x', baseRef: 'main', fork: false,
   additions: 10, deletions: 2, changedFiles: 3, labels: [{ name: 'bug', color: 'd73a4a' }], milestone: 'v1',
   assignees: [user], reviewers: [], commits: [], commitTotal: 0, timeline: [], timelineTotal: 0,
-  checkState: 'none', checks: [], checksTotal: 0, ...over,
+  checkState: 'none', checks: [], checksTotal: 0,
+  id: 'PR_1', headSha: 'c'.repeat(40),
+  actions: {
+    review: { available: true, canApprove: true, pending: null },
+    merge: { enabled: true, hint: 'Ready to merge.', methods: ['MERGE', 'SQUASH'] },
+    state: 'close', draft: 'draft',
+  },
+  ...over,
 });
 const check = (over: Obj = {}): Obj => ({ name: 'test', state: 'success', url: 'https://github.com/o/r/actions/runs/1', runId: 1, description: '', ...over });
 
@@ -130,6 +138,44 @@ test('sidebar: reviewers with verdicts, a pending request, labels, milestone, as
 test('the header offers check out, open on GitHub and refresh', () => {
   const out = html.pullPageHtml(page());
   for (const act of ['checkout', 'open-github', 'refresh']) assert.ok(out.includes(`data-act="${act}"`), act);
+});
+
+const actions = (over: Obj = {}): Obj => ({ ...page().actions, ...over });
+
+test('actions row: an open PR offers review, merge, convert to draft and close', () => {
+  const out = html.pullActionsHtml(page());
+  for (const act of ['review', 'merge', 'draft', 'close']) assert.ok(out.includes(`data-act="${act}"`), act);
+  assert.ok(out.includes('class="btn btn-primary" data-act="merge">'), 'merge is the primary button and enabled');
+  assert.ok(out.includes('Ready to merge.'));
+});
+
+test('actions row: a disabled merge says why; the hint is escaped', () => {
+  const out = html.pullActionsHtml(page({ actions: actions({ merge: { enabled: false, hint: '<b>conflicts</b>', methods: ['MERGE'] } }) }));
+  assert.match(out, /data-act="merge" disabled>/);
+  assert.ok(!out.includes('<b>conflicts</b>') && out.includes('&lt;b&gt;conflicts&lt;/b&gt;'));
+});
+
+test('actions row: a pending review shows its comment count; a draft offers ready for review', () => {
+  assert.ok(html.pullActionsHtml(page({ actions: actions({ review: { available: true, canApprove: true, pending: 3 } }) })).includes('Finish review (3)'));
+  const draft = html.pullActionsHtml(page({ draft: true, actions: actions({ draft: 'ready', merge: { enabled: false, hint: 'Mark this as ready for review to merge it.', methods: ['MERGE'] } }) }));
+  assert.ok(draft.includes('data-act="ready"') && draft.includes('Ready for review'));
+  assert.ok(!draft.includes('data-act="draft"'));
+});
+
+test('actions row: closed offers reopen only; merged and read-only viewers get no row', () => {
+  const closed = html.pullActionsHtml(page({ state: 'closed', actions: actions({
+    review: { available: false, canApprove: false, pending: null }, merge: { enabled: false, hint: '', methods: ['MERGE'] }, state: 'reopen', draft: null }) }));
+  assert.ok(closed.includes('data-act="reopen"'));
+  for (const act of ['merge', 'review', 'close', 'draft']) assert.ok(!closed.includes(`data-act="${act}"`), act);
+  const nothing = html.pullActionsHtml(page({ state: 'merged', actions: actions({
+    review: { available: false, canApprove: false, pending: null }, merge: { enabled: false, hint: '', methods: [] }, state: null, draft: null }) }));
+  assert.strictEqual(nothing, '');
+});
+
+test('the page carries the actions row, and no longer claims reviewing and merging happen on GitHub', () => {
+  const out = html.pullPageHtml(page());
+  assert.ok(out.includes('class="pr-actions"'));
+  assert.ok(!out.includes('reviewing and merging happen on GitHub'));
 });
 
 test('withBodies applies the sanitizer to the description, comments and reviews, and leaves the input alone', () => {

@@ -14,8 +14,16 @@ type PullTimelineEntry =
   | { kind: 'review'; author: PullUser; at: string; verdict: PullVerdict; bodyHTML: string; url: string; comments: number }
   | { kind: 'event'; at: string; actor: string; event: 'closed' | 'merged' | 'reopened' | 'ready' | 'draft' };
 
+type PullMergeMethod = 'MERGE' | 'SQUASH' | 'REBASE';
+interface PullActions {
+  review: { available: boolean; canApprove: boolean; pending: number | null; };
+  merge: { enabled: boolean; hint: string; methods: PullMergeMethod[]; };
+  state: 'close' | 'reopen' | null;
+  draft: 'ready' | 'draft' | null;
+}
+
 interface PullPage {
-  number: number; title: string; url: string; state: 'open' | 'closed' | 'merged'; draft: boolean;
+  number: number; id: string; headSha: string; title: string; url: string; state: 'open' | 'closed' | 'merged'; draft: boolean;
   author: PullUser; createdAt: string; bodyHTML: string;
   headRef: string; baseRef: string; fork: boolean;
   additions: number; deletions: number; changedFiles: number;
@@ -26,4 +34,5 @@ interface PullPage {
   commits: PullCommit[]; commitTotal: number;
   timeline: PullTimelineEntry[]; timelineTotal: number;
   checkState: 'success' | 'failure' | 'pending' | 'none'; checks: PullCheck[]; checksTotal: number;
+  actions: PullActions;
 }
