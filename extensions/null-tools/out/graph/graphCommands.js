@@ -154,18 +154,34 @@ function pullMessage(outcome) {
     }
 }
 const commits = (n, adjective) => `${n} ${adjective} ${n === 1 ? 'commit' : 'commits'}`;
-/** Pull never merges or rebases on its own: a diverged branch asks, and a dismissed prompt changes nothing. */
-async function divergedFlow(session, ahead, behind) {
+/** The modal for a user whose git config does not say. A dismissed prompt returns null and changes nothing. */
+async function askStrategy(ahead, behind) {
     const choice = await vscode.window.showWarningMessage(`This branch has diverged from its upstream: ${commits(ahead, 'local')}, ${commits(behind, 'incoming')}.`, {
         modal: true,
         detail: 'Rebase puts your local commits on top of the incoming ones and keeps history linear; your local commits get new hashes. '
-            + 'Merge keeps every commit as it is and adds a merge commit. Either can stop on conflicts: the Commit Graph then offers Continue, Skip and Abort.',
+            + 'Merge keeps every commit as it is and adds a merge commit. Either can stop on conflicts: the Commit Graph then offers Continue, Skip and Abort. '
+            + 'Set pull.rebase in your git config to stop being asked.',
     }, 'Rebase', 'Merge');
-    if (choice !== 'Rebase' && choice !== 'Merge')
+    if (choice === 'Rebase')
+        return 'rebase';
+    return choice === 'Merge' ? 'merge' : null;
+}
+/** Pull never merges or rebases unprompted unless the user's git config (pull.rebase, branch.<name>.rebase, pull.ff) already says to. */
+async function divergedFlow(session, ahead, behind) {
+    const availability = await session.availability();
+    if (!availability.ok)
         return;
-    const strategy = choice === 'Rebase' ? 'rebase' : 'merge';
+    const preference = await (0, gitActions_1.pullPreference)(availability.read);
+    if (preference === 'ff-only') {
+        void vscode.window.showWarningMessage(`This branch has diverged from its upstream (${commits(ahead, 'local')}, ${commits(behind, 'incoming')}) and pull.ff is "only", so nothing was pulled. Rebase or merge it yourself, or change pull.ff.`);
+        return;
+    }
+    const strategy = preference === 'ask' ? await askStrategy(ahead, behind) : preference;
+    if (!strategy)
+        return;
+    const label = strategy === 'rebase' ? 'Rebase' : 'Merge';
     const result = await session.runAction((a) => (0, gitActions_1.integrateUpstream)(a.act, () => a.service.inProgress(), strategy));
-    await reportOperation(result, choice);
+    await reportOperation(result, label);
     if (result.ok && !result.value.stopped) {
         void vscode.window.showInformationMessage(strategy === 'rebase' ? 'Rebased onto the upstream.' : 'Merged the upstream.');
     }

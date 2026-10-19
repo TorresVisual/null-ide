@@ -359,4 +359,68 @@ function divergedClone(local, remote) {
     node_assert_1.default.strictEqual(expectOk(await (0, gitActions_1.integrateUpstream)(run, inProgress, 'rebase')).stopped, false);
     node_assert_1.default.strictEqual(git(clone, 'rev-parse', 'HEAD'), git(clone, 'rev-parse', '@{u}'), 'no duplicate commit is left');
 });
+// fakeGit answers only the keys given; an absent key throws, which is how `git config --get` reports "unset" (exit 1).
+function configGit(config, branch = 'main') {
+    const answers = {};
+    if (branch)
+        answers['symbolic-ref --quiet --short HEAD'] = `${branch}\n`;
+    for (const [key, value] of Object.entries(config))
+        answers[`config --get ${key}`] = `${value}\n`;
+    return fakeGit(answers);
+}
+(0, node_test_1.default)('pullPreference maps git config to a strategy', async () => {
+    const cases = [
+        [{}, 'ask'],
+        [{ 'pull.rebase': 'true' }, 'rebase'],
+        [{ 'pull.rebase': 'false' }, 'merge'],
+        [{ 'pull.ff': 'only' }, 'ff-only'],
+        [{ 'pull.ff': 'false' }, 'merge'],
+        [{ 'pull.ff': 'true' }, 'ask'],
+        [{ 'pull.ff': 'only', 'pull.rebase': 'true' }, 'rebase'],
+        [{ 'pull.ff': 'only', 'pull.rebase': 'false' }, 'ff-only'],
+    ];
+    for (const [config, expected] of cases) {
+        node_assert_1.default.strictEqual(await (0, gitActions_1.pullPreference)(configGit(config)), expected, JSON.stringify(config));
+    }
+});
+(0, node_test_1.default)('pullPreference asks for the rebase modes Null cannot run', async () => {
+    for (const value of ['merges', 'interactive', 'preserve', 'nonsense']) {
+        node_assert_1.default.strictEqual(await (0, gitActions_1.pullPreference)(configGit({ 'pull.rebase': value })), 'ask', value);
+    }
+});
+(0, node_test_1.default)('pullPreference accepts every boolean spelling git does, in any case', async () => {
+    for (const value of ['true', 'TRUE', 'yes', 'on', '1']) {
+        node_assert_1.default.strictEqual(await (0, gitActions_1.pullPreference)(configGit({ 'pull.rebase': value })), 'rebase', value);
+    }
+    for (const value of ['false', 'No', 'off', '0']) {
+        node_assert_1.default.strictEqual(await (0, gitActions_1.pullPreference)(configGit({ 'pull.rebase': value })), 'merge', value);
+    }
+});
+(0, node_test_1.default)('pullPreference: the branch setting beats pull.rebase', async () => {
+    node_assert_1.default.strictEqual(await (0, gitActions_1.pullPreference)(configGit({ 'pull.rebase': 'false', 'branch.main.rebase': 'true' })), 'rebase');
+    node_assert_1.default.strictEqual(await (0, gitActions_1.pullPreference)(configGit({ 'pull.rebase': 'true', 'branch.main.rebase': 'false' })), 'merge');
+});
+(0, node_test_1.default)('pullPreference on a detached HEAD uses pull.* only, and never throws when git fails', async () => {
+    node_assert_1.default.strictEqual(await (0, gitActions_1.pullPreference)(configGit({ 'pull.rebase': 'true' }, null)), 'rebase');
+    const broken = async () => { throw new Error('fatal: not a git repository'); };
+    node_assert_1.default.strictEqual(await (0, gitActions_1.pullPreference)(broken), 'ask');
+});
+(0, node_test_1.default)('pullPreference reads the real repo config, branch setting first', async () => {
+    // Git for Windows ships pull.rebase=false in its system config; a local value cannot unset it, so ignore system and global config here.
+    const isolated = { GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: node_path_1.default.join((0, node_fs_1.mkdtempSync)(node_path_1.default.join((0, node_os_1.tmpdir)(), 'graph-cfg-')), 'none') };
+    Object.assign(process.env, isolated);
+    try {
+        const clone = divergedClone(['l.txt', 'local'], ['o.txt', 'remote']);
+        const { run } = tools(clone);
+        node_assert_1.default.strictEqual(await (0, gitActions_1.pullPreference)(run), 'ask');
+        git(clone, 'config', 'pull.rebase', 'true');
+        node_assert_1.default.strictEqual(await (0, gitActions_1.pullPreference)(run), 'rebase');
+        git(clone, 'config', 'branch.main.rebase', 'false');
+        node_assert_1.default.strictEqual(await (0, gitActions_1.pullPreference)(run), 'merge');
+    }
+    finally {
+        for (const key of Object.keys(isolated))
+            delete process.env[key];
+    }
+});
 //# sourceMappingURL=gitActions.test.js.map

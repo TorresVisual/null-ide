@@ -10,6 +10,7 @@ exports.reset = reset;
 exports.resetImpact = resetImpact;
 exports.pull = pull;
 exports.integrateUpstream = integrateUpstream;
+exports.pullPreference = pullPreference;
 const ok = (value) => ({ ok: true, value });
 const fail = (message) => ({ ok: false, message });
 const messageOf = (err) => (err instanceof Error ? err.message : String(err));
@@ -129,5 +130,38 @@ async function pull(git) {
  */
 function integrateUpstream(git, inProgress, strategy) {
     return sequencer(git, inProgress, strategy === 'rebase' ? ['rebase', '@{u}'] : ['merge', '--no-edit', '@{u}']);
+}
+/** One `git config --get` value, lower-cased; '' when unset or unreadable (git exits 1 for an unset key). */
+async function configValue(git, key) {
+    try {
+        return (await git(['config', '--get', key])).trim().toLowerCase();
+    }
+    catch {
+        return '';
+    }
+}
+/**
+ * What the user's git config says a pull should do once the branch has diverged.
+ * Same precedence as git: branch.<name>.rebase over pull.rebase; a rebase setting over pull.ff.
+ * `merges` and `interactive` are not offered by Null, so they ask rather than silently rebase plainly.
+ * Anything unset or unreadable asks: that is what git itself does (it refuses and tells the user to choose).
+ */
+async function pullPreference(git) {
+    let branch = '';
+    try {
+        branch = (await git(['symbolic-ref', '--quiet', '--short', 'HEAD'])).trim();
+    }
+    catch { /* detached */ }
+    const rebase = (branch && await configValue(git, `branch.${branch}.rebase`)) || await configValue(git, 'pull.rebase');
+    if (['true', 'yes', 'on', '1'].includes(rebase))
+        return 'rebase';
+    const ff = await configValue(git, 'pull.ff');
+    if (['false', 'no', 'off', '0'].includes(rebase))
+        return ff === 'only' ? 'ff-only' : 'merge';
+    if (rebase)
+        return 'ask';
+    if (ff === 'only')
+        return 'ff-only';
+    return ['false', 'no', 'off', '0'].includes(ff) ? 'merge' : 'ask';
 }
 //# sourceMappingURL=gitActions.js.map
