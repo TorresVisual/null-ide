@@ -51,7 +51,7 @@ suite('null-tools GitHub Actions', () => {
             'null.workflows.openOnGitHub', 'null.workflows.openWorkflowFile', 'null.workflows.createWorkflow', 'null.workflows.filter',
             'null.workflows.rerunAll', 'null.workflows.rerunFailed', 'null.workflows.rerunJob', 'null.workflows.cancel',
             'null.workflows.enable', 'null.workflows.dispatch', 'null.workflows.openLog', 'null.workflows.showFailureLog',
-            'null.workflows.showRunFailure']) {
+            'null.workflows.showRunFailure', 'null.workflows.revealRun']) {
             assert.ok(commands.includes(id), `${id} is registered`);
         }
         // A hostile URI never reaches the network: the provider answers with an empty document.

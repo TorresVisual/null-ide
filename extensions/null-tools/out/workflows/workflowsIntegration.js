@@ -191,6 +191,26 @@ function registerWorkflowsFeature(context) {
             await showFailure(slot, runId);
         else
             void vscode.window.showInformationMessage('Open a folder of this repository to see its GitHub Actions.');
+    }), 
+    // Called by the PR tab: reveal a run in the view, fetching it by id when it is not among the loaded ones.
+    vscode.commands.registerCommand('null.workflows.revealRun', async (owner, repo, runId) => {
+        if (!Number.isSafeInteger(runId) || runId <= 0)
+            return;
+        await vscode.commands.executeCommand('null.workflowsView.focus');
+        await tree.ensureLoaded();
+        const slot = tree.slotForRepo(owner, repo);
+        if (!slot) {
+            void vscode.window.showInformationMessage('Open a folder of this repository to see its GitHub Actions.');
+            return;
+        }
+        try {
+            const run = slot.runs.find(r => r.id === runId) ?? await (0, workflowsApi_1.getRun)(slot.owner, slot.repo, runId, slot.token);
+            tree.pin(slot, run);
+            await view.reveal({ kind: 'run', repo: { key: slot.key, owner: slot.owner, repo: slot.repo }, run }, { select: true, focus: true, expand: true });
+        }
+        catch (err) {
+            void vscode.window.showErrorMessage(`Could not show run ${runId}: ${(0, pullModel_1.describeFailure)(err)}`);
+        }
     }), vscode.commands.registerCommand('null.workflows.rerunAll', (node) => (0, workflowActions_1.runAction)(tree, node, 'rerunAll')), vscode.commands.registerCommand('null.workflows.rerunFailed', (node) => (0, workflowActions_1.runAction)(tree, node, 'rerunFailed')), vscode.commands.registerCommand('null.workflows.rerunJob', (node) => (0, workflowActions_1.runAction)(tree, node, 'rerunJob')), vscode.commands.registerCommand('null.workflows.cancel', (node) => (0, workflowActions_1.runAction)(tree, node, 'cancel')), vscode.commands.registerCommand('null.workflows.enable', (node) => (0, workflowActions_1.enable)(tree, node)), vscode.commands.registerCommand('null.workflows.dispatch', (node) => (0, workflowActions_1.dispatch)(tree, node)), vscode.commands.registerCommand('null.workflows.filter', async () => {
         if (tree.state !== 'ready') {
             void vscode.window.showInformationMessage('Open the GitHub Actions view of a folder with a GitHub remote first.');

@@ -153,6 +153,14 @@ class PullDetailPanel {
             case 'rerun':
                 await this.rerun();
                 break;
+            case 'showRun':
+            case 'showFailure': {
+                const check = Number.isInteger(msg.index) ? this.page?.checks[msg.index] : undefined;
+                if (!check || check.runId === null || (msg.type === 'showFailure' && check.state !== 'failure'))
+                    break;
+                void vscode.commands.executeCommand(msg.type === 'showRun' ? 'null.workflows.revealRun' : 'null.workflows.showRunFailure', this.repo.owner, this.repo.repo, check.runId);
+                break;
+            }
             case 'review':
             case 'merge':
             case 'close':

@@ -76,6 +76,18 @@ const check = (over = {}) => ({ name: 'test', state: 'success', url: 'https://gi
     node_assert_1.default.ok(out.includes('href="https://x/?a=&quot;b&quot;"'));
     node_assert_1.default.ok(out.includes('Showing 1 of 150 checks.'));
 });
+(0, node_test_1.default)('checks: runs offer Show in GitHub Actions, failed runs also Show failure log; legacy statuses offer neither', () => {
+    const out = html.pullPageHtml(page({
+        checks: [check({ name: 'unit', state: 'failure', runId: 7 }), check({ name: 'lint', state: 'success', runId: 8 }), check({ name: 'legacy', state: 'failure', runId: null })],
+        checksTotal: 3,
+    }));
+    node_assert_1.default.ok(out.includes('data-act="show-run" data-check="0"'));
+    node_assert_1.default.ok(out.includes('data-act="show-failure" data-check="0"'));
+    node_assert_1.default.ok(out.includes('data-act="show-run" data-check="1"'));
+    node_assert_1.default.ok(!out.includes('data-act="show-failure" data-check="1"'), 'a passing run has no failure log');
+    node_assert_1.default.ok(!out.includes('data-check="2"'), 'a legacy status belongs to no workflow run');
+    node_assert_1.default.ok(!/data-(run|id)/.test(out), 'run ids never go into the page for the webview to send back');
+});
 (0, node_test_1.default)('checkSummary names only non-empty groups', () => {
     node_assert_1.default.strictEqual(html.checkSummary([check(), check({ state: 'neutral' }), check({ state: 'neutral' })]), '1 successful, 2 skipped');
     node_assert_1.default.strictEqual(html.checkSummary([]), '');

@@ -547,12 +547,19 @@ function pullChecksHtml(p) {
     if (p.checks.length === 0)
         return '';
     const canRerun = p.checks.some(c => c.state === 'failure' && c.runId !== null);
-    const rows = p.checks.map(c => `<div class="check-row">
+    const rows = p.checks.map((c, i) => {
+        // Only the check's position goes into the page; the host looks the run id up in the page it loaded itself.
+        const run = c.runId !== null
+            ? `<button type="button" class="check-link" data-act="show-run" data-check="${i}">Show in GitHub Actions</button>`
+                + (c.state === 'failure' ? `<button type="button" class="check-link" data-act="show-failure" data-check="${i}">Show failure log</button>` : '')
+            : '';
+        return `<div class="check-row">
       <span class="check-dot check-${c.state}" title="${PULL_CHECK_TEXT[c.state]}"></span>
       <span class="check-name">${escapeHtml(c.name)}</span>
       <span class="muted">${escapeHtml(c.description)}</span>
-      ${c.url ? `<a class="check-link" href="${escapeHtml(c.url)}">Details</a>` : ''}
-    </div>`).join('');
+      <span class="check-actions">${c.url ? `<a class="check-link" href="${escapeHtml(c.url)}">Details</a>` : ''}${run}</span>
+    </div>`;
+    }).join('');
     const more = p.checksTotal > p.checks.length
         ? `<div class="muted check-more">Showing ${p.checks.length} of ${p.checksTotal} checks.</div>` : '';
     return `<section class="checks"><div class="checks-head"><b>Checks</b> <span class="muted">${checkSummary(p.checks)}</span>`
@@ -651,6 +658,11 @@ function withBodies(p, fn) {
             case 'rerun':
                 button.disabled = true; // the host answers with a toast and a fresh page
                 post({ type: 'rerun' });
+                break;
+            case 'show-run':
+            case 'show-failure':
+                // Only the position of the check goes out; the host looks the run up in the page it loaded itself.
+                post({ type: (button === null || button === void 0 ? void 0 : button.dataset.act) === 'show-run' ? 'showRun' : 'showFailure', index: Number(button === null || button === void 0 ? void 0 : button.dataset.check) });
                 break;
             case 'review':
             case 'merge':
