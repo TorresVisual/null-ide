@@ -99,7 +99,7 @@ Null IDE is built on [VSCodium](https://vscodium.com) and ships with a dark them
 |---|---|
 | **null-theme** | *Null Dark* color theme: deep navy backgrounds, teal and indigo accents, Geist Mono |
 | **null-icons** | File and folder icon theme |
-| **null-tools** | Project dashboard, GitHub Issues and pull requests, commit graph, commit message generation, worktrees, scratch files and notes, port manager, Discord Rich Presence, in-app updater |
+| **null-tools** | Project dashboard, GitHub Issues, pull requests and Actions, commit graph, commit message generation, worktrees, scratch files and notes, port manager, Discord Rich Presence, in-app updater |
 | **null-markdown** | Markdown preview with GFM, Mermaid, KaTeX math, and GitHub-style alerts |
 | **null-format** | Prettier (in-process), rustfmt, and clang-format; project config files win over built-in defaults |
 | **null-cpp** | Symbol-aware header/source switching (`Alt+O`), paired split editors, `.hpp`/`.cpp` class scaffolding, on top of clangd |
@@ -119,6 +119,7 @@ Null IDE is built on [VSCodium](https://vscodium.com) and ships with a dark them
 - **Project dashboard** opens on startup as a recent-project launcher: search, sort, pin and manage projects, with best-effort Git/type details alongside New Project, Clone Repo, and Open Folder.
 - **GitHub Issues** in its own activity-bar view and a full-width tab, with github.com-style search, filters, an issue detail tab, and issue creation and commenting. Sign in from the view.
 - **Pull requests** next to Issues: review changed files in a diff, comment, resolve threads, check out a PR and merge it.
+- **GitHub Actions** in its own activity-bar view: workflow runs, jobs and steps, logs in a tab, and re-run, cancel and run-workflow actions.
 - **Commit messages** from your staged diff with `Ctrl+Shift+Alt+G` (uses the [`claude`](https://claude.com/claude-code) CLI, which must be installed separately).
 - **Git worktrees** view: create (including one per issue), open in a new window, merge back, prune.
 - **`null .`** opens the current folder from any terminal.
@@ -201,7 +202,7 @@ _For more, see the [wiki](https://github.com/TorresVisual/null-ide/wiki)._
 
 - Extension gallery lookups (VS Marketplace), on user action
 - The GitHub Releases API for update checks
-- GitHub API calls from the Issues and Pull Requests views, only after you sign in
+- GitHub API calls from the Issues, Pull Requests and GitHub Actions views, only after you sign in
 - GitHub and GitLab API calls from the account manager, only for accounts you add
 - Sync and activity badges (GitHub Gists), only if you turn them on
 - Discord Rich Presence, only if enabled via `null.discord.*`
