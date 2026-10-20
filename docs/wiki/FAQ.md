@@ -14,7 +14,7 @@ No telemetry (`enableTelemetry` is `false`). The only network calls are:
 
 - Extension gallery lookups (VS Marketplace), on user action
 - The GitHub Releases API for update checks
-- GitHub API calls from the Issues and Pull Requests views, only after you sign in
+- GitHub API calls from the Issues, Pull Requests and GitHub Actions views, only after you sign in
 - GitHub and GitLab API calls from the account manager, only for accounts you add
 - Discord Rich Presence, only if you enable it
 - Sync and activity badges, only if you turn those on

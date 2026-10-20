@@ -62,7 +62,7 @@ Set `null.discord.clientId` to the Application ID from the Discord Developer Por
 
 ### GitHub Issues view asks me to sign in
 
-Sign-in is required for the Issues and Pull Requests views; use **Null: Sign in to GitHub**. Nothing is sent to GitHub before you sign in.
+Sign-in is required for the Issues, Pull Requests and GitHub Actions views; use **Null: Sign in to GitHub**. Nothing is sent to GitHub before you sign in.
 
 ### A sideloaded extension stopped updating
 

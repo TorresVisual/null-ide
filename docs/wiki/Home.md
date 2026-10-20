@@ -22,7 +22,7 @@ Null IDE is a personal daily-driver editor developed in the open. It ships for W
 ## At a glance
 
 - Dark theme, file icons, formatters (Prettier, rustfmt, clang-format) and C++ header/source navigation work with no setup.
-- A project dashboard opens on startup, with GitHub Issues and pull requests, a commit graph and Git worktrees in the same window.
+- A project dashboard opens on startup, with GitHub Issues, pull requests and Actions, a commit graph and Git worktrees in the same window.
 - `null .` opens a folder from any terminal; **Open in Null** is in the Windows 11 Explorer menu.
 - The IDE updates itself from GitHub Releases, without administrator rights.
 - No telemetry. See [Privacy](FAQ#does-null-ide-send-any-data-anywhere).

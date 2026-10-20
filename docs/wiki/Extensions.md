@@ -8,7 +8,7 @@ Fourteen extensions are bundled at build time. The installer lets you drop the o
 |---|---|
 | `null-theme` | *Null Dark* color theme (the default) |
 | `null-icons` | File and folder icon theme (based on Symbols by Miguel Solorio) |
-| `null-tools` | Dashboard, GitHub Issues, commit messages, worktrees, commit graph, scratch files and notes, ports, Discord, updater, crash recovery |
+| `null-tools` | Dashboard, GitHub Issues, pull requests, GitHub Actions, commit messages, worktrees, commit graph, scratch files and notes, ports, Discord, updater, crash recovery |
 | `null-markdown` | Markdown Editor and enhanced preview |
 | `null-format` | Prettier, rustfmt, clang-format |
 | `null-cpp` | C/C++ navigation, scaffolding and CMake toolbar (needs clangd) |
