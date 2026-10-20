@@ -1,5 +1,7 @@
 # GitHub Actions — Design
 
+Status: implemented (plans: `docs/plans/github-actions.md`, `docs/plans/github-actions-logs.md`).
+
 Issue: **#132** (GitHub Actions Integration). Builds on the Pull Requests work (#92, #117): same module shape, same GitHub client, same auth helpers.
 
 Naming: the feature is called **workflows** in code (`null.workflows.*`, `src/workflows/`, `null-workflows:`) so nothing collides with the `null-actions` extension (status-bar buttons). The user-facing title is "GitHub Actions".
@@ -106,6 +108,12 @@ The workflows API does not say which workflows are dispatchable. Per refresh of 
 ## Out of scope
 
 GitLab CI; editing or validating workflow YAML (language tooling covers it); artifacts, caches, secrets, variables, environments, deployment approvals; a status bar item; settings; webhooks or any push channel (polling only).
+
+### Known limits
+
+- Only the first 100 workflows of a repo are listed.
+- Step segmentation of a job log is a marker heuristic validated against logs captured from a real run (`realLog.fixture.ts`); when it cannot place a step it falls back to the full log.
+- Live logs: GitHub serves nothing for a running job (observed above), so a running job shows its steps and "Logs appear when the job finishes."
 
 ## Acceptance mapping (#132)
 
