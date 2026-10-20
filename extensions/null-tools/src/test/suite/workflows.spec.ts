@@ -20,8 +20,18 @@ suite('null-tools GitHub Actions', () => {
     for (const id of ['null.workflows.refresh', 'null.workflows.open', 'null.workflows.signIn', 'null.workflows.loadMore',
       'null.workflows.openOnGitHub', 'null.workflows.openWorkflowFile', 'null.workflows.createWorkflow', 'null.workflows.filter',
       'null.workflows.rerunAll', 'null.workflows.rerunFailed', 'null.workflows.rerunJob', 'null.workflows.cancel',
-      'null.workflows.enable', 'null.workflows.dispatch']) {
+      'null.workflows.enable', 'null.workflows.dispatch', 'null.workflows.openLog', 'null.workflows.showFailureLog',
+      'null.workflows.showRunFailure']) {
       assert.ok(commands.includes(id), `${id} is registered`);
+    }
+
+    // A hostile URI never reaches the network: the provider answers with an empty document.
+    for (const hostile of [
+      vscode.Uri.from({ scheme: 'null-workflows', path: '/../../etc/passwd' }),
+      vscode.Uri.from({ scheme: 'null-workflows', path: '/o/r/abc/x.log' }),
+      vscode.Uri.from({ scheme: 'null-workflows', path: '/o/r/5/x.log', query: 'step=abc' }),
+    ]) {
+      assert.strictEqual((await vscode.workspace.openTextDocument(hostile)).getText(), '', hostile.toString());
     }
 
     const snapshot = await vscode.commands.executeCommand<{ state: string; repos: unknown[] }>('_null.workflows.snapshot');

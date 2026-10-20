@@ -284,7 +284,10 @@
       { "command": "null.workflows.rerunJob", "title": "Re-run Job", "icon": "$(debug-rerun)" },
       { "command": "null.workflows.cancel", "title": "Cancel Run", "icon": "$(debug-stop)" },
       { "command": "null.workflows.enable", "title": "Enable Workflow" },
-      { "command": "null.workflows.dispatch", "title": "Run Workflow…", "icon": "$(play)" }
+      { "command": "null.workflows.dispatch", "title": "Run Workflow…", "icon": "$(play)" },
+      { "command": "null.workflows.openLog", "title": "Open Log" },
+      { "command": "null.workflows.showFailureLog", "title": "Show Failure Log", "icon": "$(error)" },
+      { "command": "null.workflows.showRunFailure", "title": "Null: Show Workflow Run Failure Log" }
     ],
     "viewsContainers": {
       "activitybar": [
@@ -523,7 +526,10 @@
         { "command": "null.workflows.rerunFailed", "when": "view == null.workflowsView && viewItem =~ /(^| )rerunFailed( |$)/", "group": "3_manage@2" },
         { "command": "null.workflows.rerunJob", "when": "view == null.workflowsView && viewItem =~ /(^| )rerunJob( |$)/", "group": "3_manage@3" },
         { "command": "null.workflows.dispatch", "when": "view == null.workflowsView && viewItem =~ /(^| )dispatch( |$)/", "group": "3_manage@4" },
-        { "command": "null.workflows.enable", "when": "view == null.workflowsView && viewItem =~ /(^| )enable( |$)/", "group": "3_manage@5" }
+        { "command": "null.workflows.enable", "when": "view == null.workflowsView && viewItem =~ /(^| )enable( |$)/", "group": "3_manage@5" },
+        { "command": "null.workflows.openLog", "when": "view == null.workflowsView && viewItem =~ /^(job|step)/", "group": "2_log@0" },
+        { "command": "null.workflows.showFailureLog", "when": "view == null.workflowsView && viewItem =~ /^(run|job|step) failed/", "group": "inline@0" },
+        { "command": "null.workflows.showFailureLog", "when": "view == null.workflowsView && viewItem =~ /^(run|job|step) failed/", "group": "2_log@1" }
       ],
       "comments/commentThread/context": [
         { "command": "null.pulls.addToReview", "when": "commentController == null.pulls", "group": "inline@0" },
@@ -586,6 +592,9 @@
         { "command": "null.workflows.cancel", "when": "false" },
         { "command": "null.workflows.enable", "when": "false" },
         { "command": "null.workflows.dispatch", "when": "false" },
+        { "command": "null.workflows.openLog", "when": "false" },
+        { "command": "null.workflows.showFailureLog", "when": "false" },
+        { "command": "null.workflows.showRunFailure", "when": "false" },
         { "command": "null.pulls.finishReview", "when": "false" },
         { "command": "null.graph.checkout", "when": "false" },
         { "command": "null.graph.createBranch", "when": "false" },

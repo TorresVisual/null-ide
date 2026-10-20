@@ -9,8 +9,12 @@ import { getGitApi } from '../graph/gitApi';
 import { describeFailure } from '../pulls/pullModel';
 import { dispatch, enable, runAction } from './workflowActions';
 import { editFilter } from './workflowFilterMenu';
-import { POLL_FAST_MS, RunFilter, WfNode, isWorkflowFile } from './workflowsModel';
-import { WorkflowsTreeProvider } from './workflowsTreeView';
+import { firstFailedStep } from './jobLog';
+import { WORKFLOW_SCHEME, logDocParts } from './workflowLogDocs';
+import { WorkflowLogProvider } from './workflowLogProvider';
+import { listJobs } from './workflowsApi';
+import { POLL_FAST_MS, RunFilter, WfNode, isFailed, isWorkflowFile } from './workflowsModel';
+import { RepoSlot, WorkflowsTreeProvider } from './workflowsTreeView';
 
 const MAX_WORKFLOW_FILE_BYTES = 256 * 1024;
 const FOCUS_REFRESH_MIN_MS = 60_000;
@@ -22,6 +26,34 @@ export function registerWorkflowsFeature(context: vscode.ExtensionContext): void
   let lastRefresh = 0;
   const refresh = async (): Promise<void> => { lastRefresh = Date.now(); await tree.refresh(); };
 
+  const logs = new WorkflowLogProvider({
+    tokenFor: (owner, repo) => tree.slotForRepo(owner, repo)?.token ?? null,
+    folderFor: (owner, repo) => tree.slotForRepo(owner, repo)?.folder,
+  });
+
+  async function openLog(owner: string, repo: string, jobId: number, jobName: string, step: { number: number; name: string } | null): Promise<void> {
+    const parts = logDocParts({ owner, repo, jobId, step: step?.number ?? null }, step ? `${jobName}-${step.name}` : jobName);
+    await vscode.window.showTextDocument(vscode.Uri.from(parts), { preview: true });
+    rearm(); // the document of a running job is now live: make sure the poll timer is running for it
+  }
+
+  /** The first failed step's log of the first failed job; the whole job log when no step is marked failed. */
+  async function showFailure(slot: RepoSlot, runId: number): Promise<void> {
+    try {
+      const jobs = slot.jobs.get(runId) ?? await listJobs(slot.owner, slot.repo, runId, slot.token);
+      slot.jobs.set(runId, jobs);
+      const failedJob = jobs.find(isFailed);
+      if (!failedJob) {
+        void vscode.window.showInformationMessage('No failed job in this run.');
+        return;
+      }
+      const step = firstFailedStep(failedJob);
+      await openLog(slot.owner, slot.repo, failedJob.id, failedJob.name, step ? { number: step.number, name: step.name } : null);
+    } catch (err) {
+      void vscode.window.showErrorMessage(`Could not open the failure log: ${describeFailure(err)}`);
+    }
+  }
+
   // One shared timer, only while the view is visible, only while some run is in play.
   let timer: NodeJS.Timeout | undefined;
   const stop = (): void => { if (timer) { clearTimeout(timer); timer = undefined; } };
@@ -31,9 +63,11 @@ export function registerWorkflowsFeature(context: vscode.ExtensionContext): void
   };
   const tick = async (): Promise<void> => {
     timer = undefined;
-    schedule(await tree.poll());
+    const next = await tree.poll();
+    logs.refreshLive();
+    schedule(next ?? (logs.hasLive() ? POLL_FAST_MS : null));
   };
-  const rearm = (): void => { if (!timer && view.visible && tree.hasActiveRuns()) schedule(POLL_FAST_MS); };
+  const rearm = (): void => { if (!timer && view.visible && (tree.hasActiveRuns() || logs.hasLive())) schedule(POLL_FAST_MS); };
 
   const workflowFiles = (): Array<{ file: string; name: string }> => {
     const seen = new Map<string, string>();
@@ -97,6 +131,28 @@ export function registerWorkflowsFeature(context: vscode.ExtensionContext): void
       } catch {
         void vscode.window.showInformationMessage('Create .github/workflows/ in this folder and add a YAML workflow file to it.');
       }
+    }),
+    vscode.workspace.registerTextDocumentContentProvider(WORKFLOW_SCHEME, logs),
+    vscode.languages.registerDocumentLinkProvider({ scheme: WORKFLOW_SCHEME }, logs),
+    vscode.workspace.onDidCloseTextDocument(d => { if (d.uri.scheme === WORKFLOW_SCHEME) logs.forget(d.uri); }),
+    vscode.commands.registerCommand('null.workflows.openLog', async (node: WfNode) => {
+      if (node.kind === 'job') await openLog(node.repo.owner, node.repo.repo, node.job.id, node.job.name, null);
+      else if (node.kind === 'step') await openLog(node.repo.owner, node.repo.repo, node.job.id, node.job.name, node.step);
+    }),
+    vscode.commands.registerCommand('null.workflows.showFailureLog', async (node: WfNode) => {
+      const slot = tree.slot(node.repo.key);
+      if (!slot) return;
+      if (node.kind === 'run') await showFailure(slot, node.run.id);
+      else if (node.kind === 'job') await openLog(node.repo.owner, node.repo.repo, node.job.id, node.job.name, firstFailedStep(node.job) ?? null);
+      else if (node.kind === 'step') await openLog(node.repo.owner, node.repo.repo, node.job.id, node.job.name, node.step);
+    }),
+    // Called by the PR tab (old plan Task 11): the host, not the webview, supplies owner, repo and run id from its own page.
+    vscode.commands.registerCommand('null.workflows.showRunFailure', async (owner: string, repo: string, runId: number) => {
+      if (!Number.isSafeInteger(runId) || runId <= 0) return;
+      await tree.ensureLoaded();
+      const slot = tree.slotForRepo(owner, repo);
+      if (slot) await showFailure(slot, runId);
+      else void vscode.window.showInformationMessage('Open a folder of this repository to see its GitHub Actions.');
     }),
     vscode.commands.registerCommand('null.workflows.rerunAll', (node: WfNode) => runAction(tree, node, 'rerunAll')),
     vscode.commands.registerCommand('null.workflows.rerunFailed', (node: WfNode) => runAction(tree, node, 'rerunFailed')),
