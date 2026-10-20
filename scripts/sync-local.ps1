@@ -234,7 +234,9 @@ $Extensions = [ordered]@{
             "package.json",
             "out",
             "lib",
-            "media"
+            "media",
+            "node_modules/ws",
+            "node_modules/yaml"
         )
     }
 
