@@ -10,6 +10,8 @@
 
 **Spec:** `docs/specs/github-actions-design.md` (decisions 1–10, Surfaces, Log redirect, Detecting `workflow_dispatch`). Read it first; this plan does not repeat its rationale.
 
+> **Status:** Tasks 2, 3, 5, 6, 7, 8 and 10 are done. Tasks 1 (the probe and fixtures), 4 and 9 are superseded by `docs/plans/github-actions-logs.md`; run that next. Tasks 11 and 12 below stay valid and follow it.
+
 ## Execution Options
 
 Leave every box below unchecked. The executing skill resolves them with
