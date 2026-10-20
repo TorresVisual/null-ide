@@ -91,6 +91,19 @@ test('checks: names and links are escaped, and more checks than shown are admitt
   assert.ok(out.includes('Showing 1 of 150 checks.'));
 });
 
+test('checks: runs offer Show in GitHub Actions, failed runs also Show failure log; legacy statuses offer neither', () => {
+  const out = html.pullPageHtml(page({
+    checks: [check({ name: 'unit', state: 'failure', runId: 7 }), check({ name: 'lint', state: 'success', runId: 8 }), check({ name: 'legacy', state: 'failure', runId: null })],
+    checksTotal: 3,
+  }));
+  assert.ok(out.includes('data-act="show-run" data-check="0"'));
+  assert.ok(out.includes('data-act="show-failure" data-check="0"'));
+  assert.ok(out.includes('data-act="show-run" data-check="1"'));
+  assert.ok(!out.includes('data-act="show-failure" data-check="1"'), 'a passing run has no failure log');
+  assert.ok(!out.includes('data-check="2"'), 'a legacy status belongs to no workflow run');
+  assert.ok(!/data-(run|id)/.test(out), 'run ids never go into the page for the webview to send back');
+});
+
 test('checkSummary names only non-empty groups', () => {
   assert.strictEqual(html.checkSummary([check(), check({ state: 'neutral' }), check({ state: 'neutral' })]), '1 successful, 2 skipped');
   assert.strictEqual(html.checkSummary([]), '');

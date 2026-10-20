@@ -12,7 +12,7 @@ import { editFilter } from './workflowFilterMenu';
 import { firstFailedStep } from './jobLog';
 import { WORKFLOW_SCHEME, logDocParts } from './workflowLogDocs';
 import { WorkflowLogProvider } from './workflowLogProvider';
-import { listJobs } from './workflowsApi';
+import { getRun, listJobs } from './workflowsApi';
 import { POLL_FAST_MS, RunFilter, WfNode, isFailed, isWorkflowFile } from './workflowsModel';
 import { RepoSlot, WorkflowsTreeProvider } from './workflowsTreeView';
 
@@ -153,6 +153,24 @@ export function registerWorkflowsFeature(context: vscode.ExtensionContext): void
       const slot = tree.slotForRepo(owner, repo);
       if (slot) await showFailure(slot, runId);
       else void vscode.window.showInformationMessage('Open a folder of this repository to see its GitHub Actions.');
+    }),
+    // Called by the PR tab: reveal a run in the view, fetching it by id when it is not among the loaded ones.
+    vscode.commands.registerCommand('null.workflows.revealRun', async (owner: string, repo: string, runId: number) => {
+      if (!Number.isSafeInteger(runId) || runId <= 0) return;
+      await vscode.commands.executeCommand('null.workflowsView.focus');
+      await tree.ensureLoaded();
+      const slot = tree.slotForRepo(owner, repo);
+      if (!slot) {
+        void vscode.window.showInformationMessage('Open a folder of this repository to see its GitHub Actions.');
+        return;
+      }
+      try {
+        const run = slot.runs.find(r => r.id === runId) ?? await getRun(slot.owner, slot.repo, runId, slot.token);
+        tree.pin(slot, run);
+        await view.reveal({ kind: 'run', repo: { key: slot.key, owner: slot.owner, repo: slot.repo }, run }, { select: true, focus: true, expand: true });
+      } catch (err) {
+        void vscode.window.showErrorMessage(`Could not show run ${runId}: ${describeFailure(err)}`);
+      }
     }),
     vscode.commands.registerCommand('null.workflows.rerunAll', (node: WfNode) => runAction(tree, node, 'rerunAll')),
     vscode.commands.registerCommand('null.workflows.rerunFailed', (node: WfNode) => runAction(tree, node, 'rerunFailed')),

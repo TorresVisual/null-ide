@@ -23,7 +23,8 @@
 .check-neutral { background:var(--gh-neutral); }
 .check-name { font-weight:600; }
 .check-link, .commit-row a { color:var(--vscode-textLink-foreground); text-decoration:none; }
-.check-link { margin-left:auto; }
+.check-actions { margin-left:auto; display:flex; gap:10px; }
+button.check-link { background:none; border:0; padding:0; font:inherit; cursor:pointer; }
 .check-link:hover, .commit-row a:hover { text-decoration:underline; }
 .check-more { padding:6px 12px; }
 .commits > summary { cursor:pointer; padding:6px 12px; font-weight:600; }

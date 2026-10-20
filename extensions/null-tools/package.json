@@ -287,7 +287,8 @@
       { "command": "null.workflows.dispatch", "title": "Run Workflow…", "icon": "$(play)" },
       { "command": "null.workflows.openLog", "title": "Open Log" },
       { "command": "null.workflows.showFailureLog", "title": "Show Failure Log", "icon": "$(error)" },
-      { "command": "null.workflows.showRunFailure", "title": "Null: Show Workflow Run Failure Log" }
+      { "command": "null.workflows.showRunFailure", "title": "Null: Show Workflow Run Failure Log" },
+      { "command": "null.workflows.revealRun", "title": "Null: Show Workflow Run in GitHub Actions" }
     ],
     "viewsContainers": {
       "activitybar": [
@@ -595,6 +596,7 @@
         { "command": "null.workflows.openLog", "when": "false" },
         { "command": "null.workflows.showFailureLog", "when": "false" },
         { "command": "null.workflows.showRunFailure", "when": "false" },
+        { "command": "null.workflows.revealRun", "when": "false" },
         { "command": "null.pulls.finishReview", "when": "false" },
         { "command": "null.graph.checkout", "when": "false" },
         { "command": "null.graph.createBranch", "when": "false" },

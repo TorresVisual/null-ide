@@ -54,6 +54,10 @@ declare const DOMPurify: { sanitize(html: string): string };
         (button as HTMLButtonElement).disabled = true; // the host answers with a toast and a fresh page
         post({ type: 'rerun' });
         break;
+      case 'show-run': case 'show-failure':
+        // Only the position of the check goes out; the host looks the run up in the page it loaded itself.
+        post({ type: button?.dataset.act === 'show-run' ? 'showRun' : 'showFailure', index: Number(button?.dataset.check) });
+        break;
       case 'review': case 'merge': case 'close': case 'reopen': case 'ready': case 'draft':
         // The host answers with a fresh page (a change or a failure) or with the same page again (a cancelled dialog).
         root.querySelectorAll<HTMLButtonElement>('.pr-actions button').forEach(b => { b.disabled = true; });
