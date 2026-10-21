@@ -1,14 +1,16 @@
-# Native Windows Widgets Implementation Plan
+# Desktop Widgets Implementation Plan
 
 > **For agentic workers:** See Execution Options below — the checked Execution Mode box names the REQUIRED SUB-SKILL (superpowers:executing-plans or superpowers:subagent-driven-development).
 
-**Goal:** Pin Projects, Issues and Pull Requests (GitHub) as native Windows 11 Widgets Board widgets, fed by a snapshot file the IDE writes and rendered by a dumb C++/WinRT provider that null-setup registers as an opt-in sparse package.
+**Goal:** Show Projects, Issues and Pull Requests (GitHub) as borderless Null-styled windows on the Windows desktop, fed by a snapshot file the IDE writes and drawn by a dumb Win32/Direct2D exe that null-setup starts at login as an opt-in.
 
-**Architecture:** Three independent tracks that meet at one file contract (`%LOCALAPPDATA%\Null\widgets\snapshot.json`, schema 1). (A) `shell-ext/widgets/`: a C++/WinRT out-of-proc COM provider `null_widgets.exe` packed as the sparse APPX `NullIDE.Widgets`. (B) `extensions/null-tools/src/widgets/`: the only fetcher/filter/writer. (C) `setup/core`: a new opt-in `Feature::Widgets` (register / update / remove next to `NullIDE.ExplorerCommand`). Task 1 is a hard gate: if it fails, nothing after it is built.
+**Architecture:** Three tracks that meet at one file contract (`%LOCALAPPDATA%\Null\widgets\snapshot.json`, schema 1). (A) `shell-ext/widgets/`: `null_widgets.exe`, a plain Win32 exe (no package, no signing) made of a pure, CTest-covered core (snapshot validation, row layout, placement, safe launching) and a thin window shell. (B) `extensions/null-tools/src/widgets/`: the only fetcher, filter and writer. (C) `setup/core`: an opt-in `Feature::Widgets` (HKCU Run entry, start, stop before a swap, cleanup on uninstall). Task 1 is a hard gate: if it fails, nothing after it is built.
 
-**Tech Stack:** C++/WinRT (cppwinrt.exe from the Windows SDK) + `Microsoft.WindowsAppSDK.Widgets` 2.0.5 (one 2.4 MB DLL and a winmd — not the 200 MB metapackage), CMake + MSVC, CTest; TypeScript (`node --test`); Rust (`cargo test -p null-setup-core`); PowerShell for packing/checks.
+**Tech Stack:** C++20 with C++/WinRT headers from the Windows SDK (`Windows.Data.Json` only), Direct2D/DirectWrite/GDI layered windows, CMake + MSVC, CTest; TypeScript (`node --test`); Rust (`cargo test -p null-setup-core`); PowerShell for the check script.
 
 **Spec:** [docs/specs/native-windows-widgets-design.md](../specs/native-windows-widgets-design.md) (issue #141). Task 1 writes its findings to `docs/specs/native-windows-widgets-gate.md`.
+
+**Verification state of this plan:** the C++ in Tasks 2–6 and the Rust in Tasks 14–15 was compiled and its tests were run in a scratch copy while the plan was written (all CTest and `cargo test -p null-setup-core` suites passed; the host was started and drawn on the desktop of a Windows 11 24H2 machine). The TypeScript in Tasks 8–13 is carried over from the earlier version of this plan and was not compiled; fix compile errors in place, the tests say what the behaviour must be.
 
 ## Execution Options
 
@@ -28,709 +30,242 @@ your human partner before Step 1 and checks the chosen boxes itself.
 
 Copied from the spec; every task includes them.
 
-- First release = Projects, Issues and Pull Requests widgets for **GitHub** only. No GitLab, no Build & Test widget, no Windows 10.
-- **Cache only.** The provider never fetches, holds no token, has no settings UI. Tokens stay in null-accounts' `SecretStorage`.
-- The IDE (`null-tools`) is the only fetcher, filter and writer, gated by `null.widgets.enabled`; with it off the IDE behaves identically to a build without the widget package.
-- Provider = **separate** sparse package `NullIDE.Widgets` (never an addition to `NullIDE.ExplorerCommand`), exe `null_widgets.exe`, signed with the existing `CN=Null IDE` certificate (no new trust prompt). Card JSON is built with `Windows.Data.Json`.
-- The provider treats `snapshot.json` as **untrusted input**: `Action.OpenUrl` only for `https://` URLs on host `github.com`; snapshot text only into Adaptive Card text elements (never markup or URLs) and length-capped; a malformed file keeps the last good render.
+- First release = Projects, Issues and Pull Requests widgets for **GitHub** only. No GitLab, no Build & Test widget, no Linux. Windows 10 (1703 or later, for per-monitor v2 DPI) and Windows 11.
+- **Cache only.** `null_widgets.exe` never fetches, holds no token, has no settings UI. Tokens stay in null-accounts' `SecretStorage`.
+- The IDE (`null-tools`) is the only fetcher, filter and writer, gated by `null.widgets.enabled`; with it off the IDE behaves identically to a build without widgets.
+- Host = **`null_widgets.exe`**, a plain Win32 exe in the install root next to `null.exe`: no package identity, no signing, no Windows App SDK. One instance (named mutex). Built by the CMake target in `shell-ext/widgets/` in the existing MSVC step.
+- Rendering: Direct2D / DirectWrite on layered windows, one top-level window per widget, `WS_EX_LAYERED | WS_EX_TOOLWINDOW` (no taskbar button), per-pixel alpha, rounded corners, Null Dark palette, per-monitor DPI aware. Each window stays **directly above the desktop window (`Progman`)**, below every app.
+- Layout (`%LOCALAPPDATA%\Null\widgets\layout.json`) is owned by the exe: positions, per-widget visibility, lock. Drag moves and snaps to screen edges; a saved position off every monitor is clamped on screen. Right-click menu: Refresh, Lock, Hide this widget, Quit widgets, plus a "Show <widget>" item per hidden widget; a second launch of the exe shows all hidden widgets.
+- The exe treats `snapshot.json` as **untrusted input**: links open only for `https://` URLs on host `github.com` via `ShellExecuteW`; snapshot text is length-capped and drawn as plain text only; a malformed file keeps the last good render; `schema` greater than 1 shows "Update Null IDE".
+- Actions: issue/PR rows open in the browser. "Open project" / "Open in new window" start `null.exe` with `CreateProcessW`: no shell, `null.exe` resolved from the exe's own folder (never from the snapshot), a project `path` must be absolute and is passed after a `--` separator.
 - Settings: exactly two, `null.widgets.enabled` and `null.widgets.repos` (`[{ repo, account }]`). Row maxima are constants: **8 projects, 10 issues, 10 PRs**. No filter or row-count settings.
-- Actions: issue/PR rows `Action.OpenUrl`; "Open project" / "Open in new window" are `Action.Execute`, launched through the explorer-marshalled `LaunchViaExplorer`. `null.exe` location comes from the package install location, never from the snapshot; a project `path` must be absolute and is passed after a `--` separator, never through a shell.
-- null-setup owns the lifecycle: opt-in "Windows widgets" option (default **off**), hidden when the host check fails (Windows build ≥ the confirmed floor, believed **22621**, and package `MicrosoftWindows.Client.WebExperience` present), CurrentUser-first trust with elevated `LocalMachine\TrustedPeople` only on an untrusted-root answer, stop `null_widgets.exe` (scoped to the install path) before the swap. Any widgets failure is logged and ignored; it never fails the IDE install or update. The uninstaller removes both packages and `%LOCALAPPDATA%\Null\widgets\`.
+- null-setup owns the lifecycle: opt-in "Desktop widgets" option (default **off**) writes `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\NullWidgets` and starts the exe; an update stops `null_widgets.exe` (scoped to the install path) before the swap and starts it again afterwards; uninstall removes the Run entry, ends the process and deletes `%LOCALAPPDATA%\Null\widgets\`. Any widgets failure is logged and ignored; it never fails the IDE install or update. All of it goes through the `System` seam (`FakeSystem` in tests).
 - Snapshot writes are atomic (`snapshot.json.tmp`, then rename). No secrets in the snapshot or logs. One writer window via the `PresenceOwnership` pattern with claim file `widgets-owner.json`.
 - Turning widgets off deletes `snapshot.json`; signing out does **not** delete rows (they stay dimmed as `signed_out`).
-- Nothing is enabled implicitly: snapshot writing starts only after `Null: Set Up Widgets` ran. Before that the empty card reads "Open Null IDE to set up widgets".
-- Stale footer is muted after 6 hours (one constant in the card builder).
+- Nothing runs unless asked: without the opt-in there is no Run entry and no process; snapshot writing starts only after `Null: Set Up Widgets`. Before that the widgets read "Open Null IDE to set up widgets".
+- The footer is muted after 6 hours (`kStaleAfterSeconds`, one constant in the layout code).
 - Repo conventions: `out/` of an extension is tracked — after editing `src/` run `npm run compile` and commit the refreshed `out/` as `chore: refresh null-tools compiled output`; never hand-edit `out/`. New TS test files must be added to **both** the `test` script in `package.json` and `tsconfig.json`'s `include`. Run `graphify update .` after code changes. Commit style: Conventional Commits with `(#141)`.
 
 **Interpretation notes (spec silent or ambiguous; flagged for review):**
-1. "Nothing is enabled implicitly … stored at least one repo *or enabled projects*": `Null: Set Up Widgets` sets `null.widgets.enabled = true` and stores the picked repos (possibly none). With zero repos only the Projects widget has data. There is no third setting.
-2. GitHub search queries are limited to 256 characters, so "one GraphQL request per account" is one request **per chunk of repos** that fits (`chunkRepos`), which is one request per account in the common case.
-3. Snapshot rows additionally carry `updatedAt` (spec example omits it; "timestamps" are allowed content). Schema stays 1; the provider ignores unknown fields.
-4. The spec's "card builder … no COM activation" is read as "no widget-provider/COM-server activation"; the builder uses `Windows.Data.Json`, whose tests call `winrt::init_apartment()`.
+1. **Z-order.** The spec said `HWND_BOTTOM`; measured, that hides the windows behind the wallpaper (Task 1 records it, the spec is corrected). The rule used is "insert after the window that is directly above `Progman`", re-applied in `WM_WINDOWPOSCHANGING` and after an Explorer restart (`TaskbarCreated`).
+2. **Row interaction.** The spec lists actions per widget but not how to reach the second one. Left click = the row's primary action (Open / Open in browser); right click on a row shows that row's actions above the fixed menu items.
+3. **"Open" vs "Open in new window".** "Open" runs `null.exe -- <path>` (VS Code's own rule about reusing a window for an already open folder applies); "Open in new window" adds `--new-window`.
+4. **Update when the exe cannot be stopped.** The spec says the widgets part of the update is then skipped. An update swaps the whole install folder, so a running exe can only block it, not be skipped. The stop is best effort and logged; the existing locked-files prompt of `procs::close_all` is the backstop (it lists `null_widgets.exe` like any other process).
+5. **Wizard option is always offered** (the exe works on Windows 10 and 11, so there is no host check, unlike a Widgets Board design).
+6. GitHub search queries are limited to 256 characters, so "one GraphQL request per account" is one request **per chunk of repos** that fits (`chunkRepos`), which is one request per account in the common case.
+7. Snapshot rows additionally carry `updatedAt` (the spec example omits it; timestamps are allowed content). Schema stays 1; the exe ignores unknown fields.
+8. "Nothing is enabled implicitly … stored at least one repo *or enabled projects*": `Null: Set Up Widgets` sets `null.widgets.enabled = true` and stores the picked repos (possibly none). With zero repos only the Projects widget has data. There is no third setting.
+9. Sizes are fixed at the spec's defaults (320×240, 360×320 DIP); `layout.json` may carry `w`/`h` (DIP, 200–800) but there is no resize UI.
 
 ## Review Focus
 
 Failure modes the spec implies that no happy-path task exercises. Each has a test in the owning task.
 
-1. **Hostile snapshot** (a `file:`/`javascript:`/look-alike-host URL, a `--flag` or relative project path, a 10 000-char title, a title containing `${...}` Adaptive-Card template syntax): must never produce an action or template text; it renders inert text. → Tasks 3, 4, 5.
-2. **Torn, empty, or garbage `snapshot.json`** while pinned: keep the last good card, never crash/blank the widget. → Tasks 3, 5.
-3. **Malformed `null.widgets.repos` settings** (a repo like `a/b is:private`, `../x`, non-array, duplicate entries) must never reach a search string. → Task 7.
-4. **Token expiry / offline / rate limit mid-session**: rows stay (dimmed), sections carry the reason, nothing is wiped, fetching suspends instead of hammering. → Tasks 8, 11.
-5. **Update/uninstall while a widget is pinned** (provider process alive and holding the install dir): must be stopped before the swap, and a provider that cannot be stopped must not fail the update. → Tasks 15, 16.
+1. **Hostile snapshot** (a `file:`/`javascript:`/look-alike-host URL, a `--flag` or relative project path, a 10 000-character title, markup- or template-looking text): must never produce an action; it renders as inert text. → Tasks 2, 3, 5.
+2. **Torn, empty or garbage `snapshot.json`, or a newer schema, while widgets are drawn**: keep the last good render (torn/garbage) or show "Update Null IDE" (newer); never crash or blank the widget. A deleted file falls back to the empty state. → Task 2.
+3. **Malformed `null.widgets.repos`** (a repo like `a/b is:private`, `../x`, a non-array, duplicates) must never reach a search string. → Task 8.
+4. **Token expiry / offline / rate limit mid-session**: rows stay (dimmed), sections carry the reason, nothing is wiped, fetching suspends instead of hammering. → Tasks 9, 12.
+5. **Update or uninstall while the widgets are running** (the exe runs from the install folder and would block the rename), and a **monitor that was unplugged** since the layout was saved (the card must not stay off-screen). → Tasks 4, 14, 15.
 
 ## File Structure
 
 | Path | Responsibility |
 |---|---|
-| `scripts/fetch-widgets-deps.ps1` | Downloads the pinned Widgets nupkg (SHA256-checked) into `shell-ext/deps/widgets/` (gitignored, like wil) |
-| `scripts/pack-widgets.ps1` | Stages exe + DLL + assets, `makeappx pack`, `signtool sign`, verifies the signer. Shared by CI, `build-local.ps1` and the gate |
-| `scripts/check-widgets.ps1` | Windows 11 manual-check driver (gate + final checklist), in the style of `check-cold-start-aumid.ps1` |
-| `shell-ext/CMakeLists.txt` | Adds `add_subdirectory(widgets)` and `enable_testing()` |
-| `shell-ext/src/launch_via_explorer.{h,cc}` | `QuoteForCommandLineArg` + `LaunchViaExplorer`, extracted from `explorer_command.cc`, shared by both targets |
-| `shell-ext/widgets/CMakeLists.txt` | cppwinrt projection, `null_widgets` exe, `null_widget_core` static lib, `null_widgets_test` (CTest) |
-| `shell-ext/widgets/AppxManifest.xml` | Sparse package `NullIDE.Widgets` |
-| `shell-ext/widgets/snapshot.{h,cc}` | Parse + validate + sanitize `snapshot.json` (pure, no COM server) |
-| `shell-ext/widgets/cards.{h,cc}` | Snapshot → Adaptive Card `{template, data}` per widget/size (pure) |
-| `shell-ext/widgets/provider.{h,cc}`, `main.cc` | `IWidgetProvider`, file watch, UpdateWidget, action handling, COM class factory, lifecycle |
-| `shell-ext/widgets/widgets_test.cc`, `fixtures/*.json` | CTest executable against fixture snapshots |
+| `scripts/check-widgets.ps1` | Manual-check driver: `-Status` (process, Run entry, files, z-order next to `Progman`) and `-Checklist` |
+| `shell-ext/CMakeLists.txt` | Gains `enable_testing()` and `add_subdirectory(widgets)` |
+| `shell-ext/widgets/CMakeLists.txt` | `null_widget_core` static lib, four CTest executables, the `null_widgets` exe |
+| `shell-ext/widgets/snapshot.{h,cc}` | Parse, validate and sanitize `snapshot.json`; URL/path allow-lists; last-good rule |
+| `shell-ext/widgets/layout.{h,cc}` | Snapshot → rows, footer, messages per widget; metrics (pure) |
+| `shell-ext/widgets/placement.{h,cc}` | `layout.json` read/write, default position, clamp to monitors, edge snap (pure) |
+| `shell-ext/widgets/actions.{h,cc}` | Command-line quoting, `Run(Action)`, IDE-environment scrub |
+| `shell-ext/widgets/app.cc` | `wWinMain`, windows, Direct2D painting, drag, menu, single instance, file watch |
+| `shell-ext/widgets/check.h`, `*_test.cc`, `fixtures/*.json` | CTest executables against fixture snapshots |
+| `.github/workflows/build.yml`, `scripts/build-local.ps1` | Run the tests, ship `null_widgets.exe` in the install root |
 | `extensions/null-tools/src/widgets/widgetTypes.ts` | Snapshot types, constants, `parseRepos` |
 | `…/widgetQueries.ts` | GraphQL document, search strings, chunking, mappers, ranking (pure) |
 | `…/widgetSections.ts` | Section building (partial failure, last-good, status), projects section (pure) |
 | `…/widgetStore.ts` | `widgetsDir()`, atomic writer, delete |
 | `…/widgetFetch.ts` | Per-account fetch over `requestGraphql`, error classification (no `vscode` import) |
 | `…/widgetRefresher.ts` | Refresh state machine with injected deps (ownership, timers, backoff, disable) |
-| `…/widgetSetup.ts` | Pure helpers for `Null: Set Up Widgets` (repo list mapping, settings merge) |
-| `…/widgetIntegration.ts` | The only `vscode` file: settings, commands, focus, wiring |
+| `…/widgetSetup.ts` | Pure helpers for `Null: Set Up Widgets` (repo list mapping, settings merge, exe environment) |
+| `…/widgetIntegration.ts` | The only `vscode` file: settings, commands, focus, wiring, starting the exe |
 | `extensions/null-tools/src/presenceOwnership.ts` | Gains an optional `claimFile` parameter |
 | `setup/core/src/install_config.rs` | `Feature::Widgets`, `InstallConfig.widgets` |
-| `setup/core/src/shell/widgets.rs` | Host check, register / unregister, constants |
-| `setup/core/src/shell/{mod,sys,win11}.rs`, `procs.rs`, `registrations.rs`, `update.rs`, `manage.rs` | `System` trait generalised, provider stop, wiring |
-| `setup/app/src/wizard.rs`, `setup/ui/wizard*.js` | The opt-in option, hidden when unsupported |
+| `setup/core/src/shell/widgets.rs` | Run entry, start, stop, data-folder cleanup |
+| `setup/core/src/shell/{mod,sys}.rs`, `procs.rs`, `registrations.rs`, `update.rs`, `manage.rs` | `Locations.local_data`, `System::{stop,start}_widgets`, `Registrar::stop_widgets`, wiring |
+| `setup/ui/wizard-model.js` | The opt-in option |
 
 ---
 
-### Task 1: Hard gate — minimal provider, signed package, runtime dependencies, minimum build
+### Task 1: Hard gate — clean up the abandoned spike, probe the desktop behaviour
 
-This task answers the four open questions in the spec ("Not covered by the spike"). **If any gate item fails, stop and tell the user; do not start Task 2.**
+The earlier Widgets Board design left uncommitted files in the working tree. This task removes them, then answers the open questions of the spec's "Hard gate" with a throwaway probe. **If a gate item fails, stop and tell the user; do not start Task 2.**
+
+Already measured while this plan was written (Windows 11 24H2, build 26100, with the full host of Tasks 2–6): pinned with `HWND_BOTTOM` the windows end up **below `Progman`** (z-order index greater than Progman's) and are invisible; pinned directly above `Progman` they are visible, draw with per-pixel alpha and stay visible through Win+D. The probe confirms this independently and covers what was not measured.
 
 **Files:**
-- Create: `scripts/fetch-widgets-deps.ps1`
-- Create: `scripts/pack-widgets.ps1`
-- Create: `scripts/check-widgets.ps1`
-- Create: `shell-ext/widgets/CMakeLists.txt`
-- Create: `shell-ext/widgets/main.cc` (spike skeleton; Task 5 replaces its body)
-- Create: `shell-ext/widgets/AppxManifest.xml`
-- Modify: `shell-ext/CMakeLists.txt` (append `add_subdirectory(widgets)`)
-- Create: `docs/specs/native-windows-widgets-gate.md` (results)
+- Delete (untracked, from the withdrawn design): `scripts/check-widgets.ps1`, `scripts/fetch-widgets-deps.ps1`, `scripts/pack-widgets.ps1`, `shell-ext/widgets/`
+- Create (outside the repo, not committed): `%TEMP%\widgets-probe\probe.cc`
+- Create: `docs/specs/native-windows-widgets-gate.md`
 
-**Interfaces:**
-- Produces: package name `NullIDE.Widgets`; CLSID `1CADFE2C-53CF-4DCC-AAEE-A3139D7EF60E`; exe path inside the install `shell-ext\NullIDE.Widgets\x64\null_widgets.exe`; package file `shell-ext\null-widgets.appx`; widget definition ids `Projects`, `Issues`, `PullRequests`; `scripts/pack-widgets.ps1 -RepoRoot -BuildDir -OutDir -PfxPath -PfxPassword`; `scripts/fetch-widgets-deps.ps1` leaves `shell-ext/deps/widgets/metadata/Microsoft.Windows.Widgets.winmd` and `shell-ext/deps/widgets/runtimes-framework/win-x64/native/Microsoft.Windows.Widgets.dll`.
-
-- [ ] **Step 1: Write the dependency fetcher**
-
-`scripts/fetch-widgets-deps.ps1` (a nupkg is a zip; the hash was measured on 2.0.5):
+- [ ] **Step 1: Remove the abandoned spike files**
 
 ```powershell
-# Fetches the Windows App SDK Widgets component (winmd + one native DLL) into shell-ext/deps/widgets.
-# Only this package is needed: the Microsoft.WindowsAppSDK metapackage pulls ONNX Runtime, DirectML and XAML (~200 MB).
-param([string]$Dest = (Join-Path $PSScriptRoot '..\shell-ext\deps\widgets'))
-$ErrorActionPreference = 'Stop'
-$version = '2.0.5'
-$sha256  = '7F1B585EF8F012784D2CB91B86E809814CECCAB74183A5979EF45DB141779CB5'
-$winmd   = Join-Path $Dest 'metadata\Microsoft.Windows.Widgets.winmd'
-if (Test-Path $winmd) { return }
-
-$tmp = Join-Path ([IO.Path]::GetTempPath()) "null-widgets-nupkg-$([guid]::NewGuid())"
-New-Item -ItemType Directory -Path $tmp | Out-Null
-try {
-    $pkg = Join-Path $tmp 'widgets.zip'
-    Invoke-WebRequest "https://api.nuget.org/v3-flatcontainer/microsoft.windowsappsdk.widgets/$version/microsoft.windowsappsdk.widgets.$version.nupkg" -OutFile $pkg
-    $actual = (Get-FileHash $pkg -Algorithm SHA256).Hash
-    if ($actual -ne $sha256) { throw "Widgets package hash mismatch: expected $sha256, got $actual" }
-    New-Item -ItemType Directory -Path $Dest -Force | Out-Null
-    Expand-Archive $pkg $Dest -Force
-}
-finally { Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue }
-if (-not (Test-Path $winmd)) { throw "winmd missing after extracting the Widgets package" }
-Write-Host "Widgets package $version ready in $Dest"
+git status --short            # expect exactly: M shell-ext/CMakeLists.txt, ?? the three scripts, ?? shell-ext/widgets/
+Remove-Item scripts/check-widgets.ps1, scripts/fetch-widgets-deps.ps1, scripts/pack-widgets.ps1 -Force
+Remove-Item shell-ext/widgets -Recurse -Force
 ```
 
-- [ ] **Step 2: Run it**
+These files are untracked and belong to the withdrawn design (a Widgets Board provider and its sparse package); they cannot be restored from git. Leave the uncommitted `shell-ext/CMakeLists.txt` change (`enable_testing()` and `add_subdirectory(widgets)`) alone: Task 2 provides the directory it points at and commits it.
 
-Run: `pwsh -File scripts/fetch-widgets-deps.ps1`
-Expected: `Widgets package 2.0.5 ready in …\shell-ext\deps\widgets`; `shell-ext/deps/widgets/metadata/Microsoft.Windows.Widgets.winmd` exists. (`shell-ext/deps/` is already gitignored.)
+- [ ] **Step 2: Write and build the probe**
 
-- [ ] **Step 3: Write the CMake for the widgets directory**
-
-`shell-ext/widgets/CMakeLists.txt`. cppwinrt generates the projection of the Widgets winmd into the build dir; the Windows SDK's own `cppwinrt` include dir supplies `winrt/base.h` and the `Windows.*` namespaces.
-
-```cmake
-set(WIDGETS_DEPS "${CMAKE_CURRENT_SOURCE_DIR}/../deps/widgets")
-set(WIDGETS_WINMD "${WIDGETS_DEPS}/metadata/Microsoft.Windows.Widgets.winmd")
-set(WIDGETS_DLL "${WIDGETS_DEPS}/runtimes-framework/win-x64/native/Microsoft.Windows.Widgets.dll")
-if(NOT EXISTS "${WIDGETS_WINMD}")
-  message(FATAL_ERROR "Widgets package not found. Run scripts/fetch-widgets-deps.ps1")
-endif()
-
-# cppwinrt.exe ships with the Windows SDK (same discovery as makeappx in CI).
-file(GLOB _cppwinrt_candidates "C:/Program Files (x86)/Windows Kits/10/bin/*/x64/cppwinrt.exe")
-list(SORT _cppwinrt_candidates)
-list(REVERSE _cppwinrt_candidates)
-list(GET _cppwinrt_candidates 0 CPPWINRT_EXE)
-if(NOT CPPWINRT_EXE)
-  message(FATAL_ERROR "cppwinrt.exe not found (needs the Windows SDK)")
-endif()
-
-set(WINRT_GEN "${CMAKE_CURRENT_BINARY_DIR}/winrt-gen")
-add_custom_command(
-  OUTPUT "${WINRT_GEN}/winrt/Microsoft.Windows.Widgets.Providers.h"
-  COMMAND "${CPPWINRT_EXE}" -in "${WIDGETS_WINMD}" -ref sdk -out "${WINRT_GEN}" -verbose
-  DEPENDS "${WIDGETS_WINMD}"
-  COMMENT "cppwinrt: projecting Microsoft.Windows.Widgets")
-add_custom_target(widgets_projection DEPENDS "${WINRT_GEN}/winrt/Microsoft.Windows.Widgets.Providers.h")
-
-add_executable(null_widgets main.cc)
-add_dependencies(null_widgets widgets_projection)
-target_include_directories(null_widgets PRIVATE "${WINRT_GEN}")
-target_compile_definitions(null_widgets PRIVATE WIN32_LEAN_AND_MEAN UNICODE _UNICODE)
-set_property(TARGET null_widgets PROPERTY CXX_STANDARD 20)
-set_property(TARGET null_widgets PROPERTY CXX_STANDARD_REQUIRED ON)
-if(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
-  target_compile_options(null_widgets PRIVATE /Zc:__cplusplus /EHsc /W4 /Qspectre /guard:cf /Ox /permissive-)
-  target_link_options(null_widgets PRIVATE /guard:cf /OPT:REF /OPT:ICF /MACHINE:X64 /SUBSYSTEM:WINDOWS)
-endif()
-target_link_libraries(null_widgets PRIVATE windowsapp ole32 oleaut32 shell32 shlwapi)
-# The Widgets runtime DLL travels next to the exe (staged by scripts/pack-widgets.ps1 from WIDGETS_DLL).
-set(NULL_WIDGETS_DLL "${WIDGETS_DLL}" CACHE INTERNAL "")
-```
-
-Append to `shell-ext/CMakeLists.txt`:
-
-```cmake
-enable_testing()
-add_subdirectory(widgets)
-```
-
-- [ ] **Step 4: Write the skeleton provider (spike scope: one widget, static card)**
-
-`shell-ext/widgets/main.cc`. It implements `IWidgetProvider` (real members, verified from the package docs: `CreateWidget(WidgetContext)`, `DeleteWidget(hstring widgetId, hstring customState)`, `OnActionInvoked(WidgetActionInvokedArgs)`, `OnWidgetContextChanged(WidgetContextChangedArgs)`, `Activate(WidgetContext)`, `Deactivate(hstring widgetId)`), registers a class factory, and exits when the last widget is deleted.
+`%TEMP%\widgets-probe\probe.cc` — a 240×120 layered tool window pinned directly above `Progman`, which flips its colour on every click and logs clicks, display changes and resumes to `%TEMP%\widgets-probe.log`:
 
 ```cpp
+// Throwaway gate probe (not kept). A layered tool window pinned just above the desktop window, logging what Windows does to it.
+// Build (Developer PowerShell for VS 2022):  cl /nologo /EHsc /W4 /DUNICODE /D_UNICODE probe.cc user32.lib gdi32.lib
 #include <windows.h>
-#include <unknwn.h>
-#include <mutex>
-#include <set>
-#include <string>
-#include <winrt/Windows.Foundation.h>
-#include <winrt/Microsoft.Windows.Widgets.Providers.h>
 
-namespace wp = winrt::Microsoft::Windows::Widgets::Providers;
+#include <cstdio>
+#include <ctime>
 
-namespace {
-constexpr GUID kProviderClsid = {0x1CADFE2C, 0x53CF, 0x4DCC, {0xAA, 0xEE, 0xA3, 0x13, 0x9D, 0x7E, 0xF6, 0x0E}};
-HANDLE g_emptyEvent = nullptr;
+static FILE* g_log;
+static int g_clicks = 0;
 
-void Log(std::wstring const& m) { OutputDebugStringW((L"[null_widgets] " + m + L"\n").c_str()); }
+static void Log(char const* what) {
+  std::fprintf(g_log, "%lld %s\n", static_cast<long long>(std::time(nullptr)), what);
+  std::fflush(g_log);
+}
 
-constexpr wchar_t kTemplate[] =
-    LR"({"type":"AdaptiveCard","$schema":"http://adaptivecards.io/schemas/adaptive-card.json","version":"1.6",
-"body":[{"type":"TextBlock","text":"${msg}"}],
-"actions":[{"type":"Action.Execute","title":"Ping","verb":"ping"}]})";
+static HWND AboveDesktop(HWND self) {
+  HWND prog = FindWindowW(L"Progman", nullptr);
+  HWND above = prog ? GetWindow(prog, GW_HWNDPREV) : nullptr;
+  return above == self ? nullptr : above;
+}
 
-struct Provider : winrt::implements<Provider, wp::IWidgetProvider> {
-  std::mutex m;
-  std::set<winrt::hstring> ids;
-  int pings = 0;
+static void Paint(HWND h) {
+  HDC screen = GetDC(nullptr), mem = CreateCompatibleDC(screen);
+  BITMAPINFO bi{};
+  bi.bmiHeader = {sizeof(BITMAPINFOHEADER), 240, -120, 1, 32, BI_RGB};
+  unsigned* px = nullptr;
+  HBITMAP bmp = CreateDIBSection(screen, &bi, DIB_RGB_COLORS, reinterpret_cast<void**>(&px), nullptr, 0);
+  HGDIOBJ old = SelectObject(mem, bmp);
+  unsigned colour = (g_clicks % 2) ? 0xF0204080u : 0xF0802040u;  // premultiplied ARGB: flips on every click
+  for (int i = 0; i < 240 * 120; ++i) px[i] = colour;
+  RECT wr;
+  GetWindowRect(h, &wr);
+  POINT pos{wr.left, wr.top}, src{0, 0};
+  SIZE size{240, 120};
+  BLENDFUNCTION blend{AC_SRC_OVER, 0, 255, AC_SRC_ALPHA};
+  UpdateLayeredWindow(h, screen, &pos, &size, mem, &src, 0, &blend, ULW_ALPHA);
+  SelectObject(mem, old);
+  DeleteObject(bmp);
+  DeleteDC(mem);
+  ReleaseDC(nullptr, screen);
+}
 
-  void Push(winrt::hstring const& id, wchar_t const* msg) {
-    wp::WidgetUpdateRequestOptions o{id};
-    o.Template(kTemplate);
-    o.Data(winrt::hstring{std::wstring(L"{\"msg\":\"") + msg + L"\"}"});
-    wp::WidgetManager::GetDefault().UpdateWidget(o);
+static LRESULT CALLBACK Proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
+  switch (msg) {
+    case WM_WINDOWPOSCHANGING: {
+      auto* p = reinterpret_cast<WINDOWPOS*>(lp);
+      if (HWND above = AboveDesktop(h)) {
+        p->hwndInsertAfter = above;
+        p->flags &= ~SWP_NOZORDER;
+      }
+      p->flags |= SWP_NOACTIVATE;
+      return 0;
+    }
+    case WM_MOUSEACTIVATE: return MA_NOACTIVATE;
+    case WM_LBUTTONDOWN: {
+      char buf[64];
+      std::snprintf(buf, sizeof buf, "click %d", ++g_clicks);
+      Log(buf);
+      Paint(h);
+      return 0;
+    }
+    case WM_DISPLAYCHANGE: Log("WM_DISPLAYCHANGE"); SetWindowPos(h, nullptr, 100, 100, 240, 120, SWP_NOACTIVATE | SWP_NOZORDER); Paint(h); return 0;
+    case WM_POWERBROADCAST:
+      if (wp == PBT_APMRESUMEAUTOMATIC || wp == PBT_APMRESUMESUSPEND) {
+        Log("resume");
+        SetWindowPos(h, nullptr, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOZORDER);
+        Paint(h);
+      }
+      return TRUE;
+    case WM_DESTROY: PostQuitMessage(0); return 0;
   }
-  void CreateWidget(wp::WidgetContext const& c) {
-    { std::lock_guard g{m}; ids.insert(c.Id()); }
-    Log(L"CreateWidget " + std::wstring(c.DefinitionId()));
-    Push(c.Id(), L"gate: created");
-  }
-  void DeleteWidget(winrt::hstring const& id, winrt::hstring const&) {
-    bool empty;
-    { std::lock_guard g{m}; ids.erase(id); empty = ids.empty(); }
-    Log(L"DeleteWidget");
-    if (empty) SetEvent(g_emptyEvent);
-  }
-  void OnActionInvoked(wp::WidgetActionInvokedArgs const& a) {
-    Log(L"OnActionInvoked " + std::wstring(a.Verb()));
-    Push(a.WidgetContext().Id(), (L"gate: ping " + std::to_wstring(++pings)).c_str());
-  }
-  void OnWidgetContextChanged(wp::WidgetContextChangedArgs const&) { Log(L"OnWidgetContextChanged"); }
-  void Activate(wp::WidgetContext const& c) { Log(L"Activate"); Push(c.Id(), L"gate: activated"); }
-  void Deactivate(winrt::hstring const&) { Log(L"Deactivate"); }
-};
+  return DefWindowProcW(h, msg, wp, lp);
+}
 
-struct Factory : winrt::implements<Factory, IClassFactory> {
-  winrt::com_ptr<Provider> provider = winrt::make_self<Provider>();
-  HRESULT __stdcall CreateInstance(IUnknown* outer, GUID const& iid, void** result) noexcept final {
-    if (!result) return E_POINTER;
-    *result = nullptr;
-    if (outer) return CLASS_E_NOAGGREGATION;
-    return provider->QueryInterface(iid, result);
-  }
-  HRESULT __stdcall LockServer(BOOL) noexcept final { return S_OK; }
-};
-}  // namespace
-
-int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
-  winrt::init_apartment(winrt::apartment_type::multi_threaded);
-  g_emptyEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
-  DWORD cookie = 0;
-  auto factory = winrt::make<Factory>();
-  winrt::check_hresult(CoRegisterClassObject(kProviderClsid, factory.get(), CLSCTX_LOCAL_SERVER, REGCLS_MULTIPLEUSE, &cookie));
-  Log(L"registered");
-  WaitForSingleObject(g_emptyEvent, INFINITE);
-  CoRevokeClassObject(cookie);
+int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int) {
+  wchar_t path[MAX_PATH];
+  GetTempPathW(MAX_PATH, path);
+  wcscat_s(path, L"widgets-probe.log");
+  _wfopen_s(&g_log, path, L"a");
+  WNDCLASSW wc{};
+  wc.lpfnWndProc = Proc;
+  wc.hInstance = inst;
+  wc.lpszClassName = L"NullWidgetsProbe";
+  RegisterClassW(&wc);
+  HWND h = CreateWindowExW(WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE, wc.lpszClassName, L"probe", WS_POPUP, 100, 100, 240, 120, nullptr, nullptr, inst, nullptr);
+  ShowWindow(h, SW_SHOWNOACTIVATE);
+  Paint(h);
+  Log("started");
+  MSG m;
+  while (GetMessageW(&m, nullptr, 0, 0) > 0) DispatchMessageW(&m);
   return 0;
 }
 ```
 
-Notes for the implementer: if `Provider` does not compile because a member signature differs in the generated header, open `shell-ext/build…/widgets/winrt-gen/winrt/impl/Microsoft.Windows.Widgets.Providers.2.h` and match the exact parameter types — the member *names* above are verified. If the exe exits at once when the Board starts it with widgets already pinned (a restart), that is expected for this spike; Task 5 repopulates from `WidgetManager::GetDefault().GetWidgetInfos()`.
-
-- [ ] **Step 5: Write the manifest**
-
-`shell-ext/widgets/AppxManifest.xml`. The `activatableClass` fragments are copied from the package's own `runtimes-framework/package.appxfragment`, with `Path` rebased to the external location. If registration of the in-process server through a *sparse* package does not work (Step 11 tells), the fallback is in Step 12.
-
-```xml
-<?xml version="1.0" encoding="utf-8"?>
-<Package
-  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
-  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
-  xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
-  xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
-  xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10"
-  xmlns:desktop6="http://schemas.microsoft.com/appx/manifest/desktop/windows10/6"
-  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
-  IgnorableNamespaces="uap uap3 uap10 com desktop6 rescap">
-
-  <!-- Publisher must exactly match the CN of the signing certificate (the same cert as NullIDE.ExplorerCommand).
-       Bump Version whenever this file changes: Add-AppxPackage -ForceUpdateFromAnyVersion re-registers by identity. -->
-  <Identity Name="NullIDE.Widgets" Publisher="CN=Null IDE" Version="1.0.0.0" ProcessorArchitecture="x64" />
-
-  <Properties>
-    <DisplayName>Null IDE Widgets</DisplayName>
-    <PublisherDisplayName>Null IDE</PublisherDisplayName>
-    <Logo>Assets\StoreLogo.png</Logo>
-    <uap10:AllowExternalContent>true</uap10:AllowExternalContent>
-    <desktop6:RegistryWriteVirtualization>disabled</desktop6:RegistryWriteVirtualization>
-    <desktop6:FileSystemWriteVirtualization>disabled</desktop6:FileSystemWriteVirtualization>
-  </Properties>
-
-  <Dependencies>
-    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.22621.0" MaxVersionTested="10.0.65535.0" />
-  </Dependencies>
-
-  <Resources><Resource Language="en-us" /></Resources>
-
-  <Capabilities>
-    <rescap:Capability Name="runFullTrust" />
-    <rescap:Capability Name="unvirtualizedResources" />
-  </Capabilities>
-
-  <Applications>
-    <Application Id="NullIDEWidgets"
-                 Executable="shell-ext\NullIDE.Widgets\x64\null_widgets.exe"
-                 uap10:TrustLevel="mediumIL" uap10:RuntimeBehavior="win32App">
-      <uap:VisualElements AppListEntry="none" DisplayName="Null IDE Widgets" Description="Null IDE widgets"
-                          BackgroundColor="transparent"
-                          Square150x150Logo="Assets\Square150x150Logo.png" Square44x44Logo="Assets\Square44x44Logo.png">
-        <uap:DefaultTile />
-      </uap:VisualElements>
-
-      <Extensions>
-        <com:Extension Category="windows.comServer">
-          <com:ComServer>
-            <com:ExeServer Executable="shell-ext\NullIDE.Widgets\x64\null_widgets.exe" DisplayName="Null IDE Widgets">
-              <com:Class Id="1CADFE2C-53CF-4DCC-AAEE-A3139D7EF60E" DisplayName="Null IDE Widget Provider" />
-            </com:ExeServer>
-          </com:ComServer>
-        </com:Extension>
-
-        <uap3:Extension Category="windows.appExtension">
-          <uap3:AppExtension Name="com.microsoft.windows.widgets" DisplayName="Null IDE" Id="NullIDE" PublicFolder="Public">
-            <uap3:Properties>
-              <WidgetProvider>
-                <ProviderIcons><Icon Path="ProviderAssets\icon.png" /></ProviderIcons>
-                <Activation><CreateInstance ClassId="1CADFE2C-53CF-4DCC-AAEE-A3139D7EF60E" /></Activation>
-                <Definitions>
-                  <Definition Id="Projects" DisplayName="Projects" Description="Pinned and recent Null IDE projects" AllowMultiple="false">
-                    <Capabilities>
-                      <Capability><Size Name="small" /></Capability>
-                      <Capability><Size Name="medium" /></Capability>
-                      <Capability><Size Name="large" /></Capability>
-                    </Capabilities>
-                    <ThemeResources>
-                      <Icons><Icon Path="ProviderAssets\icon.png" /></Icons>
-                      <Screenshots><Screenshot Path="ProviderAssets\screenshot-projects.png" DisplayAltText="Projects widget" /></Screenshots>
-                      <DarkMode /><LightMode />
-                    </ThemeResources>
-                  </Definition>
-                  <Definition Id="Issues" DisplayName="Issues" Description="GitHub issues assigned to or mentioning you" AllowMultiple="false">
-                    <Capabilities>
-                      <Capability><Size Name="medium" /></Capability>
-                      <Capability><Size Name="large" /></Capability>
-                    </Capabilities>
-                    <ThemeResources>
-                      <Icons><Icon Path="ProviderAssets\icon.png" /></Icons>
-                      <Screenshots><Screenshot Path="ProviderAssets\screenshot-issues.png" DisplayAltText="Issues widget" /></Screenshots>
-                      <DarkMode /><LightMode />
-                    </ThemeResources>
-                  </Definition>
-                  <Definition Id="PullRequests" DisplayName="Pull Requests" Description="GitHub pull requests that need your attention" AllowMultiple="false">
-                    <Capabilities>
-                      <Capability><Size Name="medium" /></Capability>
-                      <Capability><Size Name="large" /></Capability>
-                    </Capabilities>
-                    <ThemeResources>
-                      <Icons><Icon Path="ProviderAssets\icon.png" /></Icons>
-                      <Screenshots><Screenshot Path="ProviderAssets\screenshot-prs.png" DisplayAltText="Pull requests widget" /></Screenshots>
-                      <DarkMode /><LightMode />
-                    </ThemeResources>
-                  </Definition>
-                </Definitions>
-              </WidgetProvider>
-            </uap3:Properties>
-          </uap3:AppExtension>
-        </uap3:Extension>
-      </Extensions>
-    </Application>
-  </Applications>
-
-  <!-- From Microsoft.WindowsAppSDK.Widgets/runtimes-framework/package.appxfragment, Path rebased to the external location. -->
-  <Extensions>
-    <Extension Category="windows.activatableClass.inProcessServer">
-      <InProcessServer>
-        <Path>shell-ext\NullIDE.Widgets\x64\Microsoft.Windows.Widgets.dll</Path>
-        <ActivatableClass ActivatableClassId="Microsoft.Windows.Widgets.Providers.WidgetUpdateRequestOptions" ThreadingModel="both" />
-        <ActivatableClass ActivatableClassId="Microsoft.Windows.Widgets.Providers.WidgetManager" ThreadingModel="both" />
-        <ActivatableClass ActivatableClassId="Microsoft.Windows.Widgets.Providers.WidgetResourceResponse" ThreadingModel="both" />
-      </InProcessServer>
-    </Extension>
-  </Extensions>
-</Package>
-```
-
-- [ ] **Step 6: Write the pack script**
-
-`scripts/pack-widgets.ps1`. It renders the placeholder assets itself (icon scaled; a 600×400 dark "screenshot" with the icon centred) so the repo needs no binary assets.
+Build it in a "Developer PowerShell for VS 2022" (the build must print no warnings):
 
 ```powershell
-# Packs and signs null-widgets.appx. Used by CI, scripts/build-local.ps1 and the gate.
-# -BuildDir is the cmake build dir (holding Release\null_widgets.exe); -OutDir is VSCode-win32-x64.
-param(
-    [Parameter(Mandatory)][string]$RepoRoot,
-    [Parameter(Mandatory)][string]$BuildDir,
-    [Parameter(Mandatory)][string]$OutDir,
-    [Parameter(Mandatory)][string]$PfxPath,
-    [Parameter(Mandatory)][string]$PfxPassword
-)
-$ErrorActionPreference = 'Stop'
-$pkgDir  = Join-Path $OutDir 'shell-ext'
-$exeDir  = Join-Path $pkgDir 'NullIDE.Widgets\x64'
-$dll     = Join-Path $RepoRoot 'shell-ext\deps\widgets\runtimes-framework\win-x64\native\Microsoft.Windows.Widgets.dll'
-$exe     = Join-Path $BuildDir 'widgets\Release\null_widgets.exe'
-foreach ($f in $exe, $dll) { if (-not (Test-Path $f)) { throw "missing $f" } }
-New-Item -ItemType Directory -Path $exeDir -Force | Out-Null
-Copy-Item $exe, $dll $exeDir -Force
-
-# ── assets (placeholders rendered from the master icon) ──
-$stage = Join-Path ([IO.Path]::GetTempPath()) "null-widgets-stage-$([guid]::NewGuid())"
-New-Item -ItemType Directory -Path "$stage\Assets", "$stage\Public\ProviderAssets" -Force | Out-Null
-Add-Type -AssemblyName System.Drawing
-$icon = [System.Drawing.Image]::FromFile((Resolve-Path (Join-Path $RepoRoot 'icons\icon.png')))
-function Save-Scaled($dst, $w, $h) {
-    $bmp = New-Object System.Drawing.Bitmap($w, $h)
-    $g = [System.Drawing.Graphics]::FromImage($bmp)
-    $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
-    $g.DrawImage($icon, 0, 0, $w, $h)
-    $bmp.Save($dst, [System.Drawing.Imaging.ImageFormat]::Png); $g.Dispose(); $bmp.Dispose()
-}
-function Save-Screenshot($dst) {
-    $bmp = New-Object System.Drawing.Bitmap(600, 400)
-    $g = [System.Drawing.Graphics]::FromImage($bmp)
-    $g.Clear([System.Drawing.Color]::FromArgb(32, 32, 32))
-    $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
-    $g.DrawImage($icon, 220, 120, 160, 160)
-    $bmp.Save($dst, [System.Drawing.Imaging.ImageFormat]::Png); $g.Dispose(); $bmp.Dispose()
-}
-Save-Scaled "$stage\Assets\Square150x150Logo.png" 150 150
-Save-Scaled "$stage\Assets\Square44x44Logo.png" 44 44
-Save-Scaled "$stage\Assets\StoreLogo.png" 50 50
-Save-Scaled "$stage\Public\ProviderAssets\icon.png" 64 64
-foreach ($n in 'projects', 'issues', 'prs') { Save-Screenshot "$stage\Public\ProviderAssets\screenshot-$n.png" }
-$icon.Dispose()
-Copy-Item (Join-Path $RepoRoot 'shell-ext\widgets\AppxManifest.xml') $stage
-
-# ── pack + sign ──
-function Find-SdkTool($name) {
-    Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin' -Recurse -Filter $name -ErrorAction SilentlyContinue |
-        Where-Object { $_.FullName -match 'x64' } | Sort-Object LastWriteTime -Descending |
-        Select-Object -First 1 -ExpandProperty FullName
-}
-$makeappx = Find-SdkTool 'makeappx.exe'; if (-not $makeappx) { throw 'makeappx.exe not found' }
-$signtool = Find-SdkTool 'signtool.exe'; if (-not $signtool) { throw 'signtool.exe not found' }
-$appx = Join-Path $pkgDir 'null-widgets.appx'
-& $makeappx pack /d $stage /p $appx /nv /o
-if ($LASTEXITCODE -ne 0) { throw "makeappx pack failed ($LASTEXITCODE)" }
-& $signtool sign /fd SHA256 /f $PfxPath /p $PfxPassword $appx
-if ($LASTEXITCODE -ne 0) { throw "signtool sign failed ($LASTEXITCODE)" }
-Remove-Item $stage -Recurse -Force
-
-$expected = (New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($PfxPath, $PfxPassword)).Thumbprint
-$sig = Get-AuthenticodeSignature $appx
-if (-not $sig.SignerCertificate -or $sig.SignerCertificate.Thumbprint -ne $expected) { throw 'null-widgets.appx is not signed with the expected certificate' }
-Write-Host "null-widgets.appx built and signed (thumbprint $expected)"
+mkdir $env:TEMP\widgets-probe -Force | Out-Null; cd $env:TEMP\widgets-probe
+cl /nologo /EHsc /W4 /DUNICODE /D_UNICODE probe.cc user32.lib gdi32.lib
 ```
 
-- [ ] **Step 7: Write the check script**
+- [ ] **Step 3: Run the checks on Windows 11 24H2 and on Windows 10**
 
-`scripts/check-widgets.ps1` — reports the host check and, in `-Gate` mode, walks the person through the four gate items. Exact text matters less than the data it prints; keep the print format since the results go into the findings doc.
+Start `probe.exe` from a plain terminal. A dark-red box appears at (100,100) on the primary monitor. For each item write pass/fail and what you saw:
 
-```powershell
-# Windows 11 manual-check driver for the Null IDE widgets (cannot run in CI).
-#   -Gate    : first-task hard gate (signed package, provider with null.exe closed, build floor, size).
-#   -Status  : what is registered / running right now.
-# Run in a PLAIN PowerShell window outside Null IDE (closing the IDE is part of the gate).
-param(
-    [string]$InstallDir = (Join-Path $env:LOCALAPPDATA 'Programs\Null IDE'),
-    [switch]$Gate,
-    [switch]$Status
-)
-$ErrorActionPreference = 'Stop'
-function Section($t) { Write-Host "`n== $t ==" -ForegroundColor Cyan }
+1. Open an app over the box: the app is in front, the box never comes forward.
+2. Win+D: the box stays visible.
+3. Click the box: its colour flips and the log gains `click N`; the click does not reach any window behind it.
+4. Sleep and resume the machine: the log gains `resume`; the box is still visible.
+5. Change the display resolution or unplug/plug a monitor: the log gains `WM_DISPLAYCHANGE`; the box is still visible.
+6. Restart Explorer (Task Manager → Windows Explorer → Restart): note whether the box is still visible. (Expected: it may vanish behind the new desktop window; the host handles this with `TaskbarCreated`, so this is information, not a gate item.)
 
-Section 'Host'
-$build = [int](Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion').CurrentBuildNumber
-$web = Get-AppxPackage -Name 'MicrosoftWindows.Client.WebExperience' -ErrorAction SilentlyContinue | Select-Object -First 1
-"Windows build            : $build"
-"WebExperience package    : $(if ($web) { $web.Version } else { '<none>' })"
+Kill the probe afterwards (`Stop-Process -Name probe`).
 
-Section 'Registration'
-$pkg = Get-AppxPackage -Name 'NullIDE.Widgets' -ErrorAction SilentlyContinue | Select-Object -First 1
-"NullIDE.Widgets          : $(if ($pkg) { $pkg.PackageFullName } else { '<not registered>' })"
-$proc = Get-Process -Name 'null_widgets' -ErrorAction SilentlyContinue
-"null_widgets.exe running : $(if ($proc) { ($proc.Id -join ', ') } else { 'no' })"
-$ide = Get-Process -Name 'null' -ErrorAction SilentlyContinue
-"null.exe running         : $(if ($ide) { ($ide.Id -join ', ') } else { 'no' })"
-$exe = Join-Path $InstallDir 'shell-ext\NullIDE.Widgets\x64\null_widgets.exe'
-$dll = Join-Path $InstallDir 'shell-ext\NullIDE.Widgets\x64\Microsoft.Windows.Widgets.dll'
-if ((Test-Path $exe) -and (Test-Path $dll)) {
-    $mb = [math]::Round(((Get-Item $exe).Length + (Get-Item $dll).Length) / 1MB, 2)
-    "Provider payload         : $mb MB (budget 5 MB: exe + Widgets DLL)"
-}
-$appx = Join-Path $InstallDir 'shell-ext\null-widgets.appx'
-if (Test-Path $appx) { $s = Get-AuthenticodeSignature $appx; "appx signature           : $($s.SignerCertificate.Subject) / $($s.Status)" }
+- [ ] **Step 4: Record the findings**
 
-if ($Status -and -not $Gate) { return }
-if (-not $Gate) { return }
+Create `docs/specs/native-windows-widgets-gate.md` with: the date, the two Windows builds, a table of the six items per OS (pass/fail, notes), the sentence "pinning with `HWND_BOTTOM` hides the windows behind the desktop; pinning directly above `Progman` works", and a verdict line. Items 1–5 must pass on both systems. If Win+D hides the widgets or clicks fail, write the verdict as "stop" and report to the user: the spec's fallback is an owned-by-desktop parent window, which needs a design decision before more is built.
 
-Section 'Gate'
-@'
-1. Register (signed package, developer mode OFF is the point of this gate):
-     Add-AppxPackage -Path <install>\shell-ext\null-widgets.appx -ExternalLocation <install> -ForceUpdateFromAnyVersion
-   Needs the CN=Null IDE certificate in LocalMachine\TrustedPeople (the installed Null IDE already put it there).
-2. Open the Widgets Board (Win+W) -> "+" : "Null IDE" must list Projects / Issues / Pull Requests with an icon.
-3. Pin "Projects": the card shows "gate: created". Click "Ping": it must change to "gate: ping 1".
-4. QUIT Null IDE completely (no null.exe), then unpin and re-pin the widget and click Ping again.
-   Re-run this script with -Status afterwards to prove null.exe was not running.
-5. Record: Windows build, whether step 2-4 worked, payload size, and anything the Board complained about.
-'@
-```
-
-- [ ] **Step 8: Build everything**
-
-Run (from a "Developer PowerShell for VS 2022"):
-
-```powershell
-pwsh -File scripts/fetch-widgets-deps.ps1
-cmake -S shell-ext -B shell-ext-build -G "Visual Studio 17 2022" -A x64
-cmake --build shell-ext-build --config Release --target null_widgets
-```
-
-Expected: `shell-ext-build\widgets\Release\null_widgets.exe` exists. Fix compile errors against the generated header as described in Step 4.
-
-- [ ] **Step 9: Pack with a throwaway signing certificate**
-
-```powershell
-$cert = New-SelfSignedCertificate -Subject 'CN=Null IDE' -CertStoreLocation Cert:\CurrentUser\My -Type CodeSigning -KeySpec Signature -KeyAlgorithm RSA -KeyLength 2048 -HashAlgorithm SHA256 -NotAfter (Get-Date).AddYears(1)
-$pwd = ConvertTo-SecureString 'gate' -Force -AsPlainText
-Export-PfxCertificate -Cert $cert -FilePath "$env:TEMP\gate.pfx" -Password $pwd | Out-Null
-Export-Certificate -Cert $cert -FilePath "$env:TEMP\gate.cer" | Out-Null
-pwsh -File scripts/pack-widgets.ps1 -RepoRoot . -BuildDir shell-ext-build -OutDir "$env:TEMP\gate-out" -PfxPath "$env:TEMP\gate.pfx" -PfxPassword gate
-```
-
-Expected: `null-widgets.appx built and signed`. Trust the throwaway cert machine-wide once (admin PowerShell): `Import-Certificate -FilePath $env:TEMP\gate.cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople`. **Remove it again after the gate** (`Get-ChildItem Cert:\LocalMachine\TrustedPeople | Where Thumbprint -eq <thumb> | Remove-Item`). Developer mode must be **off** for this gate.
-
-- [ ] **Step 10: Register with the install layout and run the gate**
-
-```powershell
-$ext = "$env:TEMP\gate-install"
-New-Item -ItemType Directory -Path $ext -Force | Out-Null
-Copy-Item "$env:TEMP\gate-out\shell-ext" $ext -Recurse -Force
-Add-AppxPackage -Path "$ext\shell-ext\null-widgets.appx" -ExternalLocation $ext -ForceUpdateFromAnyVersion
-pwsh -File scripts/check-widgets.ps1 -Gate -InstallDir $ext
-```
-
-Walk the five gate steps printed by the script. Record each result.
-
-- [ ] **Step 11: Decide the runtime-dependency approach**
-
-Expected if the sparse manifest's `activatableClass.inProcessServer` works: the Board's Ping updates the card and `OutputDebugString` (view with DebugView or `dbgview`) shows `registered`, `CreateWidget`, `OnActionInvoked`. If `WidgetManager::GetDefault()` throws `REGDB_E_CLASSNOTREG` (0x80040154), the in-proc registration did not take effect for a sparse package — go to Step 12. Otherwise skip Step 12.
-
-- [ ] **Step 12 (only if Step 11 failed): Activation-factory hook**
-
-Add to the top of `main.cc` (before any winrt include that activates classes), loading the DLL that sits next to the exe, and rebuild/re-pack/re-register:
-
-```cpp
-#include <windows.h>
-#include <unknwn.h>
-#include <winrt/base.h>
-namespace {
-int32_t __stdcall NullActivation(void* classId, winrt::guid const& iid, void** factory) noexcept {
-  static HMODULE dll = [] {
-    wchar_t p[MAX_PATH]; GetModuleFileNameW(nullptr, p, MAX_PATH);
-    std::wstring s{p}; s.resize(s.find_last_of(L'\\') + 1);
-    return LoadLibraryW((s + L"Microsoft.Windows.Widgets.dll").c_str());
-  }();
-  using Fn = HRESULT(__stdcall*)(void*, void**);
-  auto get = dll ? reinterpret_cast<Fn>(GetProcAddress(dll, "DllGetActivationFactory")) : nullptr;
-  if (!get) return winrt::impl::error_class_not_available;
-  void* raw = nullptr;
-  if (HRESULT hr = get(classId, &raw); FAILED(hr)) return hr;
-  return static_cast<IUnknown*>(raw)->QueryInterface(reinterpret_cast<GUID const&>(iid), factory);
-}
-}
-// C++/WinRT calls this hook before RoGetActivationFactory when it is defined with this exact name.
-int32_t(__stdcall* winrt_activation_handler)(void* classId, winrt::guid const& iid, void** factory) = NullActivation;
-```
-
-Re-run Steps 8–10. If neither approach activates `WidgetManager`, that is a gate failure.
-
-- [ ] **Step 13: Determine the minimum Windows build**
-
-On a machine at build 22621 (Windows 11 22H2) if available, repeat Step 10. If none is available, read the Microsoft widget-provider requirements page (use `npx ctx7@latest docs /websites/learn_microsoft_en-us_windows_apps "widget providers minimum Windows version third party widgets"`) and record the stated floor with its source URL. Record whether the floor is *confirmed on hardware* or *documented only*.
-
-- [ ] **Step 14: Write the findings and decide**
-
-Create `docs/specs/native-windows-widgets-gate.md` with exactly these sections, filled from your measurements (no blanks):
-
-```markdown
-# Native Windows widgets — gate results (#141, Task 1)
-
-Date, Windows build, machine.
-
-| Gate item | Result | Evidence |
-|---|---|---|
-| Signed package (developer mode off) | pass / FAIL | … |
-| Provider works with null.exe closed | pass / FAIL | … |
-| Activation approach | manifest inProcessServer / DllGetActivationFactory hook | … |
-| Payload size (exe + Widgets DLL) | X.XX MB (budget 5 MB: met / MISSED) | … |
-| Minimum Windows build | NNNNN (confirmed on hardware / documented only) | source |
-
-Decision: proceed / stop. If a size miss: recorded as a finding, not a stop.
-```
-
-If any of the first two rows says FAIL: commit this file alone (Step 15), stop, and report to the user. Otherwise continue.
-
-- [ ] **Step 15: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
-git add scripts/fetch-widgets-deps.ps1 scripts/pack-widgets.ps1 scripts/check-widgets.ps1 shell-ext/CMakeLists.txt shell-ext/widgets docs/specs/native-windows-widgets-gate.md
-git commit -m "feat(widgets): provider skeleton, pack/check scripts and gate findings (#141)"
-```
-
-Also unregister the throwaway package (`Get-AppxPackage NullIDE.Widgets | Remove-AppxPackage`) and remove the throwaway certificate from `LocalMachine\TrustedPeople`.
-
----
-
-### Task 2: Share `LaunchViaExplorer` between the DLL and the provider
-
-A process the packaged provider starts inherits the package AUMID exactly like the DLL case (`shell-ext/CLAUDE.md`), so the provider must use the same explorer-marshalled launch. Move, do not rewrite.
-
-**Files:**
-- Create: `shell-ext/src/launch_via_explorer.h`, `shell-ext/src/launch_via_explorer.cc`
-- Modify: `shell-ext/src/explorer_command.cc` (remove the two moved functions, include the header)
-- Modify: `shell-ext/CMakeLists.txt` (compile the new .cc into `null_explorer_command`)
-
-**Interfaces:**
-- Produces (namespace `null_launch`):
-  `std::wstring QuoteForCommandLineArg(const std::wstring& arg);`
-  `HRESULT LaunchViaExplorer(const std::filesystem::path& exe, const std::filesystem::path& install_root, const std::wstring& args);`
-
-- [ ] **Step 1: Create the header**
-
-`shell-ext/src/launch_via_explorer.h`:
-
-```cpp
-#pragma once
-#include <windows.h>
-#include <filesystem>
-#include <string>
-
-namespace null_launch {
-// Chromium's base/command_line.cc quoting.
-std::wstring QuoteForCommandLineArg(const std::wstring& arg);
-
-// Asks the already-running, unpackaged explorer.exe to ShellExecute `exe`, so the new process has no package identity.
-// See shell-ext/CLAUDE.md "Cold-start identity gotcha".
-HRESULT LaunchViaExplorer(const std::filesystem::path& exe, const std::filesystem::path& install_root,
-                          const std::wstring& args);
-}  // namespace null_launch
-```
-
-- [ ] **Step 2: Move the code verbatim**
-
-Create `shell-ext/src/launch_via_explorer.cc`. Cut `QuoteForCommandLineArg` (the function starting at the line `std::wstring QuoteForCommandLineArg` in the anonymous namespace of `explorer_command.cc`) and `LaunchViaExplorer` (including the long comment block above it) out of `explorer_command.cc` and paste them, unchanged, inside `namespace null_launch { … }`. Copy exactly the includes they need: `<windows.h> <shlobj.h> <exdisp.h> <oleauto.h> <shldisp.h> <shobjidl_core.h> <wrl/client.h> "wil/stl.h" "wil/win32_helpers.h"` (keep `<oleauto.h>` **before** the wil includes, as the original comment says) and `using Microsoft::WRL::ComPtr;`.
-
-In `explorer_command.cc`: add `#include "launch_via_explorer.h"`, add `using null_launch::LaunchViaExplorer; using null_launch::QuoteForCommandLineArg;` after the existing `using` lines, and leave `LaunchNullIde` where it is.
-
-- [ ] **Step 3: Add the source to the DLL target**
-
-In `shell-ext/CMakeLists.txt`, add `src/launch_via_explorer.cc` to the `add_library(null_explorer_command SHARED …)` list.
-
-- [ ] **Step 4: Build — behaviour must not change**
-
-Run: `cmake --build shell-ext-build --config Release --target null_explorer_command`
-Expected: builds with no new warnings.
-
-- [ ] **Step 5: Regression check on the real behaviour**
-
-Pack a local build per `scripts/build-local.ps1` (or reuse your installed Null IDE and drop the new DLL in), then in a plain terminal outside Null IDE run `scripts/check-cold-start-aumid.ps1` and do the right-click "Open with Null" steps it prints.
-Expected: `PackageAUMID=<none>` and `Parent=explorer`. Anything else = the move broke it; revert and investigate.
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add shell-ext/src shell-ext/CMakeLists.txt
-git commit -m "refactor(shell-ext): share LaunchViaExplorer with the widgets provider (#141)"
+git add docs/specs/native-windows-widgets-gate.md
+git commit -m "docs(widgets): record the desktop gate findings (#141)"
 ```
 
 ---
 
-### Task 3: Snapshot parser and validator (provider side)
+### Task 2: Snapshot parser and validator
 
 **Files:**
-- Create: `shell-ext/widgets/snapshot.h`, `shell-ext/widgets/snapshot.cc`
-- Create: `shell-ext/widgets/widgets_test.cc`
-- Create: `shell-ext/widgets/fixtures/ok.json`, `partial.json`, `signed_out.json`, `newer_schema.json`, `hostile.json`, `corrupt.json`
-- Modify: `shell-ext/widgets/CMakeLists.txt` (static lib `null_widget_core`, test exe, `add_test`)
+- Create: `shell-ext/widgets/CMakeLists.txt`, `shell-ext/widgets/check.h`
+- Create: `shell-ext/widgets/snapshot.h`, `shell-ext/widgets/snapshot.cc`, `shell-ext/widgets/snapshot_test.cc`
+- Create: `shell-ext/widgets/fixtures/ok.json`, `partial.json`, `signed_out.json`, `newer_schema.json`, `corrupt.json`, `hostile.json`
+- Modify (already modified in the working tree, commit it here): `shell-ext/CMakeLists.txt`
 
 **Interfaces:**
-- Produces (namespace `null_widgets`):
+- Produces (namespace `null_widgets`, `snapshot.h`): `enum class Load { Ok, Missing, Corrupt, NewerSchema }`; structs `Failed`, `Section`, `Project`, `Issue`, `Pr`, `Snapshot`, `Loaded { Load state; Snapshot snapshot; }`; `Loaded ParseSnapshot(std::wstring const&)` (never throws; unsafe URLs and paths come back empty, text is capped); `Loaded LoadSnapshotFile(std::wstring const&)`; `Loaded KeepLastGood(Loaded const& previous, Loaded fresh)`; `bool IsSafeGithubUrl(...)`, `bool IsAbsoluteLocalPath(...)`, `std::wstring CapText(..., size_t)`, `bool ParseIsoUtc(..., long long*)`; `constexpr int kSchema = 1`.
 
-```cpp
-enum class Load { Ok, Missing, Corrupt, NewerSchema };
-struct Failed { std::wstring repo, reason; };
-struct Section { std::wstring status = L"ok"; std::vector<Failed> failed; };
-struct Project { std::wstring name, path, branch, lastOpened; bool dirty = false, pinned = false; };
-struct Issue   { std::wstring repo, title, url, attention, localPath, assignee; std::vector<std::wstring> labels; long number = 0; };
-struct Pr      { std::wstring repo, title, url, author, review, checks, localPath; bool conflict = false; long number = 0; };
-struct Snapshot {
-  std::wstring writtenAt;                       // ISO-8601 UTC as written
-  Section projectsSection, issuesSection, prsSection;
-  std::vector<Project> projects; std::vector<Issue> issues; std::vector<Pr> prs;
-};
-struct Loaded { Load state = Load::Missing; Snapshot snapshot; };
-Loaded ParseSnapshot(std::wstring const& json);                 // never throws
-Loaded LoadSnapshotFile(std::wstring const& path);              // Missing if absent, else ParseSnapshot
-bool IsSafeGithubUrl(std::wstring const& url);
-bool IsAbsoluteLocalPath(std::wstring const& path);
-std::wstring CapText(std::wstring const& s, size_t maxLen);     // control chars -> space, truncates with an ellipsis
-bool ParseIsoUtc(std::wstring const& iso, long long* epochSeconds);
-constexpr int kSchema = 1;
-```
+- [ ] **Step 1: Write the fixtures, the check header, the test and the CMake file**
 
-- [ ] **Step 1: Write the fixtures**
+`shell-ext/CMakeLists.txt` already ends with `enable_testing()` and `add_subdirectory(widgets)` (uncommitted); keep it.
 
-`fixtures/ok.json`:
+`shell-ext/widgets/fixtures/ok.json`:
 
 ```json
 {"schema":1,"writtenAt":"2026-10-21T14:03:11Z",
@@ -743,11 +278,40 @@ constexpr int kSchema = 1;
    {"provider":"github","repo":"o/r","number":9,"title":"Add widgets","url":"https://github.com/o/r/pull/9","author":"sam","review":"requested","checks":"failing","conflict":true,"localPath":"","updatedAt":"2026-10-21T12:30:00Z"}]}}
 ```
 
-`fixtures/partial.json`: same as ok but `"issues":{"status":"ok","failed":[{"repo":"o/gone","reason":"error"},{"repo":"o/two","reason":"offline"}],"items":[ …one issue… ]}`.
-`fixtures/signed_out.json`: `"issues":{"status":"signed_out","failed":[{"repo":"o/r","reason":"signed_out"}],"items":[ …one issue… ]}` and `"prs"` likewise, `"projects"` ok.
-`fixtures/newer_schema.json`: `{"schema":2,"writtenAt":"2026-10-21T14:03:11Z"}`.
-`fixtures/corrupt.json`: the text `{"schema":1,"writtenAt":"2026-10-21T14:0` (truncated on purpose; no trailing newline).
-`fixtures/hostile.json`: one project and one issue and one PR each carrying attacks:
+`fixtures/partial.json` (two repos failed, one issue kept):
+
+```json
+{"schema":1,"writtenAt":"2026-10-21T14:03:11Z",
+ "projects":{"status":"ok","failed":[],"items":[]},
+ "issues":{"status":"ok","failed":[{"repo":"o/gone","reason":"error"},{"repo":"o/two","reason":"offline"}],"items":[
+   {"provider":"github","repo":"o/r","number":7,"title":"Crash on save","url":"https://github.com/o/r/issues/7","state":"open","labels":[],"assignee":"me","attention":"assigned","localPath":"","updatedAt":"2026-10-21T12:00:00Z"}]},
+ "prs":{"status":"ok","failed":[],"items":[]}}
+```
+
+`fixtures/signed_out.json`:
+
+```json
+{"schema":1,"writtenAt":"2026-10-21T14:03:11Z",
+ "projects":{"status":"ok","failed":[],"items":[]},
+ "issues":{"status":"signed_out","failed":[{"repo":"o/r","reason":"signed_out"}],"items":[
+   {"provider":"github","repo":"o/r","number":7,"title":"Crash on save","url":"https://github.com/o/r/issues/7","state":"open","labels":[],"assignee":"me","attention":"assigned","localPath":"","updatedAt":"2026-10-21T12:00:00Z"}]},
+ "prs":{"status":"signed_out","failed":[{"repo":"o/r","reason":"signed_out"}],"items":[
+   {"provider":"github","repo":"o/r","number":9,"title":"Add widgets","url":"https://github.com/o/r/pull/9","author":"sam","review":"none","checks":"none","conflict":false,"localPath":"","updatedAt":"2026-10-21T12:30:00Z"}]}}
+```
+
+`fixtures/newer_schema.json`:
+
+```json
+{"schema":2,"writtenAt":"2026-10-21T14:03:11Z"}
+```
+
+`fixtures/corrupt.json` — the text below, truncated on purpose, **no trailing newline**:
+
+```json
+{"schema":1,"writtenAt":"2026-10-21T14:0
+```
+
+`fixtures/hostile.json` — one project, issue and PR set carrying attacks (the oversized title is built in the test by replacing `HUGE` with 10 000 characters):
 
 ```json
 {"schema":1,"writtenAt":"2026-10-21T14:03:11Z",
@@ -763,137 +327,251 @@ constexpr int kSchema = 1;
  "prs":{"status":"ok","failed":[],"items":[
    {"provider":"github","repo":"o/r","number":5,"title":"HUGE","url":"https://github.com/o/r/pull/5","author":"a","review":"none","checks":"none","conflict":false,"localPath":"","updatedAt":"2026-10-21T12:00:00Z"}]}}
 ```
-(The oversized-title case is built in the test by string replacement of `HUGE` with 10 000 `A`s — keeps the fixture small.)
 
-- [ ] **Step 2: Write the failing tests**
-
-`shell-ext/widgets/widgets_test.cc` (plain `main`, no framework; later tasks append test functions and call them from `main`):
+`shell-ext/widgets/check.h`:
 
 ```cpp
-#include <windows.h>
+#pragma once
+// A framework-free check macro for the widget tests. Each *_test.cc has its own main() and is one CTest test.
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string>
+
 #include <winrt/base.h>
+
+inline int g_failures = 0;
+
+#define CHECK(c)                                                        \
+  do {                                                                  \
+    if (!(c)) {                                                         \
+      ++g_failures;                                                     \
+      std::cerr << "FAIL " << __FILE__ << ":" << __LINE__ << "  " << #c << "\n"; \
+    }                                                                   \
+  } while (0)
+
+// Fixtures are UTF-8 files next to the sources (FIXTURE_DIR is set by CMake).
+inline std::wstring ReadFixture(char const* name) {
+  std::ifstream f(std::string(FIXTURE_DIR) + "/" + name, std::ios::binary);
+  std::stringstream ss;
+  ss << f.rdbuf();
+  return std::wstring(winrt::to_hstring(ss.str()).c_str());
+}
+
+inline int Finish(char const* what) {
+  if (g_failures) {
+    std::cerr << g_failures << " check(s) failed in " << what << "\n";
+    return 1;
+  }
+  std::cout << what << ": all checks passed\n";
+  return 0;
+}
+```
+
+`shell-ext/widgets/snapshot_test.cc`:
+
+```cpp
+#include "check.h"
 #include "snapshot.h"
 
 using namespace null_widgets;
-static int g_failures = 0;
-#define CHECK(c) do { if (!(c)) { ++g_failures; std::wcerr << L"FAIL " << __FILE__ << L":" << __LINE__ << L"  " << L#c << L"\n"; } } while (0)
 
-static std::wstring ReadFixture(char const* name) {
-  std::ifstream f(std::string(FIXTURE_DIR) + "/" + name, std::ios::binary);
-  std::stringstream ss; ss << f.rdbuf();
-  return winrt::to_hstring(ss.str()).c_str();
-}
-
-static void TestSnapshot() {
+static void TestParse() {
   auto ok = ParseSnapshot(ReadFixture("ok.json"));
   CHECK(ok.state == Load::Ok);
   CHECK(ok.snapshot.projects.size() == 2 && ok.snapshot.projects[0].name == L"null-ide" && ok.snapshot.projects[0].dirty);
+  CHECK(ok.snapshot.projects[0].pinned && ok.snapshot.projects[0].path == L"D:\\Coding\\Apps\\null-ide");
   CHECK(ok.snapshot.issues.size() == 1 && ok.snapshot.issues[0].number == 7 && ok.snapshot.issues[0].labels.size() == 1);
-  CHECK(ok.snapshot.prs[0].conflict && ok.snapshot.prs[0].review == L"requested");
+  CHECK(ok.snapshot.issues[0].localPath == L"D:\\Coding\\Apps\\null-ide");
+  CHECK(ok.snapshot.prs[0].conflict && ok.snapshot.prs[0].review == L"requested" && ok.snapshot.prs[0].checks == L"failing");
 
   auto partial = ParseSnapshot(ReadFixture("partial.json"));
   CHECK(partial.state == Load::Ok && partial.snapshot.issuesSection.status == L"ok" && partial.snapshot.issuesSection.failed.size() == 2);
+  CHECK(partial.snapshot.issuesSection.failed[1].repo == L"o/two" && partial.snapshot.issuesSection.failed[1].reason == L"offline");
 
   auto out = ParseSnapshot(ReadFixture("signed_out.json"));
   CHECK(out.snapshot.issuesSection.status == L"signed_out" && out.snapshot.issues.size() == 1);
+  CHECK(out.snapshot.prsSection.status == L"signed_out" && out.snapshot.projectsSection.status == L"ok");
 
   CHECK(ParseSnapshot(ReadFixture("newer_schema.json")).state == Load::NewerSchema);
   CHECK(ParseSnapshot(ReadFixture("corrupt.json")).state == Load::Corrupt);
   CHECK(ParseSnapshot(L"").state == Load::Corrupt);
   CHECK(ParseSnapshot(L"[1,2,3]").state == Load::Corrupt);
+  CHECK(ParseSnapshot(L"{\"writtenAt\":\"x\"}").state == Load::Corrupt);  // no schema
   CHECK(LoadSnapshotFile(L"C:\\definitely\\not\\here.json").state == Load::Missing);
 
-  // Unknown section / wrong types must degrade, never throw.
+  // Wrong types degrade; they never throw.
   auto odd = ParseSnapshot(L"{\"schema\":1,\"writtenAt\":5,\"projects\":\"x\",\"issues\":{\"items\":[1,\"a\",{\"number\":\"n\"}]}}");
-  CHECK(odd.state == Load::Ok && odd.snapshot.projects.empty());
+  CHECK(odd.state == Load::Ok && odd.snapshot.projects.empty() && odd.snapshot.issues.size() == 1 && odd.snapshot.issues[0].number == 0);
+
+  // A section is capped at 200 items however large the file is.
+  std::wstring many = L"{\"schema\":1,\"issues\":{\"items\":[";
+  for (int i = 0; i < 500; ++i) many += (i ? L",{}" : L"{}");
+  many += L"]}}";
+  CHECK(ParseSnapshot(many).snapshot.issues.size() == 200);
 }
 
 static void TestHostile() {
   auto h = ParseSnapshot(ReadFixture("hostile.json"));
   CHECK(h.state == Load::Ok);
-  // Projects: a flag-looking and a relative path are dropped; the absolute one survives.
+  // A flag-looking path and a relative path are emptied; the absolute one survives.
   CHECK(h.snapshot.projects.size() == 3);
   CHECK(h.snapshot.projects[0].path.empty() && h.snapshot.projects[1].path.empty() && h.snapshot.projects[2].path == L"C:\\work\\good");
-  // URLs: only https://github.com/... survives; localPath "-n" is dropped.
+  // Only https://github.com/... survives as a URL; localPath "-n" is dropped.
   CHECK(h.snapshot.issues.size() == 4);
   for (auto const& i : h.snapshot.issues) CHECK(i.url.empty());
   CHECK(h.snapshot.issues[0].localPath.empty());
-  // Text is kept verbatim (it is only ever data), but capped.
+  // Text is kept as it is (it is only ever drawn as plain text), but capped.
   CHECK(h.snapshot.issues[0].title == L"${$host.widgetSize} {{x}} <b>hi</b>");
   std::wstring big = ReadFixture("hostile.json");
   big.replace(big.find(L"HUGE"), 4, std::wstring(10000, L'A'));
   auto capped = ParseSnapshot(big);
-  CHECK(capped.snapshot.prs[0].title.size() <= 121);
+  CHECK(capped.snapshot.prs[0].title.size() == 121);  // 120 + the ellipsis
+  CHECK(capped.snapshot.prs[0].url == L"https://github.com/o/r/pull/5");
 
   CHECK(IsSafeGithubUrl(L"https://github.com/o/r/issues/7"));
   CHECK(!IsSafeGithubUrl(L"http://github.com/o/r"));
   CHECK(!IsSafeGithubUrl(L"https://github.com"));
+  CHECK(!IsSafeGithubUrl(L"https://github.com/"));
   CHECK(!IsSafeGithubUrl(L"https://GitHub.com.evil.com/x"));
+  CHECK(!IsSafeGithubUrl(L"https://github.com@evil.com/x"));
   CHECK(!IsSafeGithubUrl(L"https://github.com/ x"));
   CHECK(!IsSafeGithubUrl(L"https://github.com/\"x"));
+  CHECK(!IsSafeGithubUrl(L"https://github.com/o\\r"));
   CHECK(IsAbsoluteLocalPath(L"C:\\a b\\c"));
-  CHECK(!IsAbsoluteLocalPath(L"--flag")); CHECK(!IsAbsoluteLocalPath(L"-n"));
-  CHECK(!IsAbsoluteLocalPath(L"C:rel")); CHECK(!IsAbsoluteLocalPath(L"\\\\?\\C:\\x"));
+  CHECK(!IsAbsoluteLocalPath(L"--flag"));
+  CHECK(!IsAbsoluteLocalPath(L"-n"));
+  CHECK(!IsAbsoluteLocalPath(L"C:rel"));
+  CHECK(!IsAbsoluteLocalPath(L"\\\\?\\C:\\x"));
+  CHECK(!IsAbsoluteLocalPath(L"\\\\server\\share"));
   CHECK(!IsAbsoluteLocalPath(L"C:\\a|b"));
   CHECK(CapText(L"a\nb", 10) == L"a b");
-  long long t = 0; CHECK(ParseIsoUtc(L"2026-10-21T14:03:11Z", &t) && t == 1792591391);
+  CHECK(CapText(L"abcdef", 3) == L"abc\u2026");
+  long long t = 0;
+  CHECK(ParseIsoUtc(L"2026-10-21T14:03:11Z", &t) && t == 1792591391);
   CHECK(!ParseIsoUtc(L"yesterday", &t));
+}
+
+static void TestKeepLastGood() {
+  auto good = ParseSnapshot(ReadFixture("ok.json"));
+  Loaded corrupt;
+  corrupt.state = Load::Corrupt;
+  Loaded missing;  // Missing by default
+  CHECK(KeepLastGood(good, corrupt).state == Load::Ok);                // torn write: keep what is drawn
+  CHECK(KeepLastGood(good, missing).state == Load::Missing);           // file deleted (widgets turned off): fall back
+  CHECK(KeepLastGood(missing, corrupt).state == Load::Corrupt);        // nothing to keep
+  CHECK(KeepLastGood(good, ParseSnapshot(ReadFixture("newer_schema.json"))).state == Load::NewerSchema);
 }
 
 int main() {
   winrt::init_apartment();
-  TestSnapshot();
+  TestParse();
   TestHostile();
-  if (g_failures) { std::wcerr << g_failures << L" check(s) failed\n"; return 1; }
-  std::wcout << L"all widget tests passed\n";
-  return 0;
+  TestKeepLastGood();
+  return Finish("snapshot_test");
 }
 ```
 
-(`1792591391` is the epoch seconds for 2026-10-21T14:03:11Z; verify with `[DateTimeOffset]::Parse('2026-10-21T14:03:11Z').ToUnixTimeSeconds()` and correct the literal if the executor's value differs.)
-
-Add to `shell-ext/widgets/CMakeLists.txt`:
+`shell-ext/widgets/CMakeLists.txt` (later tasks widen the two `set` lines and append the exe target):
 
 ```cmake
-add_library(null_widget_core STATIC snapshot.cc cards.cc)
-add_dependencies(null_widget_core widgets_projection)
-target_include_directories(null_widget_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}" "${WINRT_GEN}")
-target_compile_definitions(null_widget_core PUBLIC WIN32_LEAN_AND_MEAN UNICODE _UNICODE)
-set_property(TARGET null_widget_core PROPERTY CXX_STANDARD 20)
-if(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
-  target_compile_options(null_widget_core PUBLIC /Zc:__cplusplus /EHsc /W4 /permissive-)
-endif()
-target_link_libraries(null_widget_core PUBLIC windowsapp)
+# null_widgets.exe: the desktop widgets host (a plain Win32 exe: no package identity, no signing). Design: docs/specs/native-windows-widgets-design.md.
+# Parsing, layout, placement and actions live in null_widget_core with no window or Direct2D calls, so CTest covers them.
+# JSON comes from Windows.Data.Json (the C++/WinRT headers ship with the Windows SDK; nothing is downloaded).
 
-add_executable(null_widgets_test widgets_test.cc)
-target_link_libraries(null_widgets_test PRIVATE null_widget_core)
-target_compile_definitions(null_widgets_test PRIVATE FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
-add_test(NAME null_widgets_test COMMAND null_widgets_test)
+set(CORE_SOURCES snapshot.cc)
+set(TESTS snapshot_test)
+
+add_library(null_widget_core STATIC ${CORE_SOURCES})
+target_include_directories(null_widget_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+target_compile_definitions(null_widget_core PUBLIC WIN32_LEAN_AND_MEAN UNICODE _UNICODE NOMINMAX)
+target_compile_features(null_widget_core PUBLIC cxx_std_20)
+if(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+  target_compile_options(null_widget_core PUBLIC /Zc:__cplusplus /EHsc /W4 /permissive- /utf-8 /Qspectre /guard:cf)
+endif()
+target_link_libraries(null_widget_core PUBLIC windowsapp shell32)
+
+foreach(t ${TESTS})
+  add_executable(${t} ${t}.cc)
+  target_link_libraries(${t} PRIVATE null_widget_core)
+  target_compile_definitions(${t} PRIVATE FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
+  add_test(NAME ${t} COMMAND ${t})
+endforeach()
 ```
 
-Until Task 4 exists, create an empty `cards.cc` containing `// filled in Task 4`.
+- [ ] **Step 2: Run to verify failure**
 
-- [ ] **Step 3: Run to verify failure**
+```powershell
+cmake -S shell-ext -B shell-ext-build -G "Visual Studio 17 2022" -A x64
+```
 
-Run: `cmake -S shell-ext -B shell-ext-build -G "Visual Studio 17 2022" -A x64; cmake --build shell-ext-build --config Release --target null_widgets_test`
-Expected: FAIL — `snapshot.h` not found.
+Expected: FAIL — `Cannot find source file: snapshot.cc`. (`shell-ext/deps/wil` must exist; it is fetched by CI and already present on a developer machine that built the shell extension.)
 
-- [ ] **Step 4: Write the implementation**
+- [ ] **Step 3: Write the implementation**
 
-`shell-ext/widgets/snapshot.h`: the declarations from **Interfaces** above (with `#include <string> <vector>`).
+`shell-ext/widgets/snapshot.h`:
+
+```cpp
+#pragma once
+#include <string>
+#include <vector>
+
+namespace null_widgets {
+
+constexpr int kSchema = 1;
+
+enum class Load { Ok, Missing, Corrupt, NewerSchema };
+
+struct Failed { std::wstring repo, reason; };
+struct Section { std::wstring status = L"ok"; std::vector<Failed> failed; };
+struct Project { std::wstring name, path, branch, lastOpened; bool dirty = false, pinned = false; };
+struct Issue { std::wstring repo, title, url, attention, localPath, assignee; std::vector<std::wstring> labels; long number = 0; };
+struct Pr { std::wstring repo, title, url, author, review, checks, localPath; bool conflict = false; long number = 0; };
+
+struct Snapshot {
+  std::wstring writtenAt;  // ISO-8601 UTC as written
+  Section projectsSection, issuesSection, prsSection;
+  std::vector<Project> projects;
+  std::vector<Issue> issues;
+  std::vector<Pr> prs;
+};
+
+struct Loaded {
+  Load state = Load::Missing;
+  Snapshot snapshot;
+};
+
+// Never throws. Everything in the result is already validated: unsafe URLs and paths are emptied, text is capped.
+Loaded ParseSnapshot(std::wstring const& json);
+// Missing when the file is absent, Corrupt when it is over 2 MB, else ParseSnapshot.
+Loaded LoadSnapshotFile(std::wstring const& path);
+// A corrupt file keeps the last good render; every other outcome (including a deleted file) replaces it.
+Loaded KeepLastGood(Loaded const& previous, Loaded fresh);
+
+bool IsSafeGithubUrl(std::wstring const& url);
+bool IsAbsoluteLocalPath(std::wstring const& path);
+// Control characters become spaces; longer text is cut and ends in an ellipsis.
+std::wstring CapText(std::wstring const& s, size_t maxLen);
+// "2026-10-21T14:03:11Z" -> epoch seconds.
+bool ParseIsoUtc(std::wstring const& iso, long long* epochSeconds);
+
+}  // namespace null_widgets
+```
 
 `shell-ext/widgets/snapshot.cc`:
 
 ```cpp
 #include "snapshot.h"
-#include <winrt/Windows.Data.Json.h>
+
+#include <cstdlib>
 #include <ctime>
+#include <filesystem>
 #include <fstream>
 #include <sstream>
+
+#include <winrt/Windows.Foundation.Collections.h>
+#include <winrt/Windows.Data.Json.h>
+#include <winrt/base.h>
 
 using namespace winrt::Windows::Data::Json;
 
@@ -901,15 +579,21 @@ namespace null_widgets {
 
 std::wstring CapText(std::wstring const& s, size_t maxLen) {
   std::wstring out = s;
-  for (auto& c : out) if (c < 0x20 || c == 0x7f) c = L' ';
-  if (out.size() > maxLen) { out.resize(maxLen); out.push_back(L'\u2026'); }
+  for (auto& c : out) {
+    if (c < 0x20 || c == 0x7f) c = L' ';
+  }
+  if (out.size() > maxLen) {
+    out.resize(maxLen);
+    out.push_back(L'\u2026');
+  }
   return out;
 }
 
 bool IsSafeGithubUrl(std::wstring const& u) {
   static constexpr wchar_t kPrefix[] = L"https://github.com/";
-  if (u.size() <= 19 || u.size() > 300 || u.compare(0, 19, kPrefix) != 0) return false;
-  for (size_t i = 19; i < u.size(); ++i) {
+  constexpr size_t kPrefixLen = 19;
+  if (u.size() <= kPrefixLen || u.size() > 300 || u.compare(0, kPrefixLen, kPrefix) != 0) return false;
+  for (size_t i = kPrefixLen; i < u.size(); ++i) {
     wchar_t c = u[i];
     if (c <= 0x20 || c >= 0x7f || c == L'"' || c == L'\\' || c == L'<' || c == L'>' || c == L'`') return false;
   }
@@ -918,15 +602,24 @@ bool IsSafeGithubUrl(std::wstring const& u) {
 
 bool IsAbsoluteLocalPath(std::wstring const& p) {
   if (p.size() < 3 || p.size() > 260) return false;
-  if (!((p[0] >= L'A' && p[0] <= L'Z') || (p[0] >= L'a' && p[0] <= L'z')) || p[1] != L':' || p[2] != L'\\') return false;
-  for (wchar_t c : p) if (c < 0x20 || c == L'<' || c == L'>' || c == L'"' || c == L'|' || c == L'?' || c == L'*') return false;
+  bool letter = (p[0] >= L'A' && p[0] <= L'Z') || (p[0] >= L'a' && p[0] <= L'z');
+  if (!letter || p[1] != L':' || p[2] != L'\\') return false;
+  for (wchar_t c : p) {
+    if (c < 0x20 || c == L'<' || c == L'>' || c == L'"' || c == L'|' || c == L'?' || c == L'*') return false;
+  }
   return true;
 }
 
 bool ParseIsoUtc(std::wstring const& iso, long long* out) {
   int y, mo, d, h, mi, s;
   if (swscanf_s(iso.c_str(), L"%4d-%2d-%2dT%2d:%2d:%2dZ", &y, &mo, &d, &h, &mi, &s) != 6) return false;
-  std::tm tm{}; tm.tm_year = y - 1900; tm.tm_mon = mo - 1; tm.tm_mday = d; tm.tm_hour = h; tm.tm_min = mi; tm.tm_sec = s;
+  std::tm tm{};
+  tm.tm_year = y - 1900;
+  tm.tm_mon = mo - 1;
+  tm.tm_mday = d;
+  tm.tm_hour = h;
+  tm.tm_min = mi;
+  tm.tm_sec = s;
   auto t = _mkgmtime64(&tm);
   if (t < 0) return false;
   *out = t;
@@ -934,33 +627,37 @@ bool ParseIsoUtc(std::wstring const& iso, long long* out) {
 }
 
 namespace {
-std::wstring Str(JsonObject const& o, wchar_t const* k, size_t cap) {
-  if (!o.HasKey(k)) return L"";
-  auto v = o.GetNamedValue(k);
-  return v.ValueType() == JsonValueType::String ? CapText(v.GetString().c_str(), cap) : L"";
-}
-bool Bool(JsonObject const& o, wchar_t const* k) {
-  if (!o.HasKey(k)) return false;
-  auto v = o.GetNamedValue(k);
-  return v.ValueType() == JsonValueType::Boolean && v.GetBoolean();
-}
-long Num(JsonObject const& o, wchar_t const* k) {
-  if (!o.HasKey(k)) return 0;
-  auto v = o.GetNamedValue(k);
-  return v.ValueType() == JsonValueType::Number ? static_cast<long>(v.GetNumber()) : 0;
-}
-std::wstring Url(JsonObject const& o) { auto u = Str(o, L"url", 400); return IsSafeGithubUrl(u) ? u : L""; }
-std::wstring Path(JsonObject const& o, wchar_t const* k) { auto p = Str(o, k, 300); return IsAbsoluteLocalPath(p) ? p : L""; }
 
-// Reads {status, failed[], items[]}; calls add() for each object item. Anything of the wrong shape is skipped.
+constexpr size_t kMaxItems = 200;
+
+bool Has(JsonObject const& o, wchar_t const* k, JsonValueType t) {
+  return o.HasKey(k) && o.GetNamedValue(k).ValueType() == t;
+}
+std::wstring Str(JsonObject const& o, wchar_t const* k, size_t cap) {
+  return Has(o, k, JsonValueType::String) ? CapText(o.GetNamedString(k).c_str(), cap) : L"";
+}
+bool Bool(JsonObject const& o, wchar_t const* k) { return Has(o, k, JsonValueType::Boolean) && o.GetNamedBoolean(k); }
+long Num(JsonObject const& o, wchar_t const* k) {
+  return Has(o, k, JsonValueType::Number) ? static_cast<long>(o.GetNamedNumber(k)) : 0;
+}
+std::wstring Url(JsonObject const& o) {
+  auto u = Str(o, L"url", 400);
+  return IsSafeGithubUrl(u) ? u : L"";
+}
+std::wstring Path(JsonObject const& o, wchar_t const* k) {
+  auto p = Str(o, k, 300);
+  return IsAbsoluteLocalPath(p) ? p : L"";
+}
+
+// Reads {status, failed[], items[]} and calls add() for each object item. Anything of the wrong shape is skipped.
 template <class F>
 Section ReadSection(JsonObject const& root, wchar_t const* key, F add) {
   Section s;
-  if (!root.HasKey(key) || root.GetNamedValue(key).ValueType() != JsonValueType::Object) return s;
+  if (!Has(root, key, JsonValueType::Object)) return s;
   auto sec = root.GetNamedObject(key);
   auto status = Str(sec, L"status", 20);
   if (status == L"signed_out" || status == L"offline" || status == L"error") s.status = status;
-  if (sec.HasKey(L"failed") && sec.GetNamedValue(L"failed").ValueType() == JsonValueType::Array) {
+  if (Has(sec, L"failed", JsonValueType::Array)) {
     for (auto const& f : sec.GetNamedArray(L"failed")) {
       if (f.ValueType() != JsonValueType::Object) continue;
       auto fo = f.GetObject();
@@ -968,40 +665,64 @@ Section ReadSection(JsonObject const& root, wchar_t const* key, F add) {
       if (s.failed.size() >= 50) break;
     }
   }
-  if (sec.HasKey(L"items") && sec.GetNamedValue(L"items").ValueType() == JsonValueType::Array) {
-    for (auto const& it : sec.GetNamedArray(L"items")) if (it.ValueType() == JsonValueType::Object) add(it.GetObject());
+  if (Has(sec, L"items", JsonValueType::Array)) {
+    size_t n = 0;
+    for (auto const& it : sec.GetNamedArray(L"items")) {
+      if (it.ValueType() != JsonValueType::Object) continue;
+      add(it.GetObject());
+      if (++n >= kMaxItems) break;
+    }
   }
   return s;
 }
+
 }  // namespace
 
 Loaded ParseSnapshot(std::wstring const& json) {
   Loaded r;
   try {
     JsonObject root{nullptr};
-    if (!JsonObject::TryParse(json, root)) { r.state = Load::Corrupt; return r; }
-    if (!root.HasKey(L"schema") || root.GetNamedValue(L"schema").ValueType() != JsonValueType::Number) { r.state = Load::Corrupt; return r; }
-    if (static_cast<int>(root.GetNamedNumber(L"schema")) > kSchema) { r.state = Load::NewerSchema; return r; }
+    if (!JsonObject::TryParse(json, root) || !Has(root, L"schema", JsonValueType::Number)) {
+      r.state = Load::Corrupt;
+      return r;
+    }
+    if (static_cast<int>(root.GetNamedNumber(L"schema")) > kSchema) {
+      r.state = Load::NewerSchema;
+      return r;
+    }
     auto& s = r.snapshot;
     s.writtenAt = Str(root, L"writtenAt", 30);
     s.projectsSection = ReadSection(root, L"projects", [&](JsonObject const& o) {
-      Project p{Str(o, L"name", 60), Path(o, L"path"), Str(o, L"branch", 60), Str(o, L"lastOpened", 30), Bool(o, L"dirty"), Bool(o, L"pinned")};
-      s.projects.push_back(std::move(p));
+      s.projects.push_back({Str(o, L"name", 60), Path(o, L"path"), Str(o, L"branch", 60), Str(o, L"lastOpened", 30),
+                            Bool(o, L"dirty"), Bool(o, L"pinned")});
     });
     s.issuesSection = ReadSection(root, L"issues", [&](JsonObject const& o) {
-      Issue i; i.repo = Str(o, L"repo", 100); i.title = Str(o, L"title", 120); i.url = Url(o);
-      i.attention = Str(o, L"attention", 20); i.localPath = Path(o, L"localPath"); i.assignee = Str(o, L"assignee", 40);
+      Issue i;
+      i.repo = Str(o, L"repo", 100);
+      i.title = Str(o, L"title", 120);
+      i.url = Url(o);
+      i.attention = Str(o, L"attention", 20);
+      i.localPath = Path(o, L"localPath");
+      i.assignee = Str(o, L"assignee", 40);
       i.number = Num(o, L"number");
-      if (o.HasKey(L"labels") && o.GetNamedValue(L"labels").ValueType() == JsonValueType::Array)
+      if (Has(o, L"labels", JsonValueType::Array)) {
         for (auto const& l : o.GetNamedArray(L"labels")) {
           if (l.ValueType() == JsonValueType::String && i.labels.size() < 5) i.labels.push_back(CapText(l.GetString().c_str(), 30));
         }
+      }
       s.issues.push_back(std::move(i));
     });
     s.prsSection = ReadSection(root, L"prs", [&](JsonObject const& o) {
-      Pr p; p.repo = Str(o, L"repo", 100); p.title = Str(o, L"title", 120); p.url = Url(o); p.author = Str(o, L"author", 40);
-      p.review = Str(o, L"review", 20); p.checks = Str(o, L"checks", 20); p.conflict = Bool(o, L"conflict");
-      p.localPath = Path(o, L"localPath"); p.number = Num(o, L"number");
+      Pr p;
+      p.repo = Str(o, L"repo", 100);
+      p.title = Str(o, L"title", 120);
+      p.url = Url(o);
+      p.author = Str(o, L"author", 40);
+      p.review = Str(o, L"review", 20);
+      p.checks = Str(o, L"checks", 20);
+      p.conflict = Bool(o, L"conflict");
+      p.localPath = Path(o, L"localPath");
+      p.number = Num(o, L"number");
       s.prs.push_back(std::move(p));
     });
     r.state = Load::Ok;
@@ -1014,673 +735,1692 @@ Loaded ParseSnapshot(std::wstring const& json) {
 
 Loaded LoadSnapshotFile(std::wstring const& path) {
   std::ifstream f(std::filesystem::path(path), std::ios::binary);
-  if (!f) { Loaded l; l.state = Load::Missing; return l; }
-  std::stringstream ss; ss << f.rdbuf();
+  Loaded l;
+  if (!f) return l;  // Missing
+  std::stringstream ss;
+  ss << f.rdbuf();
   auto text = ss.str();
-  if (text.size() > 2 * 1024 * 1024) { Loaded l; l.state = Load::Corrupt; return l; }
-  return ParseSnapshot(winrt::to_hstring(text).c_str());
+  if (text.starts_with("\xEF\xBB\xBF")) text.erase(0, 3);  // a BOM from an editor or PowerShell
+  if (text.size() > 2 * 1024 * 1024) {
+    l.state = Load::Corrupt;
+    return l;
+  }
+  return ParseSnapshot(std::wstring(winrt::to_hstring(text).c_str()));
+}
+
+Loaded KeepLastGood(Loaded const& previous, Loaded fresh) {
+  if (fresh.state == Load::Corrupt && previous.state == Load::Ok) return previous;
+  return fresh;
 }
 
 }  // namespace null_widgets
 ```
 
-Add `#include <filesystem>` and `#include <cstdlib>` at the top. Item arrays are capped by the card builder (Task 4), but cap the parse too: stop adding after 200 items per section (add `if (list.size() >= 200) return;` guards via a counter in `ReadSection`).
+- [ ] **Step 4: Run to verify it passes**
 
-- [ ] **Step 5: Run to verify it passes**
+```powershell
+cmake -S shell-ext -B shell-ext-build -G "Visual Studio 17 2022" -A x64
+cmake --build shell-ext-build --config Release --target snapshot_test
+ctest --test-dir shell-ext-build -C Release --output-on-failure -R snapshot_test
+```
 
-Run: `cmake --build shell-ext-build --config Release --target null_widgets_test; ctest --test-dir shell-ext-build -C Release --output-on-failure -R null_widgets_test`
-Expected: `all widget tests passed`, CTest `100% tests passed`.
+Expected: no compiler warnings; `snapshot_test: all checks passed`; CTest `100% tests passed`. The `.gitignore` already ignores `shell-ext-build/` and `shell-ext/deps/`.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
-git add shell-ext/widgets
+git add shell-ext/CMakeLists.txt shell-ext/widgets
 git commit -m "feat(widgets): snapshot parser with untrusted-input validation (#141)"
 ```
 
 ---
 
-### Task 4: Adaptive Card builder
-
-The template is a constant per widget kind; **all** snapshot text goes through `data`. Adaptive Card templating binds values (`${title}`) without re-evaluating them, so a title containing `${…}` stays inert. A test pins the property: the template text is identical for a benign and a hostile snapshot.
+### Task 3: Row layout (pure view model)
 
 **Files:**
-- Create: `shell-ext/widgets/cards.h`, fill `shell-ext/widgets/cards.cc`
-- Modify: `shell-ext/widgets/widgets_test.cc`
+- Create: `shell-ext/widgets/layout.h`, `shell-ext/widgets/layout.cc`, `shell-ext/widgets/layout_test.cc`
+- Modify: `shell-ext/widgets/CMakeLists.txt` (two `set` lines)
 
 **Interfaces:**
-- Consumes: everything in `snapshot.h`.
-- Produces (namespace `null_widgets`):
+- Consumes: `Loaded`, `ParseSnapshot`, `ParseIsoUtc` (Task 2).
+- Produces (`layout.h`): `enum class Kind { Projects, Issues, Prs }` (`kKindCount = 3`); `Tone`, `Span`, `ActionKind { None, OpenUrl, OpenProject, OpenProjectNewWindow }`, `Action { kind, target, label }`, `Row { title, detail, click, menu, dimmed }`, `View { title, rows, message, footer, stale }`; `constexpr long long kStaleAfterSeconds = 6*3600`; metrics `kHeaderDip=36, kRowDip=40, kFooterDip=24, kPadDip=8`; `SizeDip DefaultSize(Kind)`, `TitleOf(Kind)`, `KeyOf(Kind)`, `int RowsThatFit(int heightDip)`, `std::wstring FormatAge(long long)`, `View BuildView(Loaded const&, Kind, int maxRows, long long nowEpoch)`.
+
+- [ ] **Step 1: Write the failing test**
+
+`shell-ext/widgets/layout_test.cc`:
 
 ```cpp
-enum class Kind { Projects, Issues, Prs };
-enum class Size { Small, Medium, Large };
-struct Card { std::wstring templateJson, dataJson; };
-constexpr long long kStaleAfterSeconds = 6 * 3600;   // footer muted after 6 h
-size_t RowLimit(Size s);                              // small 3, medium 4, large 8
-Card BuildCard(Loaded const& loaded, Kind kind, Size size, long long nowEpoch);
-// Everything an action may target: project paths and localPaths of the current snapshot.
-bool IsAllowedProjectPath(Snapshot const& s, std::wstring const& path);
-std::wstring RelativeAge(long long seconds);          // "just now", "5 min ago", "3 h ago", "2 d ago"
+#include "check.h"
+#include "layout.h"
+
+using namespace null_widgets;
+
+constexpr long long kWritten = 1792591391;  // 2026-10-21T14:03:11Z, the writtenAt of the fixtures
+
+static std::wstring Text(std::vector<Span> const& spans) {
+  std::wstring s;
+  for (auto const& p : spans) s += p.text;
+  return s;
+}
+
+static void TestRows() {
+  auto ok = ParseSnapshot(ReadFixture("ok.json"));
+  long long now = kWritten + 300;
+
+  View projects = BuildView(ok, Kind::Projects, 8, now);
+  CHECK(projects.title == L"Projects" && projects.rows.size() == 2 && projects.message.empty());
+  CHECK(Text(projects.rows[0].title) == L"\u2605 null-ide \u25cf");
+  CHECK(Text(projects.rows[0].detail) == L"main \u00b7 1 h ago");
+  CHECK(projects.rows[0].click.kind == ActionKind::OpenProject && projects.rows[0].click.target == L"D:\\Coding\\Apps\\null-ide");
+  CHECK(projects.rows[0].menu.size() == 2 && projects.rows[0].menu[1].kind == ActionKind::OpenProjectNewWindow);
+  CHECK(Text(projects.rows[1].title) == L"site");
+
+  View issues = BuildView(ok, Kind::Issues, 10, now);
+  CHECK(Text(issues.rows[0].title) == L"#7 Crash on save");
+  CHECK(Text(issues.rows[0].detail) == L"assigned \u00b7 o/r \u00b7 bug");
+  CHECK(issues.rows[0].click.kind == ActionKind::OpenUrl && issues.rows[0].click.target == L"https://github.com/o/r/issues/7");
+  CHECK(issues.rows[0].menu.size() == 2 && issues.rows[0].menu[1].kind == ActionKind::OpenProject);  // it has a local checkout
+
+  View prs = BuildView(ok, Kind::Prs, 10, now);
+  CHECK(Text(prs.rows[0].title) == L"#9 Add widgets");
+  CHECK(Text(prs.rows[0].detail) == L"review requested \u00b7 checks failing \u00b7 conflict \u00b7 o/r \u00b7 sam");
+  CHECK(prs.rows[0].menu.size() == 1);  // no local checkout: only "Open in browser"
+
+  CHECK(BuildView(ok, Kind::Projects, 1, now).rows.size() == 1);  // the renderer trims to what fits
+  CHECK(RowsThatFit(240) == 4 && RowsThatFit(320) == 6 && RowsThatFit(10) == 1);
+}
+
+static void TestFooterAndStates() {
+  auto ok = ParseSnapshot(ReadFixture("ok.json"));
+  View fresh = BuildView(ok, Kind::Issues, 10, kWritten + 300);
+  CHECK(fresh.footer == L"updated 5 min ago" && !fresh.stale);
+  View old = BuildView(ok, Kind::Issues, 10, kWritten + kStaleAfterSeconds);
+  CHECK(old.footer == L"updated 6 h ago" && old.stale);
+  CHECK(!BuildView(ok, Kind::Issues, 10, kWritten + kStaleAfterSeconds - 1).stale);
+
+  auto partial = ParseSnapshot(ReadFixture("partial.json"));
+  View p = BuildView(partial, Kind::Issues, 10, kWritten + 60);
+  CHECK(p.footer == L"2 repos not updated \u00b7 updated 1 min ago" && !p.rows[0].dimmed);
+  CHECK(BuildView(partial, Kind::Prs, 10, kWritten).message == L"No pull requests need your attention");
+
+  auto out = ParseSnapshot(ReadFixture("signed_out.json"));
+  View s = BuildView(out, Kind::Issues, 10, kWritten + 60);
+  CHECK(s.rows.size() == 1 && s.rows[0].dimmed && s.footer == L"Signed out of GitHub \u00b7 updated 1 min ago");
+  CHECK(BuildView(out, Kind::Projects, 10, kWritten).message == L"No recent projects");  // projects are independent of GitHub
+
+  Loaded missing;
+  CHECK(BuildView(missing, Kind::Prs, 10, kWritten).message == L"Open Null IDE to set up widgets");
+  Loaded corrupt;
+  corrupt.state = Load::Corrupt;
+  CHECK(BuildView(corrupt, Kind::Prs, 10, kWritten).message == L"Open Null IDE to set up widgets");
+  CHECK(BuildView(ParseSnapshot(ReadFixture("newer_schema.json")), Kind::Prs, 10, kWritten).message == L"Update Null IDE");
+
+  CHECK(FormatAge(5) == L"just now" && FormatAge(90) == L"1 min ago" && FormatAge(7200) == L"2 h ago" && FormatAge(200000) == L"2 d ago");
+}
+
+static void TestHostileRowsHaveNoActions() {
+  auto h = ParseSnapshot(ReadFixture("hostile.json"));
+  View issues = BuildView(h, Kind::Issues, 10, kWritten);
+  CHECK(issues.rows.size() == 4);
+  for (auto const& r : issues.rows) CHECK(r.click.kind == ActionKind::None && r.menu.empty());
+  View projects = BuildView(h, Kind::Projects, 10, kWritten);
+  CHECK(projects.rows[0].click.kind == ActionKind::None && projects.rows[1].click.kind == ActionKind::None);
+  CHECK(projects.rows[2].click.kind == ActionKind::OpenProject);
+  // Markup-looking text stays text.
+  CHECK(Text(issues.rows[0].title) == L"#1 ${$host.widgetSize} {{x}} <b>hi</b>");
+}
+
+int main() {
+  winrt::init_apartment();
+  TestRows();
+  TestFooterAndStates();
+  TestHostileRowsHaveNoActions();
+  return Finish("layout_test");
+}
 ```
 
-- [ ] **Step 1: Write the failing tests**
+In `shell-ext/widgets/CMakeLists.txt` change the two lines to:
 
-Append to `widgets_test.cc` (include `"cards.h"` and `<winrt/Windows.Data.Json.h>`) and call from `main`:
-
-```cpp
-using namespace winrt::Windows::Data::Json;
-
-static JsonObject J(std::wstring const& s) { JsonObject o{nullptr}; CHECK(JsonObject::TryParse(s, o)); return o; }
-
-static void TestCards() {
-  auto ok = ParseSnapshot(ReadFixture("ok.json"));
-  const long long now = 1792591391 + 300;                       // 5 minutes after writtenAt
-
-  // Size limits.
-  CHECK(RowLimit(Size::Small) == 3 && RowLimit(Size::Medium) == 4 && RowLimit(Size::Large) == 8);
-
-  // Projects: rows + footer; both are valid JSON.
-  auto c = BuildCard(ok, Kind::Projects, Size::Medium, now);
-  auto data = J(c.dataJson); J(c.templateJson);
-  CHECK(data.GetNamedArray(L"rows").Size() == 2);
-  CHECK(std::wstring(data.GetNamedString(L"footer")).find(L"5 min ago") != std::wstring::npos);
-  CHECK(!data.GetNamedBoolean(L"footerMuted"));
-  auto firstRow = data.GetNamedArray(L"rows").GetObjectAt(0);
-  CHECK(firstRow.GetNamedString(L"project") == L"D:\\Coding\\Apps\\null-ide");
-
-  // Stale after 6 hours: muted.
-  auto stale = J(BuildCard(ok, Kind::Projects, Size::Medium, 1792591391 + kStaleAfterSeconds + 1).dataJson);
-  CHECK(stale.GetNamedBoolean(L"footerMuted"));
-
-  // Trimming per size.
-  auto small = J(BuildCard(ok, Kind::Projects, Size::Small, now).dataJson);
-  CHECK(small.GetNamedArray(L"rows").Size() == 2);              // only 2 projects exist, <= 3
-
-  // Issues / PRs rows carry url + project only when valid.
-  auto iss = J(BuildCard(ok, Kind::Issues, Size::Large, now).dataJson).GetNamedArray(L"rows").GetObjectAt(0);
-  CHECK(iss.GetNamedString(L"url") == L"https://github.com/o/r/issues/7" && iss.GetNamedBoolean(L"hasUrl"));
-  auto pr = J(BuildCard(ok, Kind::Prs, Size::Large, now).dataJson).GetNamedArray(L"rows").GetObjectAt(0);
-  CHECK(std::wstring(pr.GetNamedString(L"sub")).find(L"review requested") != std::wstring::npos);
-  CHECK(std::wstring(pr.GetNamedString(L"sub")).find(L"conflict") != std::wstring::npos);
-  CHECK(pr.GetNamedString(L"project") == L"");
-
-  // Signed out: rows kept, dimmed, notice present.
-  auto so = J(BuildCard(ParseSnapshot(ReadFixture("signed_out.json")), Kind::Issues, Size::Medium, now).dataJson);
-  CHECK(so.GetNamedArray(L"rows").Size() == 1 && so.GetNamedArray(L"rows").GetObjectAt(0).GetNamedBoolean(L"dim"));
-  CHECK(std::wstring(so.GetNamedString(L"notice")).find(L"Signed out") != std::wstring::npos);
-
-  // Partial failure: footer names the count, rows not dimmed.
-  auto pf = J(BuildCard(ParseSnapshot(ReadFixture("partial.json")), Kind::Issues, Size::Medium, now).dataJson);
-  CHECK(std::wstring(pf.GetNamedString(L"footer")).find(L"2 repos not updated") != std::wstring::npos);
-  CHECK(!pf.GetNamedArray(L"rows").GetObjectAt(0).GetNamedBoolean(L"dim"));
-
-  // Empty / schema / corrupt states render a notice and no rows.
-  Loaded missing; missing.state = Load::Missing;
-  auto m = J(BuildCard(missing, Kind::Projects, Size::Medium, now).dataJson);
-  CHECK(m.GetNamedString(L"notice") == L"Open Null IDE to set up widgets" && m.GetNamedArray(L"rows").Size() == 0);
-  auto n = J(BuildCard(ParseSnapshot(ReadFixture("newer_schema.json")), Kind::Prs, Size::Medium, now).dataJson);
-  CHECK(n.GetNamedString(L"notice") == L"Update Null IDE" && n.GetNamedArray(L"rows").Size() == 0);
-
-  // Hostile: the template never contains snapshot text; the same template is produced for any snapshot.
-  auto hostile = ParseSnapshot(ReadFixture("hostile.json"));
-  auto hc = BuildCard(hostile, Kind::Issues, Size::Large, now);
-  CHECK(hc.templateJson == BuildCard(ok, Kind::Issues, Size::Large, now).templateJson);
-  CHECK(hc.templateJson.find(L"${$host.widgetSize} {{x}}") == std::wstring::npos);
-  auto hrows = J(hc.dataJson).GetNamedArray(L"rows");
-  for (uint32_t i = 0; i < hrows.Size(); ++i) {
-    auto r = hrows.GetObjectAt(i);
-    CHECK(!r.GetNamedBoolean(L"hasUrl"));                       // every attack URL was rejected
-    CHECK(r.GetNamedString(L"project") == L"");                 // "-n" was rejected
-  }
-  auto proj = J(BuildCard(hostile, Kind::Projects, Size::Large, now).dataJson).GetNamedArray(L"rows");
-  CHECK(proj.GetObjectAt(0).GetNamedString(L"project") == L"" && proj.GetObjectAt(2).GetNamedString(L"project") == L"C:\\work\\good");
-
-  // Allowlist for actions.
-  CHECK(IsAllowedProjectPath(ok.snapshot, L"D:\\Coding\\Apps\\null-ide"));
-  CHECK(IsAllowedProjectPath(ok.snapshot, L"D:\\Coding\\site"));
-  CHECK(!IsAllowedProjectPath(ok.snapshot, L"C:\\Windows\\System32"));
-  CHECK(!IsAllowedProjectPath(ok.snapshot, L"--remote=x"));
-  CHECK(RelativeAge(10) == L"just now" && RelativeAge(300) == L"5 min ago" && RelativeAge(7200) == L"2 h ago" && RelativeAge(172800) == L"2 d ago");
-}
+```cmake
+set(CORE_SOURCES snapshot.cc layout.cc)
+set(TESTS snapshot_test layout_test)
 ```
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `cmake --build shell-ext-build --config Release --target null_widgets_test`
-Expected: FAIL — `cards.h` not found.
+Run: `cmake -S shell-ext -B shell-ext-build -G "Visual Studio 17 2022" -A x64`
+Expected: FAIL — `Cannot find source file: layout.cc`.
 
 - [ ] **Step 3: Write the implementation**
 
-`shell-ext/widgets/cards.h`: the declarations from **Interfaces** (with `#include "snapshot.h"`).
-
-`shell-ext/widgets/cards.cc`:
+`shell-ext/widgets/layout.h`:
 
 ```cpp
-#include "cards.h"
-#include <winrt/Windows.Data.Json.h>
-#include <algorithm>
-#include <set>
+#pragma once
+#include <string>
+#include <vector>
 
-using namespace winrt::Windows::Data::Json;
+#include "snapshot.h"
 
 namespace null_widgets {
+
+enum class Kind { Projects = 0, Issues = 1, Prs = 2 };
+constexpr int kKindCount = 3;
+
+enum class Tone { Normal, Muted, Accent, Good, Warn, Bad };
+struct Span { std::wstring text; Tone tone = Tone::Normal; };
+
+enum class ActionKind { None, OpenUrl, OpenProject, OpenProjectNewWindow };
+struct Action {
+  ActionKind kind = ActionKind::None;
+  std::wstring target;  // URL or absolute project path, already validated by ParseSnapshot
+  std::wstring label;   // menu text
+};
+
+struct Row {
+  std::vector<Span> title, detail;
+  Action click;              // left click; None when the row has nothing to open
+  std::vector<Action> menu;  // right-click items for this row
+  bool dimmed = false;
+};
+
+struct View {
+  std::wstring title;
+  std::vector<Row> rows;
+  std::wstring message;  // drawn instead of the rows when non-empty
+  std::wstring footer;
+  bool stale = false;    // footer muted
+};
+
+// The footer is muted once the snapshot is older than this.
+constexpr long long kStaleAfterSeconds = 6 * 3600;
+
+// Metrics in DIPs; the renderer and the hit test share them.
+constexpr int kHeaderDip = 36, kRowDip = 40, kFooterDip = 24, kPadDip = 8;
+
+struct SizeDip { int w, h; };
+SizeDip DefaultSize(Kind kind);
+wchar_t const* TitleOf(Kind kind);
+wchar_t const* KeyOf(Kind kind);  // "projects" | "issues" | "prs"
+int RowsThatFit(int heightDip);   // at least 1
+
+std::wstring FormatAge(long long seconds);
+View BuildView(Loaded const& loaded, Kind kind, int maxRows, long long nowEpoch);
+
+}  // namespace null_widgets
+```
+
+`shell-ext/widgets/layout.cc`:
+
+```cpp
+#include "layout.h"
+
+#include <algorithm>
+
+namespace null_widgets {
+
 namespace {
 
-JsonValue S(std::wstring const& s) { return JsonValue::CreateStringValue(s); }
-JsonValue B(bool b) { return JsonValue::CreateBooleanValue(b); }
+constexpr int kMaxRows[kKindCount] = {8, 10, 10};  // the same constants as widgetTypes.ts
 
-// One constant template per kind. Text elements only ever carry ${binding}s.
-std::wstring Template(wchar_t const* title) {
-  std::wstring t = LR"({"type":"AdaptiveCard","$schema":"http://adaptivecards.io/schemas/adaptive-card.json","version":"1.6","body":[
-{"type":"TextBlock","text":")";
-  t += title;
-  t += LR"(","weight":"Bolder","size":"Medium"},
-{"type":"TextBlock","text":"${notice}","wrap":true,"isSubtle":true,"$when":"${notice != ''}"},
-{"type":"ColumnSet","$data":"${rows}","spacing":"Small","columns":[
- {"type":"Column","width":"stretch","items":[
-  {"type":"TextBlock","text":"${title}","maxLines":1,"isSubtle":"${dim}"},
-  {"type":"TextBlock","text":"${sub}","size":"Small","isSubtle":true,"maxLines":1,"$when":"${$host.widgetSize != 'small'}"}]},
- {"type":"Column","width":"auto","items":[{"type":"ActionSet","actions":[
-  {"type":"Action.OpenUrl","title":"GitHub","url":"${url}","$when":"${hasUrl}"},
-  {"type":"Action.Execute","title":"Open","verb":"openProject","data":{"path":"${project}"},"$when":"${project != ''}"},
-  {"type":"Action.Execute","title":"New window","verb":"openProjectNew","data":{"path":"${project}"},"$when":"${project != '' && newWindow}"}]}]}]},
-{"type":"TextBlock","text":"${footer}","size":"Small","isSubtle":"${footerMuted}","$when":"${footer != ''}"}]})";
-  return t;
+Span S(std::wstring text, Tone tone = Tone::Normal) { return Span{std::move(text), tone}; }
+
+// Parts separated by " \u00b7 ".
+std::vector<Span> Joined(std::vector<Span> parts) {
+  std::vector<Span> out;
+  for (auto& p : parts) {
+    if (p.text.empty()) continue;
+    if (!out.empty()) out.push_back(S(L" \u00b7 ", Tone::Muted));
+    out.push_back(std::move(p));
+  }
+  return out;
 }
 
-std::wstring Notice(Load state, Section const& sec, bool corruptHadNothing) {
-  if (state == Load::Missing) return L"Open Null IDE to set up widgets";
-  if (state == Load::NewerSchema) return L"Update Null IDE";
-  if (state == Load::Corrupt) return corruptHadNothing ? L"Widget data unreadable. Open Null IDE to refresh" : L"";
-  if (sec.status == L"signed_out") return L"Signed out. Showing the last data";
-  if (sec.status == L"offline") return L"Offline. Showing the last data";
-  if (sec.status == L"error") return L"Could not refresh. Showing the last data";
-  return L"";
+std::wstring Num(long n) { return L"#" + std::to_wstring(n) + L" "; }
+
+std::wstring ReasonText(std::wstring const& status) {
+  if (status == L"signed_out") return L"Signed out of GitHub";
+  if (status == L"offline") return L"Offline";
+  return L"Could not update";
 }
 
-JsonObject Row(std::wstring title, std::wstring sub, std::wstring url, std::wstring project, bool dim, bool newWindow) {
-  JsonObject r;
-  r.SetNamedValue(L"title", S(title));
-  r.SetNamedValue(L"sub", S(sub));
-  r.SetNamedValue(L"url", S(url));
-  r.SetNamedValue(L"hasUrl", B(!url.empty()));
-  r.SetNamedValue(L"project", S(project));
-  r.SetNamedValue(L"dim", B(dim));
-  r.SetNamedValue(L"newWindow", B(newWindow));
+std::wstring Labels(std::vector<std::wstring> const& labels) {
+  std::wstring out;
+  for (auto const& l : labels) out += (out.empty() ? L"" : L", ") + l;
+  return out;
+}
+
+Row ProjectRow(Project const& p, long long now) {
+  Row r;
+  if (p.pinned) r.title.push_back(S(L"\u2605 ", Tone::Accent));
+  r.title.push_back(S(p.name));
+  if (p.dirty) r.title.push_back(S(L" \u25cf", Tone::Warn));
+  long long opened = 0;
+  std::wstring when = ParseIsoUtc(p.lastOpened, &opened) ? FormatAge(now - opened) : L"";
+  r.detail = Joined({S(p.branch, Tone::Muted), S(when, Tone::Muted)});
+  if (!p.path.empty()) {
+    r.click = {ActionKind::OpenProject, p.path, L"Open"};
+    r.menu = {r.click, {ActionKind::OpenProjectNewWindow, p.path, L"Open in new window"}};
+  }
   return r;
 }
 
-std::wstring Join(std::vector<std::wstring> const& parts) {
-  std::wstring out;
-  for (auto const& p : parts) if (!p.empty()) { if (!out.empty()) out += L" \u00b7 "; out += p; }
-  return out;
+Row IssueRow(Issue const& i) {
+  Row r;
+  r.title = {S(Num(i.number), Tone::Muted), S(i.title)};
+  r.detail = Joined({S(i.attention == L"assigned" ? L"assigned" : L"mentioned", i.attention == L"assigned" ? Tone::Accent : Tone::Muted),
+                     S(i.repo, Tone::Muted), S(Labels(i.labels), Tone::Muted)});
+  if (!i.url.empty()) {
+    r.click = {ActionKind::OpenUrl, i.url, L"Open in browser"};
+    r.menu.push_back(r.click);
+  }
+  if (!i.localPath.empty()) r.menu.push_back({ActionKind::OpenProject, i.localPath, L"Open project"});
+  return r;
+}
+
+Row PrRow(Pr const& p) {
+  Row r;
+  r.title = {S(Num(p.number), Tone::Muted), S(p.title)};
+  Span review = p.review == L"requested" ? S(L"review requested", Tone::Accent)
+              : p.review == L"approved"  ? S(L"approved", Tone::Good)
+              : p.review == L"changes"   ? S(L"changes requested", Tone::Bad)
+                                         : S(L"");
+  Span checks = p.checks == L"failing" ? S(L"checks failing", Tone::Bad)
+              : p.checks == L"pending" ? S(L"checks pending", Tone::Warn)
+              : p.checks == L"passing" ? S(L"checks passing", Tone::Good)
+                                       : S(L"");
+  r.detail = Joined({review, checks, S(p.conflict ? L"conflict" : L"", Tone::Bad), S(p.repo, Tone::Muted), S(p.author, Tone::Muted)});
+  if (!p.url.empty()) {
+    r.click = {ActionKind::OpenUrl, p.url, L"Open in browser"};
+    r.menu.push_back(r.click);
+  }
+  if (!p.localPath.empty()) r.menu.push_back({ActionKind::OpenProject, p.localPath, L"Open project"});
+  return r;
+}
+
+template <class T, class F>
+void FillRows(View& v, std::vector<T> const& items, int maxRows, bool dimmed, F make) {
+  for (size_t i = 0; i < items.size() && static_cast<int>(i) < maxRows; ++i) {
+    Row r = make(items[i]);
+    r.dimmed = dimmed;
+    v.rows.push_back(std::move(r));
+  }
 }
 
 }  // namespace
 
-size_t RowLimit(Size s) { return s == Size::Small ? 3 : s == Size::Medium ? 4 : 8; }
+SizeDip DefaultSize(Kind kind) {
+  return kind == Kind::Projects ? SizeDip{320, 240} : SizeDip{360, 320};
+}
 
-std::wstring RelativeAge(long long s) {
+wchar_t const* TitleOf(Kind kind) {
+  return kind == Kind::Projects ? L"Projects" : kind == Kind::Issues ? L"Issues" : L"Pull Requests";
+}
+
+wchar_t const* KeyOf(Kind kind) {
+  return kind == Kind::Projects ? L"projects" : kind == Kind::Issues ? L"issues" : L"prs";
+}
+
+int RowsThatFit(int heightDip) {
+  return std::max(1, (heightDip - kHeaderDip - kFooterDip - kPadDip) / kRowDip);
+}
+
+std::wstring FormatAge(long long s) {
   if (s < 60) return L"just now";
   if (s < 3600) return std::to_wstring(s / 60) + L" min ago";
   if (s < 86400) return std::to_wstring(s / 3600) + L" h ago";
   return std::to_wstring(s / 86400) + L" d ago";
 }
 
-bool IsAllowedProjectPath(Snapshot const& s, std::wstring const& path) {
-  if (!IsAbsoluteLocalPath(path)) return false;
-  for (auto const& p : s.projects) if (_wcsicmp(p.path.c_str(), path.c_str()) == 0) return true;
-  for (auto const& i : s.issues) if (_wcsicmp(i.localPath.c_str(), path.c_str()) == 0) return true;
-  for (auto const& p : s.prs) if (_wcsicmp(p.localPath.c_str(), path.c_str()) == 0) return true;
-  return false;
-}
+View BuildView(Loaded const& loaded, Kind kind, int maxRows, long long now) {
+  View v;
+  v.title = TitleOf(kind);
+  if (loaded.state == Load::NewerSchema) {
+    v.message = L"Update Null IDE";
+    return v;
+  }
+  if (loaded.state != Load::Ok) {
+    v.message = L"Open Null IDE to set up widgets";
+    return v;
+  }
+  Snapshot const& s = loaded.snapshot;
+  maxRows = std::min(maxRows, kMaxRows[static_cast<int>(kind)]);
+  Section const& sec = kind == Kind::Projects ? s.projectsSection : kind == Kind::Issues ? s.issuesSection : s.prsSection;
+  bool dimmed = sec.status != L"ok";
+  if (kind == Kind::Projects) FillRows(v, s.projects, maxRows, dimmed, [&](Project const& p) { return ProjectRow(p, now); });
+  if (kind == Kind::Issues) FillRows(v, s.issues, maxRows, dimmed, IssueRow);
+  if (kind == Kind::Prs) FillRows(v, s.prs, maxRows, dimmed, PrRow);
 
-Card BuildCard(Loaded const& loaded, Kind kind, Size size, long long now) {
-  Card card;
-  card.templateJson = Template(kind == Kind::Projects ? L"Projects" : kind == Kind::Issues ? L"Issues" : L"Pull requests");
-
-  auto const& snap = loaded.snapshot;
-  Section const& sec = kind == Kind::Projects ? snap.projectsSection : kind == Kind::Issues ? snap.issuesSection : snap.prsSection;
-  bool shows = loaded.state == Load::Ok;
-  bool dim = shows && sec.status != L"ok";
-  size_t limit = RowLimit(size);
-
-  JsonArray rows;
-  if (shows) {
-    if (kind == Kind::Projects) {
-      for (auto const& p : snap.projects) {
-        if (rows.Size() >= limit) break;
-        long long opened = 0; std::wstring when;
-        if (ParseIsoUtc(p.lastOpened, &opened)) when = L"opened " + RelativeAge(std::max(0LL, now - opened));
-        rows.Append(Row((p.pinned ? L"\u2605 " : L"") + p.name + (p.dirty ? L" \u25cf" : L""), Join({p.branch, when}), L"", p.path, dim, true));
-      }
-    } else if (kind == Kind::Issues) {
-      for (auto const& i : snap.issues) {
-        if (rows.Size() >= limit) break;
-        std::wstring labels; for (auto const& l : i.labels) { if (!labels.empty()) labels += L", "; labels += l; }
-        rows.Append(Row(L"#" + std::to_wstring(i.number) + L" " + i.title,
-                        Join({i.repo, i.attention == L"mentioned" ? L"mentioned" : L"assigned", labels}), i.url, i.localPath, dim, false));
-      }
-    } else {
-      for (auto const& p : snap.prs) {
-        if (rows.Size() >= limit) break;
-        std::vector<std::wstring> marks{p.repo, p.author};
-        if (p.review == L"requested") marks.push_back(L"review requested");
-        else if (p.review == L"changes") marks.push_back(L"changes requested");
-        else if (p.review == L"approved") marks.push_back(L"approved");
-        if (p.checks == L"failing") marks.push_back(L"checks failing");
-        else if (p.checks == L"pending") marks.push_back(L"checks running");
-        if (p.conflict) marks.push_back(L"conflict");
-        rows.Append(Row(L"#" + std::to_wstring(p.number) + L" " + p.title, Join(marks), p.url, p.localPath, dim, false));
-      }
-    }
+  if (v.rows.empty()) {
+    v.message = dimmed ? ReasonText(sec.status)
+              : kind == Kind::Projects ? L"No recent projects"
+              : kind == Kind::Issues   ? L"No issues need your attention"
+                                       : L"No pull requests need your attention";
   }
 
-  std::wstring footer;
-  bool muted = false;
-  if (shows) {
-    long long written = 0;
-    if (ParseIsoUtc(snap.writtenAt, &written)) {
-      long long age = std::max(0LL, now - written);
-      footer = L"Updated " + RelativeAge(age);
-      muted = age > kStaleAfterSeconds;
-    }
-    if (!sec.failed.empty() && sec.status == L"ok")
-      footer += (footer.empty() ? L"" : L" \u00b7 ") + std::to_wstring(sec.failed.size()) + L" repos not updated";
+  std::vector<Span> footer;
+  if (dimmed) {
+    footer.push_back(S(ReasonText(sec.status)));
+  } else if (!sec.failed.empty()) {
+    size_t n = sec.failed.size();
+    footer.push_back(S(std::to_wstring(n) + (n == 1 ? L" repo not updated" : L" repos not updated")));
   }
-
-  JsonObject data;
-  data.SetNamedValue(L"rows", rows);
-  data.SetNamedValue(L"notice", S(Notice(loaded.state, sec, true)));
-  data.SetNamedValue(L"footer", S(footer));
-  data.SetNamedValue(L"footerMuted", B(muted));
-  card.dataJson = data.Stringify().c_str();
-  return card;
+  long long written = 0;
+  if (ParseIsoUtc(s.writtenAt, &written)) {
+    long long age = std::max(0LL, now - written);
+    footer.push_back(S(L"updated " + FormatAge(age)));
+    v.stale = age >= kStaleAfterSeconds;
+  }
+  for (auto const& sp : Joined(std::move(footer))) v.footer += sp.text;
+  return v;
 }
 
 }  // namespace null_widgets
 ```
 
-Two details to check while running the tests: (1) the `Notice` for `Load::Corrupt` is only used when the provider has no last good snapshot (Task 5 passes the *last good* `Loaded` instead of a `Corrupt` one when it has one, so `Corrupt` reaching `BuildCard` always means "nothing to show"); (2) the 'dim' flag for `Row` is computed once per section.
-
 - [ ] **Step 4: Run to verify it passes**
 
-Run: `cmake --build shell-ext-build --config Release --target null_widgets_test; ctest --test-dir shell-ext-build -C Release --output-on-failure`
-Expected: PASS. If a JSON-shape check fails, fix the builder, not the test (the shapes are the contract with Task 5's template).
+```powershell
+cmake -S shell-ext -B shell-ext-build -G "Visual Studio 17 2022" -A x64
+cmake --build shell-ext-build --config Release --target snapshot_test layout_test
+ctest --test-dir shell-ext-build -C Release --output-on-failure -R "snapshot_test|layout_test"
+```
+
+Expected: no warnings; both tests pass.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add shell-ext/widgets
-git commit -m "feat(widgets): Adaptive Card builder with inert snapshot text (#141)"
+git commit -m "feat(widgets): row layout, footer and empty states (#141)"
 ```
 
 ---
 
-### Task 5: The provider — watch, render, act, exit
+### Task 4: Placement — layout file, clamp to monitors, edge snap
 
 **Files:**
-- Create: `shell-ext/widgets/provider.h`, `shell-ext/widgets/provider.cc`
-- Replace the body of: `shell-ext/widgets/main.cc`
-- Modify: `shell-ext/widgets/CMakeLists.txt` (`null_widgets` links `null_widget_core`, `null_launch`; sources `main.cc provider.cc ../src/launch_via_explorer.cc`)
-- Modify: `shell-ext/widgets/widgets_test.cc` (pure parts only)
+- Create: `shell-ext/widgets/placement.h`, `shell-ext/widgets/placement.cc`, `shell-ext/widgets/placement_test.cc`
+- Modify: `shell-ext/widgets/CMakeLists.txt` (two `set` lines)
 
 **Interfaces:**
-- Consumes: `Loaded`, `LoadSnapshotFile`, `BuildCard`, `IsAllowedProjectPath`, `Kind`, `Size` (Tasks 3–4); `null_launch::LaunchViaExplorer`, `QuoteForCommandLineArg` (Task 2).
-- Produces (namespace `null_widgets`, in `provider.h`, pure so they are CTest-able):
+- Consumes: `Kind`, `kKindCount`, `KeyOf`, `DefaultSize` (Task 3).
+- Produces (`placement.h`): `struct Box { int left, top, right, bottom; int w() const; int h() const; }`; `struct Placement { bool visible, placed; int x, y, w, h; }` (x/y virtual-screen pixels, w/h DIP, 0 = default); `struct LayoutFile { bool locked; Placement widget[kKindCount]; }`; `LayoutFile ParseLayout(std::wstring const&)` (never throws); `std::wstring SerializeLayout(LayoutFile const&)`; `Box DefaultBox(Kind, Box primaryWork, double scale)`; `Box ClampToMonitors(Box, std::vector<Box> const& work)`; `Box SnapToEdges(Box, std::vector<Box> const& work, int threshold)`.
+
+- [ ] **Step 1: Write the failing test**
+
+`shell-ext/widgets/placement_test.cc` (covers a monitor that was unplugged, a rect bigger than its monitor, garbage and out-of-range values in the file):
 
 ```cpp
-// Verb + data -> a validated launch request, or nothing.
-struct LaunchRequest { std::wstring path; bool newWindow = false; };
-std::optional<LaunchRequest> ParseAction(std::wstring const& verb, std::wstring const& dataJson, Snapshot const& current);
-// "-n -- <quoted path>" or "-- <quoted path>"
-std::wstring BuildLaunchArgs(LaunchRequest const& r);
-// <install>\shell-ext\NullIDE.Widgets\x64\null_widgets.exe -> <install>
-std::filesystem::path InstallRootFromExe(std::filesystem::path const& exe);
-// Last-good policy: a Corrupt reload keeps `lastGood` when it has one.
-Loaded Choose(Loaded const& fresh, std::optional<Loaded> const& lastGood);
+#include "check.h"
+#include "placement.h"
+
+using namespace null_widgets;
+
+static bool Same(Box a, Box b) { return a.left == b.left && a.top == b.top && a.right == b.right && a.bottom == b.bottom; }
+
+static void TestFile() {
+  LayoutFile l;
+  l.locked = true;
+  l.widget[1] = {false, true, -300, 40, 400, 0};
+  l.widget[2].placed = true;
+  l.widget[2].x = 10;
+  l.widget[2].y = 20;
+  LayoutFile back = ParseLayout(SerializeLayout(l));
+  CHECK(back.locked);
+  CHECK(!back.widget[1].visible && back.widget[1].placed && back.widget[1].x == -300 && back.widget[1].y == 40);
+  CHECK(back.widget[1].w == 400 && back.widget[1].h == 0);
+  CHECK(back.widget[0].visible && !back.widget[0].placed);  // never saved: defaults
+  CHECK(back.widget[2].placed && back.widget[2].x == 10 && back.widget[2].y == 20);
+
+  // Garbage and hostile values never throw and never produce a nonsense size.
+  CHECK(!ParseLayout(L"").locked && !ParseLayout(L"{nope").widget[0].placed && !ParseLayout(L"[]").widget[0].placed);
+  LayoutFile odd = ParseLayout(L"{\"locked\":\"yes\",\"widgets\":{\"projects\":{\"x\":5,\"y\":\"7\",\"w\":99999,\"h\":-5,\"visible\":3},\"issues\":7}}");
+  CHECK(!odd.locked && !odd.widget[0].placed && odd.widget[0].w == 0 && odd.widget[0].h == 0 && odd.widget[0].visible);
+  CHECK(odd.widget[1].visible && !odd.widget[1].placed);
+}
+
+static void TestBoxes() {
+  Box primary{0, 0, 1920, 1040};
+  CHECK(Same(DefaultBox(Kind::Projects, primary, 1.0), Box{1576, 24, 1896, 264}));
+  CHECK(Same(DefaultBox(Kind::Issues, primary, 1.0), Box{1536, 280, 1896, 600}));
+  CHECK(Same(DefaultBox(Kind::Prs, primary, 1.0), Box{1536, 616, 1896, 936}));
+  CHECK(DefaultBox(Kind::Projects, primary, 2.0).w() == 640);
+
+  std::vector<Box> two{{0, 0, 1920, 1040}, {1920, 0, 3840, 1040}};
+  CHECK(Same(ClampToMonitors(Box{-100, 50, 220, 290}, two), Box{0, 50, 320, 290}));            // off the left edge
+  CHECK(Same(ClampToMonitors(Box{1800, 50, 2160, 370}, two), Box{1920, 50, 2280, 370}));       // mostly on monitor 2
+  CHECK(Same(ClampToMonitors(Box{100, 900, 420, 1140}, two), Box{100, 800, 420, 1040}));       // below the work area
+  CHECK(Same(ClampToMonitors(Box{2000, 100, 2320, 340}, two), Box{2000, 100, 2320, 340}));     // already fine
+  std::vector<Box> one{{0, 0, 1920, 1040}};
+  CHECK(Same(ClampToMonitors(Box{3000, 100, 3320, 340}, one), Box{1600, 100, 1920, 340}));     // its monitor was unplugged
+  CHECK(Same(ClampToMonitors(Box{50, 50, 2150, 1500}, one), Box{0, 0, 2100, 1450}));           // bigger than the monitor: top-left
+  CHECK(Same(ClampToMonitors(Box{5, 5, 25, 25}, {}), Box{5, 5, 25, 25}));                      // no monitor list: unchanged
+
+  CHECK(Same(SnapToEdges(Box{10, 12, 330, 252}, one, 16), Box{0, 0, 320, 240}));
+  CHECK(Same(SnapToEdges(Box{1590, 400, 1910, 640}, one, 16), Box{1600, 400, 1920, 640}));     // right edge
+  CHECK(Same(SnapToEdges(Box{100, 400, 420, 640}, one, 16), Box{100, 400, 420, 640}));         // nothing near
+  CHECK(Same(SnapToEdges(Box{100, 810, 420, 1030}, one, 16), Box{100, 820, 420, 1040}));       // bottom edge only
+}
+
+int main() {
+  winrt::init_apartment();
+  TestFile();
+  TestBoxes();
+  return Finish("placement_test");
+}
 ```
 
-- [ ] **Step 1: Write the failing tests for the pure parts**
+In `CMakeLists.txt` change the two lines to:
 
-Append to `widgets_test.cc` and call from `main` (add `#include "provider.h"`):
-
-```cpp
-static void TestProviderRules() {
-  auto ok = ParseSnapshot(ReadFixture("ok.json"));
-  auto good = ParseAction(L"openProject", L"{\"path\":\"D:\\\\Coding\\\\Apps\\\\null-ide\"}", ok.snapshot);
-  CHECK(good && !good->newWindow && good->path == L"D:\\Coding\\Apps\\null-ide");
-  auto nw = ParseAction(L"openProjectNew", L"{\"path\":\"D:\\\\Coding\\\\site\"}", ok.snapshot);
-  CHECK(nw && nw->newWindow);
-  CHECK(!ParseAction(L"openProject", L"{\"path\":\"C:\\\\Windows\\\\System32\"}", ok.snapshot));   // not in the snapshot
-  CHECK(!ParseAction(L"openProject", L"{\"path\":\"--remote=x\"}", ok.snapshot));
-  CHECK(!ParseAction(L"format", L"{\"path\":\"D:\\\\Coding\\\\site\"}", ok.snapshot));            // unknown verb
-  CHECK(!ParseAction(L"openProject", L"garbage", ok.snapshot));
-  CHECK(!ParseAction(L"openProject", L"{\"path\":5}", ok.snapshot));
-
-  CHECK(BuildLaunchArgs({L"D:\\a b\\c", false}) == L"-- \"D:\\a b\\c\"");
-  CHECK(BuildLaunchArgs({L"D:\\c", true}) == L"-n -- D:\\c");
-
-  CHECK(InstallRootFromExe(L"C:\\Users\\u\\AppData\\Local\\Programs\\Null IDE\\shell-ext\\NullIDE.Widgets\\x64\\null_widgets.exe")
-        == std::filesystem::path(L"C:\\Users\\u\\AppData\\Local\\Programs\\Null IDE"));
-
-  auto corrupt = ParseSnapshot(ReadFixture("corrupt.json"));
-  CHECK(Choose(corrupt, ok).state == Load::Ok);                                                   // keeps the last good render
-  CHECK(Choose(corrupt, std::nullopt).state == Load::Corrupt);
-  CHECK(Choose(ok, std::nullopt).state == Load::Ok);
-  Loaded missing; missing.state = Load::Missing;
-  CHECK(Choose(missing, ok).state == Load::Missing);                                              // deleting the file (widgets off) empties the cards
-}
+```cmake
+set(CORE_SOURCES snapshot.cc layout.cc placement.cc)
+set(TESTS snapshot_test layout_test placement_test)
 ```
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `cmake --build shell-ext-build --config Release --target null_widgets_test`
-Expected: FAIL — `provider.h` not found.
+Run: `cmake -S shell-ext -B shell-ext-build -G "Visual Studio 17 2022" -A x64`
+Expected: FAIL — `Cannot find source file: placement.cc`.
 
-- [ ] **Step 3: Write `provider.h` / the pure functions**
+- [ ] **Step 3: Write the implementation**
 
-`provider.h`: declarations from **Interfaces** plus `#include "cards.h" <optional> <filesystem>`.
-
-In `provider.cc` (pure section first):
+`shell-ext/widgets/placement.h`:
 
 ```cpp
-#include "provider.h"
-#include <winrt/Windows.Data.Json.h>
-#include "launch_via_explorer.h"
+#pragma once
+#include <string>
+#include <vector>
 
-using namespace winrt::Windows::Data::Json;
+#include "layout.h"
+
 namespace null_widgets {
 
-std::optional<LaunchRequest> ParseAction(std::wstring const& verb, std::wstring const& dataJson, Snapshot const& current) {
-  bool isNew;
-  if (verb == L"openProject") isNew = false; else if (verb == L"openProjectNew") isNew = true; else return std::nullopt;
-  JsonObject o{nullptr};
-  if (!JsonObject::TryParse(dataJson, o) || !o.HasKey(L"path") || o.GetNamedValue(L"path").ValueType() != JsonValueType::String) return std::nullopt;
-  std::wstring path = o.GetNamedString(L"path").c_str();
-  if (!IsAllowedProjectPath(current, path)) return std::nullopt;     // card data is not trusted either
-  return LaunchRequest{path, isNew};
-}
-
-std::wstring BuildLaunchArgs(LaunchRequest const& r) {
-  return std::wstring(r.newWindow ? L"-n " : L"") + L"-- " + null_launch::QuoteForCommandLineArg(r.path);
-}
-
-std::filesystem::path InstallRootFromExe(std::filesystem::path const& exe) {
-  return exe.parent_path().parent_path().parent_path().parent_path();   // x64 -> NullIDE.Widgets -> shell-ext -> install
-}
-
-Loaded Choose(Loaded const& fresh, std::optional<Loaded> const& lastGood) {
-  if (fresh.state == Load::Corrupt && lastGood) return *lastGood;
-  return fresh;
-}
-```
-
-Note `"-n -- D:\\c"`: `QuoteForCommandLineArg` only quotes when the path contains a space, backslash or quote — it contains a backslash, so `D:\c` becomes `"D:\c"`. Run the test and **correct the expected literal in the test to match `QuoteForCommandLineArg`'s real output** (the quoting function is Chromium's and is the source of truth; the test exists to pin `--` and `-n` ordering, not the quoting).
-
-- [ ] **Step 4: Run to verify it passes**
-
-Run: `cmake --build shell-ext-build --config Release --target null_widgets_test; ctest --test-dir shell-ext-build -C Release --output-on-failure`
-Expected: PASS.
-
-- [ ] **Step 5: Write the COM provider**
-
-Add to `provider.h`:
-
-```cpp
-// The COM-facing provider. Not unit-tested (needs the Board); everything it decides is in the pure functions above.
-#include <winrt/Microsoft.Windows.Widgets.Providers.h>
-struct Provider;
-winrt::com_ptr<Provider> MakeProvider(HANDLE emptyEvent);
-```
-
-Replace `main.cc` with:
-
-```cpp
-#include <windows.h>
-#include <unknwn.h>
-#include <winrt/Windows.Foundation.h>
-#include "provider.h"
-
-namespace {
-constexpr GUID kProviderClsid = {0x1CADFE2C, 0x53CF, 0x4DCC, {0xAA, 0xEE, 0xA3, 0x13, 0x9D, 0x7E, 0xF6, 0x0E}};
-
-struct Factory : winrt::implements<Factory, IClassFactory> {
-  winrt::com_ptr<IInspectable> provider;
-  explicit Factory(winrt::com_ptr<IInspectable> p) : provider(std::move(p)) {}
-  HRESULT __stdcall CreateInstance(IUnknown* outer, GUID const& iid, void** result) noexcept final {
-    if (!result) return E_POINTER;
-    *result = nullptr;
-    if (outer) return CLASS_E_NOAGGREGATION;
-    return provider->QueryInterface(iid, result);
-  }
-  HRESULT __stdcall LockServer(BOOL) noexcept final { return S_OK; }
-};
-}  // namespace
-
-int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
-  winrt::init_apartment(winrt::apartment_type::multi_threaded);
-  HANDLE empty = CreateEventW(nullptr, TRUE, FALSE, nullptr);
-  auto provider = null_widgets::MakeProvider(empty);
-  DWORD cookie = 0;
-  auto factory = winrt::make<Factory>(provider.as<IInspectable>());
-  winrt::check_hresult(CoRegisterClassObject(kProviderClsid, factory.get(), CLSCTX_LOCAL_SERVER, REGCLS_MULTIPLEUSE, &cookie));
-  WaitForSingleObject(empty, INFINITE);       // signalled when the Board deletes the last widget
-  CoRevokeClassObject(cookie);
-  return 0;
-}
-```
-
-(Keep the Task 1 Step 12 `winrt_activation_handler` block at the top of `main.cc` if Task 1 chose the hook.)
-
-`provider.cc` (COM section appended; `struct Provider` is declared in the .cc and exposed through `MakeProvider`; adapt the forward declaration in the header to `struct Provider;` inside `namespace null_widgets`):
-
-```cpp
-#include <winrt/Windows.Foundation.h>
-#include <shlobj.h>
-#include <mutex>
-#include <map>
-#include <thread>
-
-namespace wp = winrt::Microsoft::Windows::Widgets::Providers;
-namespace null_widgets {
-namespace {
-std::wstring SnapshotDir() {
-  PWSTR p = nullptr;
-  SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &p);
-  std::wstring d = std::wstring(p ? p : L"") + L"\\Null\\widgets";
-  CoTaskMemFree(p);
-  return d;
-}
-Kind KindOf(winrt::hstring const& def) { return def == L"Issues" ? Kind::Issues : def == L"PullRequests" ? Kind::Prs : Kind::Projects; }
-Size SizeOf(wp::WidgetContext const& c) {
-  auto s = c.Size();
-  return s == wp::WidgetSize::Small ? Size::Small : s == wp::WidgetSize::Large ? Size::Large : Size::Medium;
-}
-long long NowEpoch() { return static_cast<long long>(std::time(nullptr)); }
-}  // namespace
-
-struct Provider : winrt::implements<Provider, wp::IWidgetProvider> {
-  explicit Provider(HANDLE empty) : empty_(empty), dir_(SnapshotDir()) {
-    CreateDirectoryW((dir_.substr(0, dir_.find_last_of(L'\\'))).c_str(), nullptr);
-    CreateDirectoryW(dir_.c_str(), nullptr);
-    Reload();
-    // Re-attach to widgets that stayed pinned while this process was not running.
-    try { for (auto const& info : wp::WidgetManager::GetDefault().GetWidgetInfos()) Track(info.WidgetContext()); } catch (...) {}
-    watcher_ = std::thread([this] { Watch(); });
-  }
-  ~Provider() { stop_ = true; SetEvent(wake_); if (watcher_.joinable()) watcher_.join(); }
-
-  void CreateWidget(wp::WidgetContext const& c) { Track(c); Push(c.Id()); }
-  void DeleteWidget(winrt::hstring const& id, winrt::hstring const&) {
-    bool none;
-    { std::lock_guard g{m_}; widgets_.erase(id); none = widgets_.empty(); }
-    if (none) SetEvent(empty_);
-  }
-  void Activate(wp::WidgetContext const& c) { Track(c); Reload(); Push(c.Id()); }       // re-read on Activate
-  void Deactivate(winrt::hstring const&) {}
-  void OnWidgetContextChanged(wp::WidgetContextChangedArgs const& a) { Track(a.WidgetContext()); Push(a.WidgetContext().Id()); }
-
-  void OnActionInvoked(wp::WidgetActionInvokedArgs const& a) {
-    Snapshot snap;
-    { std::lock_guard g{m_}; if (shown_) snap = shown_->snapshot; }
-    auto req = ParseAction(a.Verb().c_str(), a.Data().c_str(), snap);
-    if (!req) return;
-    wchar_t exe[MAX_PATH]; GetModuleFileNameW(nullptr, exe, MAX_PATH);
-    auto root = InstallRootFromExe(exe);
-    auto nullExe = root / L"null.exe";
-    if (!std::filesystem::is_regular_file(nullExe)) return;
-    null_launch::LaunchViaExplorer(nullExe, root, BuildLaunchArgs(*req));
-  }
-
- private:
-  void Track(wp::WidgetContext const& c) { std::lock_guard g{m_}; widgets_[c.Id()] = {KindOf(c.DefinitionId()), SizeOf(c)}; }
-
-  void Reload() {
-    auto fresh = LoadSnapshotFile(dir_ + L"\\snapshot.json");
-    std::lock_guard g{m_};
-    shown_ = Choose(fresh, shown_);         // Ok/Missing/NewerSchema replace what is shown; Corrupt keeps the last good one
-  }
-
-  void Push(winrt::hstring const& id) {
-    Kind kind; Size size; Loaded loaded;
-    { std::lock_guard g{m_}; auto it = widgets_.find(id); if (it == widgets_.end()) return; kind = it->second.first; size = it->second.second;
-      loaded = shown_ ? *shown_ : Loaded{}; }
-    auto card = BuildCard(loaded, kind, size, NowEpoch());
-    wp::WidgetUpdateRequestOptions o{id};
-    o.Template(card.templateJson);
-    o.Data(card.dataJson);
-    try { wp::WidgetManager::GetDefault().UpdateWidget(o); } catch (...) {}
-  }
-  void PushAll() {
-    std::vector<winrt::hstring> ids;
-    { std::lock_guard g{m_}; for (auto const& [id, _] : widgets_) ids.push_back(id); }
-    for (auto const& id : ids) Push(id);
-  }
-
-  void Watch() {
-    HANDLE change = FindFirstChangeNotificationW(dir_.c_str(), FALSE, FILE_NOTIFY_CHANGE_LAST_WRITE | FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_SIZE);
-    if (change == INVALID_HANDLE_VALUE) return;
-    HANDLE h[2] = {wake_, change};
-    while (!stop_) {
-      // Also re-render every minute so the "updated N min ago" footer moves without a file change.
-      DWORD r = WaitForMultipleObjects(2, h, FALSE, 60'000);
-      if (stop_) break;
-      if (r == WAIT_OBJECT_0 + 1) { Sleep(200); FindNextChangeNotification(change); }   // debounce the rename burst
-      Reload();
-      PushAll();
-    }
-    FindCloseChangeNotification(change);
-  }
-
-  HANDLE empty_;
-  std::wstring dir_;
-  std::mutex m_;
-  std::map<winrt::hstring, std::pair<Kind, Size>> widgets_;
-  std::optional<Loaded> shown_;
-  HANDLE wake_ = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-  std::atomic<bool> stop_{false};
-  std::thread watcher_;
+struct Box {
+  int left = 0, top = 0, right = 0, bottom = 0;
+  int w() const { return right - left; }
+  int h() const { return bottom - top; }
 };
 
-winrt::com_ptr<Provider> MakeProvider(HANDLE emptyEvent) { return winrt::make_self<Provider>(emptyEvent); }
+// One widget's saved state. x/y are virtual-screen pixels; w/h are DIPs (0 = the default size of the widget).
+struct Placement {
+  bool visible = true;
+  bool placed = false;  // false until the widget has a position (first run, or a file without one)
+  int x = 0, y = 0;
+  int w = 0, h = 0;
+};
+
+struct LayoutFile {
+  bool locked = false;
+  Placement widget[kKindCount];
+};
+
+// Never throws; anything unreadable falls back to the defaults (unplaced, visible, unlocked).
+LayoutFile ParseLayout(std::wstring const& json);
+std::wstring SerializeLayout(LayoutFile const& layout);
+
+// First-run position: a column down the right edge of the primary work area. `scale` is dpi / 96.
+Box DefaultBox(Kind kind, Box primaryWork, double scale);
+
+// Moves `r` fully inside the monitor it overlaps most (the nearest one when it overlaps none).
+Box ClampToMonitors(Box r, std::vector<Box> const& work);
+// Pulls `r` onto a work-area edge that is within `threshold` pixels.
+Box SnapToEdges(Box r, std::vector<Box> const& work, int threshold);
+
 }  // namespace null_widgets
 ```
 
-`Choose` is the whole policy: a `Missing` file (widgets turned off) *replaces* the shown state so cards fall back to the empty state (spec decision 16), while a `Corrupt` one keeps the last good render. Add `#include <atomic> <ctime> <vector>`.
+`shell-ext/widgets/placement.cc`:
 
-Update `shell-ext/widgets/CMakeLists.txt`: `add_executable(null_widgets main.cc provider.cc ../src/launch_via_explorer.cc)`, `target_link_libraries(null_widgets PRIVATE null_widget_core windowsapp ole32 oleaut32 shell32 shlwapi)`, and add `${WIL_INCLUDE}` (`"${CMAKE_CURRENT_SOURCE_DIR}/../deps/wil/include"`) to the include dirs because `launch_via_explorer.cc` uses wil.
+```cpp
+#include "placement.h"
 
-- [ ] **Step 6: Build and run the unit tests**
+#include <algorithm>
+#include <cmath>
+#include <cstdlib>
 
-Run: `cmake --build shell-ext-build --config Release; ctest --test-dir shell-ext-build -C Release --output-on-failure`
-Expected: everything builds, CTest passes.
+#include <winrt/Windows.Foundation.Collections.h>
+#include <winrt/Windows.Data.Json.h>
+#include <winrt/base.h>
 
-- [ ] **Step 7: Windows 11 smoke (manual)**
+using namespace winrt::Windows::Data::Json;
 
-Re-pack with `scripts/pack-widgets.ps1` as in Task 1 Step 9–10, hand-write `%LOCALAPPDATA%\Null\widgets\snapshot.json` from `fixtures/ok.json` (project paths that exist on your machine), pin all three widgets, then verify with `scripts/check-widgets.ps1 -Status`:
-- Projects/Issues/PR cards render; footer reads "Updated …".
-- Edit the file (change a title) → the card updates within ~1 s without re-pinning.
-- Overwrite it with `fixtures/corrupt.json` → card unchanged. Delete it → cards show "Open Null IDE to set up widgets".
-- Click **Open** on a project → Null IDE opens that folder; `scripts/check-cold-start-aumid.ps1`-style check: the new `null.exe` has no package AUMID.
-- Put `fixtures/hostile.json` in place → no crash, no clickable action on attack rows.
-Record anything the Board rejected (e.g. a template construct) and fix the template in `cards.cc` + its tests.
+namespace null_widgets {
 
-- [ ] **Step 8: Commit**
+namespace {
 
-```bash
-git add shell-ext/widgets
-git commit -m "feat(widgets): provider renders snapshot cards and launches projects (#141)"
+constexpr int kMinDip = 200, kMaxDip = 800;
+
+long long Overlap(Box const& a, Box const& b) {
+  long long w = std::min(a.right, b.right) - std::max(a.left, b.left);
+  long long h = std::min(a.bottom, b.bottom) - std::max(a.top, b.top);
+  return (w > 0 && h > 0) ? w * h : 0;
+}
+
+long long CenterDistance2(Box const& a, Box const& b) {
+  long long dx = (a.left + a.right) / 2 - (b.left + b.right) / 2;
+  long long dy = (a.top + a.bottom) / 2 - (b.top + b.bottom) / 2;
+  return dx * dx + dy * dy;
+}
+
+bool Number(JsonObject const& o, wchar_t const* k, int lo, int hi, int* out) {
+  if (!o.HasKey(k) || o.GetNamedValue(k).ValueType() != JsonValueType::Number) return false;
+  double d = o.GetNamedNumber(k);
+  if (!(d >= lo && d <= hi)) return false;
+  *out = static_cast<int>(d);
+  return true;
+}
+
+}  // namespace
+
+LayoutFile ParseLayout(std::wstring const& json) {
+  LayoutFile out;
+  try {
+    JsonObject root{nullptr};
+    if (!JsonObject::TryParse(json, root)) return out;
+    if (root.HasKey(L"locked") && root.GetNamedValue(L"locked").ValueType() == JsonValueType::Boolean) out.locked = root.GetNamedBoolean(L"locked");
+    if (!root.HasKey(L"widgets") || root.GetNamedValue(L"widgets").ValueType() != JsonValueType::Object) return out;
+    auto widgets = root.GetNamedObject(L"widgets");
+    for (int i = 0; i < kKindCount; ++i) {
+      wchar_t const* key = KeyOf(static_cast<Kind>(i));
+      if (!widgets.HasKey(key) || widgets.GetNamedValue(key).ValueType() != JsonValueType::Object) continue;
+      auto o = widgets.GetNamedObject(key);
+      Placement& p = out.widget[i];
+      if (o.HasKey(L"visible") && o.GetNamedValue(L"visible").ValueType() == JsonValueType::Boolean) p.visible = o.GetNamedBoolean(L"visible");
+      p.placed = Number(o, L"x", -100000, 100000, &p.x) & Number(o, L"y", -100000, 100000, &p.y);
+      Number(o, L"w", kMinDip, kMaxDip, &p.w);
+      Number(o, L"h", kMinDip, kMaxDip, &p.h);
+    }
+  } catch (...) {
+    return LayoutFile{};
+  }
+  return out;
+}
+
+std::wstring SerializeLayout(LayoutFile const& layout) {
+  JsonObject root, widgets;
+  root.SetNamedValue(L"schema", JsonValue::CreateNumberValue(1));
+  root.SetNamedValue(L"locked", JsonValue::CreateBooleanValue(layout.locked));
+  for (int i = 0; i < kKindCount; ++i) {
+    Placement const& p = layout.widget[i];
+    JsonObject o;
+    o.SetNamedValue(L"visible", JsonValue::CreateBooleanValue(p.visible));
+    if (p.placed) {
+      o.SetNamedValue(L"x", JsonValue::CreateNumberValue(p.x));
+      o.SetNamedValue(L"y", JsonValue::CreateNumberValue(p.y));
+    }
+    if (p.w > 0) o.SetNamedValue(L"w", JsonValue::CreateNumberValue(p.w));
+    if (p.h > 0) o.SetNamedValue(L"h", JsonValue::CreateNumberValue(p.h));
+    widgets.SetNamedValue(KeyOf(static_cast<Kind>(i)), o);
+  }
+  root.SetNamedValue(L"widgets", widgets);
+  return std::wstring(root.Stringify().c_str());
+}
+
+Box DefaultBox(Kind kind, Box work, double scale) {
+  int gap = static_cast<int>(std::lround(16 * scale)), margin = static_cast<int>(std::lround(24 * scale));
+  int y = work.top + margin;
+  for (int i = 0; i < static_cast<int>(kind); ++i) {
+    y += static_cast<int>(std::lround(DefaultSize(static_cast<Kind>(i)).h * scale)) + gap;
+  }
+  SizeDip d = DefaultSize(kind);
+  int w = static_cast<int>(std::lround(d.w * scale)), h = static_cast<int>(std::lround(d.h * scale));
+  int x = work.right - margin - w;
+  return Box{x, y, x + w, y + h};
+}
+
+Box ClampToMonitors(Box r, std::vector<Box> const& work) {
+  if (work.empty()) return r;
+  Box const* best = &work[0];
+  long long bestOverlap = -1, bestDist = 0;
+  for (auto const& m : work) {
+    long long o = Overlap(r, m), d = CenterDistance2(r, m);
+    if (o > bestOverlap || (o == bestOverlap && o == 0 && d < bestDist)) {
+      best = &m;
+      bestOverlap = o;
+      bestDist = d;
+    }
+  }
+  int w = r.w(), h = r.h();
+  int x = w <= best->w() ? std::clamp(r.left, best->left, best->right - w) : best->left;
+  int y = h <= best->h() ? std::clamp(r.top, best->top, best->bottom - h) : best->top;
+  return Box{x, y, x + w, y + h};
+}
+
+Box SnapToEdges(Box r, std::vector<Box> const& work, int threshold) {
+  int w = r.w(), h = r.h();
+  int bestDx = threshold + 1, bestDy = threshold + 1, x = r.left, y = r.top;
+  for (auto const& m : work) {
+    int candX[2] = {m.left, m.right - w}, candY[2] = {m.top, m.bottom - h};
+    for (int c : candX) {
+      if (std::abs(c - r.left) < bestDx) { bestDx = std::abs(c - r.left); x = c; }
+    }
+    for (int c : candY) {
+      if (std::abs(c - r.top) < bestDy) { bestDy = std::abs(c - r.top); y = c; }
+    }
+  }
+  if (bestDx > threshold) x = r.left;
+  if (bestDy > threshold) y = r.top;
+  return Box{x, y, x + w, y + h};
+}
+
+}  // namespace null_widgets
 ```
 
----
-
-### Task 6: Build, test and ship the provider in CI and `build-local.ps1`
-
-**Files:**
-- Modify: `.github/workflows/build.yml` (step "Build Win11 shell extension", before "Test null-setup")
-- Modify: `scripts/build-local.ps1` (the `-SkipShellExt` block)
-- Modify: `shell-ext/CLAUDE.md` (note the widgets directory)
-
-**Interfaces:**
-- Consumes: `scripts/fetch-widgets-deps.ps1`, `scripts/pack-widgets.ps1` (Task 1); target names `null_widgets`, `null_widgets_test`.
-- Produces: `VSCode-win32-x64/shell-ext/null-widgets.appx` and `VSCode-win32-x64/shell-ext/NullIDE.Widgets/x64/{null_widgets.exe,Microsoft.Windows.Widgets.dll}` in the zip.
-
-- [ ] **Step 1: Edit `build.yml`**
-
-In the "Build Win11 shell extension" step (paths are relative to the repo root, where the checkout lives in `ide-overlay`):
-
-1. After the wil fetch block (`# ── 1. Fetch wil …`), add:
+- [ ] **Step 4: Run to verify it passes**
 
 ```powershell
-          # ── 1b. Widgets component (winmd + native DLL; checksum-pinned) ─────
-          & "ide-overlay/scripts/fetch-widgets-deps.ps1"
+cmake -S shell-ext -B shell-ext-build -G "Visual Studio 17 2022" -A x64
+cmake --build shell-ext-build --config Release --target placement_test
+ctest --test-dir shell-ext-build -C Release --output-on-failure -R placement_test
 ```
 
-2. After `cmake --build shell-ext-build --config Release` and the identity-stub copy, add:
-
-```powershell
-          # ── 2b. Widget provider unit tests (card builder, snapshot validation) ──
-          ctest --test-dir shell-ext-build -C Release --output-on-failure
-          if ($LASTEXITCODE -ne 0) { Write-Error "widget provider tests failed"; exit $LASTEXITCODE }
-```
-
-3. After the shell-ext appx signature verification (`Write-Host "Shell extension package built and signed …"`) and **before** `Remove-Item NullIDECert.pfx -Force` — the pfx is deleted at "Sign .appx"; move that single `Remove-Item NullIDECert.pfx -Force` line to after the new block:
-
-```powershell
-          # ── 8. Widgets package (same certificate, so no extra trust prompt) ──
-          & "ide-overlay/scripts/pack-widgets.ps1" -RepoRoot "ide-overlay" -BuildDir "shell-ext-build" -OutDir $outDir -PfxPath "NullIDECert.pfx" -PfxPassword "nullbuild"
-          Remove-Item NullIDECert.pfx -Force
-```
-
-- [ ] **Step 2: Mirror it in `scripts/build-local.ps1`**
-
-In the shell-ext block: after the wil fetch add `& (Join-Path $RepoRoot "scripts/fetch-widgets-deps.ps1")`; after `cmake --build` add `Invoke-Native "ctest (widgets)" { ctest --test-dir $shellExtBuild -C Release --output-on-failure }`; replace the `Remove-Item $pfxPath -Force` line after `signtool sign` with:
-
-```powershell
-    & (Join-Path $RepoRoot "scripts/pack-widgets.ps1") -RepoRoot $RepoRoot -BuildDir $shellExtBuild -OutDir $OutDir -PfxPath $pfxPath -PfxPassword "nullbuild"
-    Remove-Item $pfxPath -Force
-```
-
-- [ ] **Step 3: Verify locally**
-
-Run the shell-ext part of `scripts/build-local.ps1` (it takes a while; do not run the whole script unless asked — run only this block, or temporarily pass `-SkipShellExt:$false` with your usual switches). Expected: `VSCode-win32-x64\shell-ext\null-widgets.appx` and `…\NullIDE.Widgets\x64\null_widgets.exe` exist; `Get-AuthenticodeSignature` on the appx shows `CN=Null IDE`. In CI the proof is the next tagged/dispatched build: the "Build Win11 shell extension" step is green and its layout listing shows both appx files.
-
-- [ ] **Step 4: Note it in `shell-ext/CLAUDE.md`**
-
-Append a short section "## Widgets provider (`widgets/`)": what it is, that it is a *second* package `NullIDE.Widgets` built by the same CMake run, packed by `scripts/pack-widgets.ps1`, tested by CTest (`ctest --test-dir shell-ext-build -C Release`), bump the manifest `Version` whenever `widgets/AppxManifest.xml` changes, and a pointer to `docs/specs/native-windows-widgets-design.md` and `…-gate.md`.
+Expected: no warnings; `placement_test: all checks passed`.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add .github/workflows/build.yml scripts/build-local.ps1 shell-ext/CLAUDE.md
-git commit -m "ci(widgets): build, test and package the widgets provider (#141)"
+git add shell-ext/widgets
+git commit -m "feat(widgets): saved layout, clamp to monitors and edge snapping (#141)"
 ```
 
 ---
 
-### Task 7: GraphQL queries, search strings and row mappers (null-tools)
+### Task 5: Actions — safe launching
+
+**Files:**
+- Create: `shell-ext/widgets/actions.h`, `shell-ext/widgets/actions.cc`, `shell-ext/widgets/actions_test.cc`
+- Modify: `shell-ext/widgets/CMakeLists.txt` (two `set` lines)
+
+**Interfaces:**
+- Consumes: `Action`, `ActionKind` (Task 3); `IsSafeGithubUrl`, `IsAbsoluteLocalPath` (Task 2).
+- Produces (`actions.h`): `std::wstring QuoteArg(std::wstring const&)`; `std::wstring NullCommandLine(nullExe, projectPath, bool newWindow)` → `"<null.exe>" [--new-window] -- "<path>"`; `void ScrubIdeEnvironment()` (drops `ELECTRON_RUN_AS_NODE` and `VSCODE_*`); `bool Run(Action const&, std::wstring const& installDir)` (re-validates; `false` without starting anything on a bad URL/path or a missing `null.exe`).
+
+- [ ] **Step 1: Write the failing test**
+
+`shell-ext/widgets/actions_test.cc`:
+
+```cpp
+#include <windows.h>
+
+#include "actions.h"
+#include "check.h"
+
+using namespace null_widgets;
+
+static void TestCommandLine() {
+  CHECK(QuoteArg(L"abc") == L"abc");
+  CHECK(QuoteArg(L"a b") == L"\"a b\"");
+  CHECK(QuoteArg(L"") == L"\"\"");
+  CHECK(QuoteArg(L"C:\\a b\\") == L"\"C:\\a b\\\\\"");  // trailing backslash is doubled so it cannot escape the closing quote
+  CHECK(QuoteArg(L"a\"b") == L"\"a\\\"b\"");
+  CHECK(NullCommandLine(L"C:\\Null IDE\\null.exe", L"C:\\work dir\\", true) ==
+        L"\"C:\\Null IDE\\null.exe\" --new-window -- \"C:\\work dir\\\\\"");
+  CHECK(NullCommandLine(L"C:\\n\\null.exe", L"C:\\work", false) == L"C:\\n\\null.exe -- C:\\work");
+}
+
+static void TestRefusals() {
+  // Nothing hostile reaches ShellExecute or CreateProcess: these all fail before any process is started.
+  CHECK(!Run({ActionKind::OpenUrl, L"file:///C:/Windows/System32/calc.exe", L""}, L"C:\\x"));
+  CHECK(!Run({ActionKind::OpenUrl, L"https://github.com.evil.com/x", L""}, L"C:\\x"));
+  CHECK(!Run({ActionKind::OpenProject, L"--remote=evil", L""}, L"C:\\x"));
+  CHECK(!Run({ActionKind::OpenProjectNewWindow, L"..\\..\\x", L""}, L"C:\\x"));
+  CHECK(!Run({ActionKind::OpenProject, L"C:\\work", L""}, L"C:\\no\\such\\install"));  // no null.exe there
+  CHECK(!Run({ActionKind::None, L"", L""}, L"C:\\x"));
+}
+
+static void TestScrub() {
+  SetEnvironmentVariableW(L"ELECTRON_RUN_AS_NODE", L"1");
+  SetEnvironmentVariableW(L"VSCODE_PID", L"5");
+  SetEnvironmentVariableW(L"vscode_lower", L"1");
+  SetEnvironmentVariableW(L"NULL_WIDGETS_TEST_KEEP", L"1");
+  ScrubIdeEnvironment();
+  wchar_t buf[8];
+  CHECK(GetEnvironmentVariableW(L"ELECTRON_RUN_AS_NODE", buf, 8) == 0);
+  CHECK(GetEnvironmentVariableW(L"VSCODE_PID", buf, 8) == 0);
+  CHECK(GetEnvironmentVariableW(L"vscode_lower", buf, 8) == 0);
+  CHECK(GetEnvironmentVariableW(L"NULL_WIDGETS_TEST_KEEP", buf, 8) == 1);
+}
+
+int main() {
+  TestCommandLine();
+  TestRefusals();
+  TestScrub();
+  return Finish("actions_test");
+}
+```
+
+In `CMakeLists.txt` change the two lines to:
+
+```cmake
+set(CORE_SOURCES snapshot.cc layout.cc placement.cc actions.cc)
+set(TESTS snapshot_test layout_test placement_test actions_test)
+```
+
+- [ ] **Step 2: Run to verify failure**
+
+Run: `cmake -S shell-ext -B shell-ext-build -G "Visual Studio 17 2022" -A x64`
+Expected: FAIL — `Cannot find source file: actions.cc`.
+
+- [ ] **Step 3: Write the implementation**
+
+`shell-ext/widgets/actions.h`:
+
+```cpp
+#pragma once
+#include <string>
+
+#include "layout.h"
+
+namespace null_widgets {
+
+// CommandLineToArgvW rules: quotes only when needed, backslashes before a quote doubled.
+std::wstring QuoteArg(std::wstring const& arg);
+// "<null.exe>" [--new-window] -- "<project>". The `--` keeps a path from ever being read as an option.
+std::wstring NullCommandLine(std::wstring const& nullExe, std::wstring const& projectPath, bool newWindow);
+
+// Drops ELECTRON_RUN_AS_NODE and VSCODE_* from this process, so a null.exe started later is the editor and not Node,
+// even when the widgets were first started from the extension host.
+void ScrubIdeEnvironment();
+
+// Runs one action. URLs and paths are validated again here. `installDir` is the folder of this exe (never from the snapshot).
+bool Run(Action const& action, std::wstring const& installDir);
+
+}  // namespace null_widgets
+```
+
+`shell-ext/widgets/actions.cc`:
+
+```cpp
+#include "actions.h"
+
+#include <windows.h>
+#include <shellapi.h>
+
+#include <filesystem>
+#include <vector>
+
+#include "snapshot.h"
+
+namespace null_widgets {
+
+std::wstring QuoteArg(std::wstring const& arg) {
+  if (!arg.empty() && arg.find_first_of(L" \t\n\v\"") == std::wstring::npos) return arg;
+  std::wstring out = L"\"";
+  size_t backslashes = 0;
+  for (wchar_t c : arg) {
+    if (c == L'\\') {
+      ++backslashes;
+      continue;
+    }
+    if (c == L'"') out.append(backslashes * 2 + 1, L'\\');
+    else out.append(backslashes, L'\\');
+    backslashes = 0;
+    out.push_back(c);
+  }
+  out.append(backslashes * 2, L'\\');  // the closing quote must not be escaped by a trailing backslash
+  out.push_back(L'"');
+  return out;
+}
+
+std::wstring NullCommandLine(std::wstring const& nullExe, std::wstring const& projectPath, bool newWindow) {
+  std::wstring cmd = QuoteArg(nullExe);
+  if (newWindow) cmd += L" --new-window";
+  cmd += L" -- " + QuoteArg(projectPath);
+  return cmd;
+}
+
+void ScrubIdeEnvironment() {
+  std::vector<std::wstring> names;
+  if (wchar_t* block = GetEnvironmentStringsW()) {
+    for (wchar_t* p = block; *p; p += wcslen(p) + 1) {
+      std::wstring entry = p;
+      size_t eq = entry.find(L'=', 1);  // a leading '=' is a drive-cwd entry such as "=C:"
+      if (eq == std::wstring::npos) continue;
+      std::wstring name = entry.substr(0, eq);
+      if (_wcsicmp(name.c_str(), L"ELECTRON_RUN_AS_NODE") == 0 || _wcsnicmp(name.c_str(), L"VSCODE_", 7) == 0) names.push_back(name);
+    }
+    FreeEnvironmentStringsW(block);
+  }
+  for (auto const& n : names) SetEnvironmentVariableW(n.c_str(), nullptr);
+}
+
+bool Run(Action const& a, std::wstring const& installDir) {
+  switch (a.kind) {
+    case ActionKind::OpenUrl: {
+      if (!IsSafeGithubUrl(a.target)) return false;
+      return reinterpret_cast<INT_PTR>(ShellExecuteW(nullptr, L"open", a.target.c_str(), nullptr, nullptr, SW_SHOWNORMAL)) > 32;
+    }
+    case ActionKind::OpenProject:
+    case ActionKind::OpenProjectNewWindow: {
+      if (!IsAbsoluteLocalPath(a.target)) return false;
+      std::wstring nullExe = installDir + L"\\null.exe";
+      if (!std::filesystem::is_regular_file(nullExe)) return false;
+      std::wstring cmd = NullCommandLine(nullExe, a.target, a.kind == ActionKind::OpenProjectNewWindow);
+      std::vector<wchar_t> buf(cmd.begin(), cmd.end());
+      buf.push_back(L'\0');
+      STARTUPINFOW si{sizeof(si)};
+      PROCESS_INFORMATION pi{};
+      if (!CreateProcessW(nullExe.c_str(), buf.data(), nullptr, nullptr, FALSE, CREATE_UNICODE_ENVIRONMENT, nullptr, nullptr, &si, &pi)) return false;
+      CloseHandle(pi.hThread);
+      CloseHandle(pi.hProcess);
+      return true;
+    }
+    case ActionKind::None:
+      break;
+  }
+  return false;
+}
+
+}  // namespace null_widgets
+```
+
+- [ ] **Step 4: Run to verify it passes**
+
+```powershell
+cmake -S shell-ext -B shell-ext-build -G "Visual Studio 17 2022" -A x64
+cmake --build shell-ext-build --config Release --target actions_test
+ctest --test-dir shell-ext-build -C Release --output-on-failure
+```
+
+Expected: no warnings; all four widget tests pass.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add shell-ext/widgets
+git commit -m "feat(widgets): validated launching of URLs and projects (#141)"
+```
+
+---
+
+### Task 6: The host — `null_widgets.exe`
+
+The windows, painting, drag, menu, single instance and file watch. There is nothing here a unit test can reach (it is all window messages); correctness rests on the four tested modules below it and on the manual check at the end.
+
+**Files:**
+- Create: `shell-ext/widgets/app.cc`
+- Modify: `shell-ext/widgets/CMakeLists.txt` (append the exe target)
+- Create: `scripts/check-widgets.ps1`
+
+**Interfaces:**
+- Consumes: everything from Tasks 2–5.
+- Produces: `null_widgets.exe` (GUI subsystem). Behaviour the other tasks rely on: one instance (named mutex `Local\NullWidgets.Singleton`); a second launch posts `WM_APP_SHOW_ALL` to the first and exits; reads `%LOCALAPPDATA%\Null\widgets\snapshot.json` and `layout.json`; creates the folder if it is missing; sets its working directory there (it never keeps the install folder busy); quits on `WM_CLOSE` of any of its windows (so `taskkill` without `/F` works).
+
+- [ ] **Step 1: Write `app.cc`**
+
+```cpp
+// null_widgets.exe: Projects / Issues / Pull Requests as borderless windows pinned just above the wallpaper.
+// Reads %LOCALAPPDATA%\Null\widgets\snapshot.json (written by the IDE) and never touches the network.
+#include <windows.h>
+#include <d2d1.h>
+#include <dwrite.h>
+#include <shlobj.h>
+#include <windowsx.h>
+
+#include <algorithm>
+#include <cmath>
+#include <ctime>
+#include <filesystem>
+#include <fstream>
+#include <sstream>
+#include <string>
+#include <vector>
+
+#include <winrt/Windows.Foundation.h>
+
+#include "actions.h"
+#include "layout.h"
+#include "placement.h"
+#include "snapshot.h"
+
+using namespace null_widgets;
+
+namespace {
+
+constexpr wchar_t kControlClass[] = L"NullWidgetsControl";
+constexpr wchar_t kWidgetClass[] = L"NullWidgetsWindow";
+constexpr wchar_t kMutexName[] = L"Local\\NullWidgets.Singleton";
+
+constexpr UINT WM_APP_RELOAD = WM_APP + 1;     // the snapshot file changed
+constexpr UINT WM_APP_SHOW_ALL = WM_APP + 2;  // a second launch: show every hidden widget
+constexpr UINT_PTR kTickTimer = 1;             // repaint once a minute so "updated N min ago" moves on
+constexpr int kDragThresholdPx = 4, kSnapDip = 16;
+
+enum MenuId : UINT { kRefresh = 1, kLock, kHide, kQuit, kShowBase = 100, kRowBase = 200 };
+
+// Null Dark (extensions/null-theme/themes/null-dark.json).
+struct Palette {
+  D2D1_COLOR_F bg{0.094f, 0.094f, 0.094f, 0.94f}, border{1, 1, 1, 0.08f}, hover{1, 1, 1, 0.07f};
+  D2D1_COLOR_F text{0.8f, 0.8f, 0.8f, 1}, muted{0.616f, 0.616f, 0.616f, 1}, faint{0.45f, 0.45f, 0.45f, 1};
+  D2D1_COLOR_F accent{0.302f, 0.667f, 0.988f, 1}, good{0.18f, 0.627f, 0.263f, 1}, warn{0.8f, 0.655f, 0, 1}, bad{0.973f, 0.318f, 0.286f, 1};
+};
+const Palette kPal;
+
+struct Widget {
+  Kind kind;
+  HWND hwnd = nullptr;
+  View view;
+  int hover = -1;      // row under the cursor
+  bool tracking = false;
+  bool down = false, dragging = false;
+  POINT downScreen{}, downOrigin{};
+};
+
+struct App {
+  HWND control = nullptr;
+  std::wstring installDir, dataDir, snapshotPath, layoutPath;
+  LayoutFile layout;
+  Loaded loaded;  // what is drawn: the last good snapshot
+  Widget widgets[kKindCount] = {{Kind::Projects}, {Kind::Issues}, {Kind::Prs}};
+  ID2D1Factory* d2d = nullptr;
+  IDWriteFactory* dwrite = nullptr;
+} app;
+
+template <class T>
+void Release(T*& p) {
+  if (p) { p->Release(); p = nullptr; }
+}
+
+std::wstring ReadText(std::wstring const& path) {
+  std::ifstream f(std::filesystem::path(path), std::ios::binary);
+  std::stringstream ss;
+  ss << f.rdbuf();
+  return std::wstring(winrt::to_hstring(ss.str()).c_str());
+}
+
+void WriteTextAtomic(std::wstring const& path, std::wstring const& text) {
+  std::wstring tmp = path + L".tmp";
+  std::string utf8(winrt::to_string(winrt::hstring(text)));
+  {
+    std::ofstream f(std::filesystem::path(tmp), std::ios::binary | std::ios::trunc);
+    f << utf8;
+  }
+  MoveFileExW(tmp.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING);
+}
+
+long long NowEpoch() { return static_cast<long long>(std::time(nullptr)); }
+
+std::vector<Box> WorkAreas() {
+  std::vector<Box> out;
+  EnumDisplayMonitors(nullptr, nullptr,
+      [](HMONITOR m, HDC, LPRECT, LPARAM lp) -> BOOL {
+        MONITORINFO mi{sizeof(mi)};
+        if (GetMonitorInfoW(m, &mi)) {
+          reinterpret_cast<std::vector<Box>*>(lp)->push_back({mi.rcWork.left, mi.rcWork.top, mi.rcWork.right, mi.rcWork.bottom});
+        }
+        return TRUE;
+      },
+      reinterpret_cast<LPARAM>(&out));
+  return out;
+}
+
+Box PrimaryWork() {
+  RECT r{};
+  SystemParametersInfoW(SPI_GETWORKAREA, 0, &r, 0);
+  return {r.left, r.top, r.right, r.bottom};
+}
+
+double ScaleOf(HWND h) { return static_cast<double>(GetDpiForWindow(h)) / 96.0; }
+int Px(double dip, double scale) { return static_cast<int>(std::lround(dip * scale)); }
+
+SizeDip SizeOfWidget(Kind k) {
+  Placement const& p = app.layout.widget[static_cast<int>(k)];
+  SizeDip d = DefaultSize(k);
+  return {p.w > 0 ? p.w : d.w, p.h > 0 ? p.h : d.h};
+}
+
+void SaveLayout() { WriteTextAtomic(app.layoutPath, SerializeLayout(app.layout)); }
+
+// ---- drawing -----------------------------------------------------------------------------------------------
+
+struct Fonts {
+  IDWriteTextFormat *title = nullptr, *row = nullptr, *detail = nullptr, *foot = nullptr, *message = nullptr;
+};
+
+IDWriteTextFormat* MakeFormat(float size, DWRITE_FONT_WEIGHT weight, DWRITE_TEXT_ALIGNMENT align = DWRITE_TEXT_ALIGNMENT_LEADING) {
+  IDWriteTextFormat* f = nullptr;
+  if (SUCCEEDED(app.dwrite->CreateTextFormat(L"Segoe UI", nullptr, weight, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, size, L"", &f))) {
+    f->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
+    f->SetTextAlignment(align);
+    f->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
+  }
+  return f;
+}
+
+D2D1_COLOR_F ToneColor(Tone t) {
+  switch (t) {
+    case Tone::Muted: return kPal.muted;
+    case Tone::Accent: return kPal.accent;
+    case Tone::Good: return kPal.good;
+    case Tone::Warn: return kPal.warn;
+    case Tone::Bad: return kPal.bad;
+    default: return kPal.text;
+  }
+}
+
+// Draws spans left to right on one line; the span that runs out of room is cut with an ellipsis.
+void DrawSpans(ID2D1RenderTarget* rt, ID2D1SolidColorBrush* brush, IDWriteTextFormat* fmt, std::vector<Span> const& spans, float x, float y,
+               float maxX, bool dimmed) {
+  IDWriteInlineObject* ellipsis = nullptr;
+  DWRITE_TRIMMING trim{DWRITE_TRIMMING_GRANULARITY_CHARACTER, 0, 0};
+  for (auto const& s : spans) {
+    if (x >= maxX) break;
+    IDWriteTextLayout* layout = nullptr;
+    if (FAILED(app.dwrite->CreateTextLayout(s.text.c_str(), static_cast<UINT32>(s.text.size()), fmt, maxX - x, 24.f, &layout))) break;
+    if (!ellipsis) app.dwrite->CreateEllipsisTrimmingSign(fmt, &ellipsis);
+    layout->SetTrimming(&trim, ellipsis);
+    DWRITE_TEXT_METRICS m{};
+    layout->GetMetrics(&m);
+    D2D1_COLOR_F c = ToneColor(s.tone);
+    if (dimmed) c.a *= 0.5f;
+    brush->SetColor(c);
+    rt->DrawTextLayout(D2D1::Point2F(x, y), layout, brush);
+    x += m.widthIncludingTrailingWhitespace;
+    layout->Release();
+  }
+  Release(ellipsis);
+}
+
+void Render(Widget& w) {
+  if (!w.hwnd || !IsWindowVisible(w.hwnd)) return;
+  double scale = ScaleOf(w.hwnd);
+  SizeDip sd = SizeOfWidget(w.kind);
+  int pw = Px(sd.w, scale), ph = Px(sd.h, scale);
+
+  HDC screen = GetDC(nullptr);
+  HDC mem = CreateCompatibleDC(screen);
+  BITMAPINFO bi{};
+  bi.bmiHeader = {sizeof(BITMAPINFOHEADER), pw, -ph, 1, 32, BI_RGB};
+  void* bits = nullptr;
+  HBITMAP bmp = CreateDIBSection(screen, &bi, DIB_RGB_COLORS, &bits, nullptr, 0);
+  HGDIOBJ old = SelectObject(mem, bmp);
+
+  ID2D1DCRenderTarget* rt = nullptr;
+  D2D1_RENDER_TARGET_PROPERTIES props = D2D1::RenderTargetProperties(
+      D2D1_RENDER_TARGET_TYPE_DEFAULT, D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED), 96.f * static_cast<float>(scale),
+      96.f * static_cast<float>(scale), D2D1_RENDER_TARGET_USAGE_GDI_COMPATIBLE);
+  if (SUCCEEDED(app.d2d->CreateDCRenderTarget(&props, &rt))) {
+    RECT bounds{0, 0, pw, ph};
+    rt->BindDC(mem, &bounds);
+    ID2D1SolidColorBrush* brush = nullptr;
+    rt->CreateSolidColorBrush(kPal.bg, &brush);
+    Fonts f{MakeFormat(13.f, DWRITE_FONT_WEIGHT_SEMI_BOLD), MakeFormat(13.f, DWRITE_FONT_WEIGHT_NORMAL), MakeFormat(11.f, DWRITE_FONT_WEIGHT_NORMAL),
+            MakeFormat(11.f, DWRITE_FONT_WEIGHT_NORMAL), MakeFormat(13.f, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_TEXT_ALIGNMENT_CENTER)};
+
+    float W = static_cast<float>(sd.w), H = static_cast<float>(sd.h);
+    View const& v = w.view;
+    rt->BeginDraw();
+    rt->Clear(D2D1::ColorF(0, 0, 0, 0));
+    D2D1_ROUNDED_RECT card = D2D1::RoundedRect(D2D1::RectF(0.5f, 0.5f, W - 0.5f, H - 0.5f), 10.f, 10.f);
+    brush->SetColor(kPal.bg);
+    rt->FillRoundedRectangle(card, brush);
+    brush->SetColor(kPal.border);
+    rt->DrawRoundedRectangle(card, brush, 1.f);
+
+    brush->SetColor(kPal.text);
+    rt->DrawText(v.title.c_str(), static_cast<UINT32>(v.title.size()), f.title, D2D1::RectF(14, 9, W - 14, kHeaderDip), brush);
+
+    if (!v.message.empty()) {
+      brush->SetColor(kPal.muted);
+      rt->DrawText(v.message.c_str(), static_cast<UINT32>(v.message.size()), f.message, D2D1::RectF(14, kHeaderDip + 24, W - 14, H - kFooterDip), brush);
+    }
+    for (size_t i = 0; i < v.rows.size(); ++i) {
+      float top = static_cast<float>(kHeaderDip + i * kRowDip);
+      if (static_cast<int>(i) == w.hover && v.rows[i].click.kind != ActionKind::None) {
+        brush->SetColor(kPal.hover);
+        rt->FillRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(6, top, W - 6, top + kRowDip - 2), 6.f, 6.f), brush);
+      }
+      DrawSpans(rt, brush, f.row, v.rows[i].title, 14, top + 3, W - 14, v.rows[i].dimmed);
+      DrawSpans(rt, brush, f.detail, v.rows[i].detail, 14, top + 22, W - 14, v.rows[i].dimmed);
+    }
+    if (!v.footer.empty()) {
+      brush->SetColor(v.stale ? kPal.faint : kPal.muted);
+      rt->DrawText(v.footer.c_str(), static_cast<UINT32>(v.footer.size()), f.foot, D2D1::RectF(14, H - kFooterDip + 2, W - 14, H), brush);
+    }
+    rt->EndDraw();
+
+    Release(f.title); Release(f.row); Release(f.detail); Release(f.foot); Release(f.message);
+    Release(brush);
+    Release(rt);
+  }
+
+  RECT wr{};
+  GetWindowRect(w.hwnd, &wr);
+  POINT pos{wr.left, wr.top}, src{0, 0};
+  SIZE size{pw, ph};
+  BLENDFUNCTION blend{AC_SRC_OVER, 0, 255, AC_SRC_ALPHA};
+  UpdateLayeredWindow(w.hwnd, screen, &pos, &size, mem, &src, 0, &blend, ULW_ALPHA);
+
+  SelectObject(mem, old);
+  DeleteObject(bmp);
+  DeleteDC(mem);
+  ReleaseDC(nullptr, screen);
+}
+
+void Rebuild(Widget& w) {
+  w.view = BuildView(app.loaded, w.kind, RowsThatFit(SizeOfWidget(w.kind).h), NowEpoch());
+  if (w.hover >= static_cast<int>(w.view.rows.size())) w.hover = -1;
+  Render(w);
+}
+
+void RebuildAll() {
+  for (auto& w : app.widgets) Rebuild(w);
+}
+
+void Reload() {
+  app.loaded = KeepLastGood(app.loaded, LoadSnapshotFile(app.snapshotPath));
+  RebuildAll();
+}
+
+// ---- placement ---------------------------------------------------------------------------------------------
+
+// The desktop window (Progman) is itself at the very bottom, so HWND_BOTTOM would hide a widget behind the wallpaper. A widget goes
+// directly above Progman instead: behind the window that is just above it, so below every app and above the desktop.
+// Null when the widget already is that window or there is no desktop window (the z-order is then left alone).
+HWND AboveDesktop(HWND self) {
+  HWND prog = FindWindowW(L"Progman", nullptr);
+  HWND above = prog ? GetWindow(prog, GW_HWNDPREV) : nullptr;
+  return above == self ? nullptr : above;
+}
+
+void PinToDesktop(HWND h) {
+  if (HWND above = AboveDesktop(h)) SetWindowPos(h, above, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+}
+
+Box WindowBox(HWND h) {
+  RECT r{};
+  GetWindowRect(h, &r);
+  return {r.left, r.top, r.right, r.bottom};
+}
+
+void MoveTo(Widget& w, Box b) {
+  SetWindowPos(w.hwnd, nullptr, b.left, b.top, b.w(), b.h(), SWP_NOACTIVATE | SWP_NOZORDER);  // WM_WINDOWPOSCHANGING re-pins the z-order
+}
+
+// Puts every widget where the layout says, clamped to the monitors that exist now.
+void ApplyLayout() {
+  auto work = WorkAreas();
+  for (int i = 0; i < kKindCount; ++i) {
+    Widget& w = app.widgets[i];
+    Placement& p = app.layout.widget[i];
+    double scale = ScaleOf(w.hwnd);
+    SizeDip sd = SizeOfWidget(w.kind);
+    int pw = Px(sd.w, scale), ph = Px(sd.h, scale);
+    Box b = p.placed ? Box{p.x, p.y, p.x + pw, p.y + ph} : DefaultBox(w.kind, PrimaryWork(), scale);
+    b = ClampToMonitors(b, work);
+    MoveTo(w, b);
+    p.placed = true;
+    p.x = b.left;
+    p.y = b.top;
+    ShowWindow(w.hwnd, p.visible ? SW_SHOWNOACTIVATE : SW_HIDE);
+  }
+  RebuildAll();
+}
+
+// ---- widget window -----------------------------------------------------------------------------------------
+
+int RowAt(Widget const& w, int yPx) {
+  double scale = ScaleOf(w.hwnd);
+  int top = Px(kHeaderDip, scale), row = Px(kRowDip, scale);
+  if (yPx < top) return -1;
+  int i = (yPx - top) / row;
+  return i < static_cast<int>(w.view.rows.size()) ? i : -1;
+}
+
+void ShowMenu(Widget& w, POINT screenPt, int row) {
+  HMENU m = CreatePopupMenu();
+  if (row >= 0) {
+    auto const& items = w.view.rows[row].menu;
+    for (size_t i = 0; i < items.size(); ++i) AppendMenuW(m, MF_STRING, kRowBase + i, items[i].label.c_str());
+    if (!items.empty()) AppendMenuW(m, MF_SEPARATOR, 0, nullptr);
+  }
+  AppendMenuW(m, MF_STRING, kRefresh, L"Refresh");
+  AppendMenuW(m, MF_STRING | (app.layout.locked ? MF_CHECKED : 0), kLock, L"Lock widgets");
+  AppendMenuW(m, MF_STRING, kHide, L"Hide this widget");
+  for (int i = 0; i < kKindCount; ++i) {
+    if (!app.layout.widget[i].visible) {
+      std::wstring label = std::wstring(L"Show ") + TitleOf(static_cast<Kind>(i));
+      AppendMenuW(m, MF_STRING, kShowBase + i, label.c_str());
+    }
+  }
+  AppendMenuW(m, MF_SEPARATOR, 0, nullptr);
+  AppendMenuW(m, MF_STRING, kQuit, L"Quit widgets");
+
+  SetForegroundWindow(w.hwnd);  // without this the menu does not close when the user clicks elsewhere
+  UINT id = TrackPopupMenu(m, TPM_RETURNCMD | TPM_RIGHTBUTTON, screenPt.x, screenPt.y, 0, w.hwnd, nullptr);
+  PostMessageW(w.hwnd, WM_NULL, 0, 0);
+  DestroyMenu(m);
+
+  int idx = static_cast<int>(w.kind);
+  if (id >= kRowBase && id < kRowBase + 8 && row >= 0 && id - kRowBase < w.view.rows[row].menu.size()) {
+    Run(w.view.rows[row].menu[id - kRowBase], app.installDir);
+  } else if (id == kRefresh) {
+    Reload();
+  } else if (id == kLock) {
+    app.layout.locked = !app.layout.locked;
+    SaveLayout();
+  } else if (id == kHide) {
+    app.layout.widget[idx].visible = false;
+    ShowWindow(w.hwnd, SW_HIDE);
+    SaveLayout();
+  } else if (id >= kShowBase && id < kShowBase + kKindCount) {
+    app.layout.widget[id - kShowBase].visible = true;
+    ShowWindow(app.widgets[id - kShowBase].hwnd, SW_SHOWNOACTIVATE);
+    SaveLayout();
+    Reload();
+  } else if (id == kQuit) {
+    PostMessageW(app.control, WM_CLOSE, 0, 0);
+  }
+}
+
+LRESULT CALLBACK WidgetProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
+  Widget* w = reinterpret_cast<Widget*>(GetWindowLongPtrW(h, GWLP_USERDATA));
+  if (!w) return DefWindowProcW(h, msg, wp, lp);
+  switch (msg) {
+    case WM_WINDOWPOSCHANGING: {
+      // Whatever asked for a new z-order (a click, Win+D, another app), the widget stays above the wallpaper and below everything else.
+      auto* pos = reinterpret_cast<WINDOWPOS*>(lp);
+      if (HWND above = AboveDesktop(h)) {
+        pos->hwndInsertAfter = above;
+        pos->flags &= ~SWP_NOZORDER;
+      } else {
+        pos->flags |= SWP_NOZORDER;
+      }
+      pos->flags |= SWP_NOACTIVATE;
+      return 0;
+    }
+    case WM_MOUSEACTIVATE:
+      return MA_NOACTIVATE;
+    case WM_MOUSEMOVE: {
+      POINT pt{GET_X_LPARAM(lp), GET_Y_LPARAM(lp)};
+      if (!w->tracking) {
+        TRACKMOUSEEVENT t{sizeof(t), TME_LEAVE, h, 0};
+        TrackMouseEvent(&t);
+        w->tracking = true;
+      }
+      if (w->down && !app.layout.locked) {
+        POINT s = pt;
+        ClientToScreen(h, &s);
+        if (!w->dragging && (std::abs(s.x - w->downScreen.x) > kDragThresholdPx || std::abs(s.y - w->downScreen.y) > kDragThresholdPx)) w->dragging = true;
+        if (w->dragging) {
+          Box cur = WindowBox(h);
+          Box want{w->downOrigin.x + s.x - w->downScreen.x, w->downOrigin.y + s.y - w->downScreen.y, 0, 0};
+          want.right = want.left + cur.w();
+          want.bottom = want.top + cur.h();
+          MoveTo(*w, SnapToEdges(want, WorkAreas(), Px(kSnapDip, ScaleOf(h))));
+          return 0;
+        }
+      }
+      int row = RowAt(*w, pt.y);
+      if (row != w->hover) {
+        w->hover = row;
+        Render(*w);
+      }
+      return 0;
+    }
+    case WM_MOUSELEAVE:
+      w->tracking = false;
+      if (w->hover != -1) {
+        w->hover = -1;
+        Render(*w);
+      }
+      return 0;
+    case WM_LBUTTONDOWN: {
+      w->down = true;
+      w->dragging = false;
+      SetCapture(h);
+      w->downScreen = {GET_X_LPARAM(lp), GET_Y_LPARAM(lp)};
+      ClientToScreen(h, &w->downScreen);
+      Box b = WindowBox(h);
+      w->downOrigin = {b.left, b.top};
+      return 0;
+    }
+    case WM_LBUTTONUP: {
+      bool wasDragging = w->dragging;
+      w->down = w->dragging = false;
+      ReleaseCapture();
+      if (wasDragging) {
+        Box b = WindowBox(h);
+        Placement& p = app.layout.widget[static_cast<int>(w->kind)];
+        p.placed = true;
+        p.x = b.left;
+        p.y = b.top;
+        SaveLayout();
+      } else {
+        int row = RowAt(*w, GET_Y_LPARAM(lp));
+        if (row >= 0) Run(w->view.rows[row].click, app.installDir);
+      }
+      return 0;
+    }
+    case WM_RBUTTONUP: {
+      POINT pt{GET_X_LPARAM(lp), GET_Y_LPARAM(lp)};
+      int row = RowAt(*w, pt.y);
+      ClientToScreen(h, &pt);
+      ShowMenu(*w, pt, row);
+      return 0;
+    }
+    case WM_DPICHANGED: {
+      Rebuild(*w);
+      return 0;
+    }
+    case WM_CLOSE:  // taskkill without /F, or Alt+F4 on a focused widget: quit everything
+      PostMessageW(app.control, WM_CLOSE, 0, 0);
+      return 0;
+  }
+  return DefWindowProcW(h, msg, wp, lp);
+}
+
+// ---- control window: second launches, file changes, display and power events --------------------------------
+
+LRESULT CALLBACK ControlProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
+  static UINT const taskbarCreated = RegisterWindowMessageW(L"TaskbarCreated");
+  if (msg == taskbarCreated) {  // Explorer restarted: there is a new desktop window to sit on
+    ApplyLayout();
+    return 0;
+  }
+  switch (msg) {
+    case WM_APP_RELOAD:
+      Reload();
+      return 0;
+    case WM_APP_SHOW_ALL:
+      for (int i = 0; i < kKindCount; ++i) {
+        app.layout.widget[i].visible = true;
+        ShowWindow(app.widgets[i].hwnd, SW_SHOWNOACTIVATE);
+      }
+      SaveLayout();
+      Reload();
+      return 0;
+    case WM_TIMER:
+      RebuildAll();
+      return 0;
+    case WM_DISPLAYCHANGE:
+    case WM_SETTINGCHANGE:
+      if (msg == WM_DISPLAYCHANGE || wp == SPI_SETWORKAREA) ApplyLayout();
+      return 0;
+    case WM_POWERBROADCAST:
+      if (wp == PBT_APMRESUMEAUTOMATIC || wp == PBT_APMRESUMESUSPEND) {
+        for (auto& w : app.widgets) PinToDesktop(w.hwnd);
+        ApplyLayout();
+        Reload();
+      }
+      return TRUE;
+    case WM_CLOSE:
+    case WM_ENDSESSION:
+      DestroyWindow(h);
+      return 0;
+    case WM_DESTROY:
+      PostQuitMessage(0);
+      return 0;
+  }
+  return DefWindowProcW(h, msg, wp, lp);
+}
+
+// Posts WM_APP_RELOAD when anything in the widgets folder changes. Reload() reads the file again, so extra wake-ups are harmless.
+DWORD WINAPI WatchThread(LPVOID) {
+  HANDLE n = FindFirstChangeNotificationW(app.dataDir.c_str(), FALSE, FILE_NOTIFY_CHANGE_LAST_WRITE | FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_SIZE);
+  if (n == INVALID_HANDLE_VALUE) return 1;
+  while (WaitForSingleObject(n, INFINITE) == WAIT_OBJECT_0) {
+    Sleep(150);  // let the writer finish its rename
+    PostMessageW(app.control, WM_APP_RELOAD, 0, 0);
+    if (!FindNextChangeNotification(n)) break;
+  }
+  FindCloseChangeNotification(n);
+  return 0;
+}
+
+std::wstring KnownFolder(REFKNOWNFOLDERID id) {
+  PWSTR p = nullptr;
+  std::wstring out;
+  if (SUCCEEDED(SHGetKnownFolderPath(id, 0, nullptr, &p))) out = p;
+  CoTaskMemFree(p);
+  return out;
+}
+
+}  // namespace
+
+int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int) {
+  SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+  HANDLE once = CreateMutexW(nullptr, TRUE, kMutexName);
+  if (GetLastError() == ERROR_ALREADY_EXISTS) {
+    // A second launch (null-setup, "Null: Set Up Widgets"): bring every hidden widget back and leave.
+    if (HWND other = FindWindowW(kControlClass, nullptr)) PostMessageW(other, WM_APP_SHOW_ALL, 0, 0);
+    return 0;
+  }
+  winrt::init_apartment(winrt::apartment_type::single_threaded);
+  ScrubIdeEnvironment();
+
+  wchar_t exe[MAX_PATH];
+  GetModuleFileNameW(nullptr, exe, MAX_PATH);
+  app.installDir = std::filesystem::path(exe).parent_path().wstring();
+  app.dataDir = KnownFolder(FOLDERID_LocalAppData) + L"\\Null\\widgets";
+  std::filesystem::create_directories(app.dataDir);
+  SetCurrentDirectoryW(app.dataDir.c_str());  // never keep the install folder busy: an update has to rename it
+  app.snapshotPath = app.dataDir + L"\\snapshot.json";
+  app.layoutPath = app.dataDir + L"\\layout.json";
+  app.layout = ParseLayout(ReadText(app.layoutPath));
+
+  D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &app.d2d);
+  DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory), reinterpret_cast<IUnknown**>(&app.dwrite));
+  if (!app.d2d || !app.dwrite) return 1;
+
+  WNDCLASSEXW cc{sizeof(cc)};
+  cc.lpfnWndProc = ControlProc;
+  cc.hInstance = inst;
+  cc.lpszClassName = kControlClass;
+  RegisterClassExW(&cc);
+  WNDCLASSEXW wc{sizeof(wc)};
+  wc.lpfnWndProc = WidgetProc;
+  wc.hInstance = inst;
+  wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
+  wc.lpszClassName = kWidgetClass;
+  RegisterClassExW(&wc);
+
+  // A hidden top-level window (not message-only): only those receive WM_DISPLAYCHANGE and WM_POWERBROADCAST.
+  app.control = CreateWindowExW(WS_EX_TOOLWINDOW, kControlClass, L"Null Widgets", WS_POPUP, 0, 0, 0, 0, nullptr, nullptr, inst, nullptr);
+  for (auto& w : app.widgets) {
+    w.hwnd = CreateWindowExW(WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE, kWidgetClass, TitleOf(w.kind), WS_POPUP, 0, 0, 10, 10, nullptr,
+                             nullptr, inst, nullptr);
+    SetWindowLongPtrW(w.hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(&w));
+  }
+  app.loaded = LoadSnapshotFile(app.snapshotPath);
+  ApplyLayout();
+  SaveLayout();
+  SetTimer(app.control, kTickTimer, 60 * 1000, nullptr);
+  CloseHandle(CreateThread(nullptr, 0, WatchThread, nullptr, 0, nullptr));
+
+  MSG msg;
+  while (GetMessageW(&msg, nullptr, 0, 0) > 0) {
+    TranslateMessage(&msg);
+    DispatchMessageW(&msg);
+  }
+  Release(app.d2d);
+  Release(app.dwrite);
+  CloseHandle(once);
+  return 0;
+}
+```
+
+- [ ] **Step 2: Add the exe target**
+
+Append to `shell-ext/widgets/CMakeLists.txt`:
+
+```cmake
+add_executable(null_widgets WIN32 app.cc)
+target_link_libraries(null_widgets PRIVATE null_widget_core d2d1 dwrite user32 gdi32 ole32 shlwapi)
+if(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+  target_link_options(null_widgets PRIVATE /guard:cf /OPT:REF /OPT:ICF /MACHINE:X64)
+endif()
+```
+
+- [ ] **Step 3: Build and run the whole suite**
+
+```powershell
+cmake -S shell-ext -B shell-ext-build -G "Visual Studio 17 2022" -A x64
+cmake --build shell-ext-build --config Release
+ctest --test-dir shell-ext-build -C Release --output-on-failure
+```
+
+Expected: no warnings; the DLL, `null_identity_stub.exe`, `null_widgets.exe` (about 190 KB) and all four tests build and pass.
+
+- [ ] **Step 4: Write the check script**
+
+`scripts/check-widgets.ps1`:
+
+```powershell
+# Manual-check driver for the Null IDE desktop widgets (null_widgets.exe). Cannot run in CI.
+#   -Status     what is running, registered and on disk right now, and where the widget windows sit relative to the desktop window
+#   -Checklist  prints the manual run (the list at the end of docs/specs/native-windows-widgets-design.md "Testing")
+# Run in a PLAIN PowerShell window outside Null IDE (updating and quitting the IDE is part of the checklist).
+param(
+    [switch]$Status,
+    [switch]$Checklist
+)
+$ErrorActionPreference = 'Stop'
+function Section($t) { Write-Host "`n== $t ==" -ForegroundColor Cyan }
+
+if (-not ($Status -or $Checklist)) { $Status = $true }
+
+if ($Status) {
+    Add-Type @'
+using System; using System.Text; using System.Runtime.InteropServices;
+public static class NullWidgetsZ {
+  delegate bool EP(IntPtr h, IntPtr l);
+  [DllImport("user32.dll")] static extern bool EnumWindows(EP cb, IntPtr l);
+  [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
+  [DllImport("user32.dll", CharSet=CharSet.Unicode)] static extern int GetClassName(IntPtr h, StringBuilder s, int n);
+  // Top-to-bottom z-order index of the desktop window and of every widget window. Widgets must sit just above Progman.
+  public static string Dump() {
+    var sb = new StringBuilder(); int idx = 0;
+    EnumWindows((h, l) => { var c = new StringBuilder(64); GetClassName(h, c, 64); var n = c.ToString();
+      if (n == "Progman" || n == "NullWidgetsWindow") sb.AppendLine("  z=" + idx + "  " + n + "  visible=" + IsWindowVisible(h));
+      idx++; return true; }, IntPtr.Zero);
+    return sb.ToString();
+  }
+}
+'@
+
+    Section 'Host'
+    $build = (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion').CurrentBuildNumber
+    "Windows build            : $build"
+    $proc = Get-Process -Name 'null_widgets' -ErrorAction SilentlyContinue
+    "null_widgets.exe running : $(if ($proc) { ($proc.Id -join ', ') } else { 'no' })"
+    $ide = Get-Process -Name 'null' -ErrorAction SilentlyContinue
+    "null.exe running         : $(if ($ide) { ($ide.Id -join ', ') } else { 'no' })"
+    $run = (Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -ErrorAction SilentlyContinue).NullWidgets
+    "Run entry NullWidgets    : $(if ($run) { $run } else { '<none>' })"
+
+    Section 'Files'
+    $dir = Join-Path $env:LOCALAPPDATA 'Null\widgets'
+    foreach ($f in 'snapshot.json', 'layout.json', 'widgets-owner.json') {
+        $p = Join-Path $dir $f
+        if (Test-Path $p) { $i = Get-Item $p; "{0,-20}: {1} bytes, written {2}" -f $f, $i.Length, $i.LastWriteTime } else { "{0,-20}: <missing>" -f $f }
+    }
+    $snap = Join-Path $dir 'snapshot.json'
+    if (Test-Path $snap) {
+        $s = Get-Content $snap -Raw | ConvertFrom-Json
+        "snapshot schema {0}: {1} projects, {2} issues, {3} PRs (issues {4}, PRs {5})" -f $s.schema, $s.projects.items.Count, $s.issues.items.Count, $s.prs.items.Count, $s.issues.status, $s.prs.status
+    }
+
+    Section 'Z-order (top = 0; widgets must be directly above Progman, never below it)'
+    [NullWidgetsZ]::Dump()
+}
+
+if ($Checklist) {
+@'
+
+Desktop widgets manual run (cannot run in CI). Use a build from scripts/build-local.ps1, installed with NullIDESetup, on Windows 11 AND Windows 10.
+ 1. Wizard: "Desktop widgets" is offered and OFF. Install without it: -Status shows no Run entry and no null_widgets.exe.
+ 2. Null Setup -> Modify -> tick "Desktop widgets" -> Apply: the Run entry exists and three cards appear on the desktop reading "Open Null IDE to set up widgets".
+ 3. Null: Set Up Widgets in the IDE: pick an account and repos. snapshot.json appears; the cards fill in with correct data and "updated <age>".
+ 4. Click an issue / PR row: the browser opens that GitHub page. Click a project row: Null IDE opens the folder. Right-click a project row -> "Open in new window" opens a new window.
+    Both IDE windows get a normal taskbar slot and icon (the widgets exe is not packaged, so no package identity is involved).
+ 5. Drag a card: it follows the cursor, snaps to screen edges, and keeps its place after Quit widgets + relaunch. Lock widgets: dragging does nothing. Unlock again.
+ 6. Win+D: the cards stay visible. Open and focus an app: it covers a card; the card never comes in front of any app. -Status z-order: cards directly above Progman.
+ 7. Hide this widget on all three, then run `<install>\null_widgets.exe` again (or Null: Set Up Widgets): all three come back.
+ 8. Sleep and resume; unplug / plug a monitor; change display scaling: cards stay visible and on screen, text stays sharp.
+ 9. Restart Explorer (Task Manager -> Windows Explorer -> Restart): cards re-appear above the desktop.
+10. Quit Null IDE completely: cards keep showing the last data; "updated" ages; after 6 h the footer is muted.
+11. Turn null.widgets.enabled off in the IDE: snapshot.json disappears and the cards read "Open Null IDE to set up widgets". Turn it on again: data returns.
+12. Sign the account out in null-accounts: rows stay, dimmed, footer "Signed out of GitHub".
+13. Update with the widgets running (headless update from a copy outside the install, see setup/CLAUDE.md): no "files are locked" prompt; the cards are back afterwards.
+14. Untick "Desktop widgets" in Modify: cards disappear, Run entry and %LOCALAPPDATA%\Null\widgets are gone, IDE untouched. Tick again, then Uninstall: same cleanup.
+'@
+}
+```
+
+- [ ] **Step 5: Look at it on the desktop**
+
+`%LOCALAPPDATA%\Null\widgets` should not exist yet (`Test-Path`); if you already use the widgets, back it up instead.
+
+```powershell
+$d = Join-Path $env:LOCALAPPDATA 'Null\widgets'; New-Item -ItemType Directory -Force $d | Out-Null
+$now = (Get-Date).ToUniversalTime().AddMinutes(-4).ToString('yyyy-MM-ddTHH:mm:ssZ')
+(Get-Content shell-ext/widgets/fixtures/ok.json -Raw) -replace '"writtenAt":"[^"]*"', "`"writtenAt`":`"$now`"" | Set-Content (Join-Path $d 'snapshot.json') -Encoding utf8
+Start-Process shell-ext-build/widgets/Release/null_widgets.exe
+scripts/check-widgets.ps1 -Status
+```
+
+Expected: three cards in a column near the right edge of the primary monitor, with the fixture's rows and "updated 4 min ago"; `-Status` lists three `NullWidgetsWindow` entries with a z-index directly above `Progman` (one less than Progman's, then two less, …). Press Win+D: the cards stay. Then run the items of `scripts/check-widgets.ps1 -Checklist` that need only the exe (4's click-through for issues/PRs, 5, 6, 7, 8, 9). Clean up: `Stop-Process -Name null_widgets; Remove-Item $d -Recurse`.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add shell-ext/widgets scripts/check-widgets.ps1
+git commit -m "feat(widgets): the desktop widgets host and its check script (#141)"
+```
+
+---
+
+### Task 7: Ship `null_widgets.exe` from CI and `build-local.ps1`
+
+**Files:**
+- Modify: `.github/workflows/build.yml` (step "Build Win11 shell extension")
+- Modify: `scripts/build-local.ps1` (the shell-ext section)
+
+- [ ] **Step 1: CI — run the tests and put the exe next to `null.exe`**
+
+In `.github/workflows/build.yml`, in the step `Build Win11 shell extension`, directly after the line `Copy-Item "shell-ext-build/Release/null_identity_stub.exe" $pkgDir -Force` add:
+
+```powershell
+          # ── 2b. Desktop widgets host: run its tests, ship it next to null.exe ──
+          ctest --test-dir shell-ext-build -C Release --output-on-failure
+          if ($LASTEXITCODE -ne 0) { Write-Error "widget tests failed with exit code $LASTEXITCODE"; exit $LASTEXITCODE }
+          Copy-Item "shell-ext-build/widgets/Release/null_widgets.exe" $outDir -Force
+          Write-Host "null_widgets.exe: $((Get-Item "$outDir/null_widgets.exe").Length) bytes"
+```
+
+(`$outDir` is `VSCode-win32-x64`, the install root that becomes the release zip; the exe is unsigned like `null.exe`.)
+
+- [ ] **Step 2: `build-local.ps1` — the same two things**
+
+In `scripts/build-local.ps1`, directly after the line `Copy-Item (Join-Path $shellExtBuild "Release/null_identity_stub.exe") $pkgDir -Force` add:
+
+```powershell
+    # Desktop widgets host: tests, then next to null.exe.
+    Invoke-Native "ctest (widgets)" { ctest --test-dir $shellExtBuild -C Release --output-on-failure }
+    Copy-Item (Join-Path $shellExtBuild "widgets/Release/null_widgets.exe") $OutDir -Force
+```
+
+- [ ] **Step 3: Verify the YAML and the local script parse**
+
+```powershell
+node -e "const y=require('fs').readFileSync('.github/workflows/build.yml','utf8'); if(!y.includes('null_widgets.exe')) process.exit(1)"
+$null = [System.Management.Automation.Language.Parser]::ParseFile("$PWD/scripts/build-local.ps1", [ref]$null, [ref]$errs); $errs
+```
+
+Expected: no output from the second command (no parse errors). The real proof is the next CI run (or `scripts/build-local.ps1`, only when asked: it takes tens of minutes): `VSCode-win32-x64/null_widgets.exe` exists and the CTest step is green.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add .github/workflows/build.yml scripts/build-local.ps1
+git commit -m "ci(widgets): test null_widgets.exe and ship it in the install root (#141)"
+```
+
+---
+
+### Task 8: GraphQL queries, search strings and row mappers (null-tools)
 
 **Files:**
 - Create: `extensions/null-tools/src/widgets/widgetTypes.ts`
@@ -2000,7 +2740,7 @@ git commit -m "feat(null-tools): widget queries, search strings and row mappers 
 
 ---
 
-### Task 8: Sections — partial failure, last-good rows, projects (pure)
+### Task 9: Sections — partial failure, last-good rows, projects (pure)
 
 **Files:**
 - Create: `extensions/null-tools/src/widgets/widgetSections.ts`
@@ -2008,7 +2748,7 @@ git commit -m "feat(null-tools): widget queries, search strings and row mappers 
 - Modify: `package.json` test list, `tsconfig.json` include
 
 **Interfaces:**
-- Consumes: `Section`, `Reason`, `Failed`, `ProjectRow`, `MAX_PROJECTS` (Task 7); `RecentProjectEntry` from `../recentProjects`; `GitStatus` from `../dashboardGitStatus`.
+- Consumes: `Section`, `Reason`, `Failed`, `ProjectRow`, `MAX_PROJECTS` (Task 8); `RecentProjectEntry` from `../recentProjects`; `GitStatus` from `../dashboardGitStatus`.
 - Produces:
 
 ```ts
@@ -2143,7 +2883,7 @@ git commit -m "feat(null-tools): widget section building with last-good rows (#1
 
 ---
 
-### Task 9: Atomic snapshot store and per-feature ownership claim
+### Task 10: Atomic snapshot store and per-feature ownership claim
 
 **Files:**
 - Create: `extensions/null-tools/src/widgets/widgetStore.ts`, `widgetStore.test.ts`
@@ -2280,7 +3020,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { Snapshot } from './widgetTypes';
 
-/** %LOCALAPPDATA%\Null\widgets. Local (not roaming): the file is derived data and the provider is per machine. */
+/** %LOCALAPPDATA%\Null\widgets. Local (not roaming): the file is derived data and the widgets host is per machine. */
 export function widgetsDir(env: NodeJS.ProcessEnv = process.env): string {
   if (!env.LOCALAPPDATA) { throw new Error('Cannot locate %LOCALAPPDATA%.'); }
   return path.win32.join(env.LOCALAPPDATA, 'Null', 'widgets');
@@ -2294,7 +3034,7 @@ export class SnapshotStore {
     this.tmp = `${this.file}.tmp`;
   }
 
-  /** Write-then-rename, so the provider never reads a torn file. Only the owning window writes, so one fixed .tmp name is enough. */
+  /** Write-then-rename, so null_widgets.exe never reads a torn file. Only the owning window writes, so one fixed .tmp name is enough. */
   write(snapshot: Snapshot): void {
     fs.mkdirSync(this.dir, { recursive: true });
     fs.writeFileSync(this.tmp, JSON.stringify(snapshot), 'utf8');
@@ -2323,14 +3063,14 @@ git commit -m "feat(null-tools): atomic widget snapshot store and ownership clai
 
 ---
 
-### Task 10: Fetching per account (no `vscode` import)
+### Task 11: Fetching per account (no `vscode` import)
 
 **Files:**
 - Create: `extensions/null-tools/src/widgets/widgetFetch.ts`, `widgetFetch.test.ts`
 - Modify: `package.json` test list, `tsconfig.json` include
 
 **Interfaces:**
-- Consumes: `WIDGET_QUERY`, `searchStrings`, `chunkRepos`, `mapIssues`, `mapPrs`, `WidgetData`, `LocalPaths` (Task 7); `ApiError` from `../github/githubApi`; `IssueRow`, `PrRow`, `Reason`.
+- Consumes: `WIDGET_QUERY`, `searchStrings`, `chunkRepos`, `mapIssues`, `mapPrs`, `WidgetData`, `LocalPaths` (Task 8); `ApiError` from `../github/githubApi`; `IssueRow`, `PrRow`, `Reason`.
 - Produces:
 
 ```ts
@@ -2467,7 +3207,7 @@ git commit -m "feat(null-tools): per-account widget fetch with error classificat
 
 ---
 
-### Task 11: The refresher — ownership, timers, backoff, disable
+### Task 12: The refresher — ownership, timers, backoff, disable
 
 **Files:**
 - Create: `extensions/null-tools/src/widgets/widgetRefresher.ts`, `widgetRefresher.test.ts`
@@ -2798,7 +3538,7 @@ git commit -m "feat(null-tools): widget refresher with ownership, backoff and di
 
 ---
 
-### Task 12: VS Code glue — settings, setup flow, commands, Features entry
+### Task 13: VS Code glue — settings, setup flow, commands, Features entry
 
 **Files:**
 - Create: `extensions/null-tools/src/widgets/widgetSetup.ts`, `widgetSetup.test.ts` (pure)
@@ -2809,12 +3549,13 @@ git commit -m "feat(null-tools): widget refresher with ownership, backoff and di
 - Modify: `extensions/null-tools/CLAUDE.md` (a new table row)
 
 **Interfaces:**
-- Consumes: everything from Tasks 7–11; `computeGitStatuses` (`../dashboardGitStatus`), `readRecentProjects`/`getRecentProjectsFilePath` (`../recentProjects`), `parseGithubRemote` (`../github/githubRemote`), `requestGraphql`/`requestJson` (`../github/githubApi`), `PresenceOwnership` (Task 9).
+- Consumes: everything from Tasks 8–12; `computeGitStatuses` (`../dashboardGitStatus`), `readRecentProjects`/`getRecentProjectsFilePath` (`../recentProjects`), `parseGithubRemote` (`../github/githubRemote`), `requestGraphql`/`requestJson` (`../github/githubApi`), `PresenceOwnership` (Task 9).
 - Produces (`widgetSetup.ts`, pure):
 
 ```ts
 export function mergeRepos(existing: WidgetRepo[], accountId: string, picked: string[]): WidgetRepo[];  // replaces only that account's entries
 export function repoChoices(raw: unknown): string[];                      // GET /user/repos JSON -> valid "owner/name" list (REPO_RE-checked)
+export function widgetEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv;                                    // without ELECTRON_RUN_AS_NODE and VSCODE_*: the environment for null_widgets.exe
 export function localPathsFrom(remotes: ReadonlyMap<string, string | null>): Map<string, string>;       // path -> "owner/repo" remote map => lowercase repo -> path (first wins)
 ```
 
@@ -2823,7 +3564,7 @@ export function localPathsFrom(remotes: ReadonlyMap<string, string | null>): Map
 ```ts
 import assert from 'node:assert';
 import test from 'node:test';
-import { localPathsFrom, mergeRepos, repoChoices } from './widgetSetup';
+import { localPathsFrom, mergeRepos, repoChoices, widgetEnv } from './widgetSetup';
 
 test('mergeRepos replaces only the chosen account\'s entries and keeps order stable', () => {
   const existing = [{ repo: 'a/b', account: 'x' }, { repo: 'k/l', account: 'y' }];
@@ -2840,6 +3581,11 @@ test('repoChoices reads full_name and ignores everything unusable', () => {
 test('localPathsFrom maps a remote repo to the first checkout, case-insensitively', () => {
   const m = localPathsFrom(new Map([['D:\\one', 'Owner/Repo'], ['D:\\two', 'owner/repo'], ['D:\\three', null]]));
   assert.deepStrictEqual([...m], [['owner/repo', 'D:\\one']]);
+});
+
+test('widgetEnv drops what would make a later null.exe run as plain Node, and nothing else', () => {
+  const env = widgetEnv({ PATH: 'p', ELECTRON_RUN_AS_NODE: '1', VSCODE_PID: '5', vscode_ipc_hook: 'x', Keep: 'k' } as NodeJS.ProcessEnv);
+  assert.deepStrictEqual(env, { PATH: 'p', Keep: 'k' });
 });
 ```
 
@@ -2869,6 +3615,16 @@ export function localPathsFrom(remotes: ReadonlyMap<string, string | null>): Map
   for (const [dir, repo] of remotes) { if (repo && !out.has(repo.toLowerCase())) { out.set(repo.toLowerCase(), dir); } }
   return out;
 }
+
+/** The extension host runs with ELECTRON_RUN_AS_NODE and VSCODE_* set; a null.exe started from the widgets must not inherit them. */
+export function widgetEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const out: NodeJS.ProcessEnv = {};
+  for (const [k, v] of Object.entries(env)) {
+    const name = k.toUpperCase();
+    if (name !== 'ELECTRON_RUN_AS_NODE' && !name.startsWith('VSCODE_')) { out[k] = v; }
+  }
+  return out;
+}
 ```
 
 - [ ] **Step 4: Run to verify it passes** — `npm test` → PASS.
@@ -2885,8 +3641,8 @@ Add under `contributes.commands`:
 Under `nullWorkspace.features` (category `setup`, sorts after Formatting Settings):
 
 ```json
-{ "id": "widgets", "label": "Windows Widgets", "category": "setup", "icon": "layout",
-  "command": "null.widgets.setup", "description": "Pin Projects, Issues and PRs to the Win11 Widgets Board", "order": 40 }
+{ "id": "widgets", "label": "Desktop Widgets", "category": "setup", "icon": "layout",
+  "command": "null.widgets.setup", "description": "Show Projects, Issues and PRs on the desktop", "order": 40 }
 ```
 
 Under `contributes.configuration.properties`:
@@ -2894,23 +3650,26 @@ Under `contributes.configuration.properties`:
 ```json
 "null.widgets.enabled": {
   "type": "boolean", "default": false, "scope": "application",
-  "description": "Write the data the Windows 11 Widgets Board widgets show (Projects, Issues, Pull Requests) to %LOCALAPPDATA%\\Null\\widgets\\snapshot.json while Null IDE runs. Issue and pull request titles from the repositories you choose, including private ones, appear on the Widgets Board and in that file. Turning this off deletes the file. Use \"Null: Set Up Widgets\" to turn it on."
+  "description": "Write the data the desktop widgets show (Projects, Issues, Pull Requests) to %LOCALAPPDATA%\\Null\\widgets\\snapshot.json while Null IDE runs. Issue and pull request titles from the repositories you choose, including private ones, appear on the desktop, visible to anyone who can see your screen, and in that file. Turning this off deletes the file. Use \"Null: Set Up Widgets\" to turn it on."
 },
 "null.widgets.repos": {
   "type": "array", "default": [], "scope": "application",
   "items": { "type": "object", "properties": { "repo": { "type": "string" }, "account": { "type": "string" } }, "required": ["repo", "account"] },
-  "description": "Repositories (owner/name, with the Null account id they were picked under) whose issues and pull requests the widgets show. Written by \"Null: Set Up Widgets\". Private issue and pull request titles appear on the Windows 11 Widgets Board."
+  "description": "Repositories (owner/name, with the Null account id they were picked under) whose issues and pull requests the widgets show. Written by \"Null: Set Up Widgets\". Private issue and pull request titles appear on the desktop."
 }
 ```
 
-Update `featureManifests.test.ts`: the `setup` entry becomes `['Null Setup', 'Environment Check', 'Actions Settings', 'Formatting Settings', 'Windows Widgets']`.
+Update `featureManifests.test.ts`: the `setup` entry becomes `['Null Setup', 'Environment Check', 'Actions Settings', 'Formatting Settings', 'Desktop Widgets']`.
 
 - [ ] **Step 6: Write `widgetIntegration.ts`**
 
 ```ts
 'use strict';
 
-import { execFile } from 'child_process';
+import { execFile, spawn } from 'child_process';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import * as vscode from 'vscode';
 import { nullDataDir } from '../dataDir';
 import { computeGitStatuses, GitStatus } from '../dashboardGitStatus';
@@ -2918,10 +3677,11 @@ import { requestGraphql, requestJson } from '../github/githubApi';
 import { parseGithubRemote } from '../github/githubRemote';
 import { PresenceOwnership } from '../presenceOwnership';
 import { getRecentProjectsFilePath, readRecentProjects } from '../recentProjects';
+import { findInstall } from '../updater';
 import { fetchRepos } from './widgetFetch';
 import { WidgetRefresher } from './widgetRefresher';
 import { buildProjects } from './widgetSections';
-import { localPathsFrom, mergeRepos, repoChoices } from './widgetSetup';
+import { localPathsFrom, mergeRepos, repoChoices, widgetEnv } from './widgetSetup';
 import { SnapshotStore, widgetsDir } from './widgetStore';
 import { WidgetRepo, parseRepos } from './widgetTypes';
 
@@ -2945,9 +3705,20 @@ const settings = (): { enabled: boolean; repos: WidgetRepo[] } => {
 
 export function registerWidgetsFeature(context: vscode.ExtensionContext): void {
   const supported = process.platform === 'win32';
-  const notSupported = (): void => void vscode.window.showInformationMessage('Windows widgets are only available on Windows 11.');
+  const notSupported = (): void => void vscode.window.showInformationMessage('Desktop widgets are only available on Windows.');
   const out = vscode.window.createOutputChannel('Null Widgets');
   const log = (m: string): void => out.appendLine(m);
+
+  /** Starts the widgets (a second start of a running exe only un-hides hidden widgets): `<install>\null_widgets.exe`. False when this build has no exe. */
+  const startWidgets = (): boolean => {
+    const install = findInstall(context);
+    const exe = install && path.join(install.installDir, 'null_widgets.exe');
+    if (!exe || !fs.existsSync(exe)) { return false; }
+    const child = spawn(exe, [], { detached: true, stdio: 'ignore', windowsHide: true, cwd: os.tmpdir(), env: widgetEnv(process.env) });
+    child.once('error', err => log(`could not start null_widgets.exe: ${err.message}`));
+    child.unref();
+    return true;
+  };
 
   const setup = async (): Promise<void> => {
     if (!supported) { notSupported(); return; }
@@ -2969,13 +3740,17 @@ export function registerWidgetsFeature(context: vscode.ExtensionContext): void {
     const chosen = new Set(settings().repos.filter(r => r.account === account.id).map(r => r.repo.toLowerCase()));
     const picked = await vscode.window.showQuickPick(names.map(label => ({ label, picked: chosen.has(label.toLowerCase()) })), {
       canPickMany: true, title: 'Widgets: repositories for Issues and Pull Requests',
-      placeHolder: 'Private issue and pull request titles will appear on the Windows Widgets Board. Pick none for Projects only.',
+      placeHolder: 'Private issue and pull request titles will appear on your desktop. Pick none for Projects only.',
     });
     if (!picked) { return; }
     const cfg = vscode.workspace.getConfiguration('null.widgets');
     await cfg.update('repos', mergeRepos(settings().repos, account.id, picked.map(p => p.label)), vscode.ConfigurationTarget.Global);
     await cfg.update('enabled', true, vscode.ConfigurationTarget.Global);
-    void vscode.window.showInformationMessage('Widgets are set up. Pin Projects, Issues or Pull Requests from the Windows Widgets Board (Win+W). If they are not listed, enable "Windows widgets" in Null: Setup.');
+    if (startWidgets()) {
+      void vscode.window.showInformationMessage('Widgets are set up and shown on your desktop. To start them at every login, tick "Desktop widgets" in Null: Setup.');
+    } else {
+      void vscode.window.showWarningMessage('Widgets are set up, but this Null IDE has no null_widgets.exe. Install or update Null IDE from a release build.');
+    }
   };
 
   context.subscriptions.push(
@@ -3046,11 +3821,11 @@ Expected: compiles; all tests pass, including `featureManifests` (new `Windows W
 
 - [ ] **Step 8: Verify in a real IDE**
 
-Use the `verify-local` skill (`/verify-local null-tools`) to sync into the installed Null IDE, then on Windows: run **Null: Set Up Widgets** (account → repos), confirm `%LOCALAPPDATA%\Null\widgets\snapshot.json` appears with real issues/PRs and projects; open a second Null IDE window and focus each — only the focused one rewrites the file (`widgets-owner.json` pid changes); set `null.widgets.enabled` to `false` → the file disappears; sign the account out in null-accounts → rows stay with `status: signed_out`.
+Use the `verify-local` skill (`/verify-local null-tools`) to sync into the installed Null IDE, then on Windows: run **Null: Set Up Widgets** (account → repos), confirm `%LOCALAPPDATA%\Null\widgets\snapshot.json` appears with real issues/PRs and projects, and the three cards fill in on the desktop (an installed release build contains `null_widgets.exe`; after a plain `sync-local.ps1` there is none, so start `shell-ext-build\widgets\Release\null_widgets.exe` by hand); open a second Null IDE window and focus each — only the focused one rewrites the file (`widgets-owner.json` pid changes); set `null.widgets.enabled` to `false` → the file disappears; sign the account out in null-accounts → rows stay with `status: signed_out`.
 
 - [ ] **Step 9: Docs**
 
-Add a row to the table in `extensions/null-tools/CLAUDE.md`: **Windows widgets** — `src/widgets/` (#141): the only fetcher/writer of `%LOCALAPPDATA%\Null\widgets\snapshot.json`; `null.widgets.enabled` (off by default) and `null.widgets.repos`; `Null: Set Up Widgets` / `Null: Refresh Widgets`; one writer window through `PresenceOwnership` with `widgets-owner.json`; pure `widgetQueries` / `widgetSections` / `widgetSetup`, `widgetRefresher` has injected deps, only `widgetIntegration` imports `vscode`; design `docs/specs/native-windows-widgets-design.md`, plan `docs/plans/native-windows-widgets.md`.
+Add a row to the table in `extensions/null-tools/CLAUDE.md`: **Desktop widgets** — `src/widgets/` (#141): the only fetcher/writer of `%LOCALAPPDATA%\Null\widgets\snapshot.json`; `null.widgets.enabled` (off by default) and `null.widgets.repos`; `Null: Set Up Widgets` (also starts `<install>\null_widgets.exe`) / `Null: Refresh Widgets`; one writer window through `PresenceOwnership` with `widgets-owner.json`; pure `widgetQueries` / `widgetSections` / `widgetSetup`, `widgetRefresher` has injected deps, only `widgetIntegration` imports `vscode`; design `docs/specs/native-windows-widgets-design.md`, plan `docs/plans/native-windows-widgets.md`.
 
 - [ ] **Step 10: Commit**
 
@@ -3059,591 +3834,707 @@ git add extensions/null-tools
 git commit -m "feat(null-tools): Null: Set Up Widgets, refresh command and snapshot writer wiring (#141)"
 ```
 
----
-
-### Task 13: null-setup — generalise the `System` trait for a second package
-
-**Files:**
-- Modify: `setup/core/src/shell/mod.rs` (trait), `setup/core/src/shell/sys.rs` (`WinSystem`), `setup/core/src/shell/win11.rs`
-- Modify: `setup/core/tests/support/mod.rs` (`FakeSystem`)
-- Modify: `setup/core/src/procs.rs` (`stop_named_under`) and its test file `setup/core/tests/procs.rs`
-
-**Interfaces:**
-- Produces (`System` trait changes):
-
-```rust
-fn appx_installed(&self, name: &str) -> Result<Option<String>>;     // was: no parameter (hard-wired to NullIDE.ExplorerCommand)
-fn windows_build(&self) -> u32;                                      // 0 when unknown
-/// Force-ends null_widgets.exe processes running from `install`; true when none is left.
-fn stop_widgets_provider(&self, install: &Path) -> bool;
-// win11.rs
-pub const PACKAGE: &str = "NullIDE.ExplorerCommand";
-// procs.rs
-pub fn stop_named_under(dir: &Path, name: &str) -> bool;
-```
-
-`FakeSystem` gains `pub widgets_package: RefCell<Option<String>>`, `pub build: Cell<u32>` (default 0 — set it in tests), `pub provider_stuck: Cell<bool>`; `appx_installed(name)` returns `widgets_package` for `"NullIDE.Widgets"`, the web-experience entry for `"MicrosoftWindows.Client.WebExperience"` (new field `pub web_experience: Cell<bool>`) and `package` otherwise; `appx_add(appx, _)` routes to `widgets_package` when `appx.file_name()` is `null-widgets.appx`; `appx_remove` clears whichever slot holds that full name; `stop_widgets_provider` pushes the call `"stop_provider"` and returns `!provider_stuck`.
-
-- [ ] **Step 1: Write the failing test for `stop_named_under`**
-
-Append to `setup/core/tests/procs.rs` (read the file first and match its imports):
-
-```rust
-#[test]
-fn stop_named_under_ends_only_the_named_process_inside_the_folder() {
-    use std::{fs, process::Command, thread, time::Duration};
-    let dir = tempfile::tempdir().unwrap();
-    // ping.exe is a long-running console program that does not depend on its own location.
-    let ping = std::path::Path::new(&std::env::var("SystemRoot").unwrap()).join("System32").join("PING.EXE");
-    let target = dir.path().join("null_widgets.exe");
-    let other = dir.path().join("other.exe");
-    fs::copy(&ping, &target).unwrap();
-    fs::copy(&ping, &other).unwrap();
-    let mut a = Command::new(&target).args(["-n", "60", "127.0.0.1"]).stdout(std::process::Stdio::null()).spawn().unwrap();
-    let mut b = Command::new(&other).args(["-n", "60", "127.0.0.1"]).stdout(std::process::Stdio::null()).spawn().unwrap();
-    thread::sleep(Duration::from_millis(300));
-
-    assert!(null_setup_core::procs::stop_named_under(dir.path(), "null_widgets.exe"));
-    assert!(a.try_wait().unwrap().is_some(), "the named process is gone");
-    assert!(b.try_wait().unwrap().is_none(), "the other process in the same folder is untouched");
-    let _ = b.kill();
-    assert!(null_setup_core::procs::stop_named_under(dir.path(), "null_widgets.exe"), "nothing to stop is success");
-}
-```
-
-- [ ] **Step 2: Run to verify failure**
-
-Run: `cd setup && cargo test -p null-setup-core --test procs stop_named_under`
-Expected: FAIL — no function `stop_named_under`.
-
-- [ ] **Step 3: Implement `stop_named_under`**
-
-Append to `setup/core/src/procs.rs`:
-
-```rust
-/// Force-ends the processes called `name` that run from `dir`. A COM server such as `null_widgets.exe` has no window,
-/// so the polite `WM_CLOSE` pass of `close_all` would never end it. Returns true when none is left.
-pub fn stop_named_under(dir: &Path, name: &str) -> bool {
-    let pids = || -> Vec<u32> {
-        running_in(dir).into_iter().filter(|r| r.name.eq_ignore_ascii_case(name)).map(|r| r.pid).collect()
-    };
-    let found = pids();
-    if found.is_empty() {
-        return true;
-    }
-    force_close(&found);
-    for _ in 0..10 {
-        thread::sleep(Duration::from_millis(300));
-        if pids().is_empty() {
-            return true;
-        }
-    }
-    false
-}
-```
-
-- [ ] **Step 4: Run to verify it passes**
-
-Run: `cd setup && cargo test -p null-setup-core --test procs`
-Expected: PASS.
-
-- [ ] **Step 5: Change the trait, `WinSystem`, `win11.rs` and `FakeSystem`**
-
-`shell/mod.rs` trait: replace `fn appx_installed(&self) -> Result<Option<String>>;` with the three signatures above (keep the doc comments).
-
-`shell/sys.rs`: delete `const PACKAGE`; change `appx_installed`:
-
-```rust
-fn appx_installed(&self, name: &str) -> Result<Option<String>> {
-    let o = powershell(&format!("(Get-AppxPackage -Name '{}' -ErrorAction SilentlyContinue | Select-Object -First 1).PackageFullName", name.replace('\'', "''")))
-        .map_err(|e| Error::Other(format!("could not start PowerShell: {e}")))?;
-    let full = String::from_utf8_lossy(&o.stdout).trim().to_string();
-    Ok((!full.is_empty()).then_some(full))
-}
-
-fn windows_build(&self) -> u32 {
-    use winreg::{enums::HKEY_LOCAL_MACHINE, RegKey};
-    RegKey::predef(HKEY_LOCAL_MACHINE)
-        .open_subkey(r"SOFTWARE\Microsoft\Windows NT\CurrentVersion")
-        .and_then(|k| k.get_value::<String, _>("CurrentBuildNumber"))
-        .ok()
-        .and_then(|s| s.trim().parse().ok())
-        .unwrap_or(0)
-}
-
-fn stop_widgets_provider(&self, install: &Path) -> bool {
-    crate::procs::stop_named_under(install, "null_widgets.exe")
-}
-```
-
-`shell/win11.rs`: add `pub const PACKAGE: &str = "NullIDE.ExplorerCommand";` and change both `sys.appx_installed()?` calls and the one in `unregister` to `sys.appx_installed(PACKAGE)?`.
-
-`tests/support/mod.rs` `FakeSystem`: add the fields and replace `appx_installed`/`appx_remove`/`appx_add` as described under **Interfaces** (default `build` 0; keep `Default` derive working — `Cell<u32>` and `Cell<bool>` implement `Default`). Concretely:
-
-```rust
-pub widgets_package: RefCell<Option<String>>,
-pub web_experience: Cell<bool>,
-pub build: Cell<u32>,
-pub provider_stuck: Cell<bool>,
-// …
-fn appx_installed(&self, name: &str) -> null_setup_core::Result<Option<String>> {
-    Ok(match name {
-        "NullIDE.Widgets" => self.widgets_package.borrow().clone(),
-        "MicrosoftWindows.Client.WebExperience" => self.web_experience.get().then(|| "MicrosoftWindows.Client.WebExperience_1".to_string()),
-        _ => self.package.borrow().clone(),
-    })
-}
-fn appx_remove(&self, f: &str) -> null_setup_core::Result<()> {
-    self.calls.borrow_mut().push(format!("appx_remove:{f}"));
-    if self.package.borrow().as_deref() == Some(f) { *self.package.borrow_mut() = None; }
-    if self.widgets_package.borrow().as_deref() == Some(f) { *self.widgets_package.borrow_mut() = None; }
-    Ok(())
-}
-fn appx_add(&self, appx: &Path, _: &Path) -> AppxAdd {
-    let widgets = appx.file_name().is_some_and(|n| n == "null-widgets.appx");
-    self.calls.borrow_mut().push(if widgets { "appx_add:widgets".into() } else { "appx_add".into() });
-    let mut q = self.adds.borrow_mut();
-    let r = if q.len() > 1 { q.remove(0) } else { q.first().cloned().unwrap_or(AppxAdd::Added) };
-    if r == AppxAdd::Added {
-        if widgets { *self.widgets_package.borrow_mut() = Some("NullIDE.Widgets_1_x64".into()); }
-        else { *self.package.borrow_mut() = Some("NullIDE.ExplorerCommand_1_x64".into()); }
-    }
-    r
-}
-fn windows_build(&self) -> u32 { self.build.get() }
-fn stop_widgets_provider(&self, _: &Path) -> bool { self.calls.borrow_mut().push("stop_provider".into()); !self.provider_stuck.get() }
-```
-
-Note the changed call name for the widgets add (`appx_add:widgets`) — the existing win11 tests assert plain `"appx_add"` for the context-menu package, so they stay green.
-
-- [ ] **Step 6: Run the whole suite**
-
-Run: `cd setup && cargo test -p null-setup-core -p null-setup`
-Expected: PASS (no behaviour change for the existing package).
-
-- [ ] **Step 7: Commit**
-
-```bash
-git add setup
-git commit -m "refactor(setup): System trait handles a second package and can stop the provider (#141)"
-```
 
 ---
 
-### Task 14: null-setup — `Feature::Widgets` and `shell::widgets`
+### Task 14: null-setup — the opt-in `Widgets` feature (Run entry, start, stop, cleanup)
+
+Everything here is verified: the diffs below were applied to a copy of `setup/` and `cargo test -p null-setup-core` passed.
 
 **Files:**
-- Modify: `setup/core/src/install_config.rs`, `setup/core/tests/install_config.rs`
-- Create: `setup/core/src/shell/widgets.rs`, `setup/core/tests/shell_widgets.rs`
-- Modify: `setup/core/src/shell/mod.rs` (module, `Locations.local_data`, `register_one`/`unregister_one` arms)
-- Modify: `setup/core/tests/support/mod.rs` (`Hive::new` fills `local_data`)
-- Modify: `setup/core/tests/shell_apply.rs` (the `Feature::ALL` tests)
+- Modify: `setup/core/src/install_config.rs`, `setup/core/src/shell/mod.rs`, `setup/core/src/shell/sys.rs`, `setup/core/src/procs.rs`, `setup/core/src/registrations.rs`
+- Create: `setup/core/src/shell/widgets.rs`
+- Modify (tests): `setup/core/tests/install_config.rs`, `setup/core/tests/support/mod.rs`, `setup/core/tests/shell_apply.rs`, `setup/core/tests/procs.rs`
+- Create (tests): `setup/core/tests/shell_widgets.rs`
 
 **Interfaces:**
 - Produces:
-
-```rust
-// install_config.rs
-Feature::Widgets;                          // name "widgets", follows_install() == true, Feature::ALL has 8 entries (Widgets last)
-InstallConfig.widgets: bool;               // serde "widgets", default false (opt-in)
-// shell/mod.rs
-Locations.local_data: PathBuf;             // %LOCALAPPDATA% (tests: a temp folder)
-sys::KnownFolder::LocalAppData
-// shell/widgets.rs
-pub const PACKAGE: &str = "NullIDE.Widgets";
-pub const WEB_EXPERIENCE: &str = "MicrosoftWindows.Client.WebExperience";
-pub const MIN_BUILD: u32 = 22621;          // Task 1's findings doc is the source; change here if it says otherwise
-pub enum Widgets { Registered, Kept, NeedsReapproval, Unsupported(String), Missing(String) }
-pub fn supported(sys: &dyn System) -> std::result::Result<(), String>;      // Err(reason) when the host cannot show widgets
-pub fn register(loc: &Locations, sys: &dyn System, install: &Path, allow_elevate: bool) -> Result<Widgets>;
-pub fn unregister(loc: &Locations, sys: &dyn System, install: &Path) -> Result<()>;
-```
+  - `Feature::Widgets` (name `"widgets"`, `follows_install() == true`, `Feature::ALL` has 8 entries, Widgets last); `InstallConfig.widgets: bool` (serde `widgets`, default **false**).
+  - `Locations.local_data: PathBuf` (`%LOCALAPPDATA%`; the tests' `Hive` uses a scratch folder), `sys::KnownFolder::LocalAppData`.
+  - `System::stop_widgets(&self, install: &Path) -> bool` and `System::start_widgets(&self, exe: &Path)`; `Registrar::stop_widgets(&self, install: &Path, ctx: &Ctx)` (default does nothing; `ShellRegistrar` calls `WinSystem.stop_widgets`).
+  - `procs::stop_named_under(dir: &Path, name: &str) -> bool` — force-ends the named processes that run from `dir`; true when none is left.
+  - `shell::widgets::{EXE, register, unregister}`: `register` writes `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\NullWidgets` = `"<install>\null_widgets.exe"` and starts the exe (a build without the exe logs and does nothing); `unregister` stops the process, deletes only that Run value and removes `<local_data>\Null\widgets`.
 
 - [ ] **Step 1: Write the failing tests**
 
-Update `tests/install_config.rs`:
-- `defaults_match_the_inno_task_defaults`: add `assert!(!c.widgets, "widgets are opt-in");`.
-- `only_the_install_path_bound_features_follow_an_update`: expected becomes `vec![Feature::ContextMenu, Feature::FileAssociations, Feature::PreviewHandler, Feature::Widgets]`.
-- Add:
+`setup/core/tests/install_config.rs` — the opt-in default, the new feature and the update rule:
 
-```rust
-#[test]
-fn widgets_is_opt_in_round_trips_and_an_older_file_reads_as_off() {
-    assert_eq!(Feature::Widgets.name(), "widgets");
-    assert_eq!(Feature::ALL.len(), 8);
-    assert!(!InstallConfig::default().enabled().contains(&Feature::Widgets));
-    let c = ic::from_json(r#"{"schema":1,"path":false}"#).unwrap();
-    assert!(!c.widgets);
-    let on = InstallConfig { widgets: true, ..Default::default() };
-    assert_eq!(InstallConfig::default().added_features(&on), vec![Feature::Widgets]);
-    assert_eq!(on.removed_features(&InstallConfig::default()), vec![Feature::Widgets]);
-    let tmp = tempfile::tempdir().unwrap();
-    ic::write(tmp.path(), &on).unwrap();
-    assert!(ic::read(tmp.path()).unwrap().widgets);
-}
+```diff
+--- a/setup/core/tests/install_config.rs
++++ b/setup/core/tests/install_config.rs
+@@ -9,10 +9,25 @@ fn defaults_match_the_inno_task_defaults() {
+     for f in [Feature::StartMenuShortcut, Feature::SafeModeShortcut, Feature::Path, Feature::ContextMenu, Feature::FileAssociations, Feature::PreviewHandler] {
+         assert!(c.has(f), "{f:?}");
+     }
++    assert!(!c.widgets, "desktop widgets are opt-in");
+     assert!(c.excluded_builtins.is_empty());
+     assert_eq!(c.schema, ic::SCHEMA);
+ }
+ 
++#[test]
++fn widgets_round_trip_and_an_older_file_reads_as_off() {
++    assert_eq!(Feature::Widgets.name(), "widgets");
++    assert_eq!(Feature::ALL.len(), 8);
++    assert!(!InstallConfig::default().enabled().contains(&Feature::Widgets));
++    assert!(!ic::from_json(r#"{"schema":1,"path":false}"#).unwrap().widgets);
++    let on = InstallConfig { widgets: true, ..Default::default() };
++    assert_eq!(InstallConfig::default().added_features(&on), vec![Feature::Widgets]);
++    assert_eq!(on.removed_features(&InstallConfig::default()), vec![Feature::Widgets]);
++    let tmp = tempfile::tempdir().unwrap();
++    ic::write(tmp.path(), &on).unwrap();
++    assert!(ic::read(tmp.path()).unwrap().widgets);
++}
++
+ #[test]
+ fn a_folder_without_a_config_reads_as_the_defaults() {
+     let tmp = tempfile::tempdir().unwrap();
+@@ -56,7 +71,7 @@ fn enabled_added_and_removed_features_are_listed_in_a_stable_order() {
+ #[test]
+ fn only_the_install_path_bound_features_follow_an_update() {
+     let follow: Vec<_> = Feature::ALL.into_iter().filter(|f| f.follows_install()).collect();
+-    assert_eq!(follow, vec![Feature::ContextMenu, Feature::FileAssociations, Feature::PreviewHandler]);
++    assert_eq!(follow, vec![Feature::ContextMenu, Feature::FileAssociations, Feature::PreviewHandler, Feature::Widgets]);
+ }
+ 
+ #[test]
 ```
 
-Create `tests/shell_widgets.rs`:
+`setup/core/tests/support/mod.rs` — `Hive` gets `local_data`; `FakeSystem` records `stop_widgets` / `start_widgets:<file>`; `Recorder` counts `stops` (used again by Task 15):
+
+```diff
+--- a/setup/core/tests/support/mod.rs
++++ b/setup/core/tests/support/mod.rs
+@@ -59,10 +59,12 @@ use null_setup_core::{
+ pub struct Call { pub register: Vec<Feature>, pub unregister: Vec<Feature>, pub allow_elevate: bool }
+ 
+ /// Stands in for the real registrar so no test writes the registry, PATH or Start Menu.
+-pub struct Recorder { pub calls: Mutex<Vec<Call>>, pub arp: Mutex<Vec<Option<String>>>, pub result: Registration }
++pub struct Recorder { pub calls: Mutex<Vec<Call>>, pub arp: Mutex<Vec<Option<String>>>, pub stops: Mutex<usize>, pub result: Registration }
+ 
+ impl Recorder {
+-    pub fn new(result: Registration) -> Arc<Recorder> { Arc::new(Recorder { calls: Mutex::new(vec![]), arp: Mutex::new(vec![]), result }) }
++    pub fn new(result: Registration) -> Arc<Recorder> {
++        Arc::new(Recorder { calls: Mutex::new(vec![]), arp: Mutex::new(vec![]), stops: Mutex::new(0), result })
++    }
+ }
+ 
+ impl Registrar for Recorder {
+@@ -74,6 +76,10 @@ impl Registrar for Recorder {
+     fn arp(&self, _: &std::path::Path, version: Option<&str>, _: &Ctx) {
+         self.arp.lock().unwrap().push(version.map(str::to_string));
+     }
++
++    fn stop_widgets(&self, _: &std::path::Path, _: &Ctx) {
++        *self.stops.lock().unwrap() += 1;
++    }
+ }
+ 
+ use std::sync::atomic::{AtomicU32, Ordering};
+@@ -95,10 +101,11 @@ impl Hive {
+         let id = format!("{}-{}", std::process::id(), HIVE_ID.fetch_add(1, Ordering::SeqCst));
+         let root = format!(r"Software\NullSetupTest\{id}");
+         let tmp = tempfile::tempdir().unwrap();
+-        let (desktop, programs) = (tmp.path().join("Desktop"), tmp.path().join("Programs"));
++        let (desktop, programs, local_data) = (tmp.path().join("Desktop"), tmp.path().join("Programs"), tmp.path().join("LocalAppData"));
+         std::fs::create_dir_all(&desktop).unwrap();
+         std::fs::create_dir_all(&programs).unwrap();
+-        Hive { loc: Locations { hkcu: format!(r"{root}\"), desktop, programs }, tmp, root }
++        std::fs::create_dir_all(&local_data).unwrap();
++        Hive { loc: Locations { hkcu: format!(r"{root}\"), desktop, programs, local_data }, tmp, root }
+     }
+     fn open(&self, rel: &str) -> Option<RegKey> {
+         RegKey::predef(HKEY_CURRENT_USER).open_subkey(self.loc.key(rel)).ok()
+@@ -135,6 +142,7 @@ use null_setup_core::shell::{shortcuts::ShortcutSpec, AppxAdd, System};
+ 
+ #[derive(Default)]
+ pub struct FakeSystem {
++    /// What was asked of the system, in order, e.g. "appx_add", "stop_widgets", "start_widgets:null_widgets.exe".
+     pub calls: RefCell<Vec<String>>,
+     /// PackageFullName of the registered package, if any.
+     pub package: RefCell<Option<String>>,
+@@ -184,4 +192,11 @@ impl System for FakeSystem {
+             Some(Err(m)) => Err(null_setup_core::Error::Other(m)),
+         }
+     }
++    fn stop_widgets(&self, _: &Path) -> bool {
++        self.calls.borrow_mut().push("stop_widgets".into());
++        true
++    }
++    fn start_widgets(&self, exe: &Path) {
++        self.calls.borrow_mut().push(format!("start_widgets:{}", exe.file_name().unwrap().to_string_lossy()));
++    }
+ }
+```
+
+`setup/core/tests/shell_widgets.rs` (new):
 
 ```rust
 mod support;
 
 use std::fs;
 
-use null_setup_core::shell::{widgets::*, AppxAdd};
+use null_setup_core::shell::widgets::*;
 use support::{FakeSystem, Hive};
 
-fn install(h: &Hive, with_appx: bool) -> std::path::PathBuf {
+const RUN: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
+
+fn install(h: &Hive, with_exe: bool) -> std::path::PathBuf {
     let dir = h.tmp.path().join("Null IDE ünï");
-    fs::create_dir_all(dir.join("shell-ext")).unwrap();
+    fs::create_dir_all(&dir).unwrap();
     fs::write(dir.join("null.exe"), "MZ").unwrap();
-    if with_appx {
-        fs::write(dir.join("shell-ext").join("null-widgets.appx"), "x").unwrap();
-        fs::write(dir.join("shell-ext").join("NullIDECert.cer"), "x").unwrap();
+    if with_exe {
+        fs::write(dir.join(EXE), "MZ").unwrap();
     }
     dir
 }
 
-fn ready() -> FakeSystem {
-    let sys = FakeSystem::default();
-    sys.build.set(MIN_BUILD);
-    sys.web_experience.set(true);
-    sys
+fn quiet() -> impl Fn(&str) {
+    |_: &str| {}
 }
 
 #[test]
-fn the_host_check_needs_the_build_floor_and_the_web_experience_package() {
-    let sys = ready();
-    assert!(supported(&sys).is_ok());
-    sys.build.set(MIN_BUILD - 1);
-    assert!(supported(&sys).unwrap_err().contains("build"));
-    sys.build.set(MIN_BUILD);
-    sys.web_experience.set(false);
-    assert!(supported(&sys).unwrap_err().contains("Widgets"));
-}
-
-#[test]
-fn an_unsupported_host_registers_nothing_and_is_not_an_error() {
-    let h = Hive::new();
-    let sys = FakeSystem::default(); // build 0, no WebExperience
-    let r = register(&h.loc, &sys, &install(&h, true), true).unwrap();
-    assert!(matches!(r, Widgets::Unsupported(_)));
-    assert!(sys.calls.borrow().is_empty(), "{:?}", sys.calls.borrow());
-}
-
-#[test]
-fn a_missing_package_file_is_reported_and_nothing_is_touched() {
-    let h = Hive::new();
-    let sys = ready();
-    let r = register(&h.loc, &sys, &install(&h, false), true).unwrap();
-    assert!(matches!(r, Widgets::Missing(m) if m.contains("null-widgets.appx")));
-    assert!(sys.calls.borrow().is_empty());
-}
-
-#[test]
-fn a_fresh_install_trusts_the_certificate_after_the_first_add_is_refused() {
-    let h = Hive::new();
-    let sys = ready();
-    *sys.adds.borrow_mut() = vec![AppxAdd::UntrustedRoot, AppxAdd::Added];
-    assert_eq!(register(&h.loc, &sys, &install(&h, true), true).unwrap(), Widgets::Registered);
-    assert_eq!(*sys.calls.borrow(), ["cert_user", "stop_provider", "appx_add:widgets", "cert_machine", "appx_add:widgets"]);
-    assert_eq!(sys.widgets_package.borrow().as_deref(), Some("NullIDE.Widgets_1_x64"));
-}
-
-#[test]
-fn an_update_with_an_untrusted_certificate_keeps_the_existing_registration() {
-    let h = Hive::new();
-    let sys = ready();
-    *sys.widgets_package.borrow_mut() = Some("NullIDE.Widgets_old".into());
-    assert_eq!(register(&h.loc, &sys, &install(&h, true), false).unwrap(), Widgets::Kept);
-    assert!(sys.calls.borrow().is_empty());
-    assert_eq!(sys.widgets_package.borrow().as_deref(), Some("NullIDE.Widgets_old"));
-}
-
-#[test]
-fn an_update_with_an_untrusted_certificate_and_no_package_asks_for_reapproval() {
-    let h = Hive::new();
-    let sys = ready();
-    assert_eq!(register(&h.loc, &sys, &install(&h, true), false).unwrap(), Widgets::NeedsReapproval);
-    assert!(sys.calls.borrow().is_empty());
-}
-
-#[test]
-fn a_trusted_certificate_replaces_the_package_without_elevating_and_without_touching_explorer() {
-    let h = Hive::new();
-    let sys = ready();
-    sys.machine_trusted.set(true);
-    *sys.widgets_package.borrow_mut() = Some("OLD".into());
-    assert_eq!(register(&h.loc, &sys, &install(&h, true), false).unwrap(), Widgets::Registered);
-    assert_eq!(*sys.calls.borrow(), ["cert_user", "stop_provider", "appx_remove:OLD", "appx_add:widgets"]);
-}
-
-#[test]
-fn a_provider_that_cannot_be_stopped_keeps_the_current_registration() {
-    let h = Hive::new();
-    let sys = ready();
-    sys.machine_trusted.set(true);
-    sys.provider_stuck.set(true);
-    *sys.widgets_package.borrow_mut() = Some("OLD".into());
-    assert_eq!(register(&h.loc, &sys, &install(&h, true), false).unwrap(), Widgets::Kept);
-    assert_eq!(sys.count("appx_remove:OLD"), 0);
-    assert_eq!(sys.count("appx_add:widgets"), 0);
-}
-
-#[test]
-fn a_declined_uac_prompt_keeps_the_existing_package() {
-    let h = Hive::new();
-    let sys = ready();
-    *sys.widgets_package.borrow_mut() = Some("OLD".into());
-    *sys.elevated.borrow_mut() = Some(Err("Could not install the shell extension certificate (exit 1223)".into()));
-    assert!(register(&h.loc, &sys, &install(&h, true), true).is_err());
-    assert_eq!(sys.widgets_package.borrow().as_deref(), Some("OLD"));
-    assert_eq!(sys.count("appx_add:widgets"), 0);
-}
-
-#[test]
-fn the_cmdlet_message_survives_when_adding_fails() {
-    let h = Hive::new();
-    let sys = ready();
-    *sys.adds.borrow_mut() = vec![AppxAdd::Failed("0x80073CF9 deployment failed".into())];
-    let e = register(&h.loc, &sys, &install(&h, true), true).unwrap_err().to_string();
-    assert!(e.contains("Widgets registration failed") && e.contains("0x80073CF9"), "{e}");
-}
-
-#[test]
-fn unregister_stops_the_provider_removes_the_package_and_deletes_the_snapshot_folder() {
+fn registering_writes_the_quoted_run_entry_and_starts_the_exe() {
     let h = Hive::new();
     let sys = FakeSystem::default();
-    *sys.widgets_package.borrow_mut() = Some("P".into());
-    let dir = h.loc.local_data.join("Null").join("widgets");
-    fs::create_dir_all(&dir).unwrap();
-    fs::write(dir.join("snapshot.json"), "{}").unwrap();
+    let dir = install(&h, true);
+    register(&h.loc, &sys, &dir, &quiet()).unwrap();
+    assert_eq!(h.get(RUN, "NullWidgets"), format!("\"{}\"", dir.join(EXE).display()));
+    assert_eq!(*sys.calls.borrow(), ["start_widgets:null_widgets.exe"]);
+}
+
+#[test]
+fn a_build_without_the_exe_registers_nothing_and_says_so() {
+    let h = Hive::new();
+    let sys = FakeSystem::default();
+    let logged = std::cell::RefCell::new(String::new());
+    register(&h.loc, &sys, &install(&h, false), &|m: &str| logged.borrow_mut().push_str(m)).unwrap();
+    assert!(!h.exists(RUN) || h.try_get(RUN, "NullWidgets").is_none());
+    assert!(sys.calls.borrow().is_empty());
+    assert!(logged.borrow().contains(EXE), "{}", logged.borrow());
+}
+
+#[test]
+fn registering_again_after_an_update_points_the_entry_at_the_new_folder() {
+    let h = Hive::new();
+    let sys = FakeSystem::default();
+    h.set_text(RUN, "NullWidgets", r#""C:\old\null_widgets.exe""#);
+    let dir = install(&h, true);
+    register(&h.loc, &sys, &dir, &quiet()).unwrap();
+    assert_eq!(h.get(RUN, "NullWidgets"), format!("\"{}\"", dir.join(EXE).display()));
+}
+
+#[test]
+fn unregistering_stops_the_exe_removes_only_its_run_entry_and_deletes_the_data_folder() {
+    let h = Hive::new();
+    let sys = FakeSystem::default();
+    h.set_text(RUN, "NullWidgets", r#""C:\x\null_widgets.exe""#);
+    h.set_text(RUN, "SomethingElse", "keep");
+    let data = h.loc.local_data.join("Null").join("widgets");
+    fs::create_dir_all(&data).unwrap();
+    fs::write(data.join("snapshot.json"), "{}").unwrap();
     unregister(&h.loc, &sys, &install(&h, true)).unwrap();
-    assert_eq!(*sys.calls.borrow(), ["stop_provider", "appx_remove:P"]);
-    assert!(!dir.exists());
-    unregister(&h.loc, &sys, &install(&h, true)).unwrap(); // nothing registered, nothing on disk: fine
+    assert_eq!(*sys.calls.borrow(), ["stop_widgets"]);
+    assert!(h.try_get(RUN, "NullWidgets").is_none());
+    assert_eq!(h.get(RUN, "SomethingElse"), "keep");
+    assert!(!data.exists());
+}
+
+#[test]
+fn unregistering_a_machine_that_never_had_widgets_is_fine_even_without_null_exe() {
+    let h = Hive::new();
+    let sys = FakeSystem::default();
+    let dir = install(&h, false);
+    fs::remove_file(dir.join("null.exe")).unwrap();
+    unregister(&h.loc, &sys, &dir).unwrap();
+    unregister(&h.loc, &sys, &dir).unwrap();
 }
 ```
 
-In `tests/shell_apply.rs` the test `registers_every_feature_into_the_scratch_locations` (uses `Feature::ALL` on a `FakeSystem::default()`) must still pass: with build 0 the widgets feature is `Unsupported` and logs only. Add one assertion to it: `assert_eq!(sys.count("appx_add:widgets"), 0);`.
+`setup/core/tests/shell_apply.rs`:
+
+```diff
+--- a/setup/core/tests/shell_apply.rs
++++ b/setup/core/tests/shell_apply.rs
+@@ -20,6 +20,22 @@ fn apply(h: &Hive, sys: &FakeSystem, dir: &std::path::Path, reg: &[Feature], unr
+     apply_with(&h.loc, sys, dir, reg, unreg, elevate, &|_| {})
+ }
+ 
++const RUN: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
++
++#[test]
++fn the_widgets_feature_registers_and_unregisters_through_apply() {
++    let h = Hive::new();
++    let sys = FakeSystem::default();
++    let dir = install(&h);
++    fs::write(dir.join("null_widgets.exe"), "MZ").unwrap();
++    assert_eq!(apply(&h, &sys, &dir, &[Feature::Widgets], &[], false), Registration::Done);
++    assert!(h.try_get(RUN, "NullWidgets").is_some());
++    assert_eq!(sys.count("start_widgets:null_widgets.exe"), 1);
++    assert_eq!(apply(&h, &sys, &dir, &[], &[Feature::Widgets], false), Registration::Done);
++    assert!(h.try_get(RUN, "NullWidgets").is_none());
++    assert_eq!(sys.count("stop_widgets"), 1);
++}
++
+ #[test]
+ fn nothing_to_do_is_skipped() {
+     let h = Hive::new();
+@@ -40,6 +56,8 @@ fn registers_every_feature_into_the_scratch_locations() {
+     assert!(h.exists(r"Software\Classes\NullIDE.AssocFile.rust"));
+     assert!(h.exists(&format!(r"Software\Classes\CLSID\{}", null_setup_core::shell::classes::PREVIEW_CLSID)));
+     assert_eq!(h.get("Environment", "Path"), dir.join("bin").display().to_string());
++    assert!(h.try_get(RUN, "NullWidgets").is_none(), "this fake install has no null_widgets.exe");
++    assert_eq!(sys.count("stop_widgets"), 0);
+ }
+ 
+ #[test]
+```
+
+`setup/core/tests/procs.rs`:
+
+```diff
+--- a/setup/core/tests/procs.rs
++++ b/setup/core/tests/procs.rs
+@@ -6,6 +6,25 @@ use null_setup_core::{
+     Error,
+ };
+ 
++#[test]
++fn stop_named_under_ends_only_the_named_process_inside_the_folder() {
++    let dir = tempfile::tempdir().unwrap();
++    // PING.EXE is a long-running console program that does not depend on where it lives.
++    let ping = r"C:\Windows\System32\PING.EXE";
++    let (target, other) = (dir.path().join("null_widgets.exe"), dir.path().join("other.exe"));
++    fs::copy(ping, &target).unwrap();
++    fs::copy(ping, &other).unwrap();
++    let start = |exe: &Path| Command::new(exe).args(["-n", "60", "127.0.0.1"]).stdout(std::process::Stdio::null()).spawn().unwrap();
++    let (mut a, mut b) = (start(&target), start(&other));
++    thread::sleep(Duration::from_millis(300));
++
++    assert!(null_setup_core::procs::stop_named_under(dir.path(), "null_widgets.exe"));
++    assert!(a.try_wait().unwrap().is_some(), "the named process is gone");
++    assert!(b.try_wait().unwrap().is_none(), "the other process in the same folder is untouched");
++    let _ = b.kill();
++    assert!(null_setup_core::procs::stop_named_under(dir.path(), "null_widgets.exe"), "nothing to stop is success");
++}
++
+ #[test]
+ fn is_under_is_case_insensitive_and_respects_directory_boundaries() {
+     let dir = Path::new(r"C:\Users\Me\AppData\Local\Programs\Null IDE");
+```
 
 - [ ] **Step 2: Run to verify failure**
 
 Run: `cd setup && cargo test -p null-setup-core`
-Expected: FAIL — compile errors (`Feature::Widgets`, `widgets`, `local_data`).
+Expected: FAIL — compile errors (`Feature::Widgets`, `local_data`, `stop_widgets`, `shell::widgets`, `stop_named_under`).
 
-- [ ] **Step 3: Implement `install_config.rs`**
+- [ ] **Step 3: Implement**
 
-Add `Widgets` to `Feature` (last), to `ALL` (`[Feature; 8]`), `name()` → `"widgets"`, `follows_install()` → add `| Feature::Widgets`, a `pub widgets: bool` field (default `false`, with the other flags in `Default`), and `Feature::Widgets => self.widgets` in `has`.
+`setup/core/src/install_config.rs`:
 
-- [ ] **Step 4: Implement `Locations.local_data` and the known folder**
+```diff
+--- a/setup/core/src/install_config.rs
++++ b/setup/core/src/install_config.rs
+@@ -8,10 +8,10 @@ pub const FILE: &str = "install-config.json";
+ pub const SCHEMA: u32 = 1;
+ 
+ #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+-pub enum Feature { DesktopShortcut, StartMenuShortcut, SafeModeShortcut, Path, ContextMenu, FileAssociations, PreviewHandler }
++pub enum Feature { DesktopShortcut, StartMenuShortcut, SafeModeShortcut, Path, ContextMenu, FileAssociations, PreviewHandler, Widgets }
+ 
+ impl Feature {
+-    pub const ALL: [Feature; 7] = [
++    pub const ALL: [Feature; 8] = [
+         Feature::DesktopShortcut,
+         Feature::StartMenuShortcut,
+         Feature::SafeModeShortcut,
+@@ -19,6 +19,7 @@ impl Feature {
+         Feature::ContextMenu,
+         Feature::FileAssociations,
+         Feature::PreviewHandler,
++        Feature::Widgets,
+     ];
+ 
+     /// Stable id used in logs and messages.
+@@ -31,13 +32,14 @@ impl Feature {
+             Feature::ContextMenu => "contextMenu",
+             Feature::FileAssociations => "fileAssociations",
+             Feature::PreviewHandler => "previewHandler",
++            Feature::Widgets => "widgets",
+         }
+     }
+ 
+     /// Registered against the install folder (registry, Explorer), so an update must re-point them.
+-    /// Shortcuts and PATH point at paths that survive the swap.
++    /// Shortcuts and PATH point at paths that survive the swap. Widgets: the update stops `null_widgets.exe`, so it is started again.
+     pub fn follows_install(self) -> bool {
+-        matches!(self, Feature::ContextMenu | Feature::FileAssociations | Feature::PreviewHandler)
++        matches!(self, Feature::ContextMenu | Feature::FileAssociations | Feature::PreviewHandler | Feature::Widgets)
+     }
+ }
+ 
+@@ -52,6 +54,8 @@ pub struct InstallConfig {
+     pub context_menu: bool,
+     pub file_associations: bool,
+     pub preview_handler: bool,
++    /// Desktop widgets (`null_widgets.exe` at login). The only feature that is off by default.
++    pub widgets: bool,
+     /// Built-ins the user left off. Stored as exclusions so a built-in added by a later release is on by default.
+     pub excluded_builtins: Vec<String>,
+ }
+@@ -67,6 +71,7 @@ impl Default for InstallConfig {
+             context_menu: true,
+             file_associations: true,
+             preview_handler: true,
++            widgets: false,
+             excluded_builtins: Vec::new(),
+         }
+     }
+@@ -82,6 +87,7 @@ impl InstallConfig {
+             Feature::ContextMenu => self.context_menu,
+             Feature::FileAssociations => self.file_associations,
+             Feature::PreviewHandler => self.preview_handler,
++            Feature::Widgets => self.widgets,
+         }
+     }
+ 
+```
 
-`shell/mod.rs`: add `pub local_data: PathBuf` to `Locations` (doc: "`%LOCALAPPDATA%`; tests use a scratch folder"), `pub mod widgets;`, and in `Locations::real()` `local_data: sys::known_folder(sys::KnownFolder::LocalAppData)?`. `shell/sys.rs`: add `LocalAppData` to `KnownFolder` and `FOLDERID_LocalAppData` to the `use` and the `match`. `tests/support/mod.rs` `Hive::new`: create `tmp.path().join("LocalAppData")` and set `local_data`. Fix every other `Locations { … }` construction site the compiler reports (grep `Locations {`).
-
-In `register_one` add `Feature::Widgets => match widgets::register(loc, sys, install, allow_elevate)? { widgets::Widgets::NeedsReapproval => return Ok(true), widgets::Widgets::Unsupported(m) | widgets::Widgets::Missing(m) => log(&m), widgets::Widgets::Kept => log("kept the existing widgets registration"), widgets::Widgets::Registered => {} }`; in `unregister_one` add `Feature::Widgets => widgets::unregister(loc, sys, install)`.
-
-- [ ] **Step 5: Implement `shell/widgets.rs`**
+`setup/core/src/shell/widgets.rs` (new):
 
 ```rust
+//! Desktop widgets (`null_widgets.exe`, issue #141): an opt-in HKCU Run entry plus start/stop of the process.
+//! The exe is a plain Win32 program in the install root: no package, no signing, no elevation.
+
 use std::{fs, io, path::Path};
 
-use super::{AppxAdd, Locations, System};
-use crate::error::{Error, IoCtx, Result};
+use super::{create, open_write, set, Locations, System};
+use crate::error::{Error, Result};
 
-pub const PACKAGE: &str = "NullIDE.Widgets";
-pub const WEB_EXPERIENCE: &str = "MicrosoftWindows.Client.WebExperience";
-/// First Windows 11 build with third-party widget providers; confirmed by the gate, see docs/specs/native-windows-widgets-gate.md.
-pub const MIN_BUILD: u32 = 22621;
+pub const EXE: &str = "null_widgets.exe";
+const RUN_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
+const RUN_VALUE: &str = "NullWidgets";
 
-#[derive(Debug, PartialEq)]
-pub enum Widgets {
-    Registered,
-    /// Left as it was: an update could not trust the new certificate without UAC, or the provider would not stop.
-    Kept,
-    /// Nothing registered and trust is missing: `modify` has to ask for approval.
-    NeedsReapproval,
-    /// This machine cannot show widgets; nothing was done.
-    Unsupported(String),
-    /// The package file is not in this build.
-    Missing(String),
+/// Writes the Run entry (so the widgets come back at every login) and starts the exe now. A second start of a running exe only
+/// asks it to show hidden widgets again.
+pub fn register(loc: &Locations, sys: &dyn System, install: &Path, log: &dyn Fn(&str)) -> Result<()> {
+    let exe = install.join(EXE);
+    if !exe.is_file() {
+        log(&format!("widgets not registered: {} not found", exe.display()));
+        return Ok(());
+    }
+    set(&create(loc, RUN_KEY)?, RUN_VALUE, &format!("\"{}\"", exe.display()))?;
+    sys.start_widgets(&exe);
+    Ok(())
 }
 
-/// Windows build at or above the floor and the Windows Web Experience pack (it hosts the Widgets Board) installed.
-pub fn supported(sys: &dyn System) -> std::result::Result<(), String> {
-    let build = sys.windows_build();
-    if build < MIN_BUILD {
-        return Err(format!("widgets need Windows 11 build {MIN_BUILD} or later (this is build {build})"));
-    }
-    match sys.appx_installed(WEB_EXPERIENCE) {
-        Ok(Some(_)) => Ok(()),
-        _ => Err("the Windows Widgets component is not installed".into()),
-    }
-}
-
-/// Mirrors `win11::register` for the second package. Trust is shared: the widgets package is signed with the same certificate.
-pub fn register(_loc: &Locations, sys: &dyn System, install: &Path, allow_elevate: bool) -> Result<Widgets> {
-    if let Err(why) = supported(sys) {
-        return Ok(Widgets::Unsupported(format!("widgets not registered: {why}")));
-    }
-    let appx = install.join("shell-ext").join("null-widgets.appx");
-    if !appx.is_file() {
-        return Ok(Widgets::Missing(format!("widgets package not found at {}", appx.display())));
-    }
-    let cer = install.join("shell-ext").join("NullIDECert.cer");
-    let trusted = cer.is_file() && sys.cert_thumbprint(&cer).map(|t| sys.cert_trusted_machine(&t)).unwrap_or(false);
-    let existing = sys.appx_installed(PACKAGE)?;
-    if !allow_elevate && !trusted {
-        return Ok(if existing.is_some() { Widgets::Kept } else { Widgets::NeedsReapproval });
-    }
-    let _ = sys.cert_add_current_user(&cer);
-
-    if !sys.stop_widgets_provider(install) {
-        return Ok(Widgets::Kept);
-    }
-    if let Some(old) = existing {
-        // Ask for trust before the old package goes: a declined UAC prompt must not leave the user with no package.
-        if !trusted {
-            sys.cert_add_machine_elevated(install)?;
-        }
-        let _ = sys.appx_remove(&old);
-    }
-    let mut added = sys.appx_add(&appx, install);
-    if added == AppxAdd::UntrustedRoot {
-        if !allow_elevate {
-            return Ok(Widgets::NeedsReapproval);
-        }
-        sys.cert_add_machine_elevated(install)?;
-        added = sys.appx_add(&appx, install);
-    }
-    match added {
-        AppxAdd::Added => {}
-        AppxAdd::UntrustedRoot => return Err(Error::Other("Widgets registration failed: the certificate is still not trusted".into())),
-        AppxAdd::Failed(m) => return Err(Error::Other(format!("Widgets registration failed: {m}"))),
-    }
-    if sys.appx_installed(PACKAGE)?.is_none() {
-        return Err(Error::Other("Widgets registration failed: NullIDE.Widgets package is not registered".into()));
-    }
-    Ok(Widgets::Registered)
-}
-
-/// Removes the package and the snapshot folder. Works without `null.exe` and on machines that never had the package.
+/// Ends the process, removes the Run entry and deletes the snapshot/layout folder. Works without `null.exe` and on machines that never
+/// had the feature.
 pub fn unregister(loc: &Locations, sys: &dyn System, install: &Path) -> Result<()> {
-    sys.stop_widgets_provider(install);
-    if let Some(existing) = sys.appx_installed(PACKAGE)? {
-        let _ = sys.appx_remove(&existing);
+    sys.stop_widgets(install);
+    if let Some(k) = open_write(loc, RUN_KEY) {
+        match k.delete_value(RUN_VALUE) {
+            Ok(()) => {}
+            Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+            Err(e) => return Err(Error::Io { context: "remove the widgets Run entry".into(), source: e }),
+        }
     }
     match fs::remove_dir_all(loc.local_data.join("Null").join("widgets")) {
         Ok(()) => Ok(()),
         Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(()),
-        Err(e) => Err(e).ctx("remove the widgets snapshot folder"),
+        Err(e) => Err(Error::Io { context: "remove the widgets data folder".into(), source: e }),
     }
 }
 ```
 
-(`IoCtx` is the extension trait used elsewhere in the crate for `.ctx(...)`; if its signature differs, use `Error::Io { context: …, source: e }` as in `install_config.rs`.)
+`setup/core/src/shell/mod.rs`:
 
-Expected call sequence in the tests above: `cert_user` → `stop_provider` → (`cert_machine` only if untrusted and a package exists) → `appx_remove` → `appx_add:widgets`. The fresh-install test expects `cert_user, stop_provider, appx_add:widgets, cert_machine, appx_add:widgets`, which this ordering yields.
+```diff
+--- a/setup/core/src/shell/mod.rs
++++ b/setup/core/src/shell/mod.rs
+@@ -14,6 +14,7 @@ pub mod classes;
+ pub mod path;
+ pub mod shortcuts;
+ pub mod sys;
++pub mod widgets;
+ pub mod win11;
+ 
+ /// Where registrations are written. Production: the real HKCU and shell folders. Tests: a scratch key prefix and temp folders.
+@@ -23,6 +24,8 @@ pub struct Locations {
+     pub hkcu: String,
+     pub desktop: PathBuf,
+     pub programs: PathBuf,
++    /// `%LOCALAPPDATA%`; the widgets keep their snapshot and layout in `Null\widgets` below it.
++    pub local_data: PathBuf,
+ }
+ 
+ impl Locations {
+@@ -73,6 +76,10 @@ pub trait System {
+     fn cert_add_current_user(&self, cer: &Path) -> Result<()>;
+     /// UAC prompt; Err when declined or failed.
+     fn cert_add_machine_elevated(&self, install: &Path) -> Result<()>;
++    /// Force-ends the `null_widgets.exe` processes that run from `install`; true when none is left.
++    fn stop_widgets(&self, install: &Path) -> bool;
++    /// Starts `exe` detached from this process. A failure to start is not an error: the Run entry starts it at the next login.
++    fn start_widgets(&self, exe: &Path);
+ }
+ 
+ #[derive(Clone, Debug, PartialEq)]
+@@ -84,6 +91,7 @@ impl Locations {
+             hkcu: String::new(),
+             desktop: sys::known_folder(sys::KnownFolder::Desktop)?,
+             programs: sys::known_folder(sys::KnownFolder::Programs)?,
++            local_data: sys::known_folder(sys::KnownFolder::LocalAppData)?,
+         })
+     }
+ }
+@@ -128,6 +136,7 @@ fn register_one(
+             let (claimed, skipped) = classes::register_preview_handler(loc, sys, install)?;
+             log(&format!("preview handler: {claimed} extensions claimed, {skipped} already handled by another app"));
+         }
++        Feature::Widgets => widgets::register(loc, sys, install, log)?,
+     }
+     Ok(false)
+ }
+@@ -147,6 +156,7 @@ fn unregister_one(f: Feature, loc: &Locations, sys: &dyn System, install: &Path)
+         }
+         Feature::FileAssociations => classes::unregister_file_associations(loc, sys),
+         Feature::PreviewHandler => classes::unregister_preview_handler(loc, sys),
++        Feature::Widgets => widgets::unregister(loc, sys, install),
+     }
+ }
+ 
+```
 
-- [ ] **Step 6: Run to verify it passes**
+`setup/core/src/shell/sys.rs`:
 
-Run: `cd setup && cargo test -p null-setup-core`
-Expected: PASS. If the manage/update tests that count `Feature::ALL` calls break, they assert the unregister list equals `Feature::ALL` — those still hold since `ALL` is the source.
+```diff
+--- a/setup/core/src/shell/sys.rs
++++ b/setup/core/src/shell/sys.rs
+@@ -6,17 +6,21 @@ use windows::{
+         Foundation::MAX_PATH,
+         Security::Cryptography::{CERT_SYSTEM_STORE_CURRENT_USER, CERT_SYSTEM_STORE_LOCAL_MACHINE},
+         System::Com::{CoCreateInstance, CoInitializeEx, CoUninitialize, IPersistFile, CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED, STGM_READ},
+-        UI::Shell::{FOLDERID_Desktop, FOLDERID_Programs, IShellLinkW, SHGetKnownFolderPath, ShellLink, KF_FLAG_DEFAULT},
++        UI::Shell::{FOLDERID_Desktop, FOLDERID_LocalAppData, FOLDERID_Programs, IShellLinkW, SHGetKnownFolderPath, ShellLink, KF_FLAG_DEFAULT},
+     },
+ };
+ 
+ use super::{shortcuts::ShortcutSpec, AppxAdd, System};
+ use crate::error::{Error, Result};
+ 
+-pub enum KnownFolder { Desktop, Programs }
++pub enum KnownFolder { Desktop, Programs, LocalAppData }
+ 
+ pub fn known_folder(id: KnownFolder) -> Result<PathBuf> {
+-    let guid = match id { KnownFolder::Desktop => FOLDERID_Desktop, KnownFolder::Programs => FOLDERID_Programs };
++    let guid = match id {
++        KnownFolder::Desktop => FOLDERID_Desktop,
++        KnownFolder::Programs => FOLDERID_Programs,
++        KnownFolder::LocalAppData => FOLDERID_LocalAppData,
++    };
+     unsafe {
+         let p = SHGetKnownFolderPath(&guid, KF_FLAG_DEFAULT, None).map_err(|e| Error::Other(format!("known folder: {e}")))?;
+         Ok(PathBuf::from(OsString::from_wide(p.as_wide())))
+@@ -117,6 +121,17 @@ impl System for WinSystem {
+             ))
+         })
+     }
++
++    fn stop_widgets(&self, install: &Path) -> bool {
++        crate::procs::stop_named_under(install, super::widgets::EXE)
++    }
++
++    fn start_widgets(&self, exe: &Path) {
++        const DETACHED_PROCESS: u32 = 0x0000_0008;
++        const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
++        // The temp folder as working directory: the exe must never keep the install folder busy, an update renames it.
++        let _ = Command::new(exe).current_dir(std::env::temp_dir()).creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP).spawn();
++    }
+ }
+ 
+ const NO_WINDOW: u32 = 0x0800_0000;
+```
 
-- [ ] **Step 7: Commit**
+`setup/core/src/procs.rs`:
+
+```diff
+--- a/setup/core/src/procs.rs
++++ b/setup/core/src/procs.rs
+@@ -62,6 +62,20 @@ fn taskkill(pids: &[u32], force: bool) {
+ pub fn request_close(pids: &[u32]) { taskkill(pids, false) }
+ pub fn force_close(pids: &[u32]) { taskkill(pids, true) }
+ 
++/// Force-ends the processes called `name` that run from `dir`; true when none is left. Meant for the widgets exe, which keeps no
++/// state in memory (its layout is saved on every drag), and which would otherwise sit in the prompt of `close_all`.
++pub fn stop_named_under(dir: &Path, name: &str) -> bool {
++    let pids = || -> Vec<u32> { running_in(dir).into_iter().filter(|r| r.name.eq_ignore_ascii_case(name)).map(|r| r.pid).collect() };
++    let found = pids();
++    if found.is_empty() { return true; }
++    force_close(&found);
++    for _ in 0..10 {
++        thread::sleep(Duration::from_millis(300));
++        if pids().is_empty() { return true; }
++    }
++    false
++}
++
+ pub fn close_all(dir: &Path, ctx: &Ctx, grace: Duration) -> Result<()> {
+     loop {
+         let mut running = running_in(dir);
+```
+
+`setup/core/src/registrations.rs`:
+
+```diff
+--- a/setup/core/src/registrations.rs
++++ b/setup/core/src/registrations.rs
+@@ -3,7 +3,7 @@ use std::{path::Path, sync::Arc};
+ use crate::{
+     install_config::Feature,
+     progress::Ctx,
+-    shell::{self, arp, sys::WinSystem, Locations},
++    shell::{self, arp, sys::WinSystem, Locations, System},
+ };
+ 
+ #[derive(Clone, Debug, PartialEq)]
+@@ -14,6 +14,10 @@ pub trait Registrar: Send + Sync {
+ 
+     /// Add/Remove Programs entry: `Some(version)` writes or refreshes it, `None` removes it. Never fails the caller.
+     fn arp(&self, _install: &Path, _version: Option<&str>, _ctx: &Ctx) {}
++
++    /// Ends `null_widgets.exe` before the install folder is renamed or deleted. Best effort; the locked-files prompt of
++    /// `procs::close_all` is the backstop, so the default does nothing.
++    fn stop_widgets(&self, _install: &Path, _ctx: &Ctx) {}
+ }
+ 
+ pub struct ShellRegistrar;
+@@ -39,6 +43,12 @@ impl Registrar for ShellRegistrar {
+             ctx.log.line(&format!("registrations: Add/Remove Programs entry: {e}"));
+         }
+     }
++
++    fn stop_widgets(&self, install: &Path, ctx: &Ctx) {
++        if !WinSystem.stop_widgets(install) {
++            ctx.log.line("registrations: null_widgets.exe is still running; it is closed with the other processes");
++        }
++    }
+ }
+ 
+ pub fn standard() -> Arc<dyn Registrar> { Arc::new(ShellRegistrar) }
+```
+
+- [ ] **Step 4: Run to verify it passes**
+
+Run: `cd setup && cargo test -p null-setup-core -p null-setup`
+Expected: PASS, including every existing suite (the `Feature::ALL` tests keep working: a fake install without `null_widgets.exe` only logs). The line `ERROR: The process with PID … could not be terminated.` that one existing suite prints is noise, not a failure.
+
+- [ ] **Step 5: Commit**
 
 ```bash
 git add setup
-git commit -m "feat(setup): opt-in Windows widgets feature and package registration (#141)"
+git commit -m "feat(setup): opt-in desktop widgets feature with Run entry, start, stop and cleanup (#141)"
 ```
 
 ---
 
-### Task 15: null-setup — stop the provider before an update or uninstall swaps the folder
+### Task 15: null-setup — stop the widgets before an update or uninstall swaps the folder
 
-`close_all` only posts `WM_CLOSE`, which a windowless COM server ignores, so without this a pinned widget turns every update into a "locked files" prompt.
+`null_widgets.exe` runs from the install folder, so a running copy would turn every update into a "files are locked" prompt. The default `Registrar::stop_widgets` and the real implementation exist since Task 14; this task calls them.
 
 **Files:**
-- Modify: `setup/core/src/registrations.rs` (`Registrar::stop_widgets`), `setup/core/src/update.rs` (`prepare_swap`), `setup/core/src/manage.rs` (`uninstall_inner`)
-- Modify: `setup/core/tests/support/mod.rs` (`Recorder`), `setup/core/tests/update.rs`, `setup/core/tests/manage.rs`
-
-**Interfaces:**
-- Produces:
-
-```rust
-// Registrar trait
-/// Ends the widgets provider before the folder is renamed. Best effort; the default does nothing.
-fn stop_widgets(&self, _install: &Path, _ctx: &Ctx) -> bool { true }
-// Recorder: pub stops: Mutex<usize>; records every call.
-```
+- Modify: `setup/core/src/update.rs` (`prepare_swap`), `setup/core/src/manage.rs` (`uninstall_inner`)
+- Modify (tests): `setup/core/tests/update.rs`, `setup/core/tests/manage.rs`
 
 - [ ] **Step 1: Write the failing tests**
 
-`tests/update.rs`:
+`setup/core/tests/update.rs`:
 
-```rust
-#[test]
-fn update_stops_the_widgets_provider_before_closing_and_swapping() {
-    let w = world(&[]);
-    let srv = serve_release(w.zip.clone(), sha(&w.zip), Arc::new(AtomicUsize::new(0)));
-    let o = opts(&w, &srv.base);
-    let rec = support::Recorder::new(null_setup_core::registrations::Registration::Done);
-    let mut o = o;
-    o.registrar = rec.clone();
-    run(|c| update(&o, c)).0.unwrap();
-    assert_eq!(*rec.stops.lock().unwrap(), 1);
-}
+```diff
+--- a/setup/core/tests/update.rs
++++ b/setup/core/tests/update.rs
+@@ -90,6 +90,17 @@ fn update_installs_the_new_version_keeps_data_and_prunes_the_cache() {
+     for s in [Progress::Checking, Progress::Preparing, Progress::Installing] { assert!(seen.contains(&s), "{s:?}"); }
+ }
+ 
++#[test]
++fn update_stops_the_widgets_exe_before_it_swaps_the_folder() {
++    let w = world(&[]);
++    let srv = serve_release(w.zip.clone(), sha(&w.zip), Arc::new(AtomicUsize::new(0)));
++    let rec = support::Recorder::new(null_setup_core::registrations::Registration::Done);
++    let mut o = opts(&w, &srv.base);
++    o.registrar = rec.clone();
++    run(|c| update(&o, c)).0.unwrap();
++    assert_eq!(*rec.stops.lock().unwrap(), 1);
++}
++
+ #[test]
+ fn prefetch_then_update_downloads_the_zip_only_once() {
+     let w = world(&[]);
 ```
 
-`tests/manage.rs`:
+`setup/core/tests/manage.rs`:
 
-```rust
-#[test]
-fn uninstall_stops_the_widgets_provider_first() {
-    let tmp = tempfile::tempdir().unwrap();
-    let dir = install_in(tmp.path());
-    let user = tmp.path().join("Null");
-    let rec = support::Recorder::new(Registration::Done);
-    let mut o = opts(&dir, false, &user);
-    o.registrar = rec.clone();
-    run(|c| uninstall(&o, c)).unwrap();
-    assert_eq!(*rec.stops.lock().unwrap(), 1);
-}
+```diff
+--- a/setup/core/tests/manage.rs
++++ b/setup/core/tests/manage.rs
+@@ -35,6 +35,17 @@ fn opts(dir: &Path, delete: bool, user_data: &Path) -> UninstallOpts {
+     o
+ }
+ 
++#[test]
++fn uninstall_stops_the_widgets_exe_first() {
++    let tmp = tempfile::tempdir().unwrap();
++    let dir = install_in(tmp.path());
++    let rec = support::Recorder::new(Registration::Done);
++    let mut o = opts(&dir, false, &tmp.path().join("Null"));
++    o.registrar = rec.clone();
++    run(|c| uninstall(&o, c)).unwrap();
++    assert_eq!(*rec.stops.lock().unwrap(), 1);
++}
++
+ #[test]
+ fn modify_in_place_only_rewrites_the_config() {
+     let tmp = tempfile::tempdir().unwrap();
 ```
-
-In `tests/support/mod.rs`, extend `Recorder` with `pub stops: Mutex<usize>` (initialise to `Mutex::new(0)` in `Recorder::new`) and implement `fn stop_widgets(&self, _: &std::path::Path, _: &Ctx) -> bool { *self.stops.lock().unwrap() += 1; true }`.
 
 - [ ] **Step 2: Run to verify failure**
 
 Run: `cd setup && cargo test -p null-setup-core --test update --test manage`
-Expected: FAIL — `stops` is 0 / the trait has no `stop_widgets`.
+Expected: FAIL — `assertion left == right failed` on `stops` (0 instead of 1).
 
 - [ ] **Step 3: Implement**
 
-`registrations.rs`: add the default method to `Registrar`; implement for `ShellRegistrar`:
+`setup/core/src/update.rs`:
 
-```rust
-fn stop_widgets(&self, install: &Path, ctx: &Ctx) -> bool {
-    let stopped = WinSystem.stop_widgets_provider(install);
-    if !stopped {
-        ctx.log.line("registrations: the widgets provider is still running; it will be closed with the other processes");
-    }
-    stopped
-}
+```diff
+--- a/setup/core/src/update.rs
++++ b/setup/core/src/update.rs
+@@ -251,6 +251,7 @@ fn prune_builtins(staged: &Path, cfg: &InstallConfig, strict: bool, ctx: &Ctx) -
+ }
+ 
+ fn prepare_swap(o: &Opts, ctx: &Ctx) -> Result<()> {
++    o.registrar.stop_widgets(&o.install_dir, ctx);
+     procs::close_all(&o.install_dir, ctx, o.close_grace)?;
+     procs::release_inherited_handles(&o.install_dir, ctx);
+     if o.release_shell_ext {
 ```
 
-(`use shell::System` is needed for the trait method; `WinSystem` is already imported.)
+`setup/core/src/manage.rs`:
 
-`update.rs` `prepare_swap` — first line of the function:
-
-```rust
-fn prepare_swap(o: &Opts, ctx: &Ctx) -> Result<()> {
-    o.registrar.stop_widgets(&o.install_dir, ctx);
-    procs::close_all(&o.install_dir, ctx, o.close_grace)?;
+```diff
+--- a/setup/core/src/manage.rs
++++ b/setup/core/src/manage.rs
+@@ -95,6 +95,7 @@ fn uninstall_inner(o: &UninstallOpts, ctx: &Ctx) -> Result<()> {
+     if !is_ours(&o.install_dir) {
+         return Err(Error::Other(format!("{} is not a Null IDE install; nothing was removed", o.install_dir.display())));
+     }
++    o.registrar.stop_widgets(&o.install_dir, ctx);
+     procs::close_all(&o.install_dir, ctx, o.close_grace)?;
+     procs::release_inherited_handles(&o.install_dir, ctx);
+     if o.release_shell_ext {
 ```
 
-`manage.rs` `uninstall_inner` — immediately before `procs::close_all(&o.install_dir, …)`: `o.registrar.stop_widgets(&o.install_dir, ctx);`.
-
-The IDE's own failure policy is unchanged: `stop_widgets` returns a bool that is only logged; the swap's existing locked-files flow remains the backstop, and `widgets::register` independently keeps the old registration when the provider is still alive after the swap (Task 14).
+The failure policy is unchanged: `stop_widgets` only logs when the exe will not stop, and `procs::close_all` right after it is the backstop. After the swap, `register` (an update re-applies every feature that `follows_install`, which now includes `Widgets`) starts the new exe.
 
 - [ ] **Step 4: Run to verify it passes**
 
@@ -3654,128 +4545,92 @@ Expected: PASS.
 
 ```bash
 git add setup
-git commit -m "feat(setup): stop the widgets provider before an update or uninstall swaps the folder (#141)"
+git commit -m "feat(setup): stop the widgets before an update or uninstall swaps the folder (#141)"
 ```
 
 ---
 
-### Task 16: Wizard — the opt-in "Windows widgets" option
+### Task 16: Wizard — the opt-in "Desktop widgets" option
+
+The wizard's options page and summary are driven by `FEATURES` in `setup/ui/wizard-model.js`; the defaults come from the Rust `InstallConfig` (so the option starts unticked), and Modify shows the saved choice. No Rust change is needed.
 
 **Files:**
-- Modify: `setup/app/src/wizard.rs` (`View.widgets_supported`)
-- Modify: `setup/ui/wizard-model.js`, `setup/ui/wizard.js`
-- Modify: `setup/ui-tests/wizard-model.test.mjs`
+- Modify: `setup/ui/wizard-model.js`
+- Modify (test): `setup/ui-tests/wizard-model.test.mjs`
 
-**Interfaces:**
-- Consumes: `shell::widgets::supported`, `shell::sys::WinSystem` (Task 14).
-- Produces: `View` JSON gains `widgetsSupported: bool`; `wizard-model.js` gains `featuresFor(view)` returning the `FEATURES` rows minus `widgets` when `view.widgetsSupported` is falsy.
+- [ ] **Step 1: Write the failing test**
 
-- [ ] **Step 1: Write the failing tests**
-
-Add to `wizard-model.test.mjs` (the file loads the model with `vm`; also export `featuresFor`: change the `runInContext` suffix to `'\nthis.FEATURES = FEATURES; this.featuresFor = featuresFor;'`):
+Add to `setup/ui-tests/wizard-model.test.mjs`, just before the test `a job the backend refuses keeps install and modify on the wizard with the reason`:
 
 ```js
-test('the widgets option is offered only where the host supports it, and is off by default', () => {
-  const keys = (view) => ctx.featuresFor(view).map(([k]) => k);
-  assert.ok(keys({ widgetsSupported: true }).includes('widgets'));
-  assert.ok(!keys({ widgetsSupported: false }).includes('widgets'));
-  assert.ok(!keys({}).includes('widgets'));
-  assert.deepStrictEqual(keys({ widgetsSupported: true }).slice(0, 7), ctx.FEATURES.filter(([k]) => k !== 'widgets').map(([k]) => k));
-});
-
-test('the summary mentions widgets only when the option exists', () => {
-  const s = { dir: 'C:\\x', config: { widgets: true }, excluded: [], settings: {}, view: { manifest: null, widgetsSupported: false } };
-  assert.ok(!ctx.summaryLines(s).some((l) => l.startsWith('Windows widgets')));
-  s.view.widgetsSupported = true;
-  assert.ok(ctx.summaryLines(s).includes('Windows widgets: on'));
+test('the desktop widgets option says that it starts a program at login, and the summary names it', () => {
+  const row = ctx.FEATURES.find(([key]) => key === 'widgets');
+  assert.ok(row, 'the page offers the widgets option');
+  assert.ok(/login/i.test(row[2]), 'the explanation says it runs at login');
+  const lines = ctx.summaryLines({ dir: 'C:\\x', config: { widgets: true }, excluded: [], settings: {}, view: { manifest: null } });
+  assert.ok(lines.includes('Desktop widgets: on'), lines.join('|'));
 });
 ```
-
-(`summaryLines` is not exported to the context today — add it to the same `this.… =` suffix.)
 
 - [ ] **Step 2: Run to verify failure**
 
 Run: `node --test setup/ui-tests/wizard-model.test.mjs`
-Expected: FAIL — `featuresFor is not a function`.
+Expected: FAIL — `the page offers the widgets option`.
 
 - [ ] **Step 3: Implement**
 
-`wizard-model.js`: append to `FEATURES`:
-`['widgets', 'Windows widgets', 'Pin Projects, Issues and Pull Requests to the Windows 11 Widgets Board. They show what Null IDE last saw.'],`
-and add
+`setup/ui/wizard-model.js`:
 
-```js
-/** The option exists only where the host can show widgets; the check runs in null-setup (`shell::widgets::supported`). */
-function featuresFor(view) {
-  return FEATURES.filter(([key]) => key !== 'widgets' || (view && view.widgetsSupported));
-}
+```diff
+--- a/setup/ui/wizard-model.js
++++ b/setup/ui/wizard-model.js
+@@ -9,6 +9,7 @@ const FEATURES = [
+   ['contextMenu', 'Explorer context menu', 'The Windows 11 menu may ask for administrator approval once.'],
+   ['fileAssociations', 'File associations', null],
+   ['previewHandler', 'Preview pane in Explorer', null],
++  ['widgets', 'Desktop widgets', 'Projects, Issues and Pull Requests on your desktop. Starts a small program at login.'],
+ ];
+ 
+ function builtinById(builtins, id) {
 ```
-
-Change `summaryLines` to iterate `featuresFor(s.view)` instead of `FEATURES`. `wizard.js` `pageOptions`: replace `FEATURES.map(feature)` with `featuresFor(S.view).map(feature)`.
-
-`wizard.rs`: add `widgets_supported: bool` to `View` (it is `#[serde(rename_all = "camelCase")]` like the other fields — check the struct attribute at its definition and add the field in the same style) and compute it in `load`:
-`let widgets_supported = shell::widgets::supported(&shell::sys::WinSystem).is_ok();` then pass it into `View { …, widgets_supported }`. (Add the `use` for `shell` if not yet imported there; `Locations`/`arp` already come from it.)
 
 - [ ] **Step 4: Run to verify it passes**
 
-Run: `node --test setup/ui-tests/wizard-model.test.mjs; cd setup && cargo test -p null-setup-core -p null-setup`
+Run: `node --test setup/ui-tests/wizard-model.test.mjs; cd setup && cargo test -p null-setup-core`
 Expected: PASS (the existing "every config key the page offers exists on the Rust InstallConfig" test now also checks `widgets`).
 
-- [ ] **Step 5: Manual check of the window**
+- [ ] **Step 5: Look at the window**
 
-Run the wizard from a copy outside an install: `setup\target\debug\null-setup.exe wizard --install-dir "$env:TEMP\widgets-wizard-test"` (build with `cargo build -p null-setup` first). Expected on Windows 11: the options page lists "Windows widgets", unticked. Tick it and the summary says "Windows widgets: on". On a host where `supported` is false the row is absent.
+Build and run the wizard from a copy outside an install: `cd setup && cargo build -p null-setup`, then `target\debug\null-setup.exe wizard --install-dir "$env:TEMP\widgets-wizard-test"`. Expected: the options page lists "Desktop widgets" with its explanation, unticked; ticking it makes the summary say "Desktop widgets: on".
 
 - [ ] **Step 6: Commit**
 
 ```bash
 git add setup
-git commit -m "feat(setup): Windows widgets option in the install wizard (#141)"
+git commit -m "feat(setup): Desktop widgets option in the install wizard (#141)"
 ```
 
 ---
 
-### Task 17: End-to-end check on Windows 11, docs, and wrap-up
+### Task 17: End-to-end check, docs and wrap-up
 
 **Files:**
-- Modify: `scripts/check-widgets.ps1` (final checklist mode)
-- Modify: `setup/CLAUDE.md`, `CLAUDE.md` (root), `docs/ROADMAP.md` (if #141 is listed), `README.md` and `docs/wiki/` (user-facing settings/commands — run the `wiki-sync` skill)
-- Modify: `docs/specs/native-windows-widgets-design.md` (status line: implemented; link the gate findings)
+- Modify: `setup/CLAUDE.md`, `shell-ext/CLAUDE.md`, `CLAUDE.md` (root), `extensions/null-tools/CLAUDE.md` (done in Task 13), `README.md` and `docs/wiki/` (run the `wiki-sync` skill)
+- Modify: `docs/specs/native-windows-widgets-design.md` (status line), `docs/specs/native-windows-widgets-gate.md` (verification section)
 
-- [ ] **Step 1: Add the final checklist to `check-widgets.ps1`**
+- [ ] **Step 1: Run the manual checklist**
 
-Add a `-Checklist` switch that prints (after the `-Status` output) the Win11 manual run from the spec's Testing section:
+Build a package with `scripts/build-local.ps1` (only when the user agrees: it takes tens of minutes), install it with `NullIDESetup`, and run every item of `scripts/check-widgets.ps1 -Checklist` on Windows 11 and on Windows 10. Write the outcome (pass/fail and notes per item) under `## Verification (YYYY-MM-DD)` at the end of `docs/specs/native-windows-widgets-gate.md`. Fix any failure in the owning task's files (with a test where one is possible) and re-run that item.
 
-```powershell
-if ($Checklist) {
-@'
-Windows 11 manual run (cannot run in CI). Use a build produced by scripts/build-local.ps1, installed with NullIDESetup.
- 1. Setup wizard: "Windows widgets" is offered and OFF. Install without it: -Status shows NullIDE.Widgets "<not registered>".
- 2. Null Setup -> Modify -> tick "Windows widgets" -> Apply. -Status shows the package. The Board (Win+W) lists Projects / Issues / Pull Requests.
- 3. Null: Set Up Widgets in the IDE. snapshot.json appears; pin all three; data and "Updated <age>" are correct.
- 4. Click-through: Issue/PR "GitHub" opens the browser; "Open" opens the project folder in Null IDE with NO package icon/own taskbar slot (scripts/check-cold-start-aumid.ps1 style); "New window" opens a new window.
- 5. Quit Null IDE completely. The pinned cards still render the last data, footer ages; after 6 h the footer is muted.
- 6. Unpin all widgets: null_widgets.exe exits (-Status: running = no).
- 7. Update with a widget pinned: run a headless update (see setup/CLAUDE.md) from a copy outside the install. No "files are locked" prompt; widgets still work afterwards (-Status).
- 8. Turn null.widgets.enabled off: snapshot.json disappears and the cards fall back to "Open Null IDE to set up widgets".
- 9. Sign the account out in null-accounts: rows stay, dimmed, with the reason.
-10. Uninstall: NullIDE.Widgets and %LOCALAPPDATA%\Null\widgets are gone; the Explorer context menu package is also gone.
-11. Untick "Windows widgets" in Modify: package and snapshot folder removed, IDE untouched.
-'@
-}
-```
+- [ ] **Step 2: Documentation**
 
-- [ ] **Step 2: Run the checklist**
+- `setup/CLAUDE.md`: in the registrations paragraph add that `Feature::Widgets` (opt-in, default off, `widgets` in `install-config.json`) writes the HKCU Run entry `NullWidgets`, starts `<install>\null_widgets.exe` through `System::start_widgets`, that `Registrar::stop_widgets` force-ends it (`procs::stop_named_under`) before an update swap and an uninstall, that uninstall also deletes `%LOCALAPPDATA%\Null\widgets\`, and that the exe is a plain Win32 program: no package, no certificate, no elevation.
+- `shell-ext/CLAUDE.md`: add a section "Desktop widgets host (`widgets/`)": `null_widgets.exe`, the `null_widget_core` library and its CTest executables, the rule that widgets sit directly above `Progman` (never `HWND_BOTTOM`), that the exe is unpackaged so the AUMID gotcha above does not apply to it, and `scripts/check-widgets.ps1`.
+- Root `CLAUDE.md`: in "Repository Layout" mention `shell-ext/widgets/` and `scripts/check-widgets.ps1`; in "How the Build Works" step 9 add that CTest runs and `null_widgets.exe` is copied to the install root.
+- Run the `wiki-sync` skill for the new settings (`null.widgets.enabled`, `null.widgets.repos`), commands (`Null: Set Up Widgets`, `Null: Refresh Widgets`), the wizard option and the privacy note (private titles appear on the desktop).
+- Design doc header: add `Status: implemented (see docs/plans/native-windows-widgets.md and docs/specs/native-windows-widgets-gate.md)`.
 
-Execute every item in a real Windows 11 session and write the outcome (pass/fail + notes) under a new heading `## Verification (YYYY-MM-DD)` at the end of `docs/specs/native-windows-widgets-gate.md`. Any failure: fix it in the owning task's files with a test where one is possible, then re-run that item.
-
-- [ ] **Step 3: Documentation**
-
-- `setup/CLAUDE.md`: add to the registrations paragraph that `Feature::Widgets` (opt-in, default off, `widgets` in `install-config.json`) registers the second sparse package `NullIDE.Widgets` through `shell/widgets.rs`, uses the same certificate/trust flow, that `Registrar::stop_widgets` ends `null_widgets.exe` before the swap/uninstall, that the wizard hides the option when `shell::widgets::supported` fails, and where `MIN_BUILD` came from.
-- Root `CLAUDE.md`: in the Repository Layout / Win11 Shell Extension sections mention the widgets provider and the new scripts (`fetch-widgets-deps.ps1`, `pack-widgets.ps1`, `check-widgets.ps1`) and add the CTest step to "How the Build Works" step 9.
-- Run the `wiki-sync` skill for the new settings (`null.widgets.enabled`, `null.widgets.repos`), commands (`Null: Set Up Widgets`, `Null: Refresh Widgets`) and the privacy note (private titles appear on the Board).
-- Update the design doc header: `Status: implemented (see docs/plans/native-windows-widgets.md and docs/specs/native-windows-widgets-gate.md)`.
-
-- [ ] **Step 4: Refresh the knowledge graph and compiled output**
+- [ ] **Step 3: Refresh the knowledge graph and compiled output**
 
 ```bash
 graphify update .
@@ -3785,7 +4640,7 @@ git status --short
 
 Expected: only the intended files; refreshed `out/` goes into its own `chore: refresh null-tools compiled output` commit.
 
-- [ ] **Step 5: Final full verification**
+- [ ] **Step 4: Final full verification**
 
 ```bash
 cd extensions/null-tools && npm test
@@ -3796,11 +4651,11 @@ node --test scripts/release-notes.test.mjs
 
 Expected: all green.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
-git add -A -- scripts setup/CLAUDE.md CLAUDE.md README.md docs
-git commit -m "docs(widgets): final checklist, setup/CLAUDE notes and wiki sync (#141)"
+git add -A -- scripts setup/CLAUDE.md shell-ext/CLAUDE.md CLAUDE.md README.md docs
+git commit -m "docs(widgets): notes, wiki sync and verification record (#141)"
 ```
 
 ---
@@ -3811,31 +4666,31 @@ git commit -m "docs(widgets): final checklist, setup/CLAUDE notes and wiki sync 
 
 | Spec item | Task |
 |---|---|
-| Gate: signed package, null.exe closed, runtime deps/size, min build | 1 |
-| Decision 1 cache only / 6 provider is dumb + untrusted input | 3, 4, 5 |
-| Decision 2 `widgetSnapshot` module (issues/PRs GraphQL, projects, gated by `enabled`) | 7, 8, 10, 11, 12 (split into focused files instead of one `widgetSnapshot` module) |
-| Decision 3 GitHub first, `provider` field | 7 (rows carry `provider: 'github'`) |
-| Decision 4 separate package; 5 C++/WinRT, CMake step, same cert, `Windows.Data.Json` | 1, 4, 6 |
-| Decision 7 settings, constants (8/10/10), no extra settings | 7, 12 |
-| Decision 8 actions, `LaunchViaExplorer`, `--`, path from package location | 2, 4, 5 |
-| Decision 9 lifecycle: opt-in, host check, trust flow, stop before swap, failures never fail install, uninstall removes both | 13–16 |
-| Decision 10 demand-driven process | 5 (exits on last DeleteWidget) |
-| Decision 11 atomic writes / corrupt keeps last good | 9, 5 |
-| Decision 12 no secrets | 7 (rows hold no token), 9 |
-| Decision 13 one writer window | 9, 11 |
-| Decision 14 accounts non-interactive | 10, 12 |
-| Decision 15 refresh cadence, backoff, rate limit, repo removal rewrite | 11 |
-| Decision 16 off deletes; signed-out keeps rows | 11, 8 |
-| Decision 17 nothing implicit | 12 (`enabled` default false; set only by setup) |
-| Snapshot sets, status/failed rules, localPath, schema-newer, PR ordering | 7, 8, 3, 4 |
-| Widgets table (sizes/actions) | 1 (manifest sizes), 4 (rows/actions) |
-| Errors and staleness incl. 6 h constant | 4 |
-| Testing: node tests / CTest fixtures incl. hostile / FakeSystem / Win11 by hand + script | 7–11 / 3–5 / 13–15 / 17 |
+| Hard gate (Win+D, clicks, sleep/resume, display change, Win 10 and 11) | 1 |
+| Decision 1 cache only; 7 exe is dumb and treats the snapshot as untrusted | 2, 3, 5 |
+| Decision 2 IDE is the only fetcher (issues/PRs GraphQL, projects, gated by `enabled`) | 8, 9, 11, 12, 13 (split into focused files instead of one `widgetSnapshot` module) |
+| Decision 3 GitHub first, `provider` field | 8 (`provider: 'github'` on every row) |
+| Decision 4 `null_widgets.exe`, plain Win32, CMake step, one instance | 2, 6, 7 |
+| Decision 5 Direct2D/DirectWrite layered windows, always above the wallpaper, per-monitor DPI | 6 (z-order rule corrected, see note 1) |
+| Decision 6 layout owned by the exe: drag, snap, lock, clamp, menu, show-all on second launch | 4, 6 |
+| Decision 7 links only `https://github.com`, plain-text, capped text, malformed keeps last good | 2, 3, 5 |
+| Decision 8 actions via `ShellExecuteW` / `CreateProcessW`, `--`, exe folder | 5 |
+| Decision 9 two settings, constants 8/10/10 | 8, 13 (and `kMaxRows` in Task 3) |
+| Decision 10 lifecycle in null-setup (Run key, stop/restart on update, uninstall cleanup, failures ignored, `FakeSystem`) | 14, 15, 16 |
+| Decision 11 nothing runs unless asked; off deletes the snapshot; signed-out keeps rows | 11, 12, 14, 16 |
+| Decision 12 atomic writes | 10 |
+| Decision 13 no secrets in snapshot or logs | 8, 10 |
+| Decision 14 one writer window | 10, 12 |
+| Decision 15 accounts non-interactive | 11, 13 |
+| Decision 16 refresh cadence, backoff, rate limit, repo removal rewrite; Refresh item re-reads the file | 12; 6 (`Reload`) |
+| Decision 17 nothing enabled implicitly | 13 (`enabled` default false, set by the setup command) |
+| Snapshot sets, status/failed rules, localPath, newer schema, PR ordering | 8, 9, 2, 3 |
+| Widgets table (sizes, rows, actions) | 3 (`DefaultSize`, rows, menus), 6 |
+| Errors and staleness incl. the 6 h constant | 3 |
+| Testing: node tests / CTest fixtures incl. hostile / `FakeSystem` / manual run + script | 8–12 / 2–5 / 14, 15 / 6, 17 |
 
-Gap found and fixed while writing: spec's FakeSystem test for "provider process cannot be stopped" → Task 14 (`a_provider_that_cannot_be_stopped_keeps_the_current_registration`).
+**2. Placeholder scan:** no TBD/TODO. Every code step carries the code (the C++ and Rust blocks are the files that were compiled and tested). Two things are deliberately "decide from a measurement", both in Task 1: the verdict of the gate, and what to do if it fails.
 
-**2. Placeholder scan:** No TBD/TODO. Two honest "measure then decide" points are explicit decision steps, not blanks: the activation approach and minimum Windows build in Task 1 (both end in a recorded finding), and `MIN_BUILD = 22621` is a stated default that Task 1 may change. Task 6 Step 3 and Task 12 Step 6 name the exact edits (including the three known compile clean-ups).
+**3. Type consistency:** `Loaded/Snapshot/Section` (Task 2) feed `BuildView` (Task 3); `Action/ActionKind` (Task 3) feed `Run` (Task 5) and the menu in `app.cc` (Task 6); `Kind/KeyOf/DefaultSize` (Task 3) feed `placement` (Task 4). TypeScript: `IssueRow/PrRow/Section/Snapshot/WidgetRepo` are defined in Task 8 and used unchanged in Tasks 9–13; `RepoResult` (Task 11) feeds `RefresherDeps.fetch` (Task 12). Rust: `System::{stop,start}_widgets`, `Registrar::stop_widgets` and `Locations.local_data` are introduced in Task 14 and used in Tasks 14–15 with the names the `FakeSystem`/`Recorder` implement.
 
-**3. Type consistency:** `IssueRow`/`PrRow`/`Section`/`Snapshot`/`WidgetRepo` defined in Task 7 and used unchanged in Tasks 8–12. `RepoResult` (Task 10) feeds `RefresherDeps.fetch` (Task 11). C++: `Loaded/Snapshot/Section` (Task 3) are consumed by `BuildCard`/`IsAllowedProjectPath` (Task 4) and `ParseAction`/`Choose` (Task 5). Rust: `System::appx_installed(name)` changes in Task 13 and every later caller (`widgets.rs`, `win11.rs`) uses the new signature; `FakeSystem` call names (`appx_add:widgets`, `stop_provider`) are consistent between Tasks 13–15.
-
-**4. Review Focus coverage:** 1 → Tasks 3, 4, 5 (hostile fixture, template-equality, allowlist); 2 → Tasks 3 (corrupt/odd types), 5 (`Choose`); 3 → Task 7 (`parseRepos`); 4 → Tasks 8, 11 (signed_out keeps rows, rate-limit suspend, failing fetch); 5 → Tasks 13–15 (`stop_named_under`, `stop_widgets` in update/uninstall, "cannot be stopped keeps registration").
+**4. Review Focus coverage:** 1 → Tasks 2 (hostile fixture, URL/path allow-lists), 3 (hostile rows have no actions, markup stays text), 5 (`Run` refuses before starting anything); 2 → Task 2 (`KeepLastGood`, corrupt/newer/missing, odd types, 200-item cap); 3 → Task 8 (`parseRepos`); 4 → Tasks 9, 12 (signed_out keeps rows, rate-limit suspend, throwing fetch); 5 → Tasks 4 (unplugged monitor clamp), 14 (`stop_named_under`, uninstall cleanup), 15 (stop before swap and uninstall).
