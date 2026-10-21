@@ -710,6 +710,9 @@ if (-not $SkipShellExt) {
     Copy-Item (Join-Path $shellExtBuild "Release/null_explorer_command.dll") $dllDest -Force
     # Never executed - see AppxManifest.xml for why this exists instead of null.exe.
     Copy-Item (Join-Path $shellExtBuild "Release/null_identity_stub.exe") $pkgDir -Force
+    # Desktop widgets host: tests, then next to null.exe.
+    Invoke-Native "ctest (widgets)" { ctest --test-dir $shellExtBuild -C Release --output-on-failure }
+    Copy-Item (Join-Path $shellExtBuild "widgets/Release/null_widgets.exe") $OutDir -Force
 
     New-Item -ItemType Directory -Path $assetDest -Force | Out-Null
     Add-Type -AssemblyName System.Drawing
