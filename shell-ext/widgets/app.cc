@@ -368,8 +368,10 @@ int RowAt(Widget const& w, int yPx) {
 
 void ShowMenu(Widget& w, POINT screenPt, int row) {
   HMENU m = CreatePopupMenu();
+  // A copy: the menu is modal, but timers and file changes keep rebuilding w.view meanwhile, so the row index must not be used again afterwards.
+  std::vector<Action> items;
   if (row >= 0) {
-    auto const& items = w.view.rows[row].menu;
+    items = w.view.rows[row].menu;
     for (size_t i = 0; i < items.size(); ++i) AppendMenuW(m, MF_STRING, kRowBase + i, items[i].label.c_str());
     if (!items.empty()) AppendMenuW(m, MF_SEPARATOR, 0, nullptr);
   }
@@ -391,8 +393,8 @@ void ShowMenu(Widget& w, POINT screenPt, int row) {
   DestroyMenu(m);
 
   int idx = static_cast<int>(w.kind);
-  if (id >= kRowBase && id < kRowBase + 8 && row >= 0 && id - kRowBase < w.view.rows[row].menu.size()) {
-    Run(w.view.rows[row].menu[id - kRowBase], app.installDir);
+  if (id >= kRowBase && id < kRowBase + 8 && id - kRowBase < items.size()) {
+    Run(items[id - kRowBase], app.installDir);
   } else if (id == kRefresh) {
     Reload();
   } else if (id == kLock) {
