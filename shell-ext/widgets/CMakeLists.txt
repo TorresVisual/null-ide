@@ -20,3 +20,10 @@ foreach(t ${TESTS})
   target_compile_definitions(${t} PRIVATE FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
   add_test(NAME ${t} COMMAND ${t})
 endforeach()
+
+add_executable(null_widgets WIN32 app.cc)
+target_link_libraries(null_widgets PRIVATE null_widget_core d2d1 dwrite user32 gdi32 ole32 shlwapi shcore)
+if(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+  target_link_options(null_widgets PRIVATE /guard:cf /OPT:REF /OPT:ICF /MACHINE:X64
+    /MANIFEST:EMBED "/MANIFESTINPUT:${CMAKE_CURRENT_SOURCE_DIR}/null_widgets.manifest")
+endif()

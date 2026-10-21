@@ -18,12 +18,12 @@ Leave every box below unchecked. The executing skill resolves them with
 your human partner before Step 1 and checks the chosen boxes itself.
 
 **Execution Target:**
-- [ ] Current branch (no isolation)
+- [x] Current branch (no isolation)
 - [ ] New feature branch (no worktree)
 - [ ] Worktree (superpowers:using-git-worktrees)
 
 **Execution Mode:**
-- [ ] Inline execution (superpowers:executing-plans)
+- [x] Inline execution (superpowers:executing-plans)
 - [ ] Subagent-driven execution (superpowers:subagent-driven-development)
 
 ## Global Constraints
@@ -34,7 +34,7 @@ Copied from the spec; every task includes them.
 - **Cache only.** `null_widgets.exe` never fetches, holds no token, has no settings UI. Tokens stay in null-accounts' `SecretStorage`.
 - The IDE (`null-tools`) is the only fetcher, filter and writer, gated by `null.widgets.enabled`; with it off the IDE behaves identically to a build without widgets.
 - Host = **`null_widgets.exe`**, a plain Win32 exe in the install root next to `null.exe`: no package identity, no signing, no Windows App SDK. One instance (named mutex). Built by the CMake target in `shell-ext/widgets/` in the existing MSVC step.
-- Rendering: Direct2D / DirectWrite on layered windows, one top-level window per widget, `WS_EX_LAYERED | WS_EX_TOOLWINDOW` (no taskbar button), per-pixel alpha, rounded corners, Null Dark palette, per-monitor DPI aware. Each window stays **directly above the desktop window (`Progman`)**, below every app.
+- Rendering: Direct2D / DirectWrite on layered windows, one top-level window per widget, `WS_EX_LAYERED | WS_EX_TOOLWINDOW` (no taskbar button), per-pixel alpha, rounded corners, Null Dark palette, per-monitor DPI aware. Each window is a layered **child of the desktop's icon host (`SHELLDLL_DefView`)**, so it stays on the desktop through Win+D and below every app (gate result, `docs/specs/native-windows-widgets-gate.md`: a top-level window pinned above `Progman` is hidden by Win+D). The exe embeds a manifest (`supportedOS` + PerMonitorV2) and recreates its windows after an Explorer restart.
 - Layout (`%LOCALAPPDATA%\Null\widgets\layout.json`) is owned by the exe: positions, per-widget visibility, lock. Drag moves and snaps to screen edges; a saved position off every monitor is clamped on screen. Right-click menu: Refresh, Lock, Hide this widget, Quit widgets, plus a "Show <widget>" item per hidden widget; a second launch of the exe shows all hidden widgets.
 - The exe treats `snapshot.json` as **untrusted input**: links open only for `https://` URLs on host `github.com` via `ShellExecuteW`; snapshot text is length-capped and drawn as plain text only; a malformed file keeps the last good render; `schema` greater than 1 shows "Update Null IDE".
 - Actions: issue/PR rows open in the browser. "Open project" / "Open in new window" start `null.exe` with `CreateProcessW`: no shell, `null.exe` resolved from the exe's own folder (never from the snapshot), a project `path` must be absolute and is passed after a `--` separator.
@@ -47,7 +47,7 @@ Copied from the spec; every task includes them.
 - Repo conventions: `out/` of an extension is tracked — after editing `src/` run `npm run compile` and commit the refreshed `out/` as `chore: refresh null-tools compiled output`; never hand-edit `out/`. New TS test files must be added to **both** the `test` script in `package.json` and `tsconfig.json`'s `include`. Run `graphify update .` after code changes. Commit style: Conventional Commits with `(#141)`.
 
 **Interpretation notes (spec silent or ambiguous; flagged for review):**
-1. **Z-order.** The spec said `HWND_BOTTOM`; measured, that hides the windows behind the wallpaper (Task 1 records it, the spec is corrected). The rule used is "insert after the window that is directly above `Progman`", re-applied in `WM_WINDOWPOSCHANGING` and after an Explorer restart (`TaskbarCreated`).
+1. **Z-order.** The spec said `HWND_BOTTOM`; measured, that hides the windows behind the wallpaper (Task 1 records it, the spec is corrected). The first replacement ("insert after the window directly above `Progman`") was also measured and fails: Win+D hides it. The rule used is now "layered child of `SHELLDLL_DefView`" (Task 1 round 2); Task 6's `app.cc` was adapted accordingly (`FindDesktopHost`, `EnsureWindows`, a 5 s timer and `TaskbarCreated` recreate the windows after an Explorer restart).
 2. **Row interaction.** The spec lists actions per widget but not how to reach the second one. Left click = the row's primary action (Open / Open in browser); right click on a row shows that row's actions above the fixed menu items.
 3. **"Open" vs "Open in new window".** "Open" runs `null.exe -- <path>` (VS Code's own rule about reusing a window for an already open folder applies); "Open in new window" adds `--new-window`.
 4. **Update when the exe cannot be stopped.** The spec says the widgets part of the update is then skipped. An update swaps the whole install folder, so a running exe can only block it, not be skipped. The stop is best effort and logged; the existing locked-files prompt of `procs::close_all` is the backstop (it lists `null_widgets.exe` like any other process).
