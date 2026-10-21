@@ -45,7 +45,7 @@ const path = __importStar(require("path"));
  * installation can see. Non-owners disconnect entirely and poll to take over if
  * the owner disappears.
  */
-const CLAIM_FILE = 'discord-presence-owner.json';
+const DEFAULT_CLAIM_FILE = 'discord-presence-owner.json';
 function isProcessAlive(pid) {
     if (!Number.isInteger(pid) || pid <= 0) {
         return false;
@@ -65,13 +65,13 @@ class PresenceOwnership {
     file;
     lastLoggedOwner = -1;
     /** Without a storage directory (tests, older hosts) ownership is always granted. */
-    constructor(storageDir, log = () => undefined) {
+    constructor(storageDir, log = () => undefined, claimFile = DEFAULT_CLAIM_FILE) {
         this.log = log;
         if (!storageDir) {
             this.file = undefined;
             return;
         }
-        this.file = path.join(storageDir, CLAIM_FILE);
+        this.file = path.join(storageDir, claimFile);
         try {
             fs.mkdirSync(storageDir, { recursive: true });
         }
