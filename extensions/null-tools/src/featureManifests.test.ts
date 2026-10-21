@@ -28,7 +28,7 @@ test('the real manifests declare exactly the agreed launcher entries', () => {
       ['develop', ['Dashboard', 'GitHub Issues', 'Pull Requests', 'GitHub Actions', 'Commit Graph', 'Music Player']],
       ['insights', ['Activity Dashboard', 'Startup Report']],
       ['account', ['Accounts', 'Sync Status']],
-      ['setup', ['Null Setup', 'Environment Check', 'Actions Settings', 'Formatting Settings']],
+      ['setup', ['Null Setup', 'Environment Check', 'Actions Settings', 'Formatting Settings', 'Desktop Widgets']],
     ],
   );
 });

@@ -15,6 +15,7 @@ import { registerDiscordPresenceFeature } from './discordPresenceIntegration';
 import { registerIssuesPanelFeature } from './issuesPanelIntegration';
 import { registerPullsFeature } from './pulls/pullsIntegration';
 import { registerWorkflowsFeature } from './workflows/workflowsIntegration';
+import { registerWidgetsFeature } from './widgets/widgetIntegration';
 import { getStagedDiff, getChangedFiles, heuristicMessage, runClaude } from './commitMessage';
 import { registerUpdaterFeature } from './updaterIntegration';
 import { registerCommitValidationFeature } from './commitValidationIntegration';
@@ -139,6 +140,7 @@ export function activate(context: vscode.ExtensionContext): void {
   registerIssuesPanelFeature(context);
   registerPullsFeature(context);
   registerWorkflowsFeature(context);
+  registerWidgetsFeature(context);
   registerDiscordPresenceFeature(context);
   registerOpenInNullNotesFeature(context);
   registerClaudeTabFeature(context);
