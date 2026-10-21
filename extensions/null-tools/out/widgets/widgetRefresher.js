@@ -22,6 +22,7 @@ class WidgetRefresher {
     running = false;
     failures = 0;
     lastFetch = 0;
+    fetchedAt = 0; // when the rows in the file were fetched; later rewrites (dispose, settings) must not make them look newer
     suspendedUntil = 0;
     timer;
     constructor(d) {
@@ -56,6 +57,13 @@ class WidgetRefresher {
         this.running = true;
         try {
             this.lastFetch = this.d.now();
+            // Projects first: reading them refreshes the repo -> checkout map that the fetch below attaches to issue and PR rows.
+            try {
+                this.sections.projects = await this.d.projects();
+            }
+            catch (err) {
+                this.d.log(`projects: ${err.message}`);
+            }
             const byAccount = new Map();
             for (const { repo, account } of cfg.repos) {
                 byAccount.set(account, [...(byAccount.get(account) ?? []), repo]);
@@ -93,12 +101,7 @@ class WidgetRefresher {
             if (retryAt > 0) {
                 this.suspendedUntil = retryAt;
             }
-            try {
-                this.sections.projects = await this.d.projects();
-            }
-            catch (err) {
-                this.d.log(`projects: ${err.message}`);
-            }
+            this.fetchedAt = this.d.now();
             this.write();
         }
         finally {
@@ -151,7 +154,7 @@ class WidgetRefresher {
         this.owner = false;
     }
     write() {
-        this.d.store.write({ schema: widgetTypes_1.SCHEMA, writtenAt: new Date(this.d.now()).toISOString(), ...this.sections });
+        this.d.store.write({ schema: widgetTypes_1.SCHEMA, writtenAt: new Date(this.fetchedAt || this.d.now()).toISOString(), ...this.sections });
         this.wrote = true;
     }
     nextDelay() {

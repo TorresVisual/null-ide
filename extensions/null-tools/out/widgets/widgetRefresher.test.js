@@ -18,7 +18,7 @@ function harness(over = {}) {
         settings: () => ({ enabled: state.enabled, repos: state.repos }),
         ownership: { isOwner: () => state.owner, claim: () => { state.claimed++; }, release: () => { state.released++; } },
         fetch: over.fetch ?? (async (_a, repos) => { state.fetches++; return repos.map((repo) => ({ repo, issues: [row(repo, 1)], prs: [] })); }),
-        projects: async () => ({ status: 'ok', failed: [], items: [] }),
+        projects: over.projects ?? (async () => ({ status: 'ok', failed: [], items: [] })),
         store: { write: s => writes.push(s), remove: () => { state.removed++; } },
         setTimeout: (fn, ms) => { const t = { fn, ms }; timers.push(t); return t; },
         clearTimeout: () => undefined, log: () => undefined,
@@ -117,13 +117,13 @@ function harness(over = {}) {
     node_assert_1.default.ok(h.state.fetches >= 1);
     node_assert_1.default.strictEqual(h.timers.at(-1).ms, widgetRefresher_1.TICK_MS);
 });
-(0, node_test_1.default)('dispose writes once more as owner and releases ownership', async () => {
+(0, node_test_1.default)('dispose writes once more as owner, keeps the time of the last fetch, and releases ownership', async () => {
     const h = harness();
     await h.r.refresh();
     h.advance(5 * 60_000);
     h.r.dispose();
     node_assert_1.default.strictEqual(h.writes.length, 2);
-    node_assert_1.default.strictEqual(h.writes[1].writtenAt, '2026-10-21T10:05:00.000Z');
+    node_assert_1.default.strictEqual(h.writes[1].writtenAt, '2026-10-21T10:00:00.000Z'); // the rows are still the 10:00 rows; the footer must keep ageing
     node_assert_1.default.strictEqual(h.state.released, 1);
 });
 (0, node_test_1.default)('a fetch that throws unexpectedly does not wipe rows or crash the cycle', async () => {
@@ -136,5 +136,22 @@ function harness(over = {}) {
     h.advance(widgetRefresher_1.REFRESH_MS);
     await node_assert_1.default.doesNotReject(h.r.refresh());
     node_assert_1.default.strictEqual(h.writes.at(-1).issues.items.length, 1);
+});
+(0, node_test_1.default)('a settings change rewrites without making the old rows look fresh', async () => {
+    const h = harness({ repos: [{ repo: 'a/b', account: 'x' }, { repo: 'c/d', account: 'x' }] });
+    await h.r.refresh();
+    h.advance(3 * 60 * 60_000);
+    h.state.repos = [{ repo: 'a/b', account: 'x' }];
+    h.r.onConfigChanged();
+    node_assert_1.default.strictEqual(h.writes.at(-1).writtenAt, '2026-10-21T10:00:00.000Z');
+});
+(0, node_test_1.default)('projects are read before the fetch, so issue and PR rows get the local checkouts of this cycle', async () => {
+    const order = [];
+    const h = harness({
+        projects: async () => { order.push('projects'); return { status: 'ok', failed: [], items: [] }; },
+        fetch: async (_a, rs) => { order.push('fetch'); return rs.map((repo) => ({ repo, issues: [], prs: [] })); },
+    });
+    await h.r.refresh();
+    node_assert_1.default.deepStrictEqual(order, ['projects', 'fetch']);
 });
 //# sourceMappingURL=widgetRefresher.test.js.map
