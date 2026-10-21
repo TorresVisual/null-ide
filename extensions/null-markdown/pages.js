@@ -4,10 +4,17 @@ const vscode = require('vscode');
 const crypto = require('crypto');
 
 // Shared webview shell for the side-by-side Preview and the Editor.
-function page(wv, extensionPath, { body, extraCss = [], scripts }) {
+// `lazyLibs`: KaTeX and Mermaid (3+ MB) are not loaded up front; their URIs go in `window.nullLibs` and the
+// page loads them the first time a block needs them.
+function page(wv, extensionPath, { body, extraCss = [], scripts, lazyLibs = false }) {
 	const ext = vscode.Uri.file(extensionPath);
 	const u = (...p) => wv.asWebviewUri(vscode.Uri.joinPath(ext, ...p));
 	const nonce = crypto.randomBytes(16).toString('hex');
+	const libs = {
+		katex: u('node_modules', 'katex', 'dist', 'katex.min.js'),
+		autoRender: u('node_modules', 'katex', 'dist', 'contrib', 'auto-render.min.js'),
+		mermaid: u('node_modules', 'mermaid', 'dist', 'mermaid.min.js')
+	};
 	const links = [
 		u('node_modules', 'katex', 'dist', 'katex.min.css'),
 		u('node_modules', 'highlight.js', 'styles', 'vs2015.min.css'),
@@ -15,11 +22,10 @@ function page(wv, extensionPath, { body, extraCss = [], scripts }) {
 		...extraCss.map(p => u(...p))
 	].map(href => `<link rel="stylesheet" href="${href}">`).join('\n');
 	const scriptTags = [
-		u('node_modules', 'katex', 'dist', 'katex.min.js'),
-		u('node_modules', 'katex', 'dist', 'contrib', 'auto-render.min.js'),
-		u('node_modules', 'mermaid', 'dist', 'mermaid.min.js'),
+		...(lazyLibs ? [] : [libs.katex, libs.autoRender, libs.mermaid]),
 		...scripts.map(p => u(...p))
 	].map(src => `<script nonce="${nonce}" src="${src}"></script>`).join('\n');
+	const libsTag = lazyLibs ? `<script nonce="${nonce}">window.nullLibs = ${JSON.stringify(libs)};</script>` : '';
 
 	return /* html */`<!DOCTYPE html>
 <html lang="en">
@@ -31,6 +37,7 @@ ${links}
 </head>
 <body>
 ${body}
+${libsTag}
 ${scriptTags}
 </body>
 </html>`;
@@ -47,7 +54,8 @@ function buildEditorPage(wv, extensionPath) {
 	return page(wv, extensionPath, {
 		body: '<div id="editor"></div>',
 		extraCss: [['lib', 'editor.css']],
-		scripts: [['lib', 'editor.js']]
+		scripts: [['lib', 'editor.js']],
+		lazyLibs: true
 	});
 }
 

@@ -82,6 +82,7 @@ export function computeSpecs(tree, doc, ranges) {
 			}
 			if (name === 'QuoteMark') { if (!onLine(n.from)) hide(n.from, afterSpace(n.to)); return; }
 
+			if (name === 'ListItem') { lines(n.from, n.from, 'cm-li'); return; }
 			if (name === 'ListMark') {
 				const item = n.node.parent;
 				if (onLine(n.from)) return;

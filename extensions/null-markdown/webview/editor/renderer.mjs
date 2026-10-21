@@ -3,8 +3,29 @@
 
 const CACHE_LIMIT = 200;
 
-function typeset(el) {
-	if (typeof renderMathInElement !== 'undefined') {
+// KaTeX and Mermaid are big; the page only records their URIs (window.nullLibs) and each is loaded the
+// first time a rendered block needs it.
+const scripts = new Map(); // src -> Promise
+function load(src) {
+	if (!scripts.has(src)) {
+		scripts.set(src, new Promise((resolve, reject) => {
+			const s = document.createElement('script');
+			s.src = src;
+			s.onload = resolve;
+			s.onerror = () => { scripts.delete(src); reject(new Error('failed to load ' + src)); };
+			document.head.append(s);
+		}));
+	}
+	return scripts.get(src);
+}
+
+let mermaidReady = false;
+async function typeset(el) {
+	const libs = window.nullLibs;
+	if (!libs) return;
+	if (el.textContent.includes('$')) {
+		await load(libs.katex);
+		await load(libs.autoRender);
 		renderMathInElement(el, {
 			delimiters: [
 				{ left: '$$', right: '$$', display: true },
@@ -14,9 +35,14 @@ function typeset(el) {
 			ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
 		});
 	}
-	if (typeof mermaid !== 'undefined') {
-		const nodes = el.querySelectorAll('.mermaid');
-		if (nodes.length) mermaid.run({ nodes });
+	const nodes = el.querySelectorAll('.mermaid');
+	if (nodes.length) {
+		await load(libs.mermaid);
+		if (!mermaidReady) {
+			mermaid.initialize({ startOnLoad: false, theme: 'dark', securityLevel: 'loose', fontFamily: 'inherit' });
+			mermaidReady = true;
+		}
+		await mermaid.run({ nodes });
 	}
 }
 
@@ -27,8 +53,9 @@ export function createRenderer(post, onPainted) {
 
 	function paint(el, html) {
 		el.innerHTML = html;
-		typeset(el);
 		onPainted();
+		// Math and diagrams change the widget's height once typeset, so measure again.
+		typeset(el).then(onPainted, e => console.error('[null-markdown]', e));
 	}
 
 	return {

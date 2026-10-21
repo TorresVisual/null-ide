@@ -47,6 +47,12 @@ test('blockquote marker, bullets, tasks and rules', () => {
 	assert.equal(plan(t, 0).filter(x => x.type === 'hr').length, 1);
 });
 
+test('each list item gets a hanging-indent line class on its first line only', () => {
+	const t = '- a\n  more\n- b\n  - c\n\n1. d';
+	const lis = plan(t, t.length + 1).filter(x => x.cls === 'cm-li').map(x => x.from);
+	assert.deepEqual(lis, [0, 11, 15, 22]); // a, b, c, d
+});
+
 test('table, html, alert, mermaid and image become widgets; raw while touched', () => {
 	const t = '| a | b |\n|---|---|\n| 1 | 2 |\n\n<div>x</div>\n\n> [!NOTE]\n> hi\n\n```mermaid\ngraph TD\n```\n\n![i](u.png)';
 	const w = plan(t, t.length + 1).filter(x => x.type === 'widget');

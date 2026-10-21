@@ -2,7 +2,6 @@
 #editor { min-height: 100vh; }
 .cm-editor { outline: none; background: transparent; color: inherit; }
 .cm-editor.cm-focused { outline: none; }
-.cm-scroller { font-family: inherit; line-height: 1.65; }
 .cm-content { caret-color: #e6e6e6; padding: 0; }
 .cm-line { padding: 0 2px; }
 
@@ -38,6 +37,8 @@
 }
 .cm-fence { color: #616161; }
 .cm-frontmatter { color: #616161; }
+/* Hanging indent: wrapped lines of a list item align with its text (marker widget is ~1.5em wide) */
+.cm-li { padding-left: 1.5em; text-indent: -1.5em; }
 .cm-bullet { display: inline-block; width: 1.2em; text-align: center; color: #9a9a9a; }
 .cm-hr { display: inline-block; width: 100%; border-top: 1px solid #2e2e2e; vertical-align: middle; }
 .cm-task { accent-color: #4daafc; margin-right: 6px; vertical-align: middle; }

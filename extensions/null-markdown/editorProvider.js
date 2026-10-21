@@ -17,6 +17,9 @@ class NullMarkdownEditorProvider {
 		this._ctx = context;
 		this._md = md;
 		this._processAlerts = processAlerts;
+		// Open-time timings ("Null Markdown" in the Output panel) so a slow file can be diagnosed.
+		this._log = vscode.window.createOutputChannel('Null Markdown', { log: true });
+		context.subscriptions.push(this._log);
 	}
 
 	// Markdown -> HTML through the same pipeline as Preview, with relative images pointed at webview URIs.
@@ -38,6 +41,8 @@ class NullMarkdownEditorProvider {
 
 		const wv = panel.webview;
 		const key = document.uri.toString();
+		const opened = Date.now();
+		const name = document.uri.path.split('/').pop();
 		wv.options = {
 			enableScripts: true,
 			localResourceRoots: [
@@ -62,12 +67,20 @@ class NullMarkdownEditorProvider {
 
 		subs.push(wv.onDidReceiveMessage(async msg => {
 			switch (msg?.type) {
-				case 'ready': sendDoc(); break;
+				case 'ready':
+					this._log.info(`${name}: webview ready ${Date.now() - opened} ms after open (${document.getText().length} chars)`);
+					sendDoc();
+					break;
+				case 'perf':
+					this._log.info(`${name}: first paint ${msg.sinceLoadMs} ms after webview load; initial decorations ${msg.dispatchMs} ms`);
+					break;
 				case 'edit': await this._applyEdit(document, sync, msg, sendDoc, post); break;
 				case 'save': await document.save(); break;
 				case 'renderBlock':
 					if (typeof msg.text === 'string' && Number.isInteger(msg.id)) {
+						const t = Date.now();
 						post({ type: 'rendered', id: msg.id, html: this._html(document, wv, msg.text) });
+						if (Date.now() - t > 30) this._log.info(`${name}: slow block render ${Date.now() - t} ms (${msg.text.length} chars)`);
 					}
 					break;
 				case 'openLink': if (typeof msg.href === 'string') await openLink(document, msg.href); break;

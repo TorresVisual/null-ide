@@ -14,15 +14,18 @@ const fromHost = Annotation.define(); // marks transactions that apply a host `d
 const sync = createSync({ post });
 const renderer = createRenderer(post, () => view.requestMeasure());
 
-if (typeof mermaid !== 'undefined') {
-	mermaid.initialize({ startOnLoad: false, theme: 'dark', securityLevel: 'loose', fontFamily: 'inherit' });
-}
+// CodeMirror's base theme sets .cm-scroller to monospace / 1.4, and out-ranks any plain stylesheet rule;
+// a theme extension out-ranks the base theme.
+const typography = EditorView.theme({
+	'.cm-scroller': { fontFamily: 'inherit', lineHeight: '1.65' }
+});
 
 const view = new EditorView({
 	parent: document.getElementById('editor'),
 	state: EditorState.create({
 		doc: '',
 		extensions: [
+			typography,
 			EditorView.lineWrapping,
 			markdown({ base: markdownLanguage }),
 			// No CodeMirror history: undo/redo belongs to the workbench (see the spec's undo section).
@@ -55,13 +58,20 @@ document.addEventListener('keydown', e => {
 }, true);
 window.addEventListener('blur', () => sync.flush());
 
+let perfSent = false;
 window.addEventListener('message', e => {
 	const msg = e.data;
 	if (!msg) return;
 	if (msg.type === 'doc') {
 		sync.reset(msg.version);
 		const change = diffChange(view.state.doc.toString(), msg.text);
+		const t0 = performance.now();
 		if (change) view.dispatch({ changes: change, annotations: fromHost.of(true) });
+		if (!perfSent) {
+			perfSent = true;
+			// performance.now() counts from webview navigation, so it includes script download + parse.
+			requestAnimationFrame(() => post({ type: 'perf', sinceLoadMs: Math.round(performance.now()), dispatchMs: Math.round(performance.now() - t0) }));
+		}
 	} else if (msg.type === 'ack') {
 		sync.ack(msg.version);
 	} else if (msg.type === 'rendered') {
