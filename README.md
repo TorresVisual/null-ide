@@ -124,6 +124,7 @@ Null IDE is built on [VSCodium](https://vscodium.com) and ships with a dark them
 - **Git worktrees** view: create (including one per issue), open in a new window, merge back, prune.
 - **`null .`** opens the current folder from any terminal.
 - **"Open in Null"** in the Win11 Explorer context menu via a native `IExplorerCommand` shell extension.
+- **Desktop widgets** (opt-in): Projects, Issues and Pull Requests as cards on the Windows desktop, fed by the IDE. Set up with **Null: Set Up Widgets**.
 - **Self-updating**: checks GitHub Releases on startup and updates without elevation.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
@@ -206,6 +207,7 @@ _For more, see the [wiki](https://github.com/TorresVisual/null-ide/wiki)._
 - GitHub and GitLab API calls from the account manager, only for accounts you add
 - Sync and activity badges (GitHub Gists), only if you turn them on
 - Discord Rich Presence, only if enabled via `null.discord.*`
+- Desktop widgets reuse the GitHub API calls above and write a local file; `null_widgets.exe` makes no network calls
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
