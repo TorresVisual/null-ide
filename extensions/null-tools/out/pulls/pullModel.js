@@ -1,6 +1,6 @@
 'use strict';
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.threadCount = exports.checkStateOf = exports.pullStateOf = exports.REVIEW_THREADS = exports.LIST_PULLS = void 0;
+exports.threadCount = exports.checkStateOf = exports.pullStateOf = exports.REVIEWS = exports.REVIEW_THREADS = exports.LIST_PULLS = void 0;
 exports.mapPulls = mapPulls;
 exports.mapFiles = mapFiles;
 exports.leftPath = leftPath;
@@ -36,7 +36,7 @@ query ReviewThreads($owner: String!, $name: String!, $number: Int!) {
 const CHECKS = {
     SUCCESS: 'success', FAILURE: 'failure', ERROR: 'failure', PENDING: 'pending', EXPECTED: 'pending',
 };
-const REVIEWS = { APPROVED: 'approved', CHANGES_REQUESTED: 'changes', REVIEW_REQUIRED: 'required' };
+exports.REVIEWS = { APPROVED: 'approved', CHANGES_REQUESTED: 'changes', REVIEW_REQUIRED: 'required' };
 const pullStateOf = (s) => (s === 'MERGED' ? 'merged' : s === 'CLOSED' ? 'closed' : 'open');
 exports.pullStateOf = pullStateOf;
 const checkStateOf = (s) => CHECKS[s ?? ''] ?? 'none';
@@ -58,7 +58,7 @@ function mapPulls(data) {
         baseSha: n.baseRefOid,
         updatedAt: n.updatedAt,
         checks: (0, exports.checkStateOf)(n.commits.nodes[0]?.commit.statusCheckRollup?.state),
-        review: REVIEWS[n.reviewDecision ?? ''] ?? 'none',
+        review: exports.REVIEWS[n.reviewDecision ?? ''] ?? 'none',
     }));
 }
 function mapFiles(raw) {
