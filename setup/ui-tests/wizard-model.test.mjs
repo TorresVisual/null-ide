@@ -98,6 +98,14 @@ test('every config key the page offers exists on the Rust InstallConfig', () => 
   }
 });
 
+test('the desktop widgets option says that it starts a program at login, and the summary names it', () => {
+  const row = ctx.FEATURES.find(([key]) => key === 'widgets');
+  assert.ok(row, 'the page offers the widgets option');
+  assert.ok(/login/i.test(row[2]), 'the explanation says it runs at login');
+  const lines = ctx.summaryLines({ dir: 'C:\\x', config: { widgets: true }, excluded: [], settings: {}, view: { manifest: null } });
+  assert.ok(lines.includes('Desktop widgets: on'), lines.join('|'));
+});
+
 test('a job the backend refuses keeps install and modify on the wizard with the reason', () => {
   assert.deepEqual(plain(ctx.startFailure('install', 'x is not empty')), { phase: 'wizard', note: 'x is not empty' });
   assert.deepEqual(plain(ctx.startFailure('modify', 'bad choice')), { phase: 'wizard', note: 'bad choice' });

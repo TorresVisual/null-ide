@@ -9,6 +9,7 @@ const FEATURES = [
   ['contextMenu', 'Explorer context menu', 'The Windows 11 menu may ask for administrator approval once.'],
   ['fileAssociations', 'File associations', null],
   ['previewHandler', 'Preview pane in Explorer', null],
+  ['widgets', 'Desktop widgets', 'Projects, Issues and Pull Requests on your desktop. Starts a small program at login.'],
 ];
 
 function builtinById(builtins, id) {
