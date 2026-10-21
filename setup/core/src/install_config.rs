@@ -8,10 +8,10 @@ pub const FILE: &str = "install-config.json";
 pub const SCHEMA: u32 = 1;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Feature { DesktopShortcut, StartMenuShortcut, SafeModeShortcut, Path, ContextMenu, FileAssociations, PreviewHandler }
+pub enum Feature { DesktopShortcut, StartMenuShortcut, SafeModeShortcut, Path, ContextMenu, FileAssociations, PreviewHandler, Widgets }
 
 impl Feature {
-    pub const ALL: [Feature; 7] = [
+    pub const ALL: [Feature; 8] = [
         Feature::DesktopShortcut,
         Feature::StartMenuShortcut,
         Feature::SafeModeShortcut,
@@ -19,6 +19,7 @@ impl Feature {
         Feature::ContextMenu,
         Feature::FileAssociations,
         Feature::PreviewHandler,
+        Feature::Widgets,
     ];
 
     /// Stable id used in logs and messages.
@@ -31,13 +32,14 @@ impl Feature {
             Feature::ContextMenu => "contextMenu",
             Feature::FileAssociations => "fileAssociations",
             Feature::PreviewHandler => "previewHandler",
+            Feature::Widgets => "widgets",
         }
     }
 
     /// Registered against the install folder (registry, Explorer), so an update must re-point them.
-    /// Shortcuts and PATH point at paths that survive the swap.
+    /// Shortcuts and PATH point at paths that survive the swap. Widgets: the update stops `null_widgets.exe`, so it is started again.
     pub fn follows_install(self) -> bool {
-        matches!(self, Feature::ContextMenu | Feature::FileAssociations | Feature::PreviewHandler)
+        matches!(self, Feature::ContextMenu | Feature::FileAssociations | Feature::PreviewHandler | Feature::Widgets)
     }
 }
 
@@ -52,6 +54,8 @@ pub struct InstallConfig {
     pub context_menu: bool,
     pub file_associations: bool,
     pub preview_handler: bool,
+    /// Desktop widgets (`null_widgets.exe` at login). The only feature that is off by default.
+    pub widgets: bool,
     /// Built-ins the user left off. Stored as exclusions so a built-in added by a later release is on by default.
     pub excluded_builtins: Vec<String>,
 }
@@ -67,6 +71,7 @@ impl Default for InstallConfig {
             context_menu: true,
             file_associations: true,
             preview_handler: true,
+            widgets: false,
             excluded_builtins: Vec::new(),
         }
     }
@@ -82,6 +87,7 @@ impl InstallConfig {
             Feature::ContextMenu => self.context_menu,
             Feature::FileAssociations => self.file_associations,
             Feature::PreviewHandler => self.preview_handler,
+            Feature::Widgets => self.widgets,
         }
     }
 

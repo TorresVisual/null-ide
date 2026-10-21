@@ -62,6 +62,20 @@ fn taskkill(pids: &[u32], force: bool) {
 pub fn request_close(pids: &[u32]) { taskkill(pids, false) }
 pub fn force_close(pids: &[u32]) { taskkill(pids, true) }
 
+/// Force-ends the processes called `name` that run from `dir`; true when none is left. Meant for the widgets exe, which keeps no
+/// state in memory (its layout is saved on every drag), and which would otherwise sit in the prompt of `close_all`.
+pub fn stop_named_under(dir: &Path, name: &str) -> bool {
+    let pids = || -> Vec<u32> { running_in(dir).into_iter().filter(|r| r.name.eq_ignore_ascii_case(name)).map(|r| r.pid).collect() };
+    let found = pids();
+    if found.is_empty() { return true; }
+    force_close(&found);
+    for _ in 0..10 {
+        thread::sleep(Duration::from_millis(300));
+        if pids().is_empty() { return true; }
+    }
+    false
+}
+
 pub fn close_all(dir: &Path, ctx: &Ctx, grace: Duration) -> Result<()> {
     loop {
         let mut running = running_in(dir);

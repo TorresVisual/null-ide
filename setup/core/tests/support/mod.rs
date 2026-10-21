@@ -59,10 +59,12 @@ use null_setup_core::{
 pub struct Call { pub register: Vec<Feature>, pub unregister: Vec<Feature>, pub allow_elevate: bool }
 
 /// Stands in for the real registrar so no test writes the registry, PATH or Start Menu.
-pub struct Recorder { pub calls: Mutex<Vec<Call>>, pub arp: Mutex<Vec<Option<String>>>, pub result: Registration }
+pub struct Recorder { pub calls: Mutex<Vec<Call>>, pub arp: Mutex<Vec<Option<String>>>, pub stops: Mutex<usize>, pub result: Registration }
 
 impl Recorder {
-    pub fn new(result: Registration) -> Arc<Recorder> { Arc::new(Recorder { calls: Mutex::new(vec![]), arp: Mutex::new(vec![]), result }) }
+    pub fn new(result: Registration) -> Arc<Recorder> {
+        Arc::new(Recorder { calls: Mutex::new(vec![]), arp: Mutex::new(vec![]), stops: Mutex::new(0), result })
+    }
 }
 
 impl Registrar for Recorder {
@@ -73,6 +75,10 @@ impl Registrar for Recorder {
 
     fn arp(&self, _: &std::path::Path, version: Option<&str>, _: &Ctx) {
         self.arp.lock().unwrap().push(version.map(str::to_string));
+    }
+
+    fn stop_widgets(&self, _: &std::path::Path, _: &Ctx) {
+        *self.stops.lock().unwrap() += 1;
     }
 }
 
@@ -95,10 +101,11 @@ impl Hive {
         let id = format!("{}-{}", std::process::id(), HIVE_ID.fetch_add(1, Ordering::SeqCst));
         let root = format!(r"Software\NullSetupTest\{id}");
         let tmp = tempfile::tempdir().unwrap();
-        let (desktop, programs) = (tmp.path().join("Desktop"), tmp.path().join("Programs"));
+        let (desktop, programs, local_data) = (tmp.path().join("Desktop"), tmp.path().join("Programs"), tmp.path().join("LocalAppData"));
         std::fs::create_dir_all(&desktop).unwrap();
         std::fs::create_dir_all(&programs).unwrap();
-        Hive { loc: Locations { hkcu: format!(r"{root}\"), desktop, programs }, tmp, root }
+        std::fs::create_dir_all(&local_data).unwrap();
+        Hive { loc: Locations { hkcu: format!(r"{root}\"), desktop, programs, local_data }, tmp, root }
     }
     fn open(&self, rel: &str) -> Option<RegKey> {
         RegKey::predef(HKEY_CURRENT_USER).open_subkey(self.loc.key(rel)).ok()
@@ -135,6 +142,7 @@ use null_setup_core::shell::{shortcuts::ShortcutSpec, AppxAdd, System};
 
 #[derive(Default)]
 pub struct FakeSystem {
+    /// What was asked of the system, in order, e.g. "appx_add", "stop_widgets", "start_widgets:null_widgets.exe".
     pub calls: RefCell<Vec<String>>,
     /// PackageFullName of the registered package, if any.
     pub package: RefCell<Option<String>>,
@@ -183,5 +191,12 @@ impl System for FakeSystem {
             None | Some(Ok(())) => Ok(()),
             Some(Err(m)) => Err(null_setup_core::Error::Other(m)),
         }
+    }
+    fn stop_widgets(&self, _: &Path) -> bool {
+        self.calls.borrow_mut().push("stop_widgets".into());
+        true
+    }
+    fn start_widgets(&self, exe: &Path) {
+        self.calls.borrow_mut().push(format!("start_widgets:{}", exe.file_name().unwrap().to_string_lossy()));
     }
 }

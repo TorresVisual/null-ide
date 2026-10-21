@@ -7,6 +7,25 @@ use null_setup_core::{
 };
 
 #[test]
+fn stop_named_under_ends_only_the_named_process_inside_the_folder() {
+    let dir = tempfile::tempdir().unwrap();
+    // PING.EXE is a long-running console program that does not depend on where it lives.
+    let ping = r"C:\Windows\System32\PING.EXE";
+    let (target, other) = (dir.path().join("null_widgets.exe"), dir.path().join("other.exe"));
+    fs::copy(ping, &target).unwrap();
+    fs::copy(ping, &other).unwrap();
+    let start = |exe: &Path| Command::new(exe).args(["-n", "60", "127.0.0.1"]).stdout(std::process::Stdio::null()).spawn().unwrap();
+    let (mut a, mut b) = (start(&target), start(&other));
+    thread::sleep(Duration::from_millis(300));
+
+    assert!(null_setup_core::procs::stop_named_under(dir.path(), "null_widgets.exe"));
+    assert!(a.try_wait().unwrap().is_some(), "the named process is gone");
+    assert!(b.try_wait().unwrap().is_none(), "the other process in the same folder is untouched");
+    let _ = b.kill();
+    assert!(null_setup_core::procs::stop_named_under(dir.path(), "null_widgets.exe"), "nothing to stop is success");
+}
+
+#[test]
 fn is_under_is_case_insensitive_and_respects_directory_boundaries() {
     let dir = Path::new(r"C:\Users\Me\AppData\Local\Programs\Null IDE");
     assert!(is_under(Path::new(r"c:\users\me\appdata\local\programs\null ide\null.exe"), dir));

@@ -14,6 +14,7 @@ pub mod classes;
 pub mod path;
 pub mod shortcuts;
 pub mod sys;
+pub mod widgets;
 pub mod win11;
 
 /// Where registrations are written. Production: the real HKCU and shell folders. Tests: a scratch key prefix and temp folders.
@@ -23,6 +24,8 @@ pub struct Locations {
     pub hkcu: String,
     pub desktop: PathBuf,
     pub programs: PathBuf,
+    /// `%LOCALAPPDATA%`; the widgets keep their snapshot and layout in `Null\widgets` below it.
+    pub local_data: PathBuf,
 }
 
 impl Locations {
@@ -73,6 +76,10 @@ pub trait System {
     fn cert_add_current_user(&self, cer: &Path) -> Result<()>;
     /// UAC prompt; Err when declined or failed.
     fn cert_add_machine_elevated(&self, install: &Path) -> Result<()>;
+    /// Force-ends the `null_widgets.exe` processes that run from `install`; true when none is left.
+    fn stop_widgets(&self, install: &Path) -> bool;
+    /// Starts `exe` detached from this process. A failure to start is not an error: the Run entry starts it at the next login.
+    fn start_widgets(&self, exe: &Path);
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -84,6 +91,7 @@ impl Locations {
             hkcu: String::new(),
             desktop: sys::known_folder(sys::KnownFolder::Desktop)?,
             programs: sys::known_folder(sys::KnownFolder::Programs)?,
+            local_data: sys::known_folder(sys::KnownFolder::LocalAppData)?,
         })
     }
 }
@@ -128,6 +136,7 @@ fn register_one(
             let (claimed, skipped) = classes::register_preview_handler(loc, sys, install)?;
             log(&format!("preview handler: {claimed} extensions claimed, {skipped} already handled by another app"));
         }
+        Feature::Widgets => widgets::register(loc, sys, install, log)?,
     }
     Ok(false)
 }
@@ -147,6 +156,7 @@ fn unregister_one(f: Feature, loc: &Locations, sys: &dyn System, install: &Path)
         }
         Feature::FileAssociations => classes::unregister_file_associations(loc, sys),
         Feature::PreviewHandler => classes::unregister_preview_handler(loc, sys),
+        Feature::Widgets => widgets::unregister(loc, sys, install),
     }
 }
 

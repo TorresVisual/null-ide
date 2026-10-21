@@ -6,17 +6,21 @@ use windows::{
         Foundation::MAX_PATH,
         Security::Cryptography::{CERT_SYSTEM_STORE_CURRENT_USER, CERT_SYSTEM_STORE_LOCAL_MACHINE},
         System::Com::{CoCreateInstance, CoInitializeEx, CoUninitialize, IPersistFile, CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED, STGM_READ},
-        UI::Shell::{FOLDERID_Desktop, FOLDERID_Programs, IShellLinkW, SHGetKnownFolderPath, ShellLink, KF_FLAG_DEFAULT},
+        UI::Shell::{FOLDERID_Desktop, FOLDERID_LocalAppData, FOLDERID_Programs, IShellLinkW, SHGetKnownFolderPath, ShellLink, KF_FLAG_DEFAULT},
     },
 };
 
 use super::{shortcuts::ShortcutSpec, AppxAdd, System};
 use crate::error::{Error, Result};
 
-pub enum KnownFolder { Desktop, Programs }
+pub enum KnownFolder { Desktop, Programs, LocalAppData }
 
 pub fn known_folder(id: KnownFolder) -> Result<PathBuf> {
-    let guid = match id { KnownFolder::Desktop => FOLDERID_Desktop, KnownFolder::Programs => FOLDERID_Programs };
+    let guid = match id {
+        KnownFolder::Desktop => FOLDERID_Desktop,
+        KnownFolder::Programs => FOLDERID_Programs,
+        KnownFolder::LocalAppData => FOLDERID_LocalAppData,
+    };
     unsafe {
         let p = SHGetKnownFolderPath(&guid, KF_FLAG_DEFAULT, None).map_err(|e| Error::Other(format!("known folder: {e}")))?;
         Ok(PathBuf::from(OsString::from_wide(p.as_wide())))
@@ -116,6 +120,17 @@ impl System for WinSystem {
                 "Could not install the shell extension certificate (exit {code}). Approve the UAC prompt or run as administrator."
             ))
         })
+    }
+
+    fn stop_widgets(&self, install: &Path) -> bool {
+        crate::procs::stop_named_under(install, super::widgets::EXE)
+    }
+
+    fn start_widgets(&self, exe: &Path) {
+        const DETACHED_PROCESS: u32 = 0x0000_0008;
+        const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
+        // The temp folder as working directory: the exe must never keep the install folder busy, an update renames it.
+        let _ = Command::new(exe).current_dir(std::env::temp_dir()).creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP).spawn();
     }
 }
 

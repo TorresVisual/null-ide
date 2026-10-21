@@ -9,8 +9,23 @@ fn defaults_match_the_inno_task_defaults() {
     for f in [Feature::StartMenuShortcut, Feature::SafeModeShortcut, Feature::Path, Feature::ContextMenu, Feature::FileAssociations, Feature::PreviewHandler] {
         assert!(c.has(f), "{f:?}");
     }
+    assert!(!c.widgets, "desktop widgets are opt-in");
     assert!(c.excluded_builtins.is_empty());
     assert_eq!(c.schema, ic::SCHEMA);
+}
+
+#[test]
+fn widgets_round_trip_and_an_older_file_reads_as_off() {
+    assert_eq!(Feature::Widgets.name(), "widgets");
+    assert_eq!(Feature::ALL.len(), 8);
+    assert!(!InstallConfig::default().enabled().contains(&Feature::Widgets));
+    assert!(!ic::from_json(r#"{"schema":1,"path":false}"#).unwrap().widgets);
+    let on = InstallConfig { widgets: true, ..Default::default() };
+    assert_eq!(InstallConfig::default().added_features(&on), vec![Feature::Widgets]);
+    assert_eq!(on.removed_features(&InstallConfig::default()), vec![Feature::Widgets]);
+    let tmp = tempfile::tempdir().unwrap();
+    ic::write(tmp.path(), &on).unwrap();
+    assert!(ic::read(tmp.path()).unwrap().widgets);
 }
 
 #[test]
@@ -56,7 +71,7 @@ fn enabled_added_and_removed_features_are_listed_in_a_stable_order() {
 #[test]
 fn only_the_install_path_bound_features_follow_an_update() {
     let follow: Vec<_> = Feature::ALL.into_iter().filter(|f| f.follows_install()).collect();
-    assert_eq!(follow, vec![Feature::ContextMenu, Feature::FileAssociations, Feature::PreviewHandler]);
+    assert_eq!(follow, vec![Feature::ContextMenu, Feature::FileAssociations, Feature::PreviewHandler, Feature::Widgets]);
 }
 
 #[test]

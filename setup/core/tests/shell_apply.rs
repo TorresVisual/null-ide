@@ -20,6 +20,22 @@ fn apply(h: &Hive, sys: &FakeSystem, dir: &std::path::Path, reg: &[Feature], unr
     apply_with(&h.loc, sys, dir, reg, unreg, elevate, &|_| {})
 }
 
+const RUN: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
+
+#[test]
+fn the_widgets_feature_registers_and_unregisters_through_apply() {
+    let h = Hive::new();
+    let sys = FakeSystem::default();
+    let dir = install(&h);
+    fs::write(dir.join("null_widgets.exe"), "MZ").unwrap();
+    assert_eq!(apply(&h, &sys, &dir, &[Feature::Widgets], &[], false), Registration::Done);
+    assert!(h.try_get(RUN, "NullWidgets").is_some());
+    assert_eq!(sys.count("start_widgets:null_widgets.exe"), 1);
+    assert_eq!(apply(&h, &sys, &dir, &[], &[Feature::Widgets], false), Registration::Done);
+    assert!(h.try_get(RUN, "NullWidgets").is_none());
+    assert_eq!(sys.count("stop_widgets"), 1);
+}
+
 #[test]
 fn nothing_to_do_is_skipped() {
     let h = Hive::new();
@@ -40,6 +56,8 @@ fn registers_every_feature_into_the_scratch_locations() {
     assert!(h.exists(r"Software\Classes\NullIDE.AssocFile.rust"));
     assert!(h.exists(&format!(r"Software\Classes\CLSID\{}", null_setup_core::shell::classes::PREVIEW_CLSID)));
     assert_eq!(h.get("Environment", "Path"), dir.join("bin").display().to_string());
+    assert!(h.try_get(RUN, "NullWidgets").is_none(), "this fake install has no null_widgets.exe");
+    assert_eq!(sys.count("stop_widgets"), 0);
 }
 
 #[test]
