@@ -1,5 +1,7 @@
 # Desktop Widgets — Design
 
+Status: implemented (see `docs/plans/native-windows-widgets.md` and `docs/specs/native-windows-widgets-gate.md`).
+
 Issue: **#141** ("Native Windows Widgets for NULL IDE"). First release = Projects, Issues and Pull Requests widgets for **GitHub**, drawn as Null's own windows on the desktop wallpaper. GitLab and the Build & Test widget are later issues.
 
 ## History: why not the Widgets Board

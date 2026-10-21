@@ -52,3 +52,17 @@ The widgets are layered **child windows of the desktop icon host (`SHELLDLL_DefV
 - A hidden top-level sink window receives `WM_DISPLAYCHANGE`, `WM_POWERBROADCAST` and `TaskbarCreated`.
 - After `TaskbarCreated` (Explorer restart) the widget windows are gone: the host destroys what is left and recreates the windows under the new `SHELLDLL_DefView`.
 - Windows 10 is untested. Its desktop is arranged differently (`SHELLDLL_DefView` lives under a `WorkerW` that is a top-level window until `0x052C` is sent), so it needs a check before the Windows 10 claim is made.
+
+## Verification (2026-10-21)
+
+Run during implementation on Windows 11 24H2 with a Release build from `shell-ext-build` (not a `build-local.ps1` package, so the installer, Run entry, update and uninstall items were not exercised):
+
+| Checklist item | Result |
+|---|---|
+| 6. Win+D keeps the cards; apps cover them | pass (screen pixels read back while Win+D was sent twice; the cards kept their colour while the wallpaper was revealed) |
+| 5. Drag and persistence | pass (the user dragged the cards; `layout.json` was rewritten with the new positions) |
+| Render of the `ok.json` fixture | pass (screenshot: three cards, rows, "updated 4 min ago", muted/accent/bad tones) |
+| `check-widgets.ps1 -Status` | pass (three `NullWidgetsWindow` entries, parent `SHELLDLL_DefView`) |
+| 4 (click-through), 7, 8 (sleep/resume, scaling), 9 (Explorer restart) | **not run** — the Explorer-restart recreate path (`EnsureWindows`) is untested |
+| 1–3, 10–14 (wizard, setup flow, snapshot data, update, uninstall) | **not run** — need a `build-local.ps1` package and a signed-in account |
+| Windows 10 | **not tested** |

@@ -27,12 +27,13 @@ Key characteristics:
 │   └── wooting-analog/        # Archived, not built by CI — depth-sensitive key actions for Wooting keyboards
 ├── setup/                     # null-setup (Rust workspace: core + Tauri app); update/prefetch/recover, headless install modes and the wizard window
 ├── shell-ext/                 # Win11 native Explorer context menu extension
+│   ├── widgets/               # null_widgets.exe: desktop widgets host (CTest-covered core + Win32/Direct2D shell)
 │   ├── src/                   # C++ IExplorerCommand implementation
 │   ├── deps/wil/              # Microsoft WIL headers (fetched by CI)
 │   └── AppxManifest.xml       # Sparse APPX manifest (ExternalLocation install)
 ├── icons/                     # Source icons used by the build (icon.svg is the master); also Null.VisualElementsManifest.xml (Win10 tile metadata)
 ├── patches/                   # Git-format patches applied against the VS Code source tree
-├── scripts/                   # fake-release.mjs, gen-builtins.mjs, merge-json.js, convert-icons.js, linux-deb-metadata.mjs (Debian template rewrite), linux-smoke.sh (Linux artifact smoke test), build-local.ps1 (CI mirror), sync-local.ps1 + reload-local.ps1 (fast local iteration)
+├── scripts/                   # check-widgets.ps1 (manual run for the desktop widgets), fake-release.mjs, gen-builtins.mjs, merge-json.js, convert-icons.js, linux-deb-metadata.mjs (Debian template rewrite), linux-smoke.sh (Linux artifact smoke test), build-local.ps1 (CI mirror), sync-local.ps1 + reload-local.ps1 (fast local iteration)
 ├── workbench/
 │   ├── custom.css             # Injected as null-custom.css into workbench.html
 │   ├── splash.js              # Runs in <head> before the workbench (no Node/AMD)
@@ -54,7 +55,7 @@ The entire build runs in GitHub Actions on a `windows-2022` runner — do **not*
 6. Replace upstream icons with files from `icons/`.
 7. Copy `workbench/custom.css` → `null-custom.css` and `workbench/splash.js` → `null-splash.js` into the source tree; inject `<link>` / `<script>` tags into `workbench.html`.
 8. `npm ci && npx gulp vscode-win32-x64` produces `VSCode-win32-x64/`.
-9. Build Win11 shell extension: fetch WIL headers, compile DLL with CMake + MSVC, pack and sign sparse APPX (`null-shell-ext.appx`).
+9. Build Win11 shell extension: fetch WIL headers, compile DLL with CMake + MSVC, pack and sign sparse APPX (`null-shell-ext.appx`). Run CTest (the desktop widgets host's tests) and copy `null_widgets.exe` to the install root.
 10. Stamp version, commit hash, and server URL into the build output's `product.json`; replace letterpress SVGs; `rcedit` the icon into `null.exe`.
 11. Build `setup/` with cargo (`cargo test`, then `cargo build --release`); ship `null-setup.exe` as `setup/null-setup.exe`; `null-setup` registers natively.
 12. `Compress-Archive` → `null-ide-win32-x64-<tag>.zip`; the setup stub → `NullIDESetup-<version>.exe`; all uploaded to the GitHub Release (tag builds) and as workflow artifacts. The release body comes from `scripts/release-notes.mjs` (highlights from `docs/specs/` + `docs/plans/` added since the previous `v*` tag, then commits grouped by Conventional Commit type); `node --test scripts/release-notes.test.mjs` covers its pure parts.
