@@ -95,6 +95,7 @@ fn uninstall_inner(o: &UninstallOpts, ctx: &Ctx) -> Result<()> {
     if !is_ours(&o.install_dir) {
         return Err(Error::Other(format!("{} is not a Null IDE install; nothing was removed", o.install_dir.display())));
     }
+    o.registrar.stop_widgets(&o.install_dir, ctx);
     procs::close_all(&o.install_dir, ctx, o.close_grace)?;
     procs::release_inherited_handles(&o.install_dir, ctx);
     if o.release_shell_ext {

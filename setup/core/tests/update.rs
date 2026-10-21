@@ -91,6 +91,17 @@ fn update_installs_the_new_version_keeps_data_and_prunes_the_cache() {
 }
 
 #[test]
+fn update_stops_the_widgets_exe_before_it_swaps_the_folder() {
+    let w = world(&[]);
+    let srv = serve_release(w.zip.clone(), sha(&w.zip), Arc::new(AtomicUsize::new(0)));
+    let rec = support::Recorder::new(null_setup_core::registrations::Registration::Done);
+    let mut o = opts(&w, &srv.base);
+    o.registrar = rec.clone();
+    run(|c| update(&o, c)).0.unwrap();
+    assert_eq!(*rec.stops.lock().unwrap(), 1);
+}
+
+#[test]
 fn prefetch_then_update_downloads_the_zip_only_once() {
     let w = world(&[]);
     let hits = Arc::new(AtomicUsize::new(0));

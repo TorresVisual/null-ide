@@ -36,6 +36,17 @@ fn opts(dir: &Path, delete: bool, user_data: &Path) -> UninstallOpts {
 }
 
 #[test]
+fn uninstall_stops_the_widgets_exe_first() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = install_in(tmp.path());
+    let rec = support::Recorder::new(Registration::Done);
+    let mut o = opts(&dir, false, &tmp.path().join("Null"));
+    o.registrar = rec.clone();
+    run(|c| uninstall(&o, c)).unwrap();
+    assert_eq!(*rec.stops.lock().unwrap(), 1);
+}
+
+#[test]
 fn modify_in_place_only_rewrites_the_config() {
     let tmp = tempfile::tempdir().unwrap();
     let dir = install_in(tmp.path());

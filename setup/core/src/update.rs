@@ -251,6 +251,7 @@ fn prune_builtins(staged: &Path, cfg: &InstallConfig, strict: bool, ctx: &Ctx) -
 }
 
 fn prepare_swap(o: &Opts, ctx: &Ctx) -> Result<()> {
+    o.registrar.stop_widgets(&o.install_dir, ctx);
     procs::close_all(&o.install_dir, ctx, o.close_grace)?;
     procs::release_inherited_handles(&o.install_dir, ctx);
     if o.release_shell_ext {
