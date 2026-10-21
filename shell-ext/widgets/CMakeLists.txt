@@ -2,8 +2,8 @@
 # Parsing, layout, placement and actions live in null_widget_core with no window or Direct2D calls, so CTest covers them.
 # JSON comes from Windows.Data.Json (the C++/WinRT headers ship with the Windows SDK; nothing is downloaded).
 
-set(CORE_SOURCES snapshot.cc layout.cc)
-set(TESTS snapshot_test layout_test)
+set(CORE_SOURCES snapshot.cc layout.cc placement.cc)
+set(TESTS snapshot_test layout_test placement_test)
 
 add_library(null_widget_core STATIC ${CORE_SOURCES})
 target_include_directories(null_widget_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
