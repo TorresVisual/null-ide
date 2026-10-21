@@ -3,14 +3,17 @@
 .cm-editor { outline: none; background: transparent; color: inherit; }
 .cm-editor.cm-focused { outline: none; }
 .cm-content { caret-color: #e6e6e6; padding: 0; }
-.cm-line { padding: 0 2px; }
+
+/* Line-level rules carry the #editor prefix: CodeMirror's base theme sets `.cm-line { padding: 0 2px 0 6px }`
+   at specificity (0,2,0), which silently beats any plain single-class padding rule below. */
+#editor .cm-line { padding: 0 2px; }
 
 /* Headings (lines use padding, not margin, so CodeMirror's height measuring stays exact) */
-.cm-h1, .cm-h2, .cm-h3, .cm-h4, .cm-h5, .cm-h6 { color: #ffffff; font-weight: 600; }
-.cm-h1 { font-size: 2em; line-height: 1.3; padding-top: 20px; border-bottom: 1px solid #2a2a2a; }
-.cm-h2 { font-size: 1.5em; line-height: 1.3; padding-top: 16px; border-bottom: 1px solid #2a2a2a; }
-.cm-h3 { font-size: 1.25em; padding-top: 12px; }
-.cm-h4 { font-size: 1.1em; padding-top: 8px; }
+#editor .cm-h1, #editor .cm-h2, #editor .cm-h3, #editor .cm-h4, #editor .cm-h5, #editor .cm-h6 { color: #ffffff; font-weight: 600; }
+#editor .cm-h1 { font-size: 2em; line-height: 1.3; padding-top: 20px; border-bottom: 1px solid #2a2a2a; }
+#editor .cm-h2 { font-size: 1.5em; line-height: 1.3; padding-top: 16px; border-bottom: 1px solid #2a2a2a; }
+#editor .cm-h3 { font-size: 1.25em; padding-top: 12px; }
+#editor .cm-h4 { font-size: 1.1em; padding-top: 8px; }
 
 /* Inline */
 .cm-strong { font-weight: 700; color: #ffffff; }
@@ -26,25 +29,28 @@
 }
 .cm-link { color: #4daafc; text-decoration: underline; }
 .cm-wikilink { color: #4daafc; text-decoration: underline dotted; }
+.cm-htmltag { color: #616161; }
 
 /* Blocks */
-.cm-quote { border-left: 4px solid #616161; padding-left: 16px; color: #9a9a9a; background: #141414; }
-.cm-codeblock, .cm-raw-block, .cm-frontmatter {
+#editor .cm-quote { border-left: 4px solid #616161; padding-left: 16px; color: #9a9a9a; background: #141414; }
+#editor .cm-codeblock, #editor .cm-raw-block, #editor .cm-frontmatter {
 	font-family: 'Geist Mono', 'JetBrains Mono', 'Cascadia Code', monospace;
 	font-size: 0.875em;
 	background: #1c1c1c;
 	padding: 0 16px;
 }
-.cm-fence { color: #616161; }
-.cm-frontmatter { color: #616161; }
-/* Hanging indent: wrapped lines of a list item align with its text (marker widget is ~1.5em wide) */
-.cm-li { padding-left: 1.5em; text-indent: -1.5em; }
+#editor .cm-fence, #editor .cm-frontmatter { color: #616161; }
+
+/* Lists: hanging indent so wrapped lines align with the item text (the bullet widget is ~1.5em wide) */
+#editor .cm-li { padding-left: 1.5em; text-indent: -1.5em; }
+#editor .cm-li :is(.cm-bullet, .cm-task, .cm-rendered) { text-indent: 0; } /* text-indent inherits into inline-blocks */
 .cm-bullet { display: inline-block; width: 1.2em; text-align: center; color: #9a9a9a; }
 .cm-hr { display: inline-block; width: 100%; border-top: 1px solid #2e2e2e; vertical-align: middle; }
 .cm-task { accent-color: #4daafc; margin-right: 6px; vertical-align: middle; }
 
 /* Rendered widgets (tables, mermaid, math, alerts, html, images) reuse the Preview element styles */
-.cm-rendered { padding: 2px 0; }
+/* CodeMirror wraps lines with white-space: pre-wrap; widgets hold HTML, where source newlines/indents must collapse */
+.cm-rendered { padding: 2px 0; white-space: normal; }
 .cm-rendered-inline { display: inline-block; max-width: 100%; vertical-align: bottom; }
 .cm-rendered > :first-child { margin-top: 0; }
 .cm-rendered > :last-child { margin-bottom: 0; }

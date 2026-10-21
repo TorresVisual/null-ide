@@ -53,6 +53,12 @@ test('each list item gets a hanging-indent line class on its first line only', (
 	assert.deepEqual(lis, [0, 11, 15, 22]); // a, b, c, d
 });
 
+test('inline html tags are dimmed', () => {
+	const t = 'a<br />b <kbd>x</kbd>';
+	const tags = plan(t, t.length + 1).filter(x => x.cls === 'cm-htmltag').map(x => t.slice(x.from, x.to));
+	assert.deepEqual(tags, ['<br />', '<kbd>', '</kbd>']);
+});
+
 test('table, html, alert, mermaid and image become widgets; raw while touched', () => {
 	const t = '| a | b |\n|---|---|\n| 1 | 2 |\n\n<div>x</div>\n\n> [!NOTE]\n> hi\n\n```mermaid\ngraph TD\n```\n\n![i](u.png)';
 	const w = plan(t, t.length + 1).filter(x => x.type === 'widget');

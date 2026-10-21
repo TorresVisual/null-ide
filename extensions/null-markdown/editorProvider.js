@@ -10,6 +10,8 @@ const { applyCheckboxToggle, openWikiLink, openLink } = require('./docActions');
 // round-trips and whole-document decoration rebuilds do not scale to huge files.
 const MAX_EDITOR_CHARS = 1_000_000;
 
+const REF_DEF = /^ {0,3}\[[^\]\n]+\]:[ \t]*\S.*$/gm;
+
 // CustomTextEditorProvider for the live-preview Markdown Editor. A thin relay: the TextDocument
 // stays the source of truth.
 class NullMarkdownEditorProvider {
@@ -24,7 +26,9 @@ class NullMarkdownEditorProvider {
 
 	// Markdown -> HTML through the same pipeline as Preview, with relative images pointed at webview URIs.
 	_html(document, webview, text) {
-		const html = this._processAlerts(this._md.render(text));
+		// A widget holds one block, so `![x][ref]` needs the document's `[ref]: url` lines to resolve.
+		const defs = document.getText().match(REF_DEF);
+		const html = this._processAlerts(this._md.render(defs ? `${text}\n\n${defs.join('\n')}` : text));
 		return rewriteImageSrc(html, src => {
 			try { return webview.asWebviewUri(vscode.Uri.joinPath(document.uri, '..', decodeURI(src))).toString(); }
 			catch { return null; }

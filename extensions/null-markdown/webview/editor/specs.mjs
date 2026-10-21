@@ -73,6 +73,8 @@ export function computeSpecs(tree, doc, ranges) {
 				return;
 			}
 
+			if (name === 'HTMLTag') { mark(n.from, n.to, 'cm-htmltag'); return; }
+
 			if (name === 'Image') { block(n.from, n.to, 'inline'); return false; }
 
 			if (name === 'Blockquote') {
