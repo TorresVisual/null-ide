@@ -95,3 +95,25 @@ fn close_all_without_a_choice_reports_the_blocking_process_names() {
     }
     assert!(seen.lock().unwrap().iter().any(|p| matches!(p, Progress::WaitingForClose { .. })));
 }
+
+#[test]
+fn stop_named_under_leaves_the_processes_the_target_started() {
+    // An IDE window opened from a widget is a child of null_widgets.exe; ending the widgets must not end it (no /T).
+    let dir = tempfile::tempdir().unwrap();
+    let (host, child) = (dir.path().join("null_widgets.exe"), dir.path().join("started_by_widgets.exe"));
+    fs::copy(r"C:\Windows\System32\cmd.exe", &host).unwrap();
+    fs::copy(r"C:\Windows\System32\PING.EXE", &child).unwrap();
+    use std::os::windows::process::CommandExt;
+    let mut parent = Command::new(&host).raw_arg(format!("/c \"\"{}\" -n 60 127.0.0.1 >nul\"", child.display())).spawn().unwrap();
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while !running_in(dir.path()).iter().any(|r| r.name.eq_ignore_ascii_case("started_by_widgets.exe")) && Instant::now() < deadline {
+        thread::sleep(Duration::from_millis(100));
+    }
+    assert!(running_in(dir.path()).iter().any(|r| r.name.eq_ignore_ascii_case("started_by_widgets.exe")), "the child is running");
+
+    assert!(null_setup_core::procs::stop_named_under(dir.path(), "null_widgets.exe"));
+    let _ = parent.wait();
+    let survivors: Vec<_> = running_in(dir.path()).into_iter().filter(|r| r.name.eq_ignore_ascii_case("started_by_widgets.exe")).collect();
+    for s in &survivors { null_setup_core::procs::force_close(&[s.pid]); }
+    assert_eq!(survivors.len(), 1, "the process the widgets started survives");
+}
