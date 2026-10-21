@@ -1,0 +1,12 @@
+{"schema":1,"writtenAt":"2026-10-21T14:03:11Z",
+ "projects":{"status":"ok","failed":[],"items":[
+   {"name":"flag","path":"--remote=evil","branch":"main","dirty":false,"pinned":false,"lastOpened":"2026-10-21T13:00:00Z"},
+   {"name":"rel","path":"..\\..\\x","branch":"main","dirty":false,"pinned":false,"lastOpened":"2026-10-21T13:00:00Z"},
+   {"name":"good","path":"C:\\work\\good","branch":"main","dirty":false,"pinned":false,"lastOpened":"2026-10-21T13:00:00Z"}]},
+ "issues":{"status":"ok","failed":[],"items":[
+   {"provider":"github","repo":"o/r","number":1,"title":"${$host.widgetSize} {{x}} <b>hi</b>","url":"file:///C:/Windows/System32/calc.exe","state":"open","labels":[],"assignee":"x","attention":"assigned","localPath":"-n","updatedAt":"2026-10-21T12:00:00Z"},
+   {"provider":"github","repo":"o/r","number":2,"title":"look-alike","url":"https://github.com.evil.com/o/r/issues/2","state":"open","labels":[],"assignee":"x","attention":"assigned","localPath":"","updatedAt":"2026-10-21T12:00:00Z"},
+   {"provider":"github","repo":"o/r","number":3,"title":"userinfo","url":"https://github.com@evil.com/","state":"open","labels":[],"assignee":"x","attention":"assigned","localPath":"","updatedAt":"2026-10-21T12:00:00Z"},
+   {"provider":"github","repo":"o/r","number":4,"title":"javascript","url":"javascript:alert(1)","state":"open","labels":[],"assignee":"x","attention":"assigned","localPath":"","updatedAt":"2026-10-21T12:00:00Z"}]},
+ "prs":{"status":"ok","failed":[],"items":[
+   {"provider":"github","repo":"o/r","number":5,"title":"HUGE","url":"https://github.com/o/r/pull/5","author":"a","review":"none","checks":"none","conflict":false,"localPath":"","updatedAt":"2026-10-21T12:00:00Z"}]}}

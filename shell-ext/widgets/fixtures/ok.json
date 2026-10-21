@@ -1,0 +1,8 @@
+{"schema":1,"writtenAt":"2026-10-21T14:03:11Z",
+ "projects":{"status":"ok","failed":[],"items":[
+   {"name":"null-ide","path":"D:\\Coding\\Apps\\null-ide","branch":"main","dirty":true,"pinned":true,"lastOpened":"2026-10-21T13:00:00Z"},
+   {"name":"site","path":"D:\\Coding\\site","branch":"dev","dirty":false,"pinned":false,"lastOpened":"2026-10-20T09:00:00Z"}]},
+ "issues":{"status":"ok","failed":[],"items":[
+   {"provider":"github","repo":"o/r","number":7,"title":"Crash on save","url":"https://github.com/o/r/issues/7","state":"open","labels":["bug"],"assignee":"me","attention":"assigned","localPath":"D:\\Coding\\Apps\\null-ide","updatedAt":"2026-10-21T12:00:00Z"}]},
+ "prs":{"status":"ok","failed":[],"items":[
+   {"provider":"github","repo":"o/r","number":9,"title":"Add widgets","url":"https://github.com/o/r/pull/9","author":"sam","review":"requested","checks":"failing","conflict":true,"localPath":"","updatedAt":"2026-10-21T12:30:00Z"}]}}

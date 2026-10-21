@@ -1,0 +1,5 @@
+{"schema":1,"writtenAt":"2026-10-21T14:03:11Z",
+ "projects":{"status":"ok","failed":[],"items":[]},
+ "issues":{"status":"ok","failed":[{"repo":"o/gone","reason":"error"},{"repo":"o/two","reason":"offline"}],"items":[
+   {"provider":"github","repo":"o/r","number":7,"title":"Crash on save","url":"https://github.com/o/r/issues/7","state":"open","labels":[],"assignee":"me","attention":"assigned","localPath":"","updatedAt":"2026-10-21T12:00:00Z"}]},
+ "prs":{"status":"ok","failed":[],"items":[]}}

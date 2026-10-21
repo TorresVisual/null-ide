@@ -78,3 +78,6 @@ target_link_libraries(null_explorer_command PRIVATE
 add_executable(null_identity_stub src/identity_stub.cc)
 set_property(TARGET null_identity_stub PROPERTY CXX_STANDARD 17)
 set_property(TARGET null_identity_stub PROPERTY CXX_STANDARD_REQUIRED ON)
+
+enable_testing()
+add_subdirectory(widgets)
