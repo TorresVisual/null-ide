@@ -7,7 +7,7 @@ import { RepoResult } from './widgetFetch';
 
 const row = (repo: string, n: number): IssueRow => ({ provider: 'github', repo, number: n, title: 't', url: '', state: 'open', labels: [], assignee: null, attention: 'assigned', localPath: null, updatedAt: '2026-10-21T10:00:00Z' });
 
-function harness(over: { enabled?: boolean; repos?: WidgetRepo[]; owner?: boolean; fetch?: RefresherDeps['fetch'] } = {}) {
+function harness(over: { enabled?: boolean; repos?: WidgetRepo[]; owner?: boolean; fetch?: RefresherDeps['fetch']; projects?: RefresherDeps['projects'] } = {}) {
   let clock = Date.parse('2026-10-21T10:00:00Z');
   const writes: Snapshot[] = [];
   const state = { enabled: over.enabled ?? true, repos: over.repos ?? [{ repo: 'a/b', account: 'x' }], owner: over.owner ?? true, removed: 0, released: 0, claimed: 0, fetches: 0 };
@@ -17,7 +17,7 @@ function harness(over: { enabled?: boolean; repos?: WidgetRepo[]; owner?: boolea
     settings: () => ({ enabled: state.enabled, repos: state.repos }),
     ownership: { isOwner: () => state.owner, claim: () => { state.claimed++; }, release: () => { state.released++; } },
     fetch: over.fetch ?? (async (_a, repos) => { state.fetches++; return repos.map((repo): RepoResult => ({ repo, issues: [row(repo, 1)], prs: [] })); }),
-    projects: async () => ({ status: 'ok', failed: [], items: [] }),
+    projects: over.projects ?? (async () => ({ status: 'ok', failed: [], items: [] })),
     store: { write: s => writes.push(s), remove: () => { state.removed++; } },
     setTimeout: (fn, ms) => { const t = { fn, ms }; timers.push(t); return t; },
     clearTimeout: () => undefined, log: () => undefined,
@@ -110,13 +110,13 @@ test('the tick refreshes a focused owner when due and a window that just became 
   assert.strictEqual(h.timers.at(-1)!.ms, TICK_MS);
 });
 
-test('dispose writes once more as owner and releases ownership', async () => {
+test('dispose writes once more as owner, keeps the time of the last fetch, and releases ownership', async () => {
   const h = harness();
   await h.r.refresh();
   h.advance(5 * 60_000);
   h.r.dispose();
   assert.strictEqual(h.writes.length, 2);
-  assert.strictEqual(h.writes[1].writtenAt, '2026-10-21T10:05:00.000Z');
+  assert.strictEqual(h.writes[1].writtenAt, '2026-10-21T10:00:00.000Z');   // the rows are still the 10:00 rows; the footer must keep ageing
   assert.strictEqual(h.state.released, 1);
 });
 
@@ -126,4 +126,23 @@ test('a fetch that throws unexpectedly does not wipe rows or crash the cycle', a
   await h.r.refresh(); boom = true; h.advance(REFRESH_MS);
   await assert.doesNotReject(h.r.refresh());
   assert.strictEqual(h.writes.at(-1)!.issues.items.length, 1);
+});
+
+test('a settings change rewrites without making the old rows look fresh', async () => {
+  const h = harness({ repos: [{ repo: 'a/b', account: 'x' }, { repo: 'c/d', account: 'x' }] });
+  await h.r.refresh();
+  h.advance(3 * 60 * 60_000);
+  h.state.repos = [{ repo: 'a/b', account: 'x' }];
+  h.r.onConfigChanged();
+  assert.strictEqual(h.writes.at(-1)!.writtenAt, '2026-10-21T10:00:00.000Z');
+});
+
+test('projects are read before the fetch, so issue and PR rows get the local checkouts of this cycle', async () => {
+  const order: string[] = [];
+  const h = harness({
+    projects: async () => { order.push('projects'); return { status: 'ok', failed: [], items: [] }; },
+    fetch: async (_a, rs) => { order.push('fetch'); return rs.map((repo): RepoResult => ({ repo, issues: [], prs: [] })); },
+  });
+  await h.r.refresh();
+  assert.deepStrictEqual(order, ['projects', 'fetch']);
 });
