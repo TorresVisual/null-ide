@@ -39,6 +39,7 @@ Everything below ships in the box as a built-in extension. For the extension lis
 | Feature | What it does |
 |---|---|
 | **Explorer integration** | `null .` in any terminal, and **Open in Null** in the Windows 11 Explorer context menu (Windows only). |
+| **Desktop widgets** | Projects, Issues and Pull Requests as borderless cards on the Windows desktop. Opt in with **Null: Set Up Widgets** (pick an account and repositories), or tick **Desktop widgets** in the installer to start them at login. The IDE writes the data to `%LOCALAPPDATA%Nullwidgetssnapshot.json` and `null_widgets.exe` only reads it; click a row to open it, drag to move, right-click for Refresh, Lock and Hide. **Null: Refresh Widgets** refreshes now. Private issue and pull request titles appear on the desktop. Windows only; tested on Windows 11. |
 | **Self-update** | Checks GitHub Releases on startup and updates without elevation. On Linux the status-bar button opens the release page instead. |
 | **Safe Mode** | `null --safe-mode` disables installed and Null-owned extensions without changing them. **Restart Normally** brings you back. Offered automatically after three failed starts in a row. |
 | **Crash recovery** | After an unexpected exit, offers to reopen the Claude Code conversations that were open. |

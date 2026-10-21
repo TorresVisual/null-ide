@@ -49,6 +49,13 @@ A project's own config file always wins. The `defaultConfig` settings apply only
 | `null.ports.refreshInterval` | `5` | Seconds between port scans; `0` turns scanning off |
 | `null.ports.filterDevOnly` | `true` | Show only recognised dev servers |
 
+## Desktop widgets
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `null.widgets.enabled` | `false` | Write the widgets' data file while the IDE runs. Off deletes it. Set by **Null: Set Up Widgets**. |
+| `null.widgets.repos` | `[]` | Repositories (and the account they were picked under) whose issues and pull requests are shown. Private titles appear on the desktop. |
+
 ## Claude Code helpers
 
 | Setting | Default | Meaning |

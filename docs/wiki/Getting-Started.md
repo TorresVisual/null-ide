@@ -15,6 +15,7 @@ On Linux, see [Linux](Linux) for the `.deb` and tarball instead.
 3. The wizard downloads the newest release and lets you pick:
    - the install folder (default `%LOCALAPPDATA%\Programs\Null IDE`)
    - shortcuts, the `PATH` entry, the Explorer context menu and file associations
+   - **Desktop widgets** (off by default): Projects, Issues and Pull Requests on the desktop, started at login
    - which built-in extensions to keep
    - a few starting settings: theme, font, auto save, format on save, update check, menu bar
 
