@@ -1,22 +1,54 @@
 # Desktop widgets — hard gate findings (#141)
 
-Date: 2026-10-21. Machine: Windows 11 Pro 10.0.26100 (24H2). Windows 10: **not tested** (no machine available).
+Date: 2026-10-21. Machine: Windows 11 Pro 10.0.26100 (24H2), three monitors (virtual screen -2560,-193, 6400×1440). Windows 10: **not tested** (no machine available).
 
-Probe: a 240×120 layered tool window (`WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE`) pinned directly above `Progman` through `WM_WINDOWPOSCHANGING`, logging clicks, `WM_DISPLAYCHANGE` and resume to `%TEMP%\widgets-probe.log`.
+The gate ran in two rounds. Round 1 tested the spec's design (a top-level layered tool window pinned directly above `Progman`) and failed. Round 2 tested the fallback the spec names (a child of the desktop's own windows) and passed.
 
-Pinning with `HWND_BOTTOM` hides the windows behind the desktop; pinning directly above `Progman` works.
+## Round 1 — top-level window pinned above `Progman`
 
-| # | Check | Windows 11 24H2 | Windows 10 |
-|---|---|---|---|
-| 1 | Apps open over the box; the box never comes forward | pass | not tested |
-| 2 | Win+D: the box stays visible | **fail** — the box is hidden | not tested |
-| 3 | Click flips the colour and logs `click N`, click does not reach windows behind | pass (log: `click 1`–`click 6`) | not tested |
-| 4 | Sleep and resume: log gains `resume`, box still visible | **inconclusive** — no `resume` line in the log | not tested |
-| 5 | Display change: log gains `WM_DISPLAYCHANGE`, box still visible | pass (log: two `WM_DISPLAYCHANGE` lines) | not tested |
-| 6 | Explorer restart (information only) | box stays visible | not tested |
+Pinning with `HWND_BOTTOM` hides the windows behind the desktop; pinning directly above `Progman` works for drawing and z-order, but **Win+D hides the window**. Verdict: fails the gate.
 
-## Verdict: stop
+| # | Check | Result |
+|---|---|---|
+| 1 | Apps open over the box | pass |
+| 2 | Win+D keeps the box visible | **fail** |
+| 3 | Click flips the colour, does not reach windows behind | pass |
+| 4 | Sleep and resume | inconclusive (no `resume` logged) |
+| 5 | Display change | pass |
+| 6 | Explorer restart | stays visible |
 
-Item 2 fails: Win+D hides a window that is pinned just above `Progman`. The plan's premise ("stay visible through Win+D", measured earlier with the full host) did not reproduce with this probe. Item 4 produced no evidence either way (the probe was possibly not put to sleep, or `WM_POWERBROADCAST` did not reach it). Windows 10 was not tested.
+## Round 2 — which desktop window to attach to
 
-The spec's fallback is an owned-by-desktop parent window (for example parenting each widget to the `WorkerW`/`SHELLDLL_DefView` host that holds the wallpaper), which changes the rendering and z-order design and needs a decision before Task 2 onward is built.
+Each variant was a 240×120 layered child (`WS_CHILD`, `WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE`) of a different desktop window, after sending `0x052C` to `Progman`. The probe read the composed screen pixel back with the desktop revealed (Win+D sent by the probe) and compared it with the colour it painted. Win+D sequencing was uneven between runs, so only the variant that was visible with the desktop shown is a firm result.
+
+| Parent | Visible with the desktop revealed |
+|---|---|
+| `Progman` (layered child) | no |
+| `SHELLDLL_DefView` (layered child) | **yes** |
+| `WorkerW` (wallpaper) | no |
+| `Progman`, not layered (plain GDI) | no |
+| none (top-level above `Progman`, control) | no |
+
+Two things were needed for a layered child to draw at all: an embedded manifest declaring Windows 8–10 support (`supportedOS`), and `UpdateLayeredWindow` with the position in the **parent's client coordinates**. On this 24H2 build `Progman`'s children are `SHELLDLL_DefView` (with `SysListView32`) and `WorkerW`. The probe also needed a separate hidden top-level window to receive `WM_DISPLAYCHANGE` and `WM_POWERBROADCAST`; a child window does not get those broadcasts.
+
+Manual checks of the `SHELLDLL_DefView` variant on Windows 11:
+
+| # | Check | Result |
+|---|---|---|
+| 1 | Apps open over the box; it never comes forward | pass |
+| 2 | Win+D: the box stays visible, and is there after restoring | pass |
+| 3 | Click flips the colour (log `click 1`–`click 3`), no desktop icon is selected behind it | pass |
+| 4 | Sleep and resume | not verified (no sleep was done; resume handling is repaint-only and is re-checked in Task 17) |
+| 5 | Display change | pass (log: two `WM_DISPLAYCHANGE`) |
+| 6 | Explorer restart | **the window is destroyed** (`IsWindowVisible` went to 0 in the log). It is a child of a window Explorer destroys, so it must be recreated, not re-pinned |
+
+## Verdict: pass, with a design change
+
+The widgets are layered **child windows of the desktop icon host (`SHELLDLL_DefView`)**, not top-level windows. Consequences recorded for the plan:
+
+- Create the window as `WS_POPUP`, then switch the style to `WS_CHILD | WS_VISIBLE` and `SetParent` to `SHELLDLL_DefView` (found by sending `0x052C` to `Progman`, then searching `Progman`'s children, falling back to the `WorkerW` that holds one). Win+D, apps in front and clicks then work as probed.
+- Positions are screen coordinates converted with `ScreenToClient(DefView)`; `UpdateLayeredWindow` takes the client position.
+- The exe needs a manifest with `supportedOS` entries and per-monitor v2 DPI awareness.
+- A hidden top-level sink window receives `WM_DISPLAYCHANGE`, `WM_POWERBROADCAST` and `TaskbarCreated`.
+- After `TaskbarCreated` (Explorer restart) the widget windows are gone: the host destroys what is left and recreates the windows under the new `SHELLDLL_DefView`.
+- Windows 10 is untested. Its desktop is arranged differently (`SHELLDLL_DefView` lives under a `WorkerW` that is a top-level window until `0x052C` is sent), so it needs a check before the Windows 10 claim is made.
