@@ -100,7 +100,7 @@ export interface ListPullsData { search: { nodes: Array<GqlPull | Record<string,
 const CHECKS: Record<string, CheckState> = {
   SUCCESS: 'success', FAILURE: 'failure', ERROR: 'failure', PENDING: 'pending', EXPECTED: 'pending',
 };
-const REVIEWS: Record<string, ReviewState> = { APPROVED: 'approved', CHANGES_REQUESTED: 'changes', REVIEW_REQUIRED: 'required' };
+export const REVIEWS: Record<string, ReviewState> = { APPROVED: 'approved', CHANGES_REQUESTED: 'changes', REVIEW_REQUIRED: 'required' };
 
 export const pullStateOf = (s: string): PullState => (s === 'MERGED' ? 'merged' : s === 'CLOSED' ? 'closed' : 'open');
 export const checkStateOf = (s: string | undefined): CheckState => CHECKS[s ?? ''] ?? 'none';
