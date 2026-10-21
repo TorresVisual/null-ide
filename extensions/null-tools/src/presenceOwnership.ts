@@ -13,7 +13,7 @@ import * as path from 'path';
  * the owner disappears.
  */
 
-const CLAIM_FILE = 'discord-presence-owner.json';
+const DEFAULT_CLAIM_FILE = 'discord-presence-owner.json';
 type LogFn = (message: string) => void;
 
 interface OwnerClaim {
@@ -39,12 +39,12 @@ export class PresenceOwnership {
   private lastLoggedOwner = -1;
 
   /** Without a storage directory (tests, older hosts) ownership is always granted. */
-  constructor(storageDir: string | undefined, private readonly log: LogFn = () => undefined) {
+  constructor(storageDir: string | undefined, private readonly log: LogFn = () => undefined, claimFile: string = DEFAULT_CLAIM_FILE) {
     if (!storageDir) {
       this.file = undefined;
       return;
     }
-    this.file = path.join(storageDir, CLAIM_FILE);
+    this.file = path.join(storageDir, claimFile);
     try {
       fs.mkdirSync(storageDir, { recursive: true });
     } catch {
