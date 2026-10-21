@@ -61,7 +61,7 @@ function readManifests() {
         ['develop', ['Dashboard', 'GitHub Issues', 'Pull Requests', 'GitHub Actions', 'Commit Graph', 'Music Player']],
         ['insights', ['Activity Dashboard', 'Startup Report']],
         ['account', ['Accounts', 'Sync Status']],
-        ['setup', ['Null Setup', 'Environment Check', 'Actions Settings', 'Formatting Settings']],
+        ['setup', ['Null Setup', 'Environment Check', 'Actions Settings', 'Formatting Settings', 'Desktop Widgets']],
     ]);
 });
 (0, node_test_1.default)('every launcher command is declared by some extension', () => {
