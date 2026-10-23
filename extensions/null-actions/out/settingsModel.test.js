@@ -79,4 +79,24 @@ const prios = (l) => l.map(b => b.priority).join(',');
     node_assert_1.default.deepStrictEqual(errs.map(e => `${e.index}:${e.field}`), ['0:label', '1:command', '2:id']);
     node_assert_1.default.deepStrictEqual(plain(m.validate([btn("a", 0), btn("b", 0)])), []);
 });
+(0, node_test_1.test)('isDirty: identical lists are clean, any real edit is dirty', () => {
+    const list = [btn('a', 2), btn('b', 1)];
+    node_assert_1.default.strictEqual(m.isDirty(list, JSON.parse(JSON.stringify(list))), false);
+    node_assert_1.default.strictEqual(m.isDirty([btn('a', 2), btn('b', 1, { label: 'x' })], list), true);
+    node_assert_1.default.strictEqual(m.isDirty([btn('a', 2)], list), true);
+    node_assert_1.default.strictEqual(m.isDirty([btn('a', 3), btn('b', 1)], list), true);
+});
+(0, node_test_1.test)('isDirty ignores representation the host would normalise away', () => {
+    const base = btn('a', 0);
+    const noisy = { ...base, args: [], icon: '', problemMatcher: '  ', onBusy: 'ask', saveAll: false };
+    node_assert_1.default.strictEqual(m.isDirty([noisy], [base]), false);
+    node_assert_1.default.strictEqual(m.isDirty([{ ...base, problemMatcher: ' $tsc ' }], [{ ...base, problemMatcher: '$tsc' }]), false);
+    node_assert_1.default.strictEqual(m.isDirty([{ ...base, problemMatcher: '$tsc' }], [base]), true);
+});
+(0, node_test_1.test)('isDirty: moving a button and moving it back is clean when priorities are distinct', () => {
+    const list = [btn('a', 5), btn('b', 3), btn('c', 1)];
+    const moved = m.moveButton(list, 1, 'up');
+    node_assert_1.default.strictEqual(m.isDirty(moved, list), true);
+    node_assert_1.default.strictEqual(m.isDirty(m.moveButton(moved, 0, 'down'), list), false);
+});
 //# sourceMappingURL=settingsModel.test.js.map

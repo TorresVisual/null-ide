@@ -79,6 +79,9 @@ class ActionButtonsPanel {
             if (msg.type === 'ready') {
                 this.postState();
             }
+            else if (msg.type === 'dirty') {
+                this.panel.title = msg.dirty ? 'Action Buttons ●' : 'Action Buttons';
+            }
             else if (msg.type === 'save') {
                 this.handleSave(msg.buttons);
             }
@@ -106,7 +109,8 @@ class ActionButtonsPanel {
             return;
         }
         await (0, buttonConfigIntegration_1.writeButtonConfigs)(buttons);
-        this.panel.webview.postMessage({ type: 'saved' });
+        // The canonical buttons let the webview adopt exactly what was written as its saved snapshot.
+        this.panel.webview.postMessage({ type: 'saved', buttons });
     }
     async handleBrowseFile(id) {
         const uris = await vscode.window.showOpenDialog({
@@ -163,11 +167,13 @@ class ActionButtonsPanel {
   <p class="subtitle">Status bar shortcuts for the commands you run most</p>
 </header>
 <div id="ignored-banner" class="banner" hidden></div>
+<div id="external-banner" class="banner" hidden>Settings changed outside this panel. <button data-action="reload">Reload</button> <button data-action="keep">Keep mine</button></div>
 <div id="toolbar">
   <button id="add-btn">+ Add Button</button>
   <button id="load-npm-btn">Load npm scripts</button>
   <button id="save-btn" class="primary">Save All</button>
   <span id="status"></span>
+  <span id="undo" hidden></span>
 </div>
 <section>
 <div id="buttons-list"></div>

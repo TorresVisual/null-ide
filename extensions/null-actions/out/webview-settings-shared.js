@@ -81,3 +81,28 @@ function validate(buttons) {
     });
     return errors;
 }
+/** Canonical form: the defaults the host's parseButtonConfigs applies, so representation differences are not edits. */
+function normalize(buttons) {
+    const opt = (v) => (v ? v : undefined);
+    return buttons.map(b => ({
+        id: b.id,
+        label: b.label,
+        icon: opt(b.icon),
+        type: b.type === 'vscode-command' ? b.type : 'terminal',
+        command: b.command,
+        args: Array.isArray(b.args) && b.args.length ? b.args : undefined,
+        color: opt(b.color),
+        background: b.background === 'warning' || b.background === 'error' ? b.background : 'none',
+        tooltip: opt(b.tooltip),
+        cwd: opt(b.cwd),
+        saveAll: b.saveAll === true,
+        focus: b.focus !== false,
+        onBusy: b.onBusy === 'restart' || b.onBusy === 'show' || b.onBusy === 'run' ? b.onBusy : 'ask',
+        problemMatcher: (b.problemMatcher || '').trim() || undefined,
+        priority: typeof b.priority === 'number' ? b.priority : 0,
+    }));
+}
+/** List order counts: callers pass both lists in display (priority) order. */
+function isDirty(draft, saved) {
+    return JSON.stringify(normalize(draft)) !== JSON.stringify(normalize(saved));
+}
