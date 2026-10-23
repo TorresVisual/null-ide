@@ -58,9 +58,28 @@ function activate(context) {
     context.subscriptions.push(vscode.commands.registerCommand('null-actions.openSettings', () => {
         settingsPanel_1.ActionButtonsPanel.createOrShow(context.extensionUri);
     }));
+    let knownIds = new Set();
+    let lastErrors = '';
     function refresh() {
-        const { buttons } = (0, buttonConfigIntegration_1.readButtonConfigs)();
+        const { buttons, errors } = (0, buttonConfigIntegration_1.readButtonConfigs)();
         statusBar.update(buttons);
+        const ids = new Set(buttons.map(b => b.id));
+        knownIds.forEach(id => { if (!ids.has(id)) {
+            terminalRegistry.forget(id);
+        } });
+        knownIds = ids;
+        // One warning per distinct problem set, not one per settings change.
+        const summary = errors.join('\n');
+        if (summary !== lastErrors) {
+            lastErrors = summary;
+            if (summary) {
+                const more = errors.length > 1 ? ` (+${errors.length - 1} more)` : '';
+                void vscode.window.showWarningMessage(`Some Null Actions buttons are ignored: ${errors[0]}${more}`, 'Open Settings')
+                    .then(pick => { if (pick) {
+                    void vscode.commands.executeCommand('null-actions.openSettings');
+                } });
+            }
+        }
     }
     context.subscriptions.push(vscode.commands.registerCommand('null-actions.runButton', async (buttonId) => {
         const { buttons } = (0, buttonConfigIntegration_1.readButtonConfigs)();

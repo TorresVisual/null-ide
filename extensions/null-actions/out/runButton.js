@@ -34,18 +34,20 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.runButton = runButton;
+const path = __importStar(require("path"));
 const vscode = __importStar(require("vscode"));
 const variableResolver_1 = require("./variableResolver");
 function buildVariableContext() {
     const editor = vscode.window.activeTextEditor;
-    const folder = vscode.workspace.workspaceFolders?.[0];
     const doc = editor?.document;
+    // In a multi-root workspace the active file's folder wins over the first one.
+    const folder = (doc && vscode.workspace.getWorkspaceFolder(doc.uri)) ?? vscode.workspace.workspaceFolders?.[0];
     const fsPath = doc?.uri.fsPath;
     return {
         workspaceFolder: folder?.uri.fsPath,
         file: fsPath,
-        fileBasename: fsPath ? fsPath.split(/[\\/]/).pop() : undefined,
-        fileDirname: fsPath ? fsPath.replace(/[\\/][^\\/]*$/, '') : undefined,
+        fileBasename: fsPath ? path.basename(fsPath) : undefined,
+        fileDirname: fsPath ? path.dirname(fsPath) : undefined,
         relativeFile: doc ? vscode.workspace.asRelativePath(doc.uri) : undefined,
         selectedText: editor && !editor.selection.isEmpty ? editor.document.getText(editor.selection) : undefined,
         lineNumber: editor ? String(editor.selection.active.line + 1) : undefined,
@@ -57,13 +59,29 @@ async function runButton(button, registry) {
         await vscode.workspace.saveAll();
     }
     const ctx = buildVariableContext();
+    // Running with a literal "${file}" in the command is never what the user meant.
+    const missing = [];
+    const resolve = (text) => (0, variableResolver_1.resolveVariables)(text, ctx, missing);
+    const refuseIfUnresolved = () => {
+        if (missing.length === 0) {
+            return false;
+        }
+        void vscode.window.showWarningMessage(`"${button.label}" was not run: ${[...new Set(missing)].join(', ')} could not be resolved (open a file, folder or selection first).`);
+        return true;
+    };
     if (button.type === 'vscode-command') {
-        const args = (button.args ?? []).map(a => (typeof a === 'string' ? (0, variableResolver_1.resolveVariables)(a, ctx) : a));
+        const args = (button.args ?? []).map(a => (typeof a === 'string' ? resolve(a) : a));
+        if (refuseIfUnresolved()) {
+            return;
+        }
         await vscode.commands.executeCommand(button.command, ...args);
         return;
     }
-    const cwd = button.cwd ? (0, variableResolver_1.resolveVariables)(button.cwd, ctx) : ctx.workspaceFolder;
-    const command = (0, variableResolver_1.resolveVariables)(button.command, ctx);
+    const cwd = button.cwd ? resolve(button.cwd) : ctx.workspaceFolder;
+    const command = resolve(button.command);
+    if (refuseIfUnresolved()) {
+        return;
+    }
     const run = () => registry.dispatch(button.id, button.label, command, { cwd, focus: button.focus, problemMatcher: button.problemMatcher });
     if (!registry.isBusy(button.id)) {
         await run();

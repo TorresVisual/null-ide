@@ -77,7 +77,9 @@ class VscodeTerminalHost {
     }
     async runTask(label, command, options) {
         const name = `Action: ${label}`;
-        const task = new vscode.Task({ type: 'shell' }, vscode.workspace.workspaceFolders?.[0] ?? vscode.TaskScope.Workspace, name, 'null-actions', new vscode.ShellExecution(command, { cwd: options.cwd }), [options.problemMatcher]);
+        // Scope to the folder that owns the cwd (multi-root), else the first folder.
+        const owner = options.cwd ? vscode.workspace.getWorkspaceFolder(vscode.Uri.file(options.cwd)) : undefined;
+        const task = new vscode.Task({ type: 'shell' }, owner ?? vscode.workspace.workspaceFolders?.[0] ?? vscode.TaskScope.Workspace, name, 'null-actions', new vscode.ShellExecution(command, { cwd: options.cwd }), [options.problemMatcher]);
         task.presentationOptions = {
             reveal: options.focus ? vscode.TaskRevealKind.Always : vscode.TaskRevealKind.Silent,
             focus: options.focus,

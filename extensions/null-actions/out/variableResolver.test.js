@@ -44,4 +44,9 @@ const variableResolver_1 = require("./variableResolver");
 (0, node_test_1.test)('template with no variables passes through unchanged', () => {
     node_assert_1.default.strictEqual((0, variableResolver_1.resolveVariables)('npm run build', {}), 'npm run build');
 });
+(0, node_test_1.test)('collects known variables it could not resolve, but not shell-style ${NAME}', () => {
+    const missing = [];
+    (0, variableResolver_1.resolveVariables)('cp ${file} ${env:NOPE} ${HOME} ${notAVariable}', {}, missing);
+    node_assert_1.default.deepStrictEqual(missing, ['${file}', '${env:NOPE}']);
+});
 //# sourceMappingURL=variableResolver.test.js.map

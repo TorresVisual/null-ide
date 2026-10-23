@@ -238,4 +238,25 @@ class FakeTaskHost extends FakeTerminalHost {
     await node_assert_1.default.rejects(registry.dispatch('a', 'A', 'x', { problemMatcher: '$nope' }));
     node_assert_1.default.strictEqual(registry.getState('a'), undefined);
 });
+(0, node_test_1.test)('a throwing shell-integration execute clears the running state and falls back to sendText', async () => {
+    class ThrowingHost extends FakeTerminalHost {
+        async execute() { throw new Error('terminal disposed'); }
+    }
+    const host = new ThrowingHost();
+    const registry = new terminalRegistry_1.TerminalRegistry(host);
+    await registry.dispatch('build', 'Build', 'npm run build');
+    node_assert_1.default.strictEqual(registry.isBusy('build'), false);
+    node_assert_1.default.deepStrictEqual(host.terminals[0].sentTexts, ['npm run build']);
+});
+(0, node_test_1.test)('two buttons sharing a label adopt different restored terminals instead of sharing one', async () => {
+    const a = new FakeTerminal('Action: Build');
+    const b = new FakeTerminal('Action: Build');
+    const host = new FakeTerminalHost([a, b]);
+    const registry = new terminalRegistry_1.TerminalRegistry(host);
+    await registry.dispatch('one', 'Build', 'cmd one');
+    await registry.dispatch('two', 'Build', 'cmd two');
+    node_assert_1.default.strictEqual(host.createCount, 0);
+    node_assert_1.default.deepStrictEqual(b.sentTexts, ['cmd one']);
+    node_assert_1.default.deepStrictEqual(a.sentTexts, ['cmd two']);
+});
 //# sourceMappingURL=terminalRegistry.test.js.map

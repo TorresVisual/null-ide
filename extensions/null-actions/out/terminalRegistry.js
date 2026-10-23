@@ -39,7 +39,13 @@ class TerminalRegistry {
         // and a second click in that window must not type into the starting command.
         const startedAt = this.now();
         this.setState(buttonId, { kind: 'running' });
-        const execution = await this.host.execute?.(terminal, command);
+        let execution;
+        try {
+            execution = await this.host.execute?.(terminal, command);
+        }
+        catch {
+            execution = undefined; // e.g. terminal disposed mid-wait; fall back to sendText
+        }
         if (execution) {
             this.track(buttonId, execution, startedAt);
         }
@@ -144,7 +150,9 @@ class TerminalRegistry {
         // live terminal to keep its name in sync in the meantime.
         // `vscode.window.terminals` is ordered by creation, so the last match
         // is the most recently created one.
-        const matches = live.filter(t => t.name === name);
+        // Skip terminals another button already owns, so same-label buttons don't share one.
+        const claimed = new Set([...this.cache].filter(([id]) => id !== buttonId).map(([, t]) => t));
+        const matches = live.filter(t => t.name === name && !claimed.has(t));
         if (matches.length > 0) {
             const adopted = matches[matches.length - 1];
             this.cache.set(buttonId, adopted);
