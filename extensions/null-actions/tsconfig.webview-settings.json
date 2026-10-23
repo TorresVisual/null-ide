@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "module": "none",
+    "lib": ["ES2017", "DOM"],
+    "outFile": "./lib/settings.js",
+    "strict": true,
+    "sourceMap": false,
+    "skipLibCheck": true
+  },
+  "include": [
+    "src/webview/settings/protocol.ts",
+    "src/webview/settings/dom.ts",
+    "src/webview/settings/main.ts"
+  ]
+}

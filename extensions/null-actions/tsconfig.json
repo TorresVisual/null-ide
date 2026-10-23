@@ -32,6 +32,7 @@
     "src/runButton.ts",
     "src/settingsPanel.ts",
     "src/workspaceFolder.ts",
+    "src/settingsDom.test.ts",
     "src/test/runTest.ts",
     "src/test/suite/index.ts",
     "src/test/suite/activation.spec.ts",

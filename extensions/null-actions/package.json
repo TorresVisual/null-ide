@@ -10,8 +10,8 @@
   "activationEvents": ["onStartupFinished"],
   "extensionDependencies": ["null.null-env"],
   "scripts": {
-    "compile": "tsc -p tsconfig.json && tsc -p tsconfig.webview.json",
-    "test": "tsc -p tsconfig.json && node --test out/buttonConfig.test.js out/variableResolver.test.js out/terminalRegistry.test.js out/buttonState.test.js out/projectDetector.test.js out/npmScriptsProvider.test.js",
+    "compile": "tsc -p tsconfig.json && tsc -p tsconfig.webview.json && tsc -p tsconfig.webview-settings-shared.json && tsc -p tsconfig.webview-settings.json",
+    "test": "tsc -p tsconfig.json && tsc -p tsconfig.webview-settings-shared.json && tsc -p tsconfig.webview-settings.json && node --test out/buttonConfig.test.js out/variableResolver.test.js out/terminalRegistry.test.js out/buttonState.test.js out/projectDetector.test.js out/npmScriptsProvider.test.js out/settingsDom.test.js",
     "pretest:integration": "tsc -p tsconfig.json",
     "test:integration": "node ./out/test/runTest.js"
   },
