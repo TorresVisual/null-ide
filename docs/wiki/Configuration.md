@@ -79,7 +79,7 @@ Needs `null.discord.clientId` (the Application ID from the Discord Developer Por
 
 ## Action buttons
 
-`null-actions.buttons` is an array of status-bar buttons. Edit it in the Action Buttons panel or directly in `settings.json`.
+`null-actions.buttons` is an array of status-bar buttons. Edit it in the Action Buttons panel (**Null Actions: Open Settings**, or the gear item in the status bar) or directly in `settings.json`.
 
 ## Activity, startup, sync, music
 

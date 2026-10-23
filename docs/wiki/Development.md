@@ -8,7 +8,8 @@ A repackaging of [VSCodium](https://vscodium.com) with its own branding, built-i
 
 ```
 extensions/        Built-in extensions (TypeScript in src/, compiled output in out/)
-shell-ext/         Win11 IExplorerCommand DLL + sparse APPX manifest (CMake + MSVC)
+shell-ext/         Win11 IExplorerCommand DLL + sparse APPX manifest (CMake + MSVC); widgets/ holds the desktop widgets host
+launcher/          null_launcher.exe: project picker started by the jump list (Rust + Tauri)
 patches/           Patches against the VS Code source tree
 setup/             null-setup: installer, wizard and updater (Rust + Tauri)
 scripts/           Local dev helpers and build scripts
@@ -24,7 +25,7 @@ archive/           Retired code, not built
 | For | You need |
 |---|---|
 | Extension work | Node.js and npm |
-| `setup/` | Rust toolchain (`cargo`) |
+| `setup/`, `launcher/` | Rust toolchain (`cargo`) |
 | `shell-ext/` | CMake and Visual Studio 2022 (MSVC) |
 | Full local build mirror | all of the above, plus tens of minutes |
 
@@ -39,7 +40,7 @@ Release builds run in GitHub Actions on `windows-2022`. **Do not try to build th
 5. Swaps in icons and injects `workbench/custom.css` and `splash.js`.
 6. Runs `npx gulp vscode-win32-x64`.
 7. Builds and signs the shell extension, stamps version info into `product.json`.
-8. Builds `setup/` with cargo, then packages `null-ide-win32-x64-<tag>.zip` and `NullIDESetup-<version>.exe`.
+8. Builds `setup/` and `launcher/` with cargo (tests first), then packages `null-ide-win32-x64-<tag>.zip` and `NullIDESetup-<version>.exe`.
 
 Releases come from pushing a `v*` tag, or **Actions → Build Null IDE → Run workflow**. The `upstream-check` workflow opens a PR on Mondays when VSCodium ships a new release; to bump by hand edit `VSCODIUM_TAG` and check that each patch still applies.
 
