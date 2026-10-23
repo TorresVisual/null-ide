@@ -55,4 +55,5 @@ dist/
 graphify-out/
 
 setup/target/
+launcher/target/
 setup/app/gen/
