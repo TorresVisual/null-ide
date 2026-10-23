@@ -64,7 +64,7 @@ As in `SaturationBox`, `onDidChangeColor` is ignored while a drag is active, so 
 
 ## Producing the patch
 
-`vscode-src` is the patched tree with patches 001–011 applied and uncommitted, not a clean checkout at `MS_TAG`. The touched files are not touched by 001–011. Write the change in `vscode-src`, `git add` only the files of this patch, commit, `git format-patch HEAD~1 -o ../patches/` as `012-color-ring-picker.patch`, then `git reset --soft HEAD~1` and unstage so `vscode-src` is back as it was. Never commit the other uncommitted changes there. Prove the patch applies with `git apply --check` in a throwaway worktree at `MS_TAG` with patches 001–011 applied.
+`vscode-src` is the patched tree with patches 001–011 applied and uncommitted, not a clean checkout at `MS_TAG`. The touched files are not touched by 001–011. Write the change in `vscode-src`, `git add` only the files of this patch, export `git diff --cached > ../patches/012-color-ring-picker.patch` (a plain diff, like patch 011; no commit, so no `vscode-src` hooks run), then `git reset -q` to unstage. The edits stay in the working tree, like patches 001–011. Never commit the other uncommitted changes there. Prove the patch applies with `git apply --check` in a throwaway worktree at `HEAD` (valid because the touched upstream files are unmodified in the patched tree), and that it matches the working tree with `git apply --check -R`.
 
 ## Testing and verification
 
