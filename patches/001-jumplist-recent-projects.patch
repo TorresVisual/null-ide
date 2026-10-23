@@ -1,5 +1,5 @@
 diff --git a/src/vs/platform/workspaces/electron-main/workspacesHistoryMainService.ts b/src/vs/platform/workspaces/electron-main/workspacesHistoryMainService.ts
-index 7027a315..0dddda08 100644
+index 7027a315..c5709cbb 100644
 --- a/src/vs/platform/workspaces/electron-main/workspacesHistoryMainService.ts
 +++ b/src/vs/platform/workspaces/electron-main/workspacesHistoryMainService.ts
 @@ -7,7 +7,7 @@ import { app, JumpListCategory, JumpListItem } from 'electron';
@@ -33,7 +33,7 @@ index 7027a315..0dddda08 100644
 +	// Null IDE: retention for null-recent-projects.json (pinned entries are always kept).
 +	private nullRecentProjectsMaxItems(): number {
 +		const value = this.configurationService.getValue<number>('null.recentProjects.maxItems');
-+		return typeof value === 'number' && Number.isFinite(value) ? Math.max(1, Math.floor(value)) : 20;
++		return typeof value === 'number' && Number.isFinite(value) ? Math.max(1, Math.floor(value)) : 50;
 +	}
 +
 +	// Null IDE: write a sibling temp file, then rename over the store so readers never see a partial file.
@@ -99,49 +99,53 @@ index 7027a315..0dddda08 100644
  		let workspaces: Array<IRecentFolder | IRecentWorkspace> = [];
  		let files: IRecentFile[] = [];
  
-@@ -381,7 +447,6 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
+@@ -381,7 +447,10 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
  		}
  
  		const jumpList: JumpListCategory[] = [];
 -		let recentWorkspaces = this.getWindowsJumpListWorkspaces((await this.getRecentlyOpened()).workspaces);
++
++		// Null IDE: the standalone project launcher sits next to the main executable.
++		const launcherExe = join(process.execPath, '..', 'null_launcher.exe');
++		const hasLauncher = await fsPromises.access(launcherExe).then(() => true, () => false);
  
  		// Tasks
  		const tasks: JumpListItem[] = [
-@@ -393,21 +458,20 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
+@@ -393,77 +462,83 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
  				args: '-n', // force new window
  				iconPath: process.execPath,
  				iconIndex: 0
-+			},
-+			{
-+				// Null IDE: opens a quick-pick of all tracked recent projects (beyond the
-+				// jumpListSettings.minItems cap below), handled by the null-tools extension's
-+				// registered URI handler. 'null' below must match product.json's urlProtocol.
-+				type: 'task',
-+				title: localize('moreRecentProjects', "More Recent Projects..."),
-+				description: localize('moreRecentProjectsDesc', "Shows all recently opened projects"),
-+				program: process.execPath,
-+				args: '--open-url -- "null://null.null-tools/recent-projects"',
-+				iconPath: process.execPath,
-+				iconIndex: 0
- 			}
- 		];
- 
+-			}
+-		];
+-
 -		// Agents Window (hidden when AI features are disabled)
 -		if (this.configurationService.getValue<boolean>(ChatAIDisabledSettingId) !== true) {
 -			tasks.push({
--				type: 'task',
++			},
++			{
++				// Null IDE: shows all tracked recent projects (beyond the jumpListSettings.minItems cap
++				// below). Primary path: the standalone launcher, which opens the pick without touching any
++				// open window. Fallback when it is not installed: the null-tools extension's registered URI
++				// handler. 'null' below must match product.json's urlProtocol.
+ 				type: 'task',
 -				title: localize('agentsWindow', "Agents Window"),
 -				description: localize('openAgentsWindowDesc', "Opens the Agents Window"),
 -				program: process.execPath,
 -				args: '--agents',
 -				iconPath: join(this.environmentMainService.appRoot, 'resources/win32/sessions.ico'),
--				iconIndex: 0
++				title: localize('moreRecentProjects', "More Recent Projects..."),
++				description: localize('moreRecentProjectsDesc', "Shows all recently opened projects"),
++				program: hasLauncher ? launcherExe : process.execPath,
++				args: hasLauncher ? '' : '--open-url -- "null://null.null-tools/recent-projects"',
++				iconPath: process.execPath,
+ 				iconIndex: 0
 -			});
 -		}
--
++			}
++		];
+ 
  		jumpList.push({
  			type: 'tasks',
-@@ -414,56 +478,62 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
  			items: tasks
  		});
  
@@ -240,7 +244,7 @@ index 7027a315..0dddda08 100644
  					items
  				});
  			}
-@@ -484,36 +554,6 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
+@@ -484,36 +559,6 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
  		}
  	}
  
