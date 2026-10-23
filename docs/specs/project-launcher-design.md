@@ -147,10 +147,10 @@ The `/recent-projects` URI handler in null-tools stays (it is the fallback below
   --release --locked` for `launcher/`, copy `null_launcher.exe` to the install
   root next to `null.exe`, so it ships in the zip. Mirror in
   `scripts/build-local.ps1`.
-- Updates and uninstall: the exe sits in the install root, so the swap must end
-  any running `null_launcher.exe` under that folder the way it already ends
-  `null_widgets.exe` (`procs::stop_named_under`); it lives for seconds, so no
-  Run entry or install option.
+- Updates and uninstall: the exe sits in the install root. `procs::close_all`
+  already closes every process under the install folder (WM_CLOSE first, then the
+  locked-files prompt), and the launcher has a real window, so no `stop_widgets`-style
+  change is made; it lives for seconds, so no Run entry or install option.
 - Settings: `null.recentProjects.maxItems` default 50 in `null-tools`'
   `package.json` and the patch's fallback constant (was 20); refresh `out/` per the
   extension conventions.

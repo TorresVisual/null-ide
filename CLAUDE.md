@@ -26,6 +26,7 @@ Key characteristics:
 ├── archive/
 │   └── wooting-analog/        # Archived, not built by CI — depth-sensitive key actions for Wooting keyboards
 ├── setup/                     # null-setup (Rust workspace: core + Tauri app); update/prefetch/recover, headless install modes and the wizard window
+├── launcher/                  # null_launcher.exe: standalone project picker started by the jump list (Rust lib + Tauri shell + plain JS page); see launcher/CLAUDE.md
 ├── shell-ext/                 # Win11 native Explorer context menu extension
 │   ├── widgets/               # null_widgets.exe: desktop widgets host (CTest-covered core + Win32/Direct2D shell)
 │   ├── src/                   # C++ IExplorerCommand implementation
@@ -58,7 +59,8 @@ The entire build runs in GitHub Actions on a `windows-2022` runner — do **not*
 9. Build Win11 shell extension: fetch WIL headers, compile DLL with CMake + MSVC, pack and sign sparse APPX (`null-shell-ext.appx`). Run CTest (the desktop widgets host's tests) and copy `null_widgets.exe` to the install root.
 10. Stamp version, commit hash, and server URL into the build output's `product.json`; replace letterpress SVGs; `rcedit` the icon into `null.exe`.
 11. Build `setup/` with cargo (`cargo test`, then `cargo build --release`); ship `null-setup.exe` as `setup/null-setup.exe`; `null-setup` registers natively.
-12. `Compress-Archive` → `null-ide-win32-x64-<tag>.zip`; the setup stub → `NullIDESetup-<version>.exe`; all uploaded to the GitHub Release (tag builds) and as workflow artifacts. The release body comes from `scripts/release-notes.mjs` (highlights from `docs/specs/` + `docs/plans/` added since the previous `v*` tag, then commits grouped by Conventional Commit type); `node --test scripts/release-notes.test.mjs` covers its pure parts.
+12. Test and build `launcher/` (`cargo test --locked`, `node --test launcher/ui-tests/launcher-model.test.mjs`, `cargo build --release --locked`); `null_launcher.exe` is copied into the install root next to `null.exe` (patch 001 starts it from the jump list).
+13. `Compress-Archive` → `null-ide-win32-x64-<tag>.zip`; the setup stub → `NullIDESetup-<version>.exe`; all uploaded to the GitHub Release (tag builds) and as workflow artifacts. The release body comes from `scripts/release-notes.mjs` (highlights from `docs/specs/` + `docs/plans/` added since the previous `v*` tag, then commits grouped by Conventional Commit type); `node --test scripts/release-notes.test.mjs` covers its pure parts.
 
 ### Linux (`build-linux` job)
 
