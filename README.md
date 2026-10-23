@@ -122,6 +122,7 @@ Null IDE is built on [VSCodium](https://vscodium.com) and ships with a dark them
 - **GitHub Actions** in its own activity-bar view: workflow runs, jobs and steps, logs in a tab, and re-run, cancel and run-workflow actions.
 - **Commit messages** from your staged diff with `Ctrl+Shift+Alt+G` (uses the [`claude`](https://claude.com/claude-code) CLI, which must be installed separately).
 - **Git worktrees** view: create (including one per issue), open in a new window, merge back, prune.
+- **Project launcher** (Windows): *More Recent Projects...* in the taskbar jump list opens a searchable picker of every tracked project without disturbing open windows.
 - **`null .`** opens the current folder from any terminal.
 - **"Open in Null"** in the Win11 Explorer context menu via a native `IExplorerCommand` shell extension.
 - **Desktop widgets** (opt-in): Projects, Issues and Pull Requests as cards on the Windows desktop, fed by the IDE. Set up with **Null: Set Up Widgets**.
@@ -228,7 +229,8 @@ Or run **Actions → Build Null IDE → Run workflow** manually. A scheduled job
 
 ```
 extensions/        Built-in extensions (TypeScript sources in src/, compiled to out/ in CI)
-shell-ext/         Win11 IExplorerCommand DLL + sparse APPX manifest (CMake + MSVC)
+shell-ext/         Win11 IExplorerCommand DLL + sparse APPX manifest (CMake + MSVC), desktop widgets host
+launcher/          Project picker started from the taskbar jump list (Rust + Tauri)
 patches/           Patches against the VS Code source tree
 setup/             null-setup: installer, wizard and updater (Rust + Tauri)
 scripts/           Local dev helpers and build scripts
