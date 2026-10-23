@@ -62,7 +62,7 @@
 | GitHub issues | Implemented | issuesPanel.ts | |
 | Pull requests (list, review, merge, checks) | Implemented | null-tools | #92 #117 |
 | GitHub Actions view, logs, dispatch | Implemented | null-tools | #132 |
-| GitLab issues / MRs | Missing | — | accounts exist; pull-requests-design Phase 6 "later", no issue |
+| GitLab issues / MRs | Missing | — | accounts exist; pull-requests-design Phase 6; issue #143 |
 | Git accounts, per-folder identity, SSH keys, commit signing | Implemented | null-accounts | #102 |
 | Git worktrees | Implemented | null-tools/src/worktrees*.ts | #88 closed |
 

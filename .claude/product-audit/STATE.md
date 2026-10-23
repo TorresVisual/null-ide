@@ -22,11 +22,19 @@ Last GitHub issue audit:
 Architecture confidence: high
 Feature inventory confidence: medium (new features taken from CLAUDE.md, specs and commit log)
 
+Follow-up checks (2026-10-23, same day):
+- #138-#140: no matching code in null-markdown yet (still open, unimplemented).
+- #141: implemented as desktop child windows (gate passed 2026-10-21), not the
+  Windows Widgets Board the issue body describes; the body is stale vs the
+  design (`docs/specs/native-windows-widgets-design.md`). Maintainer's call.
+- #12: closing was attempted and denied by the permission classifier; still open.
+- Linux self-update: updater points at the release page (33c694a), no native update.
+- Remote REH server: no new verification found.
+
 Known areas requiring re-audit:
 - performance (#22, #30) needs a live install
 - Linux build/updater is unverified end to end (CLAUDE.md says so for remote REH too)
 - Remote REH server (#85) "not yet verified in a CI-built package"
-- GitLab MRs/issues (Phase 6 of pull-requests-design, no issue)
 
 Corrections this run:
 - Patches 008-011 exist; Linux x64 is built and released (the "Windows-only" claim was stale).
@@ -41,6 +49,6 @@ Corrections to project docs noticed (outside this skill's scope):
   null-cpp extensionDependencies note: not rechecked this run.
 
 Last created issues:
-- #142 Python development support (2026-10-23).
+- #142 Python development support, #143 GitLab MRs/issues (2026-10-23).
 - No other unrepresented gap met the bar; Java (#134), widgets (#141) and
   extension updater (#135) were maintainer-filed.

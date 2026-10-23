@@ -29,8 +29,7 @@ Status: #114 umbrella, #138 paste images, #139 outline/breadcrumbs, #140 copy bu
 
 ### Pull requests / Actions
 Status: shipped (#92, #117, #132): list, review, merge, checks, Actions view,
-logs, dispatch. Not built: GitLab merge requests/issues (pull-requests-design
-Phase 6 "later", no issue). File only if the maintainer wants GitLab parity.
+logs, dispatch. GitLab merge requests/issues: issue #143 (pull-requests-design Phase 6).
 
 ### Rust run/debug parity
 Status: #91 (remaining: CodeLLDB debug config synthesis)

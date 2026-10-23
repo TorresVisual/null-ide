@@ -1,7 +1,7 @@
 # GitHub Issue Audit
 
 Last synchronized:
-2026-10-23 (#1–#142 via `gh issue list --state all`; 22 open)
+2026-10-23 (#1–#143 via `gh issue list --state all`; 23 open)
 
 GitHub is the source of truth. Closed issues are not listed individually; check
 `gh issue list --state closed` if needed.
@@ -22,6 +22,7 @@ proposals to larger, workflow-level items.
 
 | Issue | Title | Status | Area | Last Audited |
 |---|---|---|---|---|
+| #143 | GitLab merge requests and issues in the PR and Issues views | open (filed by this audit) | git | 2026-10-23 |
 | #142 | Python development support: environment check, language server, run/test buttons | open (filed by this audit) | python | 2026-10-23 |
 | #141 | Native Windows Widgets | open (implementation landed: shell-ext/widgets, setup option; issue still open) | shell | 2026-10-23 |
 | #140 #139 #138 | Markdown Editor: code-block copy button, Outline/breadcrumbs, paste images | open (from vscode-watch 1.142) | markdown | 2026-10-23 |
