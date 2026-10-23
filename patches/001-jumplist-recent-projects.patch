@@ -107,7 +107,7 @@ index 7027a315..0dddda08 100644
  
  		// Tasks
  		const tasks: JumpListItem[] = [
-@@ -393,6 +458,18 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
+@@ -393,21 +458,20 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
  				args: '-n', // force new window
  				iconPath: process.execPath,
  				iconIndex: 0
@@ -126,7 +126,22 @@ index 7027a315..0dddda08 100644
  			}
  		];
  
-@@ -414,56 +491,62 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
+-		// Agents Window (hidden when AI features are disabled)
+-		if (this.configurationService.getValue<boolean>(ChatAIDisabledSettingId) !== true) {
+-			tasks.push({
+-				type: 'task',
+-				title: localize('agentsWindow', "Agents Window"),
+-				description: localize('openAgentsWindowDesc', "Opens the Agents Window"),
+-				program: process.execPath,
+-				args: '--agents',
+-				iconPath: join(this.environmentMainService.appRoot, 'resources/win32/sessions.ico'),
+-				iconIndex: 0
+-			});
+-		}
+-
+ 		jumpList.push({
+ 			type: 'tasks',
+@@ -414,56 +478,62 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
  			items: tasks
  		});
  
@@ -225,7 +240,7 @@ index 7027a315..0dddda08 100644
  					items
  				});
  			}
-@@ -484,36 +567,6 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
+@@ -484,36 +554,6 @@ export class WorkspacesHistoryMainService extends Disposable implements IWorkspa
  		}
  	}
  
