@@ -1,0 +1,39 @@
+:root {
+  color-scheme: light dark;
+  --bg: #f6f6f7; --fg: #1d1d1f; --muted: #6b6b73; --line: #dcdce0;
+  --sel: #e3e6ee; --chip: #e6e6ea; --accent: #3b6fd4; --warn: #a15c00;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #17181a; --fg: #e6e6e8; --muted: #8e8e98; --line: #2c2d31;
+    --sel: #25282f; --chip: #2a2b30; --accent: #7aa2f7; --warn: #e0a458;
+  }
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  display: flex; flex-direction: column;
+  background: var(--bg); color: var(--fg);
+  border: 1px solid var(--line);
+  font: 13px/1.4 "Geist Mono", "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+  user-select: none; overflow: hidden;
+}
+#query {
+  width: 100%; padding: 14px 16px; border: 0; border-bottom: 1px solid var(--line);
+  background: transparent; color: var(--fg); font: inherit; font-size: 15px; outline: none;
+}
+#query::placeholder { color: var(--muted); }
+#list { flex: 1; overflow-y: auto; padding: 4px 0; }
+.group { padding: 8px 16px 2px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
+.row { display: flex; align-items: center; gap: 8px; padding: 6px 16px; cursor: default; }
+.row.selected { background: var(--sel); box-shadow: inset 2px 0 0 var(--accent); }
+.row.missing .name, .row.missing .meta { opacity: 0.5; }
+.name { font-weight: 600; white-space: nowrap; }
+.chip { padding: 0 6px; border-radius: 3px; background: var(--chip); color: var(--muted); font-size: 11px; white-space: nowrap; }
+.chip.missing { color: var(--warn); }
+.spacer { flex: 1; min-width: 8px; }
+.meta { display: flex; gap: 10px; min-width: 0; color: var(--muted); font-size: 11px; }
+.meta .path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.empty { padding: 24px 16px; color: var(--muted); }
+#footer { display: flex; justify-content: space-between; gap: 12px; padding: 6px 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
+#status { color: var(--warn); }

@@ -7,12 +7,34 @@ edition = "2021"
 name = "null_launcher"
 path = "src/lib.rs"
 
+[[bin]]
+name = "null_launcher"
+path = "src/main.rs"
+
 # Keeps this package out of the `setup/` workspace.
 [workspace]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+tauri = { version = "2", features = [] }
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.56"
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_System_Threading",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
+[features]
+# Embeds the UI assets instead of looking for a dev server. Needed because CI runs plain `cargo build --release`.
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
 
 [dev-dependencies]
 tempfile = "3"

@@ -57,3 +57,4 @@ graphify-out/
 setup/target/
 launcher/target/
 setup/app/gen/
+launcher/gen/
