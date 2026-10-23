@@ -7,10 +7,12 @@ import { TerminalRegistry } from './terminalRegistry';
 import { StatusBarController } from './statusBarController';
 import { runButton } from './runButton';
 import { ActionButtonsPanel } from './settingsPanel';
+import { trackActiveEditor } from './workspaceFolder';
 
 export function activate(context: vscode.ExtensionContext): void {
   const terminalRegistry = new TerminalRegistry(new VscodeTerminalHost());
   const statusBar = new StatusBarController();
+  trackActiveEditor(context);
 
   context.subscriptions.push(statusBar, terminalRegistry.onDidChangeState((id, state) => statusBar.setState(id, state)));
 

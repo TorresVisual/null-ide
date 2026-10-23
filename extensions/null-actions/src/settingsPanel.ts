@@ -8,6 +8,7 @@ import { readButtonConfigs, writeButtonConfigs } from './buttonConfigIntegration
 import { detectSuggestedButtons, SuggestedButton } from './projectDetector';
 import { getEnvApi } from './envApi';
 import { parseNpmScripts, toActionButtonConfig } from './npmScriptsProvider';
+import { activeWorkspaceFolder } from './workspaceFolder';
 
 function getNonce(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -76,7 +77,7 @@ export class ActionButtonsPanel {
 
   private postState(): void {
     const { buttons } = readButtonConfigs();
-    const folder = vscode.workspace.workspaceFolders?.[0];
+    const folder = activeWorkspaceFolder();
     const suggestions: SuggestedButton[] = folder ? detectSuggestedButtons(folder.uri.fsPath, getEnvApi().detectProjects) : [];
     this.panel.webview.postMessage({ type: 'init', buttons, suggestions });
   }
@@ -103,14 +104,14 @@ export class ActionButtonsPanel {
   }
 
   private handleLoadNpmScripts(): void {
-    const folder = vscode.workspace.workspaceFolders?.[0];
+    const folder = activeWorkspaceFolder();
     if (!folder) {
       this.panel.webview.postMessage({ type: 'npmScriptsLoaded', buttons: [], errors: ['No workspace folder is open.'] });
       return;
     }
     const pkgPath = path.join(folder.uri.fsPath, 'package.json');
     if (!fs.existsSync(pkgPath)) {
-      this.panel.webview.postMessage({ type: 'npmScriptsLoaded', buttons: [], errors: ['No package.json found in the workspace root.'] });
+      this.panel.webview.postMessage({ type: 'npmScriptsLoaded', buttons: [], errors: [`No package.json found in ${folder.name}.`] });
       return;
     }
     let content: string;

@@ -5,12 +5,12 @@ import * as vscode from 'vscode';
 import { ActionButtonConfig, OnBusy } from './buttonConfig';
 import { resolveVariables, VariableContext } from './variableResolver';
 import { TerminalRegistry } from './terminalRegistry';
+import { activeWorkspaceFolder } from './workspaceFolder';
 
 function buildVariableContext(): VariableContext {
   const editor = vscode.window.activeTextEditor;
   const doc = editor?.document;
-  // In a multi-root workspace the active file's folder wins over the first one.
-  const folder = (doc && vscode.workspace.getWorkspaceFolder(doc.uri)) ?? vscode.workspace.workspaceFolders?.[0];
+  const folder = activeWorkspaceFolder();
   const fsPath = doc?.uri.fsPath;
 
   return {
