@@ -50,3 +50,9 @@ test('unknown variable name is left untouched', () => {
 test('template with no variables passes through unchanged', () => {
   assert.strictEqual(resolveVariables('npm run build', {}), 'npm run build');
 });
+
+test('collects known variables it could not resolve, but not shell-style ${NAME}', () => {
+  const missing: string[] = [];
+  resolveVariables('cp ${file} ${env:NOPE} ${HOME} ${notAVariable}', {}, missing);
+  assert.deepStrictEqual(missing, ['${file}', '${env:NOPE}']);
+});

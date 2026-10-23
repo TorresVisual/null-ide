@@ -34,9 +34,27 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
   );
 
+  let knownIds = new Set<string>();
+  let lastErrors = '';
+
   function refresh(): void {
-    const { buttons } = readButtonConfigs();
+    const { buttons, errors } = readButtonConfigs();
     statusBar.update(buttons);
+
+    const ids = new Set(buttons.map(b => b.id));
+    knownIds.forEach(id => { if (!ids.has(id)) { terminalRegistry.forget(id); } });
+    knownIds = ids;
+
+    // One warning per distinct problem set, not one per settings change.
+    const summary = errors.join('\n');
+    if (summary !== lastErrors) {
+      lastErrors = summary;
+      if (summary) {
+        const more = errors.length > 1 ? ` (+${errors.length - 1} more)` : '';
+        void vscode.window.showWarningMessage(`Some Null Actions buttons are ignored: ${errors[0]}${more}`, 'Open Settings')
+          .then(pick => { if (pick) { void vscode.commands.executeCommand('null-actions.openSettings'); } });
+      }
+    }
   }
 
   context.subscriptions.push(

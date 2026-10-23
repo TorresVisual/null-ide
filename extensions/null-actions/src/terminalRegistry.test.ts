@@ -259,3 +259,26 @@ test('a task that fails to start clears the running state', async () => {
   await assert.rejects(registry.dispatch('a', 'A', 'x', { problemMatcher: '$nope' }));
   assert.strictEqual(registry.getState('a'), undefined);
 });
+
+test('a throwing shell-integration execute clears the running state and falls back to sendText', async () => {
+  class ThrowingHost extends FakeTerminalHost {
+    async execute(): Promise<never> { throw new Error('terminal disposed'); }
+  }
+  const host = new ThrowingHost();
+  const registry = new TerminalRegistry(host);
+  await registry.dispatch('build', 'Build', 'npm run build');
+  assert.strictEqual(registry.isBusy('build'), false);
+  assert.deepStrictEqual(host.terminals[0].sentTexts, ['npm run build']);
+});
+
+test('two buttons sharing a label adopt different restored terminals instead of sharing one', async () => {
+  const a = new FakeTerminal('Action: Build');
+  const b = new FakeTerminal('Action: Build');
+  const host = new FakeTerminalHost([a, b]);
+  const registry = new TerminalRegistry(host);
+  await registry.dispatch('one', 'Build', 'cmd one');
+  await registry.dispatch('two', 'Build', 'cmd two');
+  assert.strictEqual(host.createCount, 0);
+  assert.deepStrictEqual(b.sentTexts, ['cmd one']);
+  assert.deepStrictEqual(a.sentTexts, ['cmd two']);
+});

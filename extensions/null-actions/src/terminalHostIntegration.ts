@@ -45,9 +45,11 @@ export class VscodeTerminalHost implements TerminalHost {
 
   async runTask(label: string, command: string, options: { cwd?: string; focus?: boolean; problemMatcher: string }): Promise<TaskRun> {
     const name = `Action: ${label}`;
+    // Scope to the folder that owns the cwd (multi-root), else the first folder.
+    const owner = options.cwd ? vscode.workspace.getWorkspaceFolder(vscode.Uri.file(options.cwd)) : undefined;
     const task = new vscode.Task(
       { type: 'shell' },
-      vscode.workspace.workspaceFolders?.[0] ?? vscode.TaskScope.Workspace,
+      owner ?? vscode.workspace.workspaceFolders?.[0] ?? vscode.TaskScope.Workspace,
       name,
       'null-actions',
       new vscode.ShellExecution(command, { cwd: options.cwd }),
