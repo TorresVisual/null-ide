@@ -14,7 +14,7 @@ from another editor is still missing.
 
 ### Package managers / updater
 Status: winget #13 open; scoop/choco closed not planned. Updater #120 closed
-(completed); #12 is a stale duplicate. Extension updater: #135 (empty body).
+(completed); #12 closed not planned. Extension updater: #135 (empty body).
 Linux build shipped (#119).
 
 ## Core IDE

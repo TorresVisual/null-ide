@@ -17,7 +17,7 @@ Last inspected areas:
 - 2026-10-11 and earlier: see git history of this file.
 
 Last GitHub issue audit:
-2026-10-23 (#1-#142; 22 open)
+2026-10-23 (#1-#143; 22 open, re-checked, no issue activity after #143)
 
 Architecture confidence: high
 Feature inventory confidence: medium (new features taken from CLAUDE.md, specs and commit log)
@@ -27,7 +27,7 @@ Follow-up checks (2026-10-23, same day):
 - #141: implemented as desktop child windows (gate passed 2026-10-21), not the
   Windows Widgets Board the issue body describes; the body is stale vs the
   design (`docs/specs/native-windows-widgets-design.md`). Maintainer's call.
-- #12: closing was attempted and denied by the permission classifier; still open.
+- #12: now closed NOT_PLANNED (2026-10-23 00:05); no longer open.
 - Linux self-update: updater points at the release page (33c694a), no native update.
 - Remote REH server: no new verification found.
 

@@ -1,7 +1,7 @@
 # GitHub Issue Audit
 
 Last synchronized:
-2026-10-23 (#1–#143 via `gh issue list --state all`; 23 open)
+2026-10-23 (#1–#143 via `gh issue list --state all`; 22 open)
 
 GitHub is the source of truth. Closed issues are not listed individually; check
 `gh issue list --state closed` if needed.
@@ -15,7 +15,7 @@ Closed 2026-10-11..23, implemented (COMPLETED): #5 #9 #11 #17 #18 #19 #23 #81 #8
 #119 (Linux build), #120 (updater), #121, #122 (wiki), #130 (installer redesign),
 #131 (activity multi-machine), #132 (GitHub Actions), #133 (Workspace hub).
 
-Closed NOT_PLANNED by the maintainer 2026-10-11..14 (do not re-file): #6 #8 #14
+Closed NOT_PLANNED by the maintainer 2026-10-11..23 (do not re-file): #12 (updater, superseded by #120) #6 #8 #14
 #15 #20 #21 #36 #37 #82 #83 #93 #94 #96. Pattern: the maintainer closes
 test-explorer, project-template, CI-status and diagnostics-panel ideas; keep
 proposals to larger, workflow-level items.
@@ -38,5 +38,5 @@ proposals to larger, workflow-level items.
 | #33 | Auto-open browser for dev server port | open | run | 2026-10-23 |
 | #30 #22 | Low-memory mode, large-file performance | open | performance | 2026-10-23 |
 | #13 | Winget package | open | install | 2026-10-23 |
-| #12 | Fix broken updater (unreproduced) | open; superseded by closed #120, closeable | install | 2026-10-23 |
+
 | #7 | Interactive hunk-level staging UI | open | git | 2026-10-23 |
