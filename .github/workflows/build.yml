@@ -734,6 +734,20 @@ jobs:
         working-directory: ide-overlay/setup
         run: cargo build --release --locked -p null-setup
 
+      - name: Test null-launcher
+        shell: pwsh
+        working-directory: ide-overlay/launcher
+        run: cargo test --locked
+
+      - name: Test launcher UI rules
+        shell: pwsh
+        run: node --test ide-overlay/launcher/ui-tests/launcher-model.test.mjs
+
+      - name: Build null-launcher
+        shell: pwsh
+        working-directory: ide-overlay/launcher
+        run: cargo build --release --locked
+
       - name: Prepare release payload
         shell: pwsh
         run: |
@@ -750,6 +764,9 @@ jobs:
           $setupDir = Join-Path $outDir "setup"
           New-Item -ItemType Directory -Path $setupDir -Force | Out-Null
           Copy-Item ide-overlay/setup/target/release/null-setup.exe $setupDir -Force
+
+          # The jump list's "More Recent Projects..." starts this next to null.exe (patch 001).
+          Copy-Item ide-overlay/launcher/target/release/null_launcher.exe $outDir -Force
 
           $metadata = [ordered]@{
             repo        = '${{ github.repository }}'

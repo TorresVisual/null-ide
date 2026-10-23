@@ -790,6 +790,17 @@ finally {
     Pop-Location
 }
 
+Write-Step "Testing and building null-launcher"
+Push-Location (Join-Path $RepoRoot "launcher")
+try {
+    Invoke-Native "cargo test (null-launcher)" { cargo test --locked }
+    Invoke-Native "node --test (launcher UI rules)" { node --test ui-tests/launcher-model.test.mjs }
+    Invoke-Native "cargo build (null-launcher)" { cargo build --release --locked }
+}
+finally {
+    Pop-Location
+}
+
 Write-Step "Preparing release payload"
 $builtinsJson = Join-Path $OutDir "builtins.json"
 node (Join-Path $RepoRoot "scripts/gen-builtins.mjs") $builtinsJson
@@ -798,6 +809,9 @@ if ($LASTEXITCODE -ne 0) { throw "gen-builtins failed" }
 $setupDir = Join-Path $OutDir "setup"
 New-Item -ItemType Directory -Path $setupDir -Force | Out-Null
 Copy-Item (Join-Path $RepoRoot "setup/target/release/null-setup.exe") $setupDir -Force
+
+# The jump list's "More Recent Projects..." starts this next to null.exe (patch 001).
+Copy-Item (Join-Path $RepoRoot "launcher/target/release/null_launcher.exe") $OutDir -Force
 
 @{
     repo        = "TorresVisual/null-ide"
