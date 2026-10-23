@@ -168,7 +168,7 @@ class DashboardEditorProvider {
         return (0, recentProjects_1.findCurrentRecentProject)((0, recentProjects_1.getRecentProjectsFilePath)(), requestedPath);
     }
     _maxItems() {
-        const value = vscode.workspace.getConfiguration('null.recentProjects').get('maxItems', 20);
+        const value = vscode.workspace.getConfiguration('null.recentProjects').get('maxItems', 50);
         return Number.isFinite(value) ? Math.max(1, Math.floor(value)) : 20;
     }
     _sendProjectsAndStatuses(webview) {
