@@ -1,43 +1,46 @@
 # Audit State
 
 Last audit:
-2026-10-11 (incremental — 354 commits since e3301b1, mostly new extensions)
+2026-10-23 (incremental — 452 commits since ccb9544)
 
 Repository state:
-main @ ccb9544
+main @ 918b433
 
 Last inspected areas:
-- 2026-10-11: commit log e3301b1..HEAD, extensions/ + archive/ + patches/
-  listings, product.json trust settings, null-tools updater trigger code,
-  null-activity trust guard, new open issues #111 #114 #115 #117 #119-#122.
-  Not deep-inspected: null-music / null-activity / null-accounts internals
-  (CLAUDE.md documents them in detail; trusted as accurate).
-- 2026-09-25/26 (unchanged areas): null-cpp, null-format, null-actions,
-  installer/shell-ext, updater/ native EXE.
+- 2026-10-23: commit log ccb9544..HEAD (summary only), open/closed issue delta
+  (#111-#142), product.json recommendations, patches list (now 001-011),
+  null-env rules/detect (languages: rust, cpp, node, dotnet; no Python),
+  null-actions project detector, pull-requests-design (GitLab = Phase 6 "later"),
+  docs/vscode-tracking.md (reviewed through 1.142).
+  Not deep-inspected: Actions view, PR review internals, widgets host,
+  null-sync, null-startup, Linux CI (trusted from CLAUDE.md / specs).
+- 2026-10-11 and earlier: see git history of this file.
 
 Last GitHub issue audit:
-2026-10-11 (#1-#123 via `gh issue list --state all`)
+2026-10-23 (#1-#142; 22 open)
 
 Architecture confidence: high
-Feature inventory confidence: medium (new extensions taken from CLAUDE.md)
+Feature inventory confidence: medium (new features taken from CLAUDE.md, specs and commit log)
 
 Known areas requiring re-audit:
-- performance (#19-#22, #30) needs a live install
-- #12/#120 updater: a real-install smoke test would settle it
-- null-cpp / null-actions not re-read since 2026-09-25 (few commits touched them)
+- performance (#22, #30) needs a live install
+- Linux build/updater is unverified end to end (CLAUDE.md says so for remote REH too)
+- Remote REH server (#85) "not yet verified in a CI-built package"
+- GitLab MRs/issues (Phase 6 of pull-requests-design, no issue)
 
 Corrections this run:
-- Extensions: 3 new built-ins (accounts, activity, music); wooting archived.
-- Patches 005-007 exist; #98-#100 and #88 are implemented, not open.
-- Updater is Partial, not Implemented (startup-only check, silent failure).
-- Trust guards are inert (#97 impact grew).
+- Patches 008-011 exist; Linux x64 is built and released (the "Windows-only" claim was stale).
+- Thirteen built-ins now (added null-env, null-startup, null-sync).
+- #12/#120 updater: #120 closed; #12 is a stale duplicate.
+- Workspace trust (#97) closed as completed.
+- Many 2026-09 issues were closed (see ISSUES.md); the maintainer closes small
+  diagnostic/test/template ideas as not planned.
 
 Corrections to project docs noticed (outside this skill's scope):
-- docs/index.html and PRODUCT.md still mention Ollama (2 hits each) though
-  it was removed in e3301b1.
-- docs/ROADMAP.md Phase 4 still says null-cpp declares extensionDependencies.
+- docs/index.html and PRODUCT.md Ollama mentions and docs/ROADMAP.md Phase 4
+  null-cpp extensionDependencies note: not rechecked this run.
 
 Last created issues:
-- None this run. Existing issues updated: comments on #120, #117, #92, #97.
-  The backlog (~50 open) is already comprehensive; no unrepresented gap met
-  the quality bar. GitLab issues/MRs is a recorded candidate in ROADMAP.md.
+- #142 Python development support (2026-10-23).
+- No other unrepresented gap met the bar; Java (#134), widgets (#141) and
+  extension updater (#135) were maintainer-filed.

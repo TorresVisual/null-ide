@@ -1,6 +1,6 @@
 # NULL IDE Architecture
 
-VSCodium fork, Windows-only (win32-x64). Built entirely in GitHub Actions
+VSCodium fork, Windows (win32-x64) plus Linux x64 (tar.gz/deb, #119). Built entirely in GitHub Actions
 (`.github/workflows/build.yml`); `scripts/build-local.ps1` mirrors it locally.
 
 ## Workbench
@@ -10,7 +10,9 @@ VSCodium fork, Windows-only (win32-x64). Built entirely in GitHub Actions
   `002` copilotApi types, `003`/`004` dashboard startup + Help > Welcome,
   `005` Claude Code command-center split button (#98), `006` Settings TOC
   splits Extensions into Null / Installed / Built-in (#108), `007` Accounts
-  menu lists null-accounts accounts + avatar on the activity-bar button.
+  menu lists null-accounts accounts + avatar on the activity-bar button,
+  `008` commit-message check hook, `009` safe mode, `010` startup snapshot,
+  `011` compile-cache rm retries.
 - Upstream: root `VSCODIUM_TAG` file (1.135.06055 as of 2026-10-11);
   `.github/workflows/upstream-check.yml` opens a bump PR weekly and dry-runs
   the patches (#115 asks for a process on top of this: feature parity review).
@@ -40,14 +42,15 @@ VSCodium fork, Windows-only (win32-x64). Built entirely in GitHub Actions
   `issuesListController.ts`, `github/`): github.com-style list/search, detail
   tab, composer, New-issue form with templates, image upload to an orphan
   `null-issue-assets` branch, branch→issue prompt. GitHub.com only (token via
-  null-accounts); **no pull request support, no GitLab issues/MRs** (#92/#117).
+  null-accounts); pull requests (list, review, merge, checks) and a GitHub Actions view added
+  2026-10 (#92/#117/#132); **no GitLab issues/MRs** (design Phase 6).
 - Git worktree manager (null-tools `worktrees*.ts`, #88) for parallel agent
   sessions.
 
 ## Extensions (built-in, `extensions/`)
-- Ten built-ins + cspell: null-theme, null-icons, null-markdown, null-format,
-  null-tools, null-cpp, null-actions, null-accounts, null-activity,
-  null-music. `wooting-analog` moved to `archive/` (ee50b16), not built.
+- Thirteen built-ins + cspell + open-remote-*: null-theme, null-icons, null-markdown,
+  null-format, null-tools, null-cpp, null-actions, null-accounts, null-activity,
+  null-music, null-env (env check), null-startup (profiler), null-sync (Gist sync). `wooting-analog` moved to `archive/` (ee50b16), not built.
 - null-accounts (#102): GitHub (wraps VS Code's session) + GitLab (device-flow
   OAuth or PAT) + SSH-only accounts; folder→account binding wired into git
   (user.name/email, credential store, core.sshCommand), SSH key
@@ -79,16 +82,14 @@ closed not-planned), AI Agents panel deleted (#84, e3301b1).
   session transcripts (`~/.claude/projects/<encoded-workspace>/<sessionId>.jsonl`)
   instead of hooks: `followAlong.ts` (#99), `whyIsThisHere.ts` (#100),
   `claudeTabIntegration.ts`, and patch 005 (#98 command-center button).
-- Still open: #111 "Continue" button outside the extension.
+- #111 "Continue" button shipped.
 - Blocked by the extension: submitting prompts programmatically and
   surfacing its permission prompts (per #41 closing comment).
 - Claude Code is neither bundled nor in `extensionRecommendations` (scope
   added to #89).
 
 ## Security posture
-Workspace trust is force-disabled (product.json + `disableRestrictedMode()` in
-null-tools, #97). Consequence found 2026-10-11: any `vscode.workspace.isTrusted`
-guard is inert — null-activity's git-stats gate is the only one.
+Workspace trust handling was reworked (#97 closed 2026-10-14); not re-read this run.
 
 ## Important Entry Points
 - `extensions/*/src/extension.ts` (activate), mostly `onStartupFinished`.

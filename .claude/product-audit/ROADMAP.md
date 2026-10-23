@@ -2,93 +2,65 @@
 
 ## Foundation
 
-### Environment check: companion extensions + toolchains per project
-Status: issue created
-Issue: #89
-Why: null-cpp needs clangd/cpptools/CodeLLDB but no longer declares them
-(1f7c00b); fresh installs fail at Debug with no guidance. Rust has no LSP path.
-2026-09-26: scope comment added — also the Claude Code extension (only AI
-workflow, prerequisite of #98–#100, not in extensionRecommendations) and the
-`claude` CLI that commit-message generation shells out to.
+### Language support parity (C++ done; Rust, Java, Python)
+Status: issues exist — #91 (Rust debug synthesis; rust-analyzer already recommended
+and checked), #134 (Java), #142 (Python, filed 2026-10-23).
+Why: null-env's manifest table covers rust/cpp/node/dotnet only; Pylance is
+MS-licensed and unusable in VSCodium.
 
 ### Import settings/keybindings/snippets/extensions from VS Code / Cursor
-Status: issue created
-Issue: #90
-Why: installer only seeds defaults; migration is the main acquisition path.
-
-### Workspace trust hardening
-Status: issue created (#97)
-Why: null-tools' `disableRestrictedMode()` re-disables trust on every
-activation, overriding a user's explicit opt-in; Clone Repo + `runOn:
-folderOpen` tasks run untrusted code on open.
+Status: issue exists (#90). Cross-device sync shipped as null-sync, but migration
+from another editor is still missing.
 
 ### Package managers / updater
-Status: winget/scoop/choco issues exist (#13–#15). Updater: #12 + #120 (the
-maintainer now reports it as broken). Root-cause leads commented on #120
-2026-10-11: startup-only check, silent failure. Linux build #119.
+Status: winget #13 open; scoop/choco closed not planned. Updater #120 closed
+(completed); #12 is a stale duplicate. Extension updater: #135 (empty body).
+Linux build shipped (#119).
 
 ## Core IDE
 
 ### Project metadata as source of truth
 Status: issue exists (#39)
 
-### Remote WSL/SSH
-Status: issue exists (#85)
+### Markdown Editor follow-ups
+Status: #114 umbrella, #138 paste images, #139 outline/breadcrumbs, #140 copy button.
 
 ## Developer Workflow
 
-### Pull requests in GitHub panel (list, checkout, review diff, comment)
-Status: issue created (#92); maintainer filed umbrella #117 (cross-linked
-2026-10-11).
-Candidate (not filed): GitLab issues/merge requests in the panel. null-accounts
-already authenticates GitLab, but nothing consumes it for issues/MRs. File only
-if the maintainer wants GitLab parity (decide inside #117 first).
+### Pull requests / Actions
+Status: shipped (#92, #117, #132): list, review, merge, checks, Actions view,
+logs, dispatch. Not built: GitLab merge requests/issues (pull-requests-design
+Phase 6 "later", no issue). File only if the maintainer wants GitLab parity.
 
-### Test explorer for non-C++ (cargo test, npm test)
-Status: issue created (#93); CTest itself is #82.
+### Rust run/debug parity
+Status: #91 (remaining: CodeLLDB debug config synthesis)
 
-### Rust run/debug (cargo + CodeLLDB) parity with null-cpp
-Status: issue created (#91)
+### Git
+Status: graph #87 and pull flows shipped. Open: hunk staging #7, secret scan #34.
 
-### Git: graph #87, worktrees #88, hunk staging #7, secret scan #34
-Status: issues exist
-
-### New Project templates wired to existing scaffolders
-Status: issue created (#94)
-Why: dashboard New Project = empty dir + git init; null-cpp scaffolders and
-autoGitignore exist but are disconnected from it.
-
-### Build output → Problems for non-C++ action buttons
-Status: issue created (#95)
-Why: buttons use sendText, so cargo/tsc/eslint errors never reach Problems.
-
-### CI status (GitHub Actions) for HEAD
-Status: issue created (#96)
-Why: Commit → Push → CI loop leaves the IDE.
+### Dev server
+Status: #33 auto-open browser.
 
 ## Advanced
 
 ### Editor-first Claude Code integration
-Status: #98, #99, #100 implemented and closed (patch 005, followAlong,
-whyIsThisHere). Remaining: #111 continue button.
-Why: replaces the removed AI Agents panel / #41. Don't propose a native
-agent UI or panel again; new AI items should sit on top of the extension
-(transcripts, URI handler `vscode://anthropic.claude-code/open?session=`).
+Status: shipped (#98 #99 #100 #111). Don't propose a native agent UI or panel.
 
-### Compiler Explorer (#86), process panel (#37)
-Status: issues exist
+### Compiler Explorer (#86), Windows widgets (#141, implementation landed)
 
 ## Polish
+Issues panel extras (#54 #56 #59); large files / low memory (#22 #30).
 
-### Floating terminal #11
-Status: issue exists (#10 distraction-free and #29 explorer redesign closed
-by the maintainer 2026-09-25)
+## Shipped since 2026-10-11 (not roadmap anymore)
+Linux x64 build (#119), PR view + review (#92/#117), GitHub Actions view (#132),
+Workspace hub (#133), installer/first-run redesign (#130), null-env (#89),
+null-startup profiler (#19), safe mode + crash recovery (#17/#18), null-sync
+(#23), remote WSL/SSH (#85, unverified in CI build), commit graph (#87),
+activity multi-machine (#131), action-button run state (#81), build output to
+Problems (#95), trust hardening (#97), wiki (#122), desktop widgets host (#141).
 
-## Shipped since 2026-09-26 (not roadmap anymore)
-null-accounts (#102), null-activity (#113), null-music (#112), worktree
-manager (#88), Issues panel v2, dashboard launcher redesign (#118), settings
-TOC (#108), extension registry (#110).
-
-## Process
-#115 (track VS Code features) and #122 (wiki) are maintainer-owned process/docs
-items; no further issues needed.
+## Not doing (maintainer closed as not planned; don't re-file)
+Test Explorer for non-C++ (#93), CTest (#82), project templates (#94), CI status
+for branch (#96), dirty/stash dashboard flags (#83), wiki-link diagnostics (#36),
+terminal process panel (#37), extension perf/memory monitors (#20 #21),
+scoop/choco (#14 #15), commit templates (#6), multi-root git summary (#8).
