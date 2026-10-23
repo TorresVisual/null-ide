@@ -36,8 +36,11 @@ section { margin-bottom: 26px; }
 .card-title { font-weight: 600; flex-shrink: 0; }
 .card-summary { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 11px; color: var(--vscode-descriptionForeground); }
 
-.card-body { max-height: 960px; opacity: 1; padding: 2px 13px 13px; transition: max-height .22s ease, opacity .16s ease, padding .22s ease; }
-.card.collapsed .card-body { max-height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; pointer-events: none; }
+/* Height animates through grid-template-rows (0fr <-> 1fr); the clip wrapper lets the row shrink to 0, the pad wrapper keeps padding out of the collapsed height. */
+.card-body { display: grid; grid-template-rows: 1fr; opacity: 1; transition: grid-template-rows .22s ease, opacity .16s ease; }
+.card-body-clip { overflow: hidden; min-height: 0; }
+.card-body-pad { padding: 2px 13px 13px; }
+.card.collapsed .card-body { grid-template-rows: 0fr; opacity: 0; pointer-events: none; visibility: hidden; transition: grid-template-rows .22s ease, opacity .16s ease, visibility 0s .22s; }
 
 .field-section { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--vscode-focusBorder); opacity: .85; margin: 14px 0 6px; }
 .field-section:first-of-type { margin-top: 2px; }

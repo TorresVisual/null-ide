@@ -77,7 +77,7 @@ function renderCard(btn: ButtonDto, index: number): HTMLElement {
     `<button data-action="down" data-index="${index}">Down</button>` +
     `<button data-action="delete" data-index="${index}">Delete</button>` +
     '</div>';
-  div.innerHTML = header + `<div class="card-body">${body}</div>`;
+  div.innerHTML = header + `<div class="card-body"><div class="card-body-clip"><div class="card-body-pad">${body}</div></div></div>`;
   // The CSP forbids style attributes in markup; CSSOM is allowed.
   (div.querySelector('.color-swatch') as HTMLElement).style.background = colorSwatchValue(btn.color);
   return div;
