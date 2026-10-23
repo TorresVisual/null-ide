@@ -12,10 +12,81 @@ function escapeHtml(s) {
 function escapeAttr(s) {
     return escapeHtml(s);
 }
+/** Display order: priority descending (the status bar order), ties keep list order. */
+function sortByPriority(buttons) {
+    return buttons.slice().sort((a, b) => (b.priority || 0) - (a.priority || 0));
+}
+/** Priority that places a new button after every existing one. Stays at or below 0: the gear item sits at 1. */
+function nextPriority(buttons) {
+    return buttons.length === 0 ? 0 : Math.min(0, ...buttons.map(b => b.priority || 0)) - 1;
+}
+/**
+ * Moves the button at `index` of the sorted list one place by swapping priorities with its neighbour.
+ * Any tie in the list is first broken by renumbering downward from 0, so the move always changes the order.
+ */
+function moveButton(buttons, index, direction) {
+    let list = sortByPriority(buttons);
+    const j = direction === 'up' ? index - 1 : index + 1;
+    if (index < 0 || index >= list.length || j < 0 || j >= list.length) {
+        return list;
+    }
+    if (new Set(list.map(b => b.priority || 0)).size < list.length) {
+        list = list.map((b, i) => (Object.assign(Object.assign({}, b), { priority: -i })));
+    }
+    const a = list[index];
+    const b = list[j];
+    list[index] = Object.assign(Object.assign({}, b), { priority: a.priority || 0 });
+    list[j] = Object.assign(Object.assign({}, a), { priority: b.priority || 0 });
+    return list;
+}
+function visibleSuggestions(buttons, suggestions) {
+    const ids = new Set(buttons.map(b => b.id));
+    return suggestions.filter(s => !ids.has(s.id));
+}
+function addSuggestion(buttons, s) {
+    if (buttons.some(b => b.id === s.id)) {
+        return buttons;
+    }
+    return [...buttons, {
+            id: s.id, label: s.label, command: s.command, icon: s.icon, problemMatcher: s.problemMatcher,
+            type: 'terminal', background: 'none', priority: nextPriority(buttons), saveAll: false, focus: true,
+        }];
+}
+/** A blank button whose id is unique in `buttons`. `now` is injectable for tests. */
+function newButton(buttons, now = Date.now()) {
+    const ids = new Set(buttons.map(b => b.id));
+    while (ids.has('button-' + now)) {
+        now++;
+    }
+    return {
+        id: 'button-' + now, label: 'New Button', command: '',
+        type: 'terminal', background: 'none', priority: nextPriority(buttons), saveAll: false, focus: true,
+    };
+}
+/** Mirrors what the host's parseButtonConfigs rejects (it trims), so Save fails here first, next to the field. */
+function validate(buttons) {
+    const errors = [];
+    const seen = new Set();
+    buttons.forEach((b, index) => {
+        if (seen.has(b.id)) {
+            errors.push({ index, field: 'id', message: `Duplicate id "${b.id}"` });
+        }
+        seen.add(b.id);
+        if (!(b.label || '').trim()) {
+            errors.push({ index, field: 'label', message: 'Label is required' });
+        }
+        if (!(b.command || '').trim()) {
+            errors.push({ index, field: 'command', message: 'Command is required' });
+        }
+    });
+    return errors;
+}
 const vscodeApi = acquireVsCodeApi(); // may be called only once per webview
 let buttons = [];
 let suggestions = [];
 let collapsedIds = null;
+// Validation messages from the last failed Save, by button id then field. Cleared per field on its next input.
+const validation = new Map();
 // Curated subset of codicon names -- not the full ~500-icon set, just ones plausibly
 // useful on an action button. The Icon field stays a free-text input (any codicon
 // name works); this only powers the dropdown suggestions via <datalist>.
@@ -28,8 +99,12 @@ function byId(id) {
 function colorSwatchValue(color) {
     return HEX_COLOR.test(color || '') ? color : '#ffffff';
 }
-function fieldRow(label, inputHtml, id) {
-    return `<div class="row"><label for="${id}">${label}</label>${inputHtml}</div>`;
+function fieldRow(label, inputHtml, id, error) {
+    const msg = error ? `<div class="field-error" data-error-for="${id}">${escapeHtml(error)}</div>` : '';
+    return `<div class="row"><label for="${id}">${label}</label>${inputHtml}${msg}</div>`;
+}
+function invalidAttrs(error) {
+    return error ? ' class="invalid" aria-invalid="true"' : '';
 }
 function textInput(field, index, value, extra = '') {
     return `<input type="text" id="field-${field}-${index}" data-field="${field}" data-index="${index}" value="${escapeAttr(value || '')}"${extra}>`;
@@ -52,9 +127,14 @@ function renderCard(btn, index) {
     div.className = collapsed ? 'card collapsed' : 'card';
     div.style.animationDelay = (index * 25) + 'ms';
     const isVscodeCommand = btn.type === 'vscode-command';
-    const body = fieldRow('Label', textInput('label', index, btn.label), `field-label-${index}`) +
+    const err = validation.get(btn.id) || {};
+    if (Object.keys(err).length) {
+        div.classList.add('has-error');
+    }
+    const body = (err.id ? `<div class="card-error">${escapeHtml(err.id)}</div>` : '') +
+        fieldRow('Label', textInput('label', index, btn.label, invalidAttrs(err.label)), `field-label-${index}`, err.label) +
         '<div class="field-section">Behavior</div>' +
-        fieldRow('Command', textInput('command', index, btn.command) + `<button data-action="browse" data-index="${index}">Browse a file...</button>`, `field-command-${index}`) +
+        fieldRow('Command', textInput('command', index, btn.command, invalidAttrs(err.command)) + `<button data-action="browse" data-index="${index}">Browse a file...</button>`, `field-command-${index}`, err.command) +
         fieldRow('Type', selectInput('type', index, ['terminal', 'vscode-command'], btn.type), `field-type-${index}`) +
         `<div class="row args-row" data-index="${index}"${isVscodeCommand ? '' : ' hidden'}><label for="field-args-${index}">Args</label>${textInput('args', index, (btn.args || []).join(','), ' placeholder="arg1,arg2"')}</div>` +
         fieldRow('Cwd', textInput('cwd', index, btn.cwd, ' placeholder="${workspaceFolder}"'), `field-cwd-${index}`) +
@@ -88,13 +168,13 @@ function render() {
     byId('empty-state').classList.toggle('visible', buttons.length === 0);
     const sList = byId('suggestions-list');
     sList.innerHTML = '';
-    suggestions.forEach(s => {
+    visibleSuggestions(buttons, suggestions).forEach(s => {
         const row = document.createElement('div');
         row.className = 'suggestion';
         row.innerHTML = `<span class="suggestion-label">${escapeHtml(s.label)}</span><button data-action="add-suggestion" data-id="${escapeAttr(s.id)}">+ Add</button>`;
         sList.appendChild(row);
     });
-    byId('suggestions-section').style.display = suggestions.length ? '' : 'none';
+    byId('suggestions-section').style.display = sList.childElementCount ? '' : 'none';
 }
 function fieldToButtons(index, field, value) {
     const btn = buttons[index];
@@ -104,6 +184,13 @@ function fieldToButtons(index, field, value) {
     }
     btn[field] = value;
 }
+function showIgnored(errors) {
+    const el = byId('ignored-banner');
+    el.hidden = errors.length === 0;
+    el.innerHTML = errors.length
+        ? `<strong>${errors.length === 1 ? '1 entry in settings was' : errors.length + ' entries in settings were'} ignored and will be removed when you save:</strong><ul>${errors.map(e => `<li>${escapeHtml(e)}</li>`).join('')}</ul>`
+        : '';
+}
 function showStatus(text, kind, autoHideMs) {
     const el = byId('status');
     el.textContent = text;
@@ -112,6 +199,29 @@ function showStatus(text, kind, autoHideMs) {
         setTimeout(() => { el.className = ''; }, autoHideMs);
     }
 }
+function clearFieldError(id, field, input) {
+    var _a;
+    const err = validation.get(id);
+    if (!err || !err[field]) {
+        return;
+    }
+    delete err[field];
+    input.classList.remove('invalid');
+    input.removeAttribute('aria-invalid');
+    (_a = document.querySelector(`[data-error-for="${input.id}"]`)) === null || _a === void 0 ? void 0 : _a.remove();
+}
+// Re-sort on change (blur / Enter), not on every keystroke, so a card does not jump while typing "10".
+document.addEventListener('change', e => {
+    const t = e.target;
+    if (t.getAttribute('data-field') !== 'priority') {
+        return;
+    }
+    const sorted = sortByPriority(buttons);
+    if (sorted.some((b, i) => b !== buttons[i])) {
+        buttons = sorted;
+        render();
+    }
+});
 document.addEventListener('input', e => {
     const t = e.target;
     const field = t.getAttribute('data-field');
@@ -124,6 +234,7 @@ document.addEventListener('input', e => {
         value = parseFloat(t.value) || 0;
     }
     fieldToButtons(index, field, value);
+    clearFieldError(buttons[index].id, field, t);
     if (field === 'color' && HEX_COLOR.test(String(value))) {
         const swatch = document.querySelector(`[data-action=swatch][data-index="${index}"]`);
         if (swatch) {
@@ -173,19 +284,19 @@ document.addEventListener('click', e => {
         buttons.splice(index, 1);
         render();
     }
-    if (action === 'up' && index > 0) {
-        [buttons[index - 1], buttons[index]] = [buttons[index], buttons[index - 1]];
+    if ((action === 'up' && index > 0) || (action === 'down' && index < buttons.length - 1)) {
+        buttons = moveButton(buttons, index, action);
         render();
-    }
-    if (action === 'down' && index < buttons.length - 1) {
-        [buttons[index + 1], buttons[index]] = [buttons[index], buttons[index + 1]];
-        render();
+        // The card moved; keep the focus on its same control.
+        const moved = document.querySelector(`[data-action="${action}"][data-index="${action === 'up' ? index - 1 : index + 1}"]`);
+        moved === null || moved === void 0 ? void 0 : moved.focus();
+        moved === null || moved === void 0 ? void 0 : moved.scrollIntoView({ block: 'nearest' });
     }
     if (action === 'add-suggestion') {
         const id = t.getAttribute('data-id');
         const s = suggestions.find(x => x.id === id);
         if (s) {
-            buttons.push({ id: s.id, label: s.label, command: s.command, icon: s.icon, problemMatcher: s.problemMatcher, type: 'terminal', background: 'none', priority: 0, saveAll: false, focus: true });
+            buttons = addSuggestion(buttons, s);
             render();
         }
     }
@@ -202,20 +313,38 @@ document.addEventListener('keydown', e => {
     t.click();
 });
 byId('add-btn').addEventListener('click', () => {
-    buttons.push({ id: 'button-' + Date.now(), label: 'New Button', command: '', type: 'terminal', background: 'none', priority: 0, saveAll: false, focus: true });
+    buttons = [...buttons, newButton(buttons)];
     render();
 });
 byId('load-npm-btn').addEventListener('click', () => {
     vscodeApi.postMessage({ type: 'loadNpmScripts' });
 });
 byId('save-btn').addEventListener('click', () => {
-    vscodeApi.postMessage({ type: 'save', buttons });
+    var _a;
+    const errors = validate(buttons);
+    validation.clear();
+    if (errors.length === 0) {
+        render();
+        vscodeApi.postMessage({ type: 'save', buttons });
+        return;
+    }
+    errors.forEach(e => {
+        const id = buttons[e.index].id;
+        validation.set(id, Object.assign(Object.assign({}, validation.get(id)), { [e.field]: e.message }));
+    });
+    // Open the failing cards (the first one is scrolled to) so every message is visible.
+    validation.forEach((_, id) => collapsedIds.delete(id));
+    render();
+    (_a = document.querySelector('.card.has-error')) === null || _a === void 0 ? void 0 : _a.scrollIntoView({ block: 'center' });
+    showStatus(validation.size === 1 ? '1 button needs fixing' : validation.size + ' buttons need fixing', 'err');
 });
 window.addEventListener('message', (event) => {
     const msg = event.data;
     if (msg.type === 'init') {
-        buttons = msg.buttons;
+        buttons = sortByPriority(msg.buttons);
         suggestions = msg.suggestions;
+        validation.clear();
+        showIgnored(msg.errors);
         render();
     }
     else if (msg.type === 'saved') {
@@ -240,7 +369,7 @@ window.addEventListener('message', (event) => {
             const existingIds = new Set(buttons.map(b => b.id));
             msg.buttons.forEach(b => {
                 if (!existingIds.has(b.id)) {
-                    buttons.push(b);
+                    buttons.push(Object.assign(Object.assign({}, b), { priority: nextPriority(buttons) }));
                     existingIds.add(b.id);
                 }
             });

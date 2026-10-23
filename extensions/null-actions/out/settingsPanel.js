@@ -94,10 +94,10 @@ class ActionButtonsPanel {
         });
     }
     postState() {
-        const { buttons } = (0, buttonConfigIntegration_1.readButtonConfigs)();
+        const { buttons, errors } = (0, buttonConfigIntegration_1.readButtonConfigs)();
         const folder = (0, workspaceFolder_1.activeWorkspaceFolder)();
         const suggestions = folder ? (0, projectDetector_1.detectSuggestedButtons)(folder.uri.fsPath, (0, envApi_1.getEnvApi)().detectProjects) : [];
-        this.panel.webview.postMessage({ type: 'init', buttons, suggestions });
+        this.panel.webview.postMessage({ type: 'init', buttons, suggestions, errors });
     }
     async handleSave(raw) {
         const { buttons, errors } = (0, buttonConfig_1.parseButtonConfigs)(raw);
@@ -162,6 +162,7 @@ class ActionButtonsPanel {
   <h1><span class="dot"></span>Action Buttons</h1>
   <p class="subtitle">Status bar shortcuts for the commands you run most</p>
 </header>
+<div id="ignored-banner" class="banner" hidden></div>
 <div id="toolbar">
   <button id="add-btn">+ Add Button</button>
   <button id="load-npm-btn">Load npm scripts</button>
