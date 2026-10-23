@@ -10,6 +10,7 @@
   },
   "include": [
     "src/webview/settings/protocol.ts",
-    "src/webview/settings/dom.ts"
+    "src/webview/settings/dom.ts",
+    "src/webview/settings/model.ts"
   ]
 }
