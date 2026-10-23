@@ -648,7 +648,7 @@
         },
         "null.recentProjects.maxItems": {
           "type": "number",
-          "default": 20,
+          "default": 50,
           "minimum": 1,
           "description": "Maximum number of unpinned projects retained by the Null recent-projects launcher. Pinned projects are always retained."
         },

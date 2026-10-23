@@ -159,7 +159,7 @@ export class DashboardEditorProvider implements vscode.CustomReadonlyEditorProvi
   }
 
   private _maxItems(): number {
-    const value = vscode.workspace.getConfiguration('null.recentProjects').get<number>('maxItems', 20);
+    const value = vscode.workspace.getConfiguration('null.recentProjects').get<number>('maxItems', 50);
     return Number.isFinite(value) ? Math.max(1, Math.floor(value)) : 20;
   }
 

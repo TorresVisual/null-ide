@@ -43,7 +43,7 @@ A project's own config file always wins. The `defaultConfig` settings apply only
 |---|---|---|
 | `null.commitMessage.useClaude` | `true` | Generate messages with the Claude CLI; off builds a basic message from the diff |
 | `null.commitMessage.validation` | `warn` | Check messages against Conventional Commits |
-| `null.recentProjects.maxItems` | `20` | Unpinned projects kept in the launcher |
+| `null.recentProjects.maxItems` | `50` | Unpinned projects kept in the launcher |
 | `null.gitignore.autoUpdate` / `.autoCommit` | `true` | Auto-scan for build artifacts, and commit the `.gitignore` change |
 | `null.worktrees.copyFilesGlob` | `[]` | Untracked setup files (such as `.env`) to copy into a new worktree |
 | `null.ports.refreshInterval` | `5` | Seconds between port scans; `0` turns scanning off |
