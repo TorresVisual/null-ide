@@ -19,6 +19,13 @@ pub fn exists(entry: &Entry) -> bool {
     if entry.is_workspace_file { path.is_file() } else { path.is_dir() }
 }
 
+/// UNC (`\\host\share`, `//host/share`) and verbatim (`\\?\...`) paths. A `.git` file in a
+/// cloned repo is untrusted, and touching a share would send the user's NTLM credentials to it.
+fn is_network_path(p: &str) -> bool {
+    let mut c = p.chars();
+    matches!((c.next(), c.next()), (Some('\\' | '/'), Some('\\' | '/')))
+}
+
 /// Reads `<dir>/.git/HEAD` (following a `gitdir:` file for worktrees and submodules); no `git` process.
 pub fn git_branch(dir: &Path) -> Option<String> {
     let dot_git = dir.join(".git");
@@ -27,6 +34,9 @@ pub fn git_branch(dir: &Path) -> Option<String> {
     } else {
         let text = std::fs::read_to_string(&dot_git).ok()?;
         let target = text.lines().find_map(|l| l.strip_prefix("gitdir:"))?.trim();
+        if is_network_path(target) {
+            return None;
+        }
         dir.join(target)
     };
     let head = std::fs::read_to_string(git_dir.join("HEAD")).ok()?;
@@ -117,6 +127,18 @@ mod tests {
         assert_eq!(git_branch(&repo("").path()), None);
         assert_eq!(git_branch(&repo("garbage\n").path()), None);
         assert_eq!(git_branch(&none.path().join("gone")), None);
+    }
+
+    #[test]
+    fn gitdir_pointing_at_a_network_share_is_never_opened() {
+        // Reading it would make Windows authenticate to an arbitrary host (NTLM leak).
+        let d = tempfile::tempdir().unwrap();
+        for target in ["\\\\attacker\\share\\git", "//attacker/share/git", "\\\\?\\UNC\\attacker\\share"] {
+            fs::write(d.path().join(".git"), format!("gitdir: {target}\n")).unwrap();
+            assert_eq!(git_branch(d.path()), None, "{target}");
+        }
+        assert!(!is_network_path("D:\\repo\\.git\\worktrees\\wt"));
+        assert!(!is_network_path("../real-git"));
     }
 
     #[test]
