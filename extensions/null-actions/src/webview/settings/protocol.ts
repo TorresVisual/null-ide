@@ -31,7 +31,7 @@ interface SuggestionDto {
 }
 
 type HostToWebview =
-  | { type: 'init'; buttons: ButtonDto[]; suggestions: SuggestionDto[] }
+  | { type: 'init'; buttons: ButtonDto[]; suggestions: SuggestionDto[]; errors: string[] }
   | { type: 'saved' }
   | { type: 'error'; errors: string[] }
   | { type: 'fileSelected'; id: string; path: string }

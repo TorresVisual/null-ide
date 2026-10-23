@@ -7,6 +7,8 @@ const vscodeApi = acquireVsCodeApi(); // may be called only once per webview
 let buttons: ButtonDto[] = [];
 let suggestions: SuggestionDto[] = [];
 let collapsedIds: Set<string> | null = null;
+// Validation messages from the last failed Save, by button id then field. Cleared per field on its next input.
+const validation = new Map<string, Record<string, string>>();
 
 // Curated subset of codicon names -- not the full ~500-icon set, just ones plausibly
 // useful on an action button. The Icon field stays a free-text input (any codicon
@@ -24,8 +26,13 @@ function colorSwatchValue(color: string | undefined): string {
   return HEX_COLOR.test(color || '') ? color as string : '#ffffff';
 }
 
-function fieldRow(label: string, inputHtml: string, id: string): string {
-  return `<div class="row"><label for="${id}">${label}</label>${inputHtml}</div>`;
+function fieldRow(label: string, inputHtml: string, id: string, error?: string): string {
+  const msg = error ? `<div class="field-error" data-error-for="${id}">${escapeHtml(error)}</div>` : '';
+  return `<div class="row"><label for="${id}">${label}</label>${inputHtml}${msg}</div>`;
+}
+
+function invalidAttrs(error: string | undefined): string {
+  return error ? ' class="invalid" aria-invalid="true"' : '';
 }
 
 function textInput(field: string, index: number, value: string | undefined, extra = ''): string {
@@ -55,10 +62,13 @@ function renderCard(btn: ButtonDto, index: number): HTMLElement {
   div.style.animationDelay = (index * 25) + 'ms';
 
   const isVscodeCommand = btn.type === 'vscode-command';
+  const err = validation.get(btn.id) || {};
+  if (Object.keys(err).length) { div.classList.add('has-error'); }
   const body =
-    fieldRow('Label', textInput('label', index, btn.label), `field-label-${index}`) +
+    (err.id ? `<div class="card-error">${escapeHtml(err.id)}</div>` : '') +
+    fieldRow('Label', textInput('label', index, btn.label, invalidAttrs(err.label)), `field-label-${index}`, err.label) +
     '<div class="field-section">Behavior</div>' +
-    fieldRow('Command', textInput('command', index, btn.command) + `<button data-action="browse" data-index="${index}">Browse a file...</button>`, `field-command-${index}`) +
+    fieldRow('Command', textInput('command', index, btn.command, invalidAttrs(err.command)) + `<button data-action="browse" data-index="${index}">Browse a file...</button>`, `field-command-${index}`, err.command) +
     fieldRow('Type', selectInput('type', index, ['terminal', 'vscode-command'], btn.type), `field-type-${index}`) +
     `<div class="row args-row" data-index="${index}"${isVscodeCommand ? '' : ' hidden'}><label for="field-args-${index}">Args</label>${textInput('args', index, (btn.args || []).join(','), ' placeholder="arg1,arg2"')}</div>` +
     fieldRow('Cwd', textInput('cwd', index, btn.cwd, ' placeholder="${workspaceFolder}"'), `field-cwd-${index}`) +
@@ -92,13 +102,13 @@ function render(): void {
 
   const sList = byId('suggestions-list');
   sList.innerHTML = '';
-  suggestions.forEach(s => {
+  visibleSuggestions(buttons, suggestions).forEach(s => {
     const row = document.createElement('div');
     row.className = 'suggestion';
     row.innerHTML = `<span class="suggestion-label">${escapeHtml(s.label)}</span><button data-action="add-suggestion" data-id="${escapeAttr(s.id)}">+ Add</button>`;
     sList.appendChild(row);
   });
-  byId('suggestions-section').style.display = suggestions.length ? '' : 'none';
+  byId('suggestions-section').style.display = sList.childElementCount ? '' : 'none';
 }
 
 function fieldToButtons(index: number, field: string, value: string | boolean | number): void {
@@ -110,12 +120,37 @@ function fieldToButtons(index: number, field: string, value: string | boolean | 
   (btn as unknown as Record<string, unknown>)[field] = value;
 }
 
+function showIgnored(errors: string[]): void {
+  const el = byId('ignored-banner');
+  el.hidden = errors.length === 0;
+  el.innerHTML = errors.length
+    ? `<strong>${errors.length === 1 ? '1 entry in settings was' : errors.length + ' entries in settings were'} ignored and will be removed when you save:</strong><ul>${errors.map(e => `<li>${escapeHtml(e)}</li>`).join('')}</ul>`
+    : '';
+}
+
 function showStatus(text: string, kind: 'ok' | 'err', autoHideMs?: number): void {
   const el = byId('status');
   el.textContent = text;
   el.className = 'visible ' + kind;
   if (autoHideMs) { setTimeout(() => { el.className = ''; }, autoHideMs); }
 }
+
+function clearFieldError(id: string, field: string, input: HTMLElement): void {
+  const err = validation.get(id);
+  if (!err || !err[field]) { return; }
+  delete err[field];
+  input.classList.remove('invalid');
+  input.removeAttribute('aria-invalid');
+  document.querySelector(`[data-error-for="${input.id}"]`)?.remove();
+}
+
+// Re-sort on change (blur / Enter), not on every keystroke, so a card does not jump while typing "10".
+document.addEventListener('change', e => {
+  const t = e.target as HTMLElement;
+  if (t.getAttribute('data-field') !== 'priority') { return; }
+  const sorted = sortByPriority(buttons);
+  if (sorted.some((b, i) => b !== buttons[i])) { buttons = sorted; render(); }
+});
 
 document.addEventListener('input', e => {
   const t = e.target as HTMLInputElement;
@@ -125,6 +160,7 @@ document.addEventListener('input', e => {
   let value: string | boolean | number = t.type === 'checkbox' ? t.checked : t.value;
   if (t.type === 'number') { value = parseFloat(t.value) || 0; }
   fieldToButtons(index, field, value);
+  clearFieldError(buttons[index].id, field, t);
   if (field === 'color' && HEX_COLOR.test(String(value))) {
     const swatch = document.querySelector<HTMLElement>(`[data-action=swatch][data-index="${index}"]`);
     if (swatch) { swatch.style.background = String(value); }
@@ -157,15 +193,18 @@ document.addEventListener('click', e => {
     });
   }
   if (action === 'delete') { buttons.splice(index, 1); render(); }
-  if (action === 'up' && index > 0) { [buttons[index - 1], buttons[index]] = [buttons[index], buttons[index - 1]]; render(); }
-  if (action === 'down' && index < buttons.length - 1) { [buttons[index + 1], buttons[index]] = [buttons[index], buttons[index + 1]]; render(); }
+  if ((action === 'up' && index > 0) || (action === 'down' && index < buttons.length - 1)) {
+    buttons = moveButton(buttons, index, action as 'up' | 'down');
+    render();
+    // The card moved; keep the focus on its same control.
+    const moved = document.querySelector<HTMLElement>(`[data-action="${action}"][data-index="${action === 'up' ? index - 1 : index + 1}"]`);
+    moved?.focus();
+    moved?.scrollIntoView({ block: 'nearest' });
+  }
   if (action === 'add-suggestion') {
     const id = t.getAttribute('data-id');
     const s = suggestions.find(x => x.id === id);
-    if (s) {
-      buttons.push({ id: s.id, label: s.label, command: s.command, icon: s.icon, problemMatcher: s.problemMatcher, type: 'terminal', background: 'none', priority: 0, saveAll: false, focus: true });
-      render();
-    }
+    if (s) { buttons = addSuggestion(buttons, s); render(); }
   }
 });
 
@@ -178,7 +217,7 @@ document.addEventListener('keydown', e => {
 });
 
 byId('add-btn').addEventListener('click', () => {
-  buttons.push({ id: 'button-' + Date.now(), label: 'New Button', command: '', type: 'terminal', background: 'none', priority: 0, saveAll: false, focus: true });
+  buttons = [...buttons, newButton(buttons)];
   render();
 });
 
@@ -187,14 +226,31 @@ byId('load-npm-btn').addEventListener('click', () => {
 });
 
 byId('save-btn').addEventListener('click', () => {
-  vscodeApi.postMessage({ type: 'save', buttons });
+  const errors = validate(buttons);
+  validation.clear();
+  if (errors.length === 0) {
+    render();
+    vscodeApi.postMessage({ type: 'save', buttons });
+    return;
+  }
+  errors.forEach(e => {
+    const id = buttons[e.index].id;
+    validation.set(id, { ...validation.get(id), [e.field]: e.message });
+  });
+  // Open the failing cards (the first one is scrolled to) so every message is visible.
+  validation.forEach((_, id) => (collapsedIds as Set<string>).delete(id));
+  render();
+  document.querySelector('.card.has-error')?.scrollIntoView({ block: 'center' });
+  showStatus(validation.size === 1 ? '1 button needs fixing' : validation.size + ' buttons need fixing', 'err');
 });
 
 window.addEventListener('message', (event: MessageEvent<HostToWebview>) => {
   const msg = event.data;
   if (msg.type === 'init') {
-    buttons = msg.buttons;
+    buttons = sortByPriority(msg.buttons);
     suggestions = msg.suggestions;
+    validation.clear();
+    showIgnored(msg.errors);
     render();
   } else if (msg.type === 'saved') {
     showStatus('✓ Saved', 'ok', 1600);
@@ -211,7 +267,7 @@ window.addEventListener('message', (event: MessageEvent<HostToWebview>) => {
     } else {
       const existingIds = new Set(buttons.map(b => b.id));
       msg.buttons.forEach(b => {
-        if (!existingIds.has(b.id)) { buttons.push(b); existingIds.add(b.id); }
+        if (!existingIds.has(b.id)) { buttons.push({ ...b, priority: nextPriority(buttons) }); existingIds.add(b.id); }
       });
       render();
     }

@@ -73,10 +73,10 @@ export class ActionButtonsPanel {
   }
 
   private postState(): void {
-    const { buttons } = readButtonConfigs();
+    const { buttons, errors } = readButtonConfigs();
     const folder = activeWorkspaceFolder();
     const suggestions: SuggestedButton[] = folder ? detectSuggestedButtons(folder.uri.fsPath, getEnvApi().detectProjects) : [];
-    this.panel.webview.postMessage({ type: 'init', buttons, suggestions });
+    this.panel.webview.postMessage({ type: 'init', buttons, suggestions, errors });
   }
 
   private async handleSave(raw: unknown): Promise<void> {
@@ -142,6 +142,7 @@ export class ActionButtonsPanel {
   <h1><span class="dot"></span>Action Buttons</h1>
   <p class="subtitle">Status bar shortcuts for the commands you run most</p>
 </header>
+<div id="ignored-banner" class="banner" hidden></div>
 <div id="toolbar">
   <button id="add-btn">+ Add Button</button>
   <button id="load-npm-btn">Load npm scripts</button>
