@@ -42,6 +42,7 @@ const buttonConfigIntegration_1 = require("./buttonConfigIntegration");
 const projectDetector_1 = require("./projectDetector");
 const envApi_1 = require("./envApi");
 const npmScriptsProvider_1 = require("./npmScriptsProvider");
+const workspaceFolder_1 = require("./workspaceFolder");
 function getNonce() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
     let text = '';
@@ -93,7 +94,7 @@ class ActionButtonsPanel {
     }
     postState() {
         const { buttons } = (0, buttonConfigIntegration_1.readButtonConfigs)();
-        const folder = vscode.workspace.workspaceFolders?.[0];
+        const folder = (0, workspaceFolder_1.activeWorkspaceFolder)();
         const suggestions = folder ? (0, projectDetector_1.detectSuggestedButtons)(folder.uri.fsPath, (0, envApi_1.getEnvApi)().detectProjects) : [];
         this.panel.webview.postMessage({ type: 'init', buttons, suggestions });
     }
@@ -119,14 +120,14 @@ class ActionButtonsPanel {
         this.panel.webview.postMessage({ type: 'fileSelected', index, path: uris[0].fsPath });
     }
     handleLoadNpmScripts() {
-        const folder = vscode.workspace.workspaceFolders?.[0];
+        const folder = (0, workspaceFolder_1.activeWorkspaceFolder)();
         if (!folder) {
             this.panel.webview.postMessage({ type: 'npmScriptsLoaded', buttons: [], errors: ['No workspace folder is open.'] });
             return;
         }
         const pkgPath = path.join(folder.uri.fsPath, 'package.json');
         if (!fs.existsSync(pkgPath)) {
-            this.panel.webview.postMessage({ type: 'npmScriptsLoaded', buttons: [], errors: ['No package.json found in the workspace root.'] });
+            this.panel.webview.postMessage({ type: 'npmScriptsLoaded', buttons: [], errors: [`No package.json found in ${folder.name}.`] });
             return;
         }
         let content;

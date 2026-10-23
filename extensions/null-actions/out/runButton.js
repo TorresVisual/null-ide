@@ -37,11 +37,11 @@ exports.runButton = runButton;
 const path = __importStar(require("path"));
 const vscode = __importStar(require("vscode"));
 const variableResolver_1 = require("./variableResolver");
+const workspaceFolder_1 = require("./workspaceFolder");
 function buildVariableContext() {
     const editor = vscode.window.activeTextEditor;
     const doc = editor?.document;
-    // In a multi-root workspace the active file's folder wins over the first one.
-    const folder = (doc && vscode.workspace.getWorkspaceFolder(doc.uri)) ?? vscode.workspace.workspaceFolders?.[0];
+    const folder = (0, workspaceFolder_1.activeWorkspaceFolder)();
     const fsPath = doc?.uri.fsPath;
     return {
         workspaceFolder: folder?.uri.fsPath,

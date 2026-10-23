@@ -42,9 +42,11 @@ const terminalRegistry_1 = require("./terminalRegistry");
 const statusBarController_1 = require("./statusBarController");
 const runButton_1 = require("./runButton");
 const settingsPanel_1 = require("./settingsPanel");
+const workspaceFolder_1 = require("./workspaceFolder");
 function activate(context) {
     const terminalRegistry = new terminalRegistry_1.TerminalRegistry(new terminalHostIntegration_1.VscodeTerminalHost());
     const statusBar = new statusBarController_1.StatusBarController();
+    (0, workspaceFolder_1.trackActiveEditor)(context);
     context.subscriptions.push(statusBar, terminalRegistry.onDidChangeState((id, state) => statusBar.setState(id, state)));
     // Slightly above the default button priority (0) so this renders just
     // ahead of the user's own buttons -- not pushed to the front of the
