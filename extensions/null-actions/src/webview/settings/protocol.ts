@@ -32,7 +32,7 @@ interface SuggestionDto {
 
 type HostToWebview =
   | { type: 'init'; buttons: ButtonDto[]; suggestions: SuggestionDto[]; errors: string[] }
-  | { type: 'saved' }
+  | { type: 'saved'; buttons: ButtonDto[] }
   | { type: 'error'; errors: string[] }
   | { type: 'fileSelected'; id: string; path: string }
   | { type: 'npmScriptsLoaded'; buttons: ButtonDto[]; errors: string[] };
@@ -40,5 +40,6 @@ type HostToWebview =
 type WebviewToHost =
   | { type: 'ready' }
   | { type: 'save'; buttons: ButtonDto[] }
+  | { type: 'dirty'; dirty: boolean }
   | { type: 'browseFile'; id: string }
   | { type: 'loadNpmScripts' };

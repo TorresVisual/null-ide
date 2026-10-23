@@ -58,6 +58,8 @@ export class ActionButtonsPanel {
     this.panel.webview.onDidReceiveMessage((msg: InboundMessage) => {
       if (msg.type === 'ready') {
         this.postState();
+      } else if (msg.type === 'dirty') {
+        this.panel.title = msg.dirty ? 'Action Buttons ●' : 'Action Buttons';
       } else if (msg.type === 'save') {
         this.handleSave(msg.buttons);
       } else if (msg.type === 'browseFile') {
@@ -86,7 +88,8 @@ export class ActionButtonsPanel {
       return;
     }
     await writeButtonConfigs(buttons);
-    this.panel.webview.postMessage({ type: 'saved' });
+    // The canonical buttons let the webview adopt exactly what was written as its saved snapshot.
+    this.panel.webview.postMessage({ type: 'saved', buttons });
   }
 
   private async handleBrowseFile(id: string): Promise<void> {
@@ -143,11 +146,13 @@ export class ActionButtonsPanel {
   <p class="subtitle">Status bar shortcuts for the commands you run most</p>
 </header>
 <div id="ignored-banner" class="banner" hidden></div>
+<div id="external-banner" class="banner" hidden>Settings changed outside this panel. <button data-action="reload">Reload</button> <button data-action="keep">Keep mine</button></div>
 <div id="toolbar">
   <button id="add-btn">+ Add Button</button>
   <button id="load-npm-btn">Load npm scripts</button>
   <button id="save-btn" class="primary">Save All</button>
   <span id="status"></span>
+  <span id="undo" hidden></span>
 </div>
 <section>
 <div id="buttons-list"></div>

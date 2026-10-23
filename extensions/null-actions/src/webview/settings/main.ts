@@ -9,6 +9,17 @@ let suggestions: SuggestionDto[] = [];
 let collapsedIds: Set<string> | null = null;
 // Validation messages from the last failed Save, by button id then field. Cleared per field on its next input.
 const validation = new Map<string, Record<string, string>>();
+type InitMsg = Extract<HostToWebview, { type: 'init' }>;
+let snapshot: ButtonDto[] = []; // last loaded or saved state, in display order
+let loaded = false;
+let awaitingSave: ButtonDto[] | null = null; // what the last Save sent, until the host confirms
+let pendingExternal: InitMsg | null = null;
+let lastDeleted: { button: ButtonDto; index: number } | null = null;
+let lastDirty = false;
+
+function clone<T>(x: T): T {
+  return JSON.parse(JSON.stringify(x));
+}
 
 // Curated subset of codicon names -- not the full ~500-icon set, just ones plausibly
 // useful on an action button. The Icon field stays a free-text input (any codicon
@@ -100,6 +111,11 @@ function render(): void {
   buttons.forEach((btn, i) => list.appendChild(renderCard(btn, i)));
   byId('empty-state').classList.toggle('visible', buttons.length === 0);
 
+  renderSuggestions();
+  updateDirty();
+}
+
+function renderSuggestions(): void {
   const sList = byId('suggestions-list');
   sList.innerHTML = '';
   visibleSuggestions(buttons, suggestions).forEach(s => {
@@ -109,6 +125,42 @@ function render(): void {
     sList.appendChild(row);
   });
   byId('suggestions-section').style.display = sList.childElementCount ? '' : 'none';
+}
+
+/** Compares the draft with the saved snapshot; tells the host (panel title) and marks Save when it changes. */
+function updateDirty(): void {
+  const dirty = isDirty(buttons, snapshot);
+  byId('save-btn').textContent = dirty ? 'Save All \u25CF' : 'Save All';
+  if (dirty !== lastDirty) {
+    lastDirty = dirty;
+    vscodeApi.postMessage({ type: 'dirty', dirty });
+  }
+}
+
+function showUndo(label: string): void {
+  const el = byId('undo');
+  el.hidden = false;
+  el.innerHTML = `Deleted ${escapeHtml(label || '(untitled)')} \u2014 <button data-action="undo">Undo</button>`;
+}
+
+function clearUndo(): void {
+  lastDeleted = null;
+  byId('undo').hidden = true;
+}
+
+/** Replaces the draft and snapshot with a state from the host. */
+function applyIncoming(msg: InitMsg): void {
+  buttons = sortByPriority(msg.buttons);
+  snapshot = clone(buttons);
+  suggestions = msg.suggestions;
+  loaded = true;
+  awaitingSave = null;
+  pendingExternal = null;
+  byId('external-banner').hidden = true;
+  validation.clear();
+  clearUndo();
+  showIgnored(msg.errors);
+  render();
 }
 
 function fieldToButtons(index: number, field: string, value: string | boolean | number): void {
@@ -161,6 +213,7 @@ document.addEventListener('input', e => {
   if (t.type === 'number') { value = parseFloat(t.value) || 0; }
   fieldToButtons(index, field, value);
   clearFieldError(buttons[index].id, field, t);
+  updateDirty();
   if (field === 'color' && HEX_COLOR.test(String(value))) {
     const swatch = document.querySelector<HTMLElement>(`[data-action=swatch][data-index="${index}"]`);
     if (swatch) { swatch.style.background = String(value); }
@@ -187,12 +240,35 @@ document.addEventListener('click', e => {
     const btn = buttons[index];
     NullColorPicker.toggle(t, btn.color || '#3fa9f5', hex => {
       btn.color = hex;
+      updateDirty();
       t.style.background = hex;
       const textInputEl = document.querySelector<HTMLInputElement>(`input[data-field=color][data-index="${index}"]`);
       if (textInputEl) { textInputEl.value = hex; }
     });
   }
-  if (action === 'delete') { buttons.splice(index, 1); render(); }
+  if (action === 'delete') {
+    const [removed] = buttons.splice(index, 1);
+    lastDeleted = { button: removed, index };
+    validation.delete(removed.id);
+    showUndo(removed.label);
+    render();
+  }
+  if (action === 'undo' && lastDeleted) {
+    const { button, index: at } = lastDeleted;
+    if (!buttons.some(b => b.id === button.id)) { buttons.splice(at, 0, button); }
+    clearUndo();
+    render();
+  }
+  if (action === 'reload' && pendingExternal) { applyIncoming(pendingExternal); }
+  if (action === 'keep' && pendingExternal) {
+    // Keep the draft; what is on disk now is the new baseline, so the dirty marker shows the difference.
+    snapshot = clone(sortByPriority(pendingExternal.buttons));
+    suggestions = pendingExternal.suggestions;
+    showIgnored(pendingExternal.errors);
+    pendingExternal = null;
+    byId('external-banner').hidden = true;
+    render();
+  }
   if ((action === 'up' && index > 0) || (action === 'down' && index < buttons.length - 1)) {
     buttons = moveButton(buttons, index, action as 'up' | 'down');
     render();
@@ -230,6 +306,7 @@ byId('save-btn').addEventListener('click', () => {
   validation.clear();
   if (errors.length === 0) {
     render();
+    awaitingSave = clone(sortByPriority(buttons));
     vscodeApi.postMessage({ type: 'save', buttons });
     return;
   }
@@ -247,14 +324,34 @@ byId('save-btn').addEventListener('click', () => {
 window.addEventListener('message', (event: MessageEvent<HostToWebview>) => {
   const msg = event.data;
   if (msg.type === 'init') {
-    buttons = sortByPriority(msg.buttons);
-    suggestions = msg.suggestions;
-    validation.clear();
-    showIgnored(msg.errors);
-    render();
+    const incoming = sortByPriority(msg.buttons);
+    if (!loaded) {
+      applyIncoming(msg);
+    } else if (awaitingSave && !isDirty(incoming, awaitingSave)) {
+      // The echo of our own save, which can arrive before the 'saved' reply.
+      snapshot = clone(incoming);
+      updateDirty();
+    } else if (!isDirty(incoming, snapshot)) {
+      // Nothing about the buttons changed (an unrelated null-actions setting, or our own save).
+      suggestions = msg.suggestions;
+      showIgnored(msg.errors);
+      renderSuggestions();
+    } else if (!isDirty(buttons, snapshot)) {
+      applyIncoming(msg);
+    } else {
+      pendingExternal = msg;
+      byId('external-banner').hidden = false;
+    }
   } else if (msg.type === 'saved') {
+    snapshot = clone(sortByPriority(msg.buttons));
+    awaitingSave = null;
+    pendingExternal = null;
+    byId('external-banner').hidden = true;
+    clearUndo();
+    updateDirty();
     showStatus('✓ Saved', 'ok', 1600);
   } else if (msg.type === 'error') {
+    awaitingSave = null;
     showStatus('Error: ' + msg.errors.join('; '), 'err');
   } else if (msg.type === 'fileSelected') {
     const btn = buttons.find(b => b.id === msg.id);

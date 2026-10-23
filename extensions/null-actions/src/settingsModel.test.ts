@@ -19,6 +19,7 @@ const m = sandbox as unknown as {
   addSuggestion(b: B[], s: S): B[];
   newButton(b: B[], now?: number): B;
   validate(b: B[]): Array<{ index: number; field: string; message: string }>;
+  isDirty(a: unknown[], b: unknown[]): boolean;
 };
 // Objects built inside the vm context have another realm's prototypes; compare as plain JSON.
 const plain = <T>(x: T): T => JSON.parse(JSON.stringify(x));
@@ -100,4 +101,27 @@ test('validate flags empty or blank label and command, and the later duplicate i
   const errs = plain(m.validate([btn('a', 0, { label: ' ' }), btn('b', 0, { command: '' }), btn('a', 0)]));
   assert.deepStrictEqual(errs.map(e => `${e.index}:${e.field}`), ['0:label', '1:command', '2:id']);
   assert.deepStrictEqual(plain(m.validate([btn("a", 0), btn("b", 0)])), []);
+});
+
+test('isDirty: identical lists are clean, any real edit is dirty', () => {
+  const list = [btn('a', 2), btn('b', 1)];
+  assert.strictEqual(m.isDirty(list, JSON.parse(JSON.stringify(list))), false);
+  assert.strictEqual(m.isDirty([btn('a', 2), btn('b', 1, { label: 'x' })], list), true);
+  assert.strictEqual(m.isDirty([btn('a', 2)], list), true);
+  assert.strictEqual(m.isDirty([btn('a', 3), btn('b', 1)], list), true);
+});
+
+test('isDirty ignores representation the host would normalise away', () => {
+  const base = btn('a', 0);
+  const noisy = { ...base, args: [], icon: '', problemMatcher: '  ', onBusy: 'ask', saveAll: false };
+  assert.strictEqual(m.isDirty([noisy], [base]), false);
+  assert.strictEqual(m.isDirty([{ ...base, problemMatcher: ' $tsc ' }], [{ ...base, problemMatcher: '$tsc' }]), false);
+  assert.strictEqual(m.isDirty([{ ...base, problemMatcher: '$tsc' }], [base]), true);
+});
+
+test('isDirty: moving a button and moving it back is clean when priorities are distinct', () => {
+  const list = [btn('a', 5), btn('b', 3), btn('c', 1)];
+  const moved = m.moveButton(list, 1, 'up');
+  assert.strictEqual(m.isDirty(moved, list), true);
+  assert.strictEqual(m.isDirty(m.moveButton(moved, 0, 'down'), list), false);
 });
