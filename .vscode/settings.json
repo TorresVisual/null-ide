@@ -8,6 +8,7 @@
       "command": "powershell -ExecutionPolicy Bypass ${workspaceFolder}\\scripts\\sync-local.ps1",
       "color": "#12c448",
       "background": "none",
+      "tooltip": "",
       "saveAll": false,
       "focus": true,
       "onBusy": "ask",
