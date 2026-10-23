@@ -49,11 +49,22 @@ Geometry: the ring is about 150 px in diameter (the body's existing height), cen
 
 ### Hue at greys
 
-HSL has no hue at saturation 0, and a `Color` built from HSLA derives its HSVA from RGB, losing hue. Without care, dragging the triangle to black or white snaps the hue handle to red. The ring therefore keeps its own `hue` field. It updates it from the model only when the incoming color has saturation above a small epsilon and the change did not originate from the ring itself; for grey incoming colors it keeps the last hue.
+HSL has no hue at saturation 0. A `Color` built from HSLA keeps that HSLA, but the opacity strip and the old hue strip rebuild colors through `.hsva`, which derives from RGB and loses hue at greys. Without care, dragging the triangle to black or white (or nudging opacity there) snaps the hue handle to red. The ring therefore keeps its own `hue` field and adopts the model's hue only when both hold: the incoming color is not the one the ring last emitted (compared ignoring alpha), and its saturation is above a small epsilon. That covers the opacity strip, and also external changes such as clicking the original swatch to reset the color.
 
 ### Model change while dragging
 
 As in `SaturationBox`, `onDidChangeColor` is ignored while a drag is active, so the ring does not fight its own writes.
+
+## Decisions
+
+- Size: ring about 150 px, centered in the existing 220 px area (about 35 px empty each side); no hover relayout. A taller widget is a follow-up only if the build looks cramped.
+- Colors: handles are fixed (white stroke with a dark halo, dark ring outline). No theme tokens and no new color registrations, so light and high-contrast themes work unchanged.
+- Keyboard: ported. The canvas is `tabindex=0`, `role="application"` with an `aria-label`. A hover-focus or hover-dismissal problem found in the build is a bug to fix, not a reason to drop it.
+- No setting to restore the stock picker. A ring bug is handled by a fix and rebuild (safe mode does not help: this is core code); a switch would double the patch surface.
+
+## Producing the patch
+
+`vscode-src` is the patched tree with patches 001–011 applied and uncommitted, not a clean checkout at `MS_TAG`. The touched files are not touched by 001–011. Write the change in `vscode-src`, `git add` only the files of this patch, commit, `git format-patch HEAD~1 -o ../patches/` as `012-color-ring-picker.patch`, then `git reset --soft HEAD~1` and unstage so `vscode-src` is back as it was. Never commit the other uncommitted changes there. Prove the patch applies with `git apply --check` in a throwaway worktree at `MS_TAG` with patches 001–011 applied.
 
 ## Testing and verification
 
@@ -63,7 +74,8 @@ As in `SaturationBox`, `onDidChangeColor` is ignored while a drag is active, so 
   - hit-test classification: on the ring, in the triangle, outside both, and the feathered edge;
   - grey colors keep a supplied hue.
 - `git apply --check` of the patch against `vscode-src`, and a TypeScript check of the touched files.
-- Visual and interaction verification needs a built app (CI or `scripts/build-local.ps1`, tens of minutes). Not run unless asked. Checklist for that run: hover on `#rrggbb`, `rgba()` and `hsl()` literals; format cycling; opacity strip; standalone picker (Insert and Close); drag to black/white keeps hue; keyboard; high-DPI.
+- Stop at these three static checks (math tests, `git apply --check`, TypeScript check) and report the patch as **not visually verified**.
+- Visual and interaction verification needs a built app: a `workflow_dispatch` CI build that the user installs. `scripts/build-local.ps1` is not run unless asked. Checklist for that run: hover on `#rrggbb`, `rgba()` and `hsl()` literals; format cycling; opacity strip; standalone picker (Insert and Close); drag to black/white keeps hue; keyboard; high-DPI.
 
 ## Bookkeeping
 
