@@ -20,8 +20,8 @@ program that shows every tracked project, opens the one you pick with
 
 - One keystroke path: open launcher, type a few letters, Enter. Never disturbs an
   existing window.
-- Shows all tracked projects (`null.recentProjects.maxItems`, default 20, plus
-  all pinned), not just what fits in the jump list.
+- Shows all tracked projects (`null.recentProjects.maxItems`, default raised from
+  20 to 50, plus all pinned), not just what fits in the jump list.
 - Same-named folders are told apart (path, branch).
 - Missing folders are visible and marked, never silently dropped.
 
@@ -64,11 +64,16 @@ Frameless, ~640 px wide, centred, always on top, closes on Esc or on losing focu
 - Row: name, git-branch chip, project-type chip, path and last-opened time on
   the right. Missing folders are greyed with a "missing" chip and are not
   openable.
-- Keys: type to filter (matches name and path), ↑/↓ move, Enter opens, Esc closes,
-  Ctrl+P pins/unpins, Delete removes the entry from the list.
-- Text is at least 11 px.
-- Filter: case-insensitive; name matches rank above path-only matches; ties keep
-  store order (pinned first, then newest).
+- Keys: type to filter, ↑/↓ move, Enter opens, Esc closes, Ctrl+P pins/unpins
+  (suppress the webview's print shortcut), Delete removes an **unpinned** entry
+  from the list at once; on a pinned entry Delete does nothing (unpin first).
+  A missing folder cannot be opened; Delete removes it. Relocating a moved
+  project stays in the dashboard.
+- Text is at least 11 px. Colours follow the Windows light/dark setting
+  (`prefers-color-scheme`); the launcher does not read the Null theme.
+- Filter: case-insensitive. Name: subsequence (fuzzy) match, so `nide` finds
+  `null-ide`. Path: plain substring. Rank by match quality first (name above
+  path-only), then store order (pinned first, then newest).
 
 ### Where the chips come from
 
@@ -90,7 +95,9 @@ launcher computes both itself, after the first paint, so opening never waits:
 `null.exe` in the same folder as the launcher is started with `--folder-uri
 "<file URI>"`, or `--file-uri` for a `.code-workspace` entry (the exact
 arguments the jump list entries already use). Null's own launch logic then opens a
-new window or focuses the window that already has it. The launcher then exits.
+new window, focuses the window that already has it, or (only if Null's launch
+logic does so by itself) reuses an empty window. The launcher adds no window
+tracking and passes no `--reuse-window`. It then exits.
 It does not write to the store when opening: the main-process
 `addRecentlyOpened` already records the open.
 
@@ -99,8 +106,8 @@ It does not write to the store when opening: the main-process
 - Reads `null-recent-projects.json`. Location: `<install>\data\user-data` when
   `<install>\data` exists (portable), else `%APPDATA%\Null`. This is what
   `environmentMainService.userDataPath` resolves to in the patch.
-  (`null-tools`' `nullDataDir()` ignores portable mode today; flagged, not fixed
-  here.)
+  (`null-tools`' `nullDataDir()` ignores portable mode today; not fixed here, a
+  separate issue is filed.)
 - Entry format is unchanged. Unknown fields are preserved when the launcher writes.
 - Missing, corrupt or empty file → empty list ("No recent projects"), never a crash.
 - Pin and remove re-read the file, change the one entry, and write a temp file
@@ -118,10 +125,14 @@ The `/recent-projects` URI handler in null-tools stays (it is the fallback below
 
 - Only one launcher at a time: a second start (double-click on the jump list)
   brings the existing one forward and exits (named mutex).
-- Closes on losing focus, like a palette.
+- Closes on losing focus, like a palette, and has no taskbar button. Windows can
+  refuse a fresh window its first focus, so the close-on-blur handler must ignore
+  that case; "launched from the jump list, window stays open" is an explicit
+  manual test.
 - WebView2 missing or the launcher failing to start its window: fall back to the
   old behaviour (`null.exe --open-url "null://null.null-tools/recent-projects"`)
-  instead of showing an error, so the entry never becomes dead.
+  silently, so the entry never becomes dead, and append the reason to
+  `launcher.log` next to the store. The log is capped (truncate past ~64 KB).
 - Appears centred on the monitor under the mouse.
 
 ## Build, packaging, lifecycle
@@ -140,6 +151,9 @@ The `/recent-projects` URI handler in null-tools stays (it is the fallback below
   any running `null_launcher.exe` under that folder the way it already ends
   `null_widgets.exe` (`procs::stop_named_under`); it lives for seconds, so no
   Run entry or install option.
+- Settings: `null.recentProjects.maxItems` default 50 in `null-tools`'
+  `package.json` and the patch's fallback constant (was 20); refresh `out/` per the
+  extension conventions.
 - Docs: a `launcher/CLAUDE.md`, a line in the root `CLAUDE.md` layout, and a
   note in the wiki.
 
@@ -154,6 +168,15 @@ The `/recent-projects` URI handler in null-tools stays (it is the fallback below
 - Manual in a built Null package (like the other native pieces): jump list click
   with Null closed and running, a project that is already open, a missing folder,
   an update while the launcher is open.
+
+## Decisions confirmed with the user
+
+No hotkey or resident process for now; empty-window reuse only if Null does it
+natively; pinned entries ignore Delete; relocation stays in the dashboard; default
+list size 50; close-on-blur with no taskbar button and the first-focus case
+tested; silent fallback to the dashboard plus a log file; fuzzy name matching;
+follow Windows light/dark; the portable-mode path mismatch in null-tools is a
+separate issue.
 
 ## Left to the builder
 
