@@ -163,6 +163,13 @@ jobs:
         shell: pwsh
         run: npm run build --prefix ide-overlay/extensions/null-markdown
 
+      # The whole node_modules is copied into vscode-src and globbed by gulp; the dev
+      # tree (esbuild, CodeMirror) is only needed for the bundle above and can push
+      # gulp into EMFILE on the runner.
+      - name: Prune null-markdown dev dependencies
+        shell: pwsh
+        run: npm prune --omit=dev --prefix ide-overlay/extensions/null-markdown
+
       - name: Compile null-tools TypeScript
         shell: pwsh
         run: |
@@ -961,6 +968,7 @@ jobs:
         run: |
           npm ci --prefix ide-overlay/extensions/null-markdown
           npm run build --prefix ide-overlay/extensions/null-markdown
+          npm prune --omit=dev --prefix ide-overlay/extensions/null-markdown
           for ext in null-tools null-cpp null-actions null-accounts null-format null-music null-activity null-startup null-env null-sync; do
             (cd "ide-overlay/extensions/$ext" && npm ci --ignore-scripts && npm run compile)
           done
