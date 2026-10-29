@@ -336,7 +336,7 @@ Write-Step "Installing null-markdown dependencies"
 Invoke-Native "npm ci (null-markdown)" { npm ci --prefix (Join-Path $RepoRoot "extensions/null-markdown") }
 Invoke-Native "npm run build (null-markdown)" { npm run build --prefix (Join-Path $RepoRoot "extensions/null-markdown") }
 
-foreach ($ext in @("null-tools", "null-cpp", "null-actions", "null-accounts", "null-format", "null-music", "null-activity", "null-startup", "null-env", "null-sync")) {
+foreach ($ext in @("null-tools", "null-cpp", "null-actions", "null-accounts", "null-format", "null-music", "null-activity", "null-startup", "null-env", "null-sync", "null-devcontainer")) {
     Write-Step "Compiling $ext"
     Push-Location (Join-Path $RepoRoot "extensions/$ext")
     try {
@@ -353,7 +353,7 @@ foreach ($ext in @("null-tools", "null-cpp", "null-actions", "null-accounts", "n
 # ============================================================
 
 Write-Step "Copying built-in extensions"
-foreach ($ext in @("null-theme", "null-tools", "null-icons", "null-markdown", "null-cpp", "null-actions", "null-accounts", "null-format", "null-music", "null-activity", "null-startup", "null-env", "null-sync")) {
+foreach ($ext in @("null-theme", "null-tools", "null-icons", "null-markdown", "null-cpp", "null-actions", "null-accounts", "null-format", "null-music", "null-activity", "null-startup", "null-env", "null-sync", "null-devcontainer")) {
     Copy-Item -Recurse -Force (Join-Path $RepoRoot "extensions/$ext") (Join-Path $VscodeSrc "extensions/")
 }
 # CLAUDE.md files are agent notes, not extension content

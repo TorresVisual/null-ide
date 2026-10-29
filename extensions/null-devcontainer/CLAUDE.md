@@ -1,0 +1,7 @@
+# null-devcontainer
+
+Quick-and-dirty dev containers. `extensionKind: ["ui"]` (runs on the machine with Docker); `enabledApiProposals: ["resolvers"]`, so `product.json → extensionAllowedProposedApi` lists `null.null-devcontainer`. Not in the REH server tarball (UI-side only).
+
+Flow: `Null: Reopen in Container` opens `vscode-remote://dev-container+<hex(local path)>/workspaces/<name>`. `resolve` in `extension.ts` then: runs `initializeCommand` (via `sh -c`), `docker run -d` (name `null-dc-<sha1>`, entrypoint replaced by a sleep loop, workspace bind-mounted, `-p 127.0.0.1::33000`), downloads the Null server from `product.json → serverDownloadUrlTemplate` (cached in globalStorage) and `docker cp`s it into `~/<serverDataFolderName>/bin/<commit>`, installs the listed extensions with the server's `--install-extension` (once per container, marker `dc-exts`), starts the server on 0.0.0.0:33000 with a persistent token (pid file `dc-pid`) and returns `ResolvedAuthority('127.0.0.1', <docker port>, token)`. Pure helpers (JSONC parse, variable substitution, authority encoding, run args) are in `devcontainer.ts` and covered by `npm test`.
+
+Known gaps (deliberate): `image` only (no Dockerfile/compose/features), `updateRemoteUserUID` is ignored (the real extension skips it on Windows/macOS hosts too), no `forwardPorts`/`mounts`/`postCreateCommand`, config edits need `Null: Rebuild Container`, registry login (`docker login`) is the user's job. Not verified end to end: written without Docker on the dev machine.

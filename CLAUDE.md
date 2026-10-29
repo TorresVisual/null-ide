@@ -9,7 +9,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 Key characteristics:
 - Binary name: `null.exe` — accessible from the terminal as `null .`
 - Built on VSCodium, which strips Microsoft telemetry from VS Code
-- Thirteen built-in extensions bundled at build time: `null-theme`, `null-icons`, `null-tools`, `null-markdown`, `null-cpp`, `null-actions`, `null-accounts`, `null-format`, `null-music`, `null-activity`, `null-startup`, `null-env`, `null-sync`
+- Fourteen built-in extensions bundled at build time: `null-theme`, `null-icons`, `null-tools`, `null-markdown`, `null-cpp`, `null-actions`, `null-accounts`, `null-format`, `null-music`, `null-activity`, `null-startup`, `null-env`, `null-sync`, `null-devcontainer`
 - **Code Spell Checker** (`streetsidesoftware.code-spell-checker`) bundled as a fourteenth built-in extension; version pinned via `CSPELL_TAG` env var in `build.yml`
 - **Remote development** (#85): `jeanp413.open-remote-wsl` / `open-remote-ssh` bundled as built-ins (Open VSX VSIXes, versions pinned via `OPEN_REMOTE_*_VERSION` in `build.yml`, mirrored in `build-local.ps1`). They connect to a Null-repacked VSCodium REH server: CI appends the workspace-side built-ins (`null-env`, `null-cpp`, `null-format`, `null-actions`, `null-markdown`, Code Spell Checker) to the stock tarball via `tar @archive` (keeps exec bits) and publishes `null-reh-linux-{x64,arm64}.tar.gz` on the Null release; `release` in the stamped `product.json` is that release's tag. `serverApplicationName` stays `codium-server` (the launcher script inside the tarball), `serverDataFolderName` is `.null-server`. The remote caches a server per VSCodium commit, so a built-in change without a VSCodium bump needs `~/.null-server/bin/<commit>` deleted. Machine-local extensions (`null-tools`, `null-accounts`, `null-music`, `null-startup`, `null-activity`, `null-sync`) declare `extensionKind: ["ui"]`. Not yet verified end to end in a CI-built package; non-tag builds publish no server
 - CI builds on `windows-2022` (and `ubuntu-22.04` for Linux); the developer authors source changes locally
@@ -51,8 +51,8 @@ The entire build runs in GitHub Actions on a `windows-2022` runner — do **not*
 1. Clone VSCodium at `VSCODIUM_TAG` and VS Code at the matching `MS_TAG`.
 2. Apply VSCodium's own patches, then every `patches/*.patch` in name order (`git apply --ignore-whitespace`).
 3. Deep-merge `product.json` overlay into `vscode-src/product.json`.
-4. `npm ci --prefix extensions/null-markdown` and `npm run build` in it (esbuild bundles the Markdown Editor webview); `npm ci && npm run compile` in each other TS extension (`null-tools`, `null-cpp`, `null-actions`, `null-accounts`, `null-format`, `null-music`, `null-activity`, `null-startup`, `null-env`, `null-sync`).
-5. Copy all thirteen built-in extensions into `vscode-src/extensions/` (their `CLAUDE.md` files are deleted after the copy); bundle Code Spell Checker from `CSPELL_TAG`.
+4. `npm ci --prefix extensions/null-markdown` and `npm run build` in it (esbuild bundles the Markdown Editor webview); `npm ci && npm run compile` in each other TS extension (`null-tools`, `null-cpp`, `null-actions`, `null-accounts`, `null-format`, `null-music`, `null-activity`, `null-startup`, `null-env`, `null-sync`, `null-devcontainer`).
+5. Copy all fourteen built-in extensions into `vscode-src/extensions/` (their `CLAUDE.md` files are deleted after the copy); bundle Code Spell Checker from `CSPELL_TAG`.
 6. Replace upstream icons with files from `icons/`.
 7. Copy `workbench/custom.css` → `null-custom.css` and `workbench/splash.js` → `null-splash.js` into the source tree; inject `<link>` / `<script>` tags into `workbench.html`.
 8. `npm ci && npx gulp vscode-win32-x64` produces `VSCode-win32-x64/`.
@@ -101,6 +101,9 @@ Environment check, workspace-side. `null-format`, `null-actions` and `null-cpp` 
 
 ### null-sync (`extensions/null-sync/`)
 Cross-device sync through one encrypted secret Gist, reached via null-accounts. `extensionKind: ["ui"]`, off by default, no UI (it exposes `NullSyncApi`). The passphrase cannot be recovered. Details: [`extensions/null-sync/CLAUDE.md`](extensions/null-sync/CLAUDE.md).
+
+### null-devcontainer (`extensions/null-devcontainer/`)
+Quick-and-dirty dev containers (no Microsoft extension). `extensionKind: ["ui"]`, a `resolvers`-proposal remote-authority resolver for `dev-container+<hex of local folder>`. Supports `image`, `initializeCommand` (run through `sh -c`, so Windows needs Git's `sh`), `runArgs`, `remoteUser`, `containerEnv`, `workspaceFolder` and `customizations.vscode.extensions`; nothing else. Details: [`extensions/null-devcontainer/CLAUDE.md`](extensions/null-devcontainer/CLAUDE.md).
 
 ### null-tools (`extensions/null-tools/`)
 TypeScript, activated on `onStartupFinished`. Project dashboard, GitHub Issues panel, GitHub pull requests review, GitHub Actions, commit message generation/validation, in-app updater, Discord Rich Presence, Null: Setup, crash recovery, first-run choices, the Null Workspace Features hub and the commit graph. Depends on null-accounts (`extensionDependencies`); webview code in `src/webview/` compiles through separate `tsconfig.webview-*.json` projects into `lib/`. Details: [`extensions/null-tools/CLAUDE.md`](extensions/null-tools/CLAUDE.md).

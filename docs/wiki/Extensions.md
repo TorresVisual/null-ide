@@ -19,6 +19,7 @@ Fourteen extensions are bundled at build time. The installer lets you drop the o
 | `null-activity` | Local activity tracking |
 | `null-startup` | Startup profiler |
 | `null-sync` | Encrypted cross-device sync |
+| `null-devcontainer` | Minimal dev containers (`Null: Reopen in Container`) |
 | Code Spell Checker | `streetsidesoftware.code-spell-checker`, bundled |
 
 Remote development (`open-remote-wsl`, `open-remote-ssh`) is bundled as well. A few extensions depend on others: `null-format`, `null-actions` and `null-cpp` need `null-env`, and `null-tools` needs `null-accounts`. Keeping one without its dependency will break it.

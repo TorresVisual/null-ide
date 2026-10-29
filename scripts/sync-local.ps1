@@ -331,6 +331,15 @@ $Extensions = [ordered]@{
         )
     }
 
+    "null-devcontainer" = @{
+        Compile       = $true
+        CompileScript = "compile"
+        Copy          = @(
+            "package.json",
+            "out"
+        )
+    }
+
 }
 
 # ============================================================

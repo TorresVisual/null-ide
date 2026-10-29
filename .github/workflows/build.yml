@@ -240,6 +240,13 @@ jobs:
           npm ci --ignore-scripts
           npm run compile
 
+      - name: Compile null-devcontainer TypeScript
+        shell: pwsh
+        run: |
+          Set-Location ide-overlay/extensions/null-devcontainer
+          npm ci --ignore-scripts
+          npm run compile
+
       - name: Copy built-in extensions
         shell: pwsh
         run: |
@@ -256,6 +263,7 @@ jobs:
           Copy-Item -Recurse -Force ide-overlay/extensions/null-startup    vscode-src/extensions/
           Copy-Item -Recurse -Force ide-overlay/extensions/null-env        vscode-src/extensions/
           Copy-Item -Recurse -Force ide-overlay/extensions/null-sync       vscode-src/extensions/
+          Copy-Item -Recurse -Force ide-overlay/extensions/null-devcontainer vscode-src/extensions/
           # CLAUDE.md files are agent notes, not extension content
           Get-ChildItem vscode-src/extensions/null-*/CLAUDE.md | Remove-Item -Force
 
@@ -969,14 +977,14 @@ jobs:
           npm ci --prefix ide-overlay/extensions/null-markdown
           npm run build --prefix ide-overlay/extensions/null-markdown
           npm prune --omit=dev --prefix ide-overlay/extensions/null-markdown
-          for ext in null-tools null-cpp null-actions null-accounts null-format null-music null-activity null-startup null-env null-sync; do
+          for ext in null-tools null-cpp null-actions null-accounts null-format null-music null-activity null-startup null-env null-sync null-devcontainer; do
             (cd "ide-overlay/extensions/$ext" && npm ci --ignore-scripts && npm run compile)
           done
 
       - name: Copy built-in extensions
         shell: bash
         run: |
-          for ext in null-theme null-tools null-icons null-markdown null-cpp null-actions null-accounts null-format null-music null-activity null-startup null-env null-sync; do
+          for ext in null-theme null-tools null-icons null-markdown null-cpp null-actions null-accounts null-format null-music null-activity null-startup null-env null-sync null-devcontainer; do
             cp -r "ide-overlay/extensions/$ext" vscode-src/extensions/
           done
           # CLAUDE.md files are agent notes, not extension content

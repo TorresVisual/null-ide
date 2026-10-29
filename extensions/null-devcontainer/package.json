@@ -1,0 +1,32 @@
+{
+  "name": "null-devcontainer",
+  "displayName": "Null Dev Containers",
+  "description": "Quick-and-dirty dev containers: open a folder inside the image from its devcontainer.json (image, initializeCommand, runArgs, remoteUser, extensions)",
+  "version": "1.0.0",
+  "publisher": "null",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.93.0"
+  },
+  "extensionKind": ["ui"],
+  "enabledApiProposals": ["resolvers"],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onResolveRemoteAuthority:dev-container"
+  ],
+  "contributes": {
+    "commands": [
+      { "command": "null.devcontainer.reopen", "title": "Null: Reopen in Container" },
+      { "command": "null.devcontainer.rebuild", "title": "Null: Rebuild Container" }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p tsconfig.json",
+    "test": "tsc -p tsconfig.json && node --test out/devcontainer.test.js"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0",
+    "@types/vscode": "^1.93.0",
+    "@types/node": "^22.0.0"
+  }
+}
