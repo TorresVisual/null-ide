@@ -9,18 +9,37 @@ import {
 
 const out = vscode.window.createOutputChannel('Null Dev Containers');
 
+/**
+ * Apps started from Explorer often lack Git's `sh` and Docker Desktop's `docker` on PATH,
+ * so on Windows look in the default install dirs first.
+ */
+function tool(name: 'sh' | 'docker'): string {
+  if (process.platform !== 'win32') { return name; }
+  const roots = [process.env.ProgramFiles, process.env['ProgramFiles(x86)'], process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, 'Programs')];
+  const rels = name === 'sh'
+    ? ['Git/bin/sh.exe']
+    : ['DockerDesktop/resources/bin/docker.exe', 'Docker/Docker/resources/bin/docker.exe'];
+  for (const root of roots) {
+    for (const rel of rels) {
+      const f = root && path.join(root, rel);
+      if (f && fs.existsSync(f)) { return f; }
+    }
+  }
+  return name;
+}
+
 function run(cmd: string, args: string[], cwd?: string): Promise<string> {
   out.appendLine(`> ${cmd} ${args.join(' ')}`);
   return new Promise((resolve, reject) =>
     execFile(cmd, args, { cwd, maxBuffer: 64 << 20 }, (err, stdout, stderr) => {
       if (stdout) { out.appendLine(stdout.trimEnd()); }
       if (stderr) { out.appendLine(stderr.trimEnd()); }
-      if (err) { reject(new Error(`${cmd} ${args[0]} failed: ${(stderr || err.message).trim()}`)); } else { resolve(stdout); }
+      if (err) { reject(new Error(`${path.basename(cmd)} ${args[0]} failed: ${(stderr || err.message).trim()}`)); } else { resolve(stdout); }
     }));
 }
 
 const dexec = (name: string, user: string, script: string) =>
-  run('docker', ['exec', '-u', user, name, 'sh', '-c', script]);
+  run(tool('docker'), ['exec', '-u', user, name, 'sh', '-c', script]);
 
 function readConfig(local: string): DevContainerConfig {
   for (const f of [path.join(local, '.devcontainer', 'devcontainer.json'), path.join(local, '.devcontainer.json')]) {
@@ -62,20 +81,20 @@ async function startContainer(ctx: vscode.ExtensionContext, authority: string): 
 
   if (cfg.initializeCommand) {
     const argv = typeof cfg.initializeCommand === 'string'
-      ? ['sh', '-c', substitute(cfg.initializeCommand, vars)] // needs `sh` on PATH (Git Bash on Windows)
+      ? [tool('sh'), '-c', substitute(cfg.initializeCommand, vars)] // Windows: Git for Windows' sh
       : cfg.initializeCommand.map((a) => substitute(a, vars));
     await run(argv[0], argv.slice(1), local);
   }
 
-  const state = await run('docker', ['inspect', '-f', '{{.State.Running}}', name]).then((s) => s.trim(), () => 'missing');
-  if (state === 'missing') { await run('docker', buildRunArgs(cfg, vars, name)); }
-  else if (state !== 'true') { await run('docker', ['start', name]); }
+  const state = await run(tool('docker'), ['inspect', '-f', '{{.State.Running}}', name]).then((s) => s.trim(), () => 'missing');
+  if (state === 'missing') { await run(tool('docker'), buildRunArgs(cfg, vars, name)); }
+  else if (state !== 'true') { await run(tool('docker'), ['start', name]); }
 
   const installed = await dexec(name, user, `test -x "${bin}/bin/${app}"`).then(() => true, () => false);
   if (!installed) {
     const arch = archOf(await dexec(name, user, 'uname -m'));
     const tgz = await serverTarball(ctx, product, arch);
-    await run('docker', ['cp', tgz, `${name}:/tmp/null-server.tar.gz`]);
+    await run(tool('docker'), ['cp', tgz, `${name}:/tmp/null-server.tar.gz`]);
     await dexec(name, 'root', 'chmod a+r /tmp/null-server.tar.gz');
     await dexec(name, user, `mkdir -p "${bin}" && tar xzf /tmp/null-server.tar.gz -C "${bin}"`);
     await dexec(name, 'root', 'rm -f /tmp/null-server.tar.gz');
@@ -102,7 +121,7 @@ for i in $(seq 1 60); do grep -q 'listening on' "$D/dc.log" 2>/dev/null && break
 grep -q 'listening on' "$D/dc.log" || { cat "$D/dc.log" >&2; exit 1; }
 cat "$D/dc-token"`;
   const token = (await dexec(name, user, s)).trim().split('\n').pop()!;
-  const port = (await run('docker', ['port', name, `${SERVER_PORT}/tcp`])).match(/127\.0\.0\.1:(\d+)/)?.[1];
+  const port = (await run(tool('docker'), ['port', name, `${SERVER_PORT}/tcp`])).match(/127\.0\.0\.1:(\d+)/)?.[1];
   if (!port) { throw new Error('Could not find the published server port'); }
   return new (vscode as any).ResolvedAuthority('127.0.0.1', Number(port), token);
 }
@@ -134,7 +153,7 @@ export function activate(ctx: vscode.ExtensionContext): void {
     const authority = vscode.workspace.workspaceFolders?.[0]?.uri.authority;
     if (!authority?.startsWith('dev-container+')) { return vscode.window.showErrorMessage('Not in a dev container.'); }
     try {
-      await run('docker', ['rm', '-f', containerName(fromAuthority(authority))]);
+      await run(tool('docker'), ['rm', '-f', containerName(fromAuthority(authority))]);
       await vscode.commands.executeCommand('workbench.action.reloadWindow');
     } catch (e: any) { vscode.window.showErrorMessage(e.message); }
   }));
