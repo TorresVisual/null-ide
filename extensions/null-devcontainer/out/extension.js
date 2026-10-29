@@ -64,7 +64,9 @@ function tool(name) {
 }
 function run(cmd, args, cwd) {
     out.appendLine(`> ${cmd} ${args.join(' ')}`);
-    return new Promise((resolve, reject) => (0, child_process_1.execFile)(cmd, args, { cwd, maxBuffer: 64 << 20 }, (err, stdout, stderr) => {
+    return new Promise((resolve, reject) => 
+    // docker finds its credential helper (docker-credential-desktop) next to itself on PATH
+    (0, child_process_1.execFile)(cmd, args, { cwd, maxBuffer: 64 << 20, env: path.isAbsolute(cmd) ? { ...process.env, PATH: `${path.dirname(cmd)}${path.delimiter}${process.env.PATH ?? ''}` } : process.env }, (err, stdout, stderr) => {
         if (stdout) {
             out.appendLine(stdout.trimEnd());
         }
