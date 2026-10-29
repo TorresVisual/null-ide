@@ -71,4 +71,23 @@ const vars = { localWorkspaceFolder: 'D:/code/my proj', containerWorkspaceFolder
     assert.strictEqual((0, devcontainer_1.archOf)('x86_64\n'), 'x64');
     assert.strictEqual((0, devcontainer_1.archOf)('aarch64\n'), 'arm64');
 });
+(0, node_test_1.test)('gitKeyOverrides repoints null-accounts key paths (case-insensitive) and leaves other config alone', () => {
+    const key = 'C:/Users/Moritz/.ssh/null-accounts/gl_ed25519';
+    const env = (0, devcontainer_1.gitKeyOverrides)('c:\\users\\moritz\\.ssh\\null-accounts', '/home/vscode/.ssh/null-accounts', {
+        sshCommand: `ssh -i '${key}' -o IdentitiesOnly=yes`,
+        signingKey: key,
+    });
+    assert.deepStrictEqual(env, {
+        GIT_CONFIG_COUNT: '2',
+        GIT_CONFIG_KEY_0: 'core.sshCommand',
+        GIT_CONFIG_VALUE_0: "ssh -i '/home/vscode/.ssh/null-accounts/gl_ed25519' -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new",
+        GIT_CONFIG_KEY_1: 'user.signingkey',
+        GIT_CONFIG_VALUE_1: '/home/vscode/.ssh/null-accounts/gl_ed25519',
+    });
+    assert.deepStrictEqual((0, devcontainer_1.gitKeyOverrides)('C:/Users/Moritz/.ssh/null-accounts', '/k', { sshCommand: 'ssh -i /elsewhere/key', signingKey: '/elsewhere/key' }), {});
+    assert.deepStrictEqual((0, devcontainer_1.gitKeyOverrides)('C:/Users/Moritz/.ssh/null-accounts', '/k', {}), {});
+});
+(0, node_test_1.test)('envFile quotes single quotes for sh', () => {
+    assert.strictEqual((0, devcontainer_1.envFile)({ A: "it's" }), "export A='it'\\''s'\n");
+});
 //# sourceMappingURL=devcontainer.test.js.map

@@ -99,6 +99,48 @@ export function buildRunArgs(cfg: DevContainerConfig, v: Vars, name: string): st
   ];
 }
 
+/**
+ * null-accounts writes the host's key paths into the repo's `.git/config`, which the container shares through
+ * the bind mount. Those paths don't exist in the container, so `GIT_CONFIG_*` (command scope, beats the repo
+ * config) points `core.sshCommand` / `user.signingkey` at the copied keys instead. Needs git >= 2.31.
+ */
+export function gitKeyOverrides(
+  hostKeyDir: string, containerKeyDir: string, cfg: { sshCommand?: string; signingKey?: string },
+): Record<string, string> {
+  const host = normalizePath(hostKeyDir).toLowerCase();
+  const swap = (v?: string) => {
+    const r = v && swapAll(v, host, containerKeyDir);
+    return r && r !== v ? r : undefined;
+  };
+  const ssh = swap(cfg.sshCommand);
+  const key = swap(cfg.signingKey);
+  const entries: [string, string][] = [];
+  // accept-new: the container has no known_hosts, and git over ssh can't answer the prompt
+  if (ssh) { entries.push(['core.sshCommand', `${ssh} -o StrictHostKeyChecking=accept-new`]); }
+  if (key) { entries.push(['user.signingkey', key]); }
+  if (!entries.length) { return {}; }
+  const env: Record<string, string> = { GIT_CONFIG_COUNT: String(entries.length) };
+  entries.forEach(([k, v], i) => { env[`GIT_CONFIG_KEY_${i}`] = k; env[`GIT_CONFIG_VALUE_${i}`] = v; });
+  return env;
+}
+
+/** Case-insensitive literal replace of every `fromLower` in `v`. */
+function swapAll(v: string, fromLower: string, to: string): string {
+  let out = '';
+  let i = 0;
+  for (let j = v.toLowerCase().indexOf(fromLower); j >= 0; j = v.toLowerCase().indexOf(fromLower, i)) {
+    out += v.slice(i, j) + to;
+    i = j + fromLower.length;
+  }
+  return out + v.slice(i);
+}
+
+/** `export K='V'` lines for a POSIX shell to source. */
+export function envFile(env: Record<string, string>): string {
+  const q = (v: string) => "'" + v.replace(/'/g, "'\\''") + "'";
+  return Object.entries(env).map(([k, v]) => 'export ' + k + '=' + q(v) + '\n').join('');
+}
+
 /** Maps `uname -m` to the arch name used in the server download URL. */
 export function archOf(uname: string): string {
   return /aarch64|arm64/.test(uname) ? 'arm64' : 'x64';

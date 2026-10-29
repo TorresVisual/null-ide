@@ -1,10 +1,11 @@
 import * as vscode from 'vscode';
 import { execFile } from 'child_process';
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import {
-  SERVER_PORT, archOf, buildRunArgs, containerFolder, containerName, fromAuthority, normalizePath,
-  parseConfig, substitute, toAuthority, DevContainerConfig, Vars,
+  SERVER_PORT, archOf, buildRunArgs, containerFolder, containerName, envFile, fromAuthority, gitKeyOverrides,
+  normalizePath, parseConfig, substitute, toAuthority, DevContainerConfig, Vars,
 } from './devcontainer';
 
 const out = vscode.window.createOutputChannel('Null Dev Containers');
@@ -13,11 +14,11 @@ const out = vscode.window.createOutputChannel('Null Dev Containers');
  * Apps started from Explorer often lack Git's `sh` and Docker Desktop's `docker` on PATH,
  * so on Windows look in the default install dirs first.
  */
-function tool(name: 'sh' | 'docker'): string {
+function tool(name: 'sh' | 'git' | 'docker'): string {
   if (process.platform !== 'win32') { return name; }
   const roots = [process.env.ProgramFiles, process.env['ProgramFiles(x86)'], process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, 'Programs')];
-  const rels = name === 'sh'
-    ? ['Git/bin/sh.exe']
+  const rels = name === 'sh' ? ['Git/bin/sh.exe']
+    : name === 'git' ? ['Git/cmd/git.exe']
     : ['DockerDesktop/resources/bin/docker.exe', 'Docker/Docker/resources/bin/docker.exe'];
   for (const root of roots) {
     for (const rel of rels) {
@@ -62,6 +63,26 @@ async function serverTarball(ctx: vscode.ExtensionContext, product: any, arch: s
     fs.writeFileSync(file, Buffer.from(await res.arrayBuffer()));
   }
   return file;
+}
+
+/**
+ * Copies the host's null-accounts SSH keys into the container user's ~/.ssh (ssh and ssh-keygen refuse keys with
+ * the bind-mount's permissions) and returns the GIT_CONFIG_* overrides that point the repo's host paths at them.
+ */
+async function copyAccountKeys(name: string, user: string, local: string): Promise<Record<string, string>> {
+  const hostDir = path.join(os.homedir(), '.ssh', 'null-accounts');
+  if (!fs.existsSync(hostDir)) { return {}; }
+  const cfgOf = (key: string) => run(tool('git'), ['-C', local, 'config', '--local', '--get', key]).then((s) => s.trim(), () => '');
+  const cHome = (await dexec(name, user, 'echo $HOME')).trim();
+  if (!cHome.startsWith('/')) { throw new Error(`Unexpected home directory for ${user}: "${cHome}"`); }
+  const target = `${cHome}/.ssh/null-accounts`;
+  const env = gitKeyOverrides(hostDir, target, { sshCommand: await cfgOf('core.sshCommand'), signingKey: await cfgOf('user.signingkey') });
+  if (!Object.keys(env).length) { return {}; }
+  await run(tool('docker'), ['cp', hostDir + path.sep + '.', `${name}:/tmp/null-accounts-keys`]);
+  await dexec(name, 'root', `U=$(id -u ${user}) && G=$(id -g ${user}) && rm -rf "${target}" && mkdir -p "${cHome}/.ssh" \
+&& mv /tmp/null-accounts-keys "${target}" && chown -R $U:$G "${cHome}/.ssh" && chmod 700 "${cHome}/.ssh" "${target}" \
+&& find "${target}" -type f -exec chmod 600 {} +`);
+  return env;
 }
 
 async function startContainer(ctx: vscode.ExtensionContext, authority: string): Promise<unknown> {
@@ -111,8 +132,18 @@ async function startContainer(ctx: vscode.ExtensionContext, authority: string): 
     await dexec(name, user, `touch "${home}/dc-exts"`);
   }
 
+  const gitEnv = await copyAccountKeys(name, user, local);
+
   // Start the server unless the pid file points at a live process; the token persists across reconnects.
+  // The git overrides are the server's environment, so a changed set restarts it.
   const s = `D="${home}"; mkdir -p "$D"
+cat > "$D/dc-env.new" <<'NULL_ENV_EOF'
+${envFile(gitEnv)}NULL_ENV_EOF
+if ! cmp -s "$D/dc-env.new" "$D/dc-env" 2>/dev/null; then
+  [ -s "$D/dc-pid" ] && kill "$(cat "$D/dc-pid")" 2>/dev/null && sleep 2
+  rm -f "$D/dc-pid"; mv "$D/dc-env.new" "$D/dc-env"
+fi
+. "$D/dc-env"
 [ -s "$D/dc-token" ] || head -c 18 /dev/urandom | od -An -tx1 | tr -d ' \\n' > "$D/dc-token"
 if ! { [ -s "$D/dc-pid" ] && kill -0 "$(cat "$D/dc-pid")" 2>/dev/null; }; then
   nohup "${bin}/bin/${app}" --host 0.0.0.0 --port ${SERVER_PORT} --connection-token "$(cat "$D/dc-token")" --accept-server-license-terms --telemetry-level off >"$D/dc.log" 2>&1 &

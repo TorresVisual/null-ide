@@ -37,6 +37,7 @@ exports.activate = activate;
 const vscode = __importStar(require("vscode"));
 const child_process_1 = require("child_process");
 const fs = __importStar(require("fs"));
+const os = __importStar(require("os"));
 const path = __importStar(require("path"));
 const devcontainer_1 = require("./devcontainer");
 const out = vscode.window.createOutputChannel('Null Dev Containers');
@@ -49,9 +50,9 @@ function tool(name) {
         return name;
     }
     const roots = [process.env.ProgramFiles, process.env['ProgramFiles(x86)'], process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, 'Programs')];
-    const rels = name === 'sh'
-        ? ['Git/bin/sh.exe']
-        : ['DockerDesktop/resources/bin/docker.exe', 'Docker/Docker/resources/bin/docker.exe'];
+    const rels = name === 'sh' ? ['Git/bin/sh.exe']
+        : name === 'git' ? ['Git/cmd/git.exe']
+            : ['DockerDesktop/resources/bin/docker.exe', 'Docker/Docker/resources/bin/docker.exe'];
     for (const root of roots) {
         for (const rel of rels) {
             const f = root && path.join(root, rel);
@@ -106,6 +107,31 @@ async function serverTarball(ctx, product, arch) {
     }
     return file;
 }
+/**
+ * Copies the host's null-accounts SSH keys into the container user's ~/.ssh (ssh and ssh-keygen refuse keys with
+ * the bind-mount's permissions) and returns the GIT_CONFIG_* overrides that point the repo's host paths at them.
+ */
+async function copyAccountKeys(name, user, local) {
+    const hostDir = path.join(os.homedir(), '.ssh', 'null-accounts');
+    if (!fs.existsSync(hostDir)) {
+        return {};
+    }
+    const cfgOf = (key) => run(tool('git'), ['-C', local, 'config', '--local', '--get', key]).then((s) => s.trim(), () => '');
+    const cHome = (await dexec(name, user, 'echo $HOME')).trim();
+    if (!cHome.startsWith('/')) {
+        throw new Error(`Unexpected home directory for ${user}: "${cHome}"`);
+    }
+    const target = `${cHome}/.ssh/null-accounts`;
+    const env = (0, devcontainer_1.gitKeyOverrides)(hostDir, target, { sshCommand: await cfgOf('core.sshCommand'), signingKey: await cfgOf('user.signingkey') });
+    if (!Object.keys(env).length) {
+        return {};
+    }
+    await run(tool('docker'), ['cp', hostDir + path.sep + '.', `${name}:/tmp/null-accounts-keys`]);
+    await dexec(name, 'root', `U=$(id -u ${user}) && G=$(id -g ${user}) && rm -rf "${target}" && mkdir -p "${cHome}/.ssh" \
+&& mv /tmp/null-accounts-keys "${target}" && chown -R $U:$G "${cHome}/.ssh" && chmod 700 "${cHome}/.ssh" "${target}" \
+&& find "${target}" -type f -exec chmod 600 {} +`);
+    return env;
+}
 async function startContainer(ctx, authority) {
     const local = (0, devcontainer_1.fromAuthority)(authority);
     const cfg = readConfig(local);
@@ -154,8 +180,17 @@ async function startContainer(ctx, authority) {
         }
         await dexec(name, user, `touch "${home}/dc-exts"`);
     }
+    const gitEnv = await copyAccountKeys(name, user, local);
     // Start the server unless the pid file points at a live process; the token persists across reconnects.
+    // The git overrides are the server's environment, so a changed set restarts it.
     const s = `D="${home}"; mkdir -p "$D"
+cat > "$D/dc-env.new" <<'NULL_ENV_EOF'
+${(0, devcontainer_1.envFile)(gitEnv)}NULL_ENV_EOF
+if ! cmp -s "$D/dc-env.new" "$D/dc-env" 2>/dev/null; then
+  [ -s "$D/dc-pid" ] && kill "$(cat "$D/dc-pid")" 2>/dev/null && sleep 2
+  rm -f "$D/dc-pid"; mv "$D/dc-env.new" "$D/dc-env"
+fi
+. "$D/dc-env"
 [ -s "$D/dc-token" ] || head -c 18 /dev/urandom | od -An -tx1 | tr -d ' \\n' > "$D/dc-token"
 if ! { [ -s "$D/dc-pid" ] && kill -0 "$(cat "$D/dc-pid")" 2>/dev/null; }; then
   nohup "${bin}/bin/${app}" --host 0.0.0.0 --port ${devcontainer_1.SERVER_PORT} --connection-token "$(cat "$D/dc-token")" --accept-server-license-terms --telemetry-level off >"$D/dc.log" 2>&1 &
