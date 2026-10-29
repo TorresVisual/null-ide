@@ -181,20 +181,21 @@ async function startContainer(ctx, authority) {
         await dexec(name, user, `touch "${home}/dc-exts"`);
     }
     const gitEnv = await copyAccountKeys(name, user, local);
-    // Start the server unless the pid file points at a live process; the token persists across reconnects.
-    // The git overrides are the server's environment, so a changed set restarts it.
-    const s = `D="${home}"; mkdir -p "$D"
+    // Start the server unless one is running; the token persists across reconnects. The git overrides are the
+    // server's environment, so a changed set restarts it. Running servers are found by their install path in
+    // /proc (a pid file only sees the launcher script; its node child would keep the port).
+    const s = `D="${home}"; B="${bin}"; mkdir -p "$D"
+srv() { for p in /proc/[0-9]*; do n=$(basename "$p"); [ "$n" = "$$" ] && continue; { tr '\\0' ' ' < "$p/cmdline"; } 2>/dev/null | grep -q -F "$B/" && echo "$n"; done; }
 cat > "$D/dc-env.new" <<'NULL_ENV_EOF'
 ${(0, devcontainer_1.envFile)(gitEnv)}NULL_ENV_EOF
 if ! cmp -s "$D/dc-env.new" "$D/dc-env" 2>/dev/null; then
-  [ -s "$D/dc-pid" ] && kill "$(cat "$D/dc-pid")" 2>/dev/null && sleep 2
-  rm -f "$D/dc-pid"; mv "$D/dc-env.new" "$D/dc-env"
+  kill $(srv) 2>/dev/null; for i in 1 2 3 4 5 6 7 8 9 10; do [ -z "$(srv)" ] && break; sleep 1; done
+  kill -9 $(srv) 2>/dev/null; mv "$D/dc-env.new" "$D/dc-env"
 fi
 . "$D/dc-env"
 [ -s "$D/dc-token" ] || head -c 18 /dev/urandom | od -An -tx1 | tr -d ' \\n' > "$D/dc-token"
-if ! { [ -s "$D/dc-pid" ] && kill -0 "$(cat "$D/dc-pid")" 2>/dev/null; }; then
-  nohup "${bin}/bin/${app}" --host 0.0.0.0 --port ${devcontainer_1.SERVER_PORT} --connection-token "$(cat "$D/dc-token")" --accept-server-license-terms --telemetry-level off >"$D/dc.log" 2>&1 &
-  echo $! > "$D/dc-pid"
+if [ -z "$(srv)" ]; then
+  nohup "$B/bin/${app}" --host 0.0.0.0 --port ${devcontainer_1.SERVER_PORT} --connection-token "$(cat "$D/dc-token")" --accept-server-license-terms --telemetry-level off >"$D/dc.log" 2>&1 &
 fi
 for i in $(seq 1 60); do grep -q 'listening on' "$D/dc.log" 2>/dev/null && break; sleep 1; done
 grep -q 'listening on' "$D/dc.log" || { cat "$D/dc.log" >&2; exit 1; }
