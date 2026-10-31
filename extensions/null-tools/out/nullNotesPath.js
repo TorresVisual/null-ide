@@ -36,6 +36,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.resolveNullNotesExePath = resolveNullNotesExePath;
 const path = __importStar(require("path"));
 function resolveNullNotesExePath(override, localAppData) {
-    return override.trim() || path.join(localAppData, 'null-notes', 'null-notes.exe');
+    return override.trim() || path.join(localAppData, 'Null Notes', 'null-notes.exe');
 }
 //# sourceMappingURL=nullNotesPath.js.map
