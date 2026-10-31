@@ -4,7 +4,7 @@ Null IDE builds on VSCodium, which trails VS Code by several releases. This list
 catches VS Code features early so we can backport or adapt them now instead of
 waiting for the VSCodium bump (#115).
 
-**Last reviewed: 1.142** (backfilled 1.129–1.135, already in the 1.135 build, so those rows are ticked as reconciled)
+**Last reviewed: 1.144** (backfilled 1.129–1.135, already in the 1.135 build, so those rows are ticked as reconciled)
 
 The `upstream-check` workflow opens a *Review VS Code 1.x release notes* issue for
 every stable release after the version above; `/vscode-watch` works through them
@@ -27,6 +27,12 @@ against the real upstream feature, then tick **Reconciled**.
 
 | Feature | VS Code | Status | Null issue | Reconciled |
 |---|---:|---|---|---|
+| Issue Reporter wizard (`issueReporter.wizard.enabled`): single-page form, attachments, own window, `issueReporter.additionalRepositories`; revisit if Null points it at its own repo | 1.144 | Wait | — | |
+| Terminal: `terminal.integrated.windowsReparentConsoleWindow` (default on) opens dialogs from CLI tools in front of VS Code on Windows | 1.144 | Wait | — | |
+| N/A: cloud tasks / automations / remote environments, Agent Host Protocol, Copilot Fusion and model comparison, image generation, computer use, canvases, assisted permissions, session composer controls, Copilot Memory, worktree storage, agent customizations / connectors / marketplace, moving chats and nested sessions, session group icons, voice conversations, enterprise permission / session defaults, extensions in the Agents window, GitHub Pull Requests 0.174 stacked PR banner (not bundled), publishing with `vsce --oidc` Trusted Publishing (Null publishes no Marketplace extensions) | 1.144 | N/A | — | |
+| Diagnostic limits: editor highlight limit raised from 500 to 5,000 per file, per-collection source limit of 1,000, and a language status warning when either is hit | 1.143 | Wait | — | |
+| Multi-file diff editor file list (experimental `multiDiffEditor.experimental.fileList`): A/M/D/R list or tree beside commit / stash diffs; relevant to the commit graph in `null-tools` once stable | 1.143 | Wait | — | |
+| N/A: Copilot harness as default and working set, compare models, worktree storage reclaim, session activity bar, empty Files tab, local Copilot models, Voice Mode OpenAI models, sandbox certificate trust / policy, multiple steering messages, canvases, detached background shell output, enterprise OTel / managed models / plugins, Claude and Codex sessions, Copilot CLI install | 1.143 | N/A | — | |
 | Markdown editor: paste images from the clipboard | 1.142 | Adapt | #138 | |
 | Markdown editor: Outline view and breadcrumbs integration | 1.142 | Adapt | #139 | |
 | Markdown editor: hover copy button on code blocks | 1.142 | Adapt | #140 | |
