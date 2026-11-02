@@ -21,6 +21,13 @@ exports.RULES = [
     { id: 'tool.rustfmt', label: 'rustfmt', languages: ['rust'], kind: 'tool', anyOf: ['rustfmt'], severity: 'required', fix: url('https://rustup.rs/') },
     // Node
     { id: 'tool.node', label: 'node', languages: ['node'], kind: 'tool', anyOf: ['node'], severity: 'required', fix: url('https://nodejs.org/en/download') },
+    // Java: the Red Hat extension is the language server and the Maven/Gradle importer; the debugger extension adds the
+    // Run/Debug lenses (single files included) and generates launch configs; the test extension covers JUnit.
+    { id: 'ext.java', label: 'Language Support for Java extension', languages: ['java'], kind: 'extension', anyOf: ['redhat.java'], severity: 'required', fix: install('redhat.java') },
+    { id: 'ext.java-debug', label: 'Debugger for Java extension', languages: ['java'], kind: 'extension', anyOf: ['vscjava.vscode-java-debug'], severity: 'required', fix: install('vscjava.vscode-java-debug') },
+    { id: 'ext.java-test', label: 'Test Runner for Java extension', languages: ['java'], kind: 'extension', anyOf: ['vscjava.vscode-java-test'], severity: 'recommended', fix: install('vscjava.vscode-java-test') },
+    // javac, not java: a JRE alone cannot compile, and the language server needs a JDK.
+    { id: 'tool.jdk', label: 'JDK (javac)', languages: ['java'], kind: 'tool', anyOf: ['javac'], severity: 'required', fix: url('https://adoptium.net/temurin/releases/') },
     // Every workspace: Null IDE's AI workflow
     { id: 'ext.claude-code', label: 'Claude Code extension', languages: 'all', kind: 'extension', anyOf: ['anthropic.claude-code'], severity: 'recommended', fix: install('anthropic.claude-code') },
     { id: 'tool.claude', label: 'claude CLI', languages: 'all', kind: 'tool', anyOf: ['claude'], severity: 'recommended', fix: url('https://docs.claude.com/en/docs/claude-code/setup') },

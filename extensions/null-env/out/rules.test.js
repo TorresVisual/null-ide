@@ -69,6 +69,11 @@ const rules_1 = require("./rules");
         assert.ok(ids.has(id), id);
     }
 });
+(0, node_test_1.test)('java projects need the language server, debugger and a JDK', () => {
+    const java = rules_1.RULES.filter(r => r.languages !== 'all' && r.languages.includes('java'));
+    assert.deepEqual(java.filter(r => r.severity === 'required').map(r => r.id), ['ext.java', 'ext.java-debug', 'tool.jdk']);
+    assert.deepEqual(java.find(r => r.id === 'tool.jdk').anyOf, ['javac']);
+});
 (0, node_test_1.test)('debugExtensionFor maps the debug types null-cpp emits, and only those', () => {
     assert.deepEqual((0, rules_1.debugExtensionFor)('lldb'), { extensionId: 'vadimcn.vscode-lldb', label: 'CodeLLDB' });
     assert.deepEqual((0, rules_1.debugExtensionFor)('cppdbg'), { extensionId: 'ms-vscode.cpptools', label: 'C/C++ (cpptools)' });

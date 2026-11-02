@@ -51,6 +51,12 @@ const list = (names) => () => names;
 (0, node_test_1.test)('a .csproj file of any name is a dotnet project, reported once', () => {
     assert.deepEqual((0, detect_1.detectProjects)('/x', list(['App.csproj', 'Lib.csproj'])), [{ language: 'dotnet', manifest: '.csproj' }]);
 });
+(0, node_test_1.test)('Maven, Gradle and loose .java files are java projects, reported once per manifest', () => {
+    assert.deepEqual((0, detect_1.detectProjects)('/x', list(['pom.xml'])), [{ language: 'java', manifest: 'pom.xml' }]);
+    assert.deepEqual((0, detect_1.detectProjects)('/x', list(['build.gradle.kts'])), [{ language: 'java', manifest: 'build.gradle.kts' }]);
+    assert.deepEqual((0, detect_1.detectProjects)('/x', list(['A.java', 'B.java'])), [{ language: 'java', manifest: '.java' }]);
+    assert.deepEqual((0, detect_1.detectLanguages)('/x', list(['pom.xml', 'build.gradle', 'Main.java'])), ['java']);
+});
 (0, node_test_1.test)('manifest names match case-insensitively', () => {
     assert.deepEqual((0, detect_1.detectProjects)('/x', list(['cmakelists.txt'])), [{ language: 'cpp', manifest: 'CMakeLists.txt' }]);
 });

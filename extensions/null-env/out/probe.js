@@ -68,6 +68,9 @@ function executableNames(name, isWindows = process.platform === 'win32', pathext
 function extraToolDirs() {
     const home = os.homedir();
     const dirs = [path.join(home, '.cargo', 'bin')];
+    if (process.env.JAVA_HOME) {
+        dirs.push(path.join(process.env.JAVA_HOME, 'bin'));
+    }
     if (process.platform === 'win32') {
         dirs.push('C:\Program Files\LLVM\bin', 'C:\Program Files (x86)\LLVM\bin', 'C:\LLVM\bin', path.join(home, 'scoop', 'apps', 'llvm', 'current', 'bin'), path.join(home, 'AppData', 'Local', 'Programs', 'LLVM', 'bin'));
     }
