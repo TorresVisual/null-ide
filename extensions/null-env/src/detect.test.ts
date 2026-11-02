@@ -31,6 +31,16 @@ test('Maven, Gradle and loose .java files are java projects, reported once per m
   assert.deepEqual(detectLanguages('/x', list(['pom.xml', 'build.gradle', 'Main.java'])), ['java']);
 });
 
+test('a .java file in src/ makes a java project, but a missing src/ is fine', () => {
+  const tree = (p: string) => {
+    if (p.endsWith('src')) { return ['Main.java']; }
+    if (p === '/x') { return ['src']; }
+    throw new Error('ENOENT');
+  };
+  assert.deepEqual(detectProjects('/x', tree), [{ language: 'java', manifest: '.java' }]);
+  assert.deepEqual(detectProjects('/x', p => (p === '/x' ? ['README.md'] : (() => { throw new Error('ENOENT'); })())), []);
+});
+
 test('manifest names match case-insensitively', () => {
   assert.deepEqual(detectProjects('/x', list(['cmakelists.txt'])), [{ language: 'cpp', manifest: 'CMakeLists.txt' }]);
 });

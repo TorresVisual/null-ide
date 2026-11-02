@@ -1,4 +1,5 @@
 import * as fs from 'node:fs';
+import * as path from 'node:path';
 import type { Language } from './types';
 
 export interface DetectedProject {
@@ -24,7 +25,7 @@ const MATCHERS: readonly Matcher[] = [
   { language: 'java', exact: 'pom.xml' },
   { language: 'java', exact: 'build.gradle' },
   { language: 'java', exact: 'build.gradle.kts' },
-  // Standalone assignments with no build file. ponytail: workspace root only, so a src/ tree without pom/gradle is missed.
+  // Standalone assignments with no build file; also looked for in src/ (IntelliJ layout), see detectProjects.
   { language: 'java', suffix: '.java' },
 ];
 
@@ -37,10 +38,17 @@ export function detectProjects(folderPath: string, listDir: (p: string) => strin
   } catch {
     return [];
   }
+  // ponytail: only src/ one level down, not a recursive scan; add when assignments nest deeper.
+  let srcNames: string[] = [];
+  try {
+    srcNames = listDir(path.join(folderPath, 'src')).map(n => n.toLowerCase());
+  } catch {
+    // no src/ folder
+  }
   const found: DetectedProject[] = [];
   for (const m of MATCHERS) {
-    const hit = names.some(n => (m.exact ? n === m.exact.toLowerCase() : n.endsWith(m.suffix!)));
-    if (hit) {
+    const matches = (n: string) => (m.exact ? n === m.exact.toLowerCase() : n.endsWith(m.suffix!));
+    if (names.some(matches) || (m.suffix === '.java' && srcNames.some(matches))) {
       found.push({ language: m.language, manifest: (m.exact ?? m.suffix)! });
     }
   }
