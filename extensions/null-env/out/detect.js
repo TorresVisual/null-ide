@@ -36,6 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.detectProjects = detectProjects;
 exports.detectLanguages = detectLanguages;
 const fs = __importStar(require("node:fs"));
+const path = __importStar(require("node:path"));
 // The one manifest -> language table. Order is the order results are reported in.
 const MATCHERS = [
     { language: 'rust', exact: 'Cargo.toml' },
@@ -47,7 +48,7 @@ const MATCHERS = [
     { language: 'java', exact: 'pom.xml' },
     { language: 'java', exact: 'build.gradle' },
     { language: 'java', exact: 'build.gradle.kts' },
-    // Standalone assignments with no build file. ponytail: workspace root only, so a src/ tree without pom/gradle is missed.
+    // Standalone assignments with no build file; also looked for in src/ (IntelliJ layout), see detectProjects.
     { language: 'java', suffix: '.java' },
 ];
 const defaultListDir = (folderPath) => fs.readdirSync(folderPath);
@@ -59,10 +60,18 @@ function detectProjects(folderPath, listDir = defaultListDir) {
     catch {
         return [];
     }
+    // ponytail: only src/ one level down, not a recursive scan; add when assignments nest deeper.
+    let srcNames = [];
+    try {
+        srcNames = listDir(path.join(folderPath, 'src')).map(n => n.toLowerCase());
+    }
+    catch {
+        // no src/ folder
+    }
     const found = [];
     for (const m of MATCHERS) {
-        const hit = names.some(n => (m.exact ? n === m.exact.toLowerCase() : n.endsWith(m.suffix)));
-        if (hit) {
+        const matches = (n) => (m.exact ? n === m.exact.toLowerCase() : n.endsWith(m.suffix));
+        if (names.some(matches) || (m.suffix === '.java' && srcNames.some(matches))) {
             found.push({ language: m.language, manifest: (m.exact ?? m.suffix) });
         }
     }

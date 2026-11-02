@@ -57,6 +57,19 @@ const list = (names) => () => names;
     assert.deepEqual((0, detect_1.detectProjects)('/x', list(['A.java', 'B.java'])), [{ language: 'java', manifest: '.java' }]);
     assert.deepEqual((0, detect_1.detectLanguages)('/x', list(['pom.xml', 'build.gradle', 'Main.java'])), ['java']);
 });
+(0, node_test_1.test)('a .java file in src/ makes a java project, but a missing src/ is fine', () => {
+    const tree = (p) => {
+        if (p.endsWith('src')) {
+            return ['Main.java'];
+        }
+        if (p === '/x') {
+            return ['src'];
+        }
+        throw new Error('ENOENT');
+    };
+    assert.deepEqual((0, detect_1.detectProjects)('/x', tree), [{ language: 'java', manifest: '.java' }]);
+    assert.deepEqual((0, detect_1.detectProjects)('/x', p => (p === '/x' ? ['README.md'] : (() => { throw new Error('ENOENT'); })())), []);
+});
 (0, node_test_1.test)('manifest names match case-insensitively', () => {
     assert.deepEqual((0, detect_1.detectProjects)('/x', list(['cmakelists.txt'])), [{ language: 'cpp', manifest: 'CMakeLists.txt' }]);
 });
