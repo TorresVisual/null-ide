@@ -39,6 +39,15 @@ test('the issue-89 requirements are present', () => {
   }
 });
 
+test('java projects need the language server, debugger and a JDK', () => {
+  const java = RULES.filter(r => r.languages !== 'all' && r.languages.includes('java'));
+  assert.deepEqual(
+    java.filter(r => r.severity === 'required').map(r => r.id),
+    ['ext.java', 'ext.java-debug', 'tool.jdk'],
+  );
+  assert.deepEqual(java.find(r => r.id === 'tool.jdk')!.anyOf, ['javac']);
+});
+
 test('debugExtensionFor maps the debug types null-cpp emits, and only those', () => {
   assert.deepEqual(debugExtensionFor('lldb'), { extensionId: 'vadimcn.vscode-lldb', label: 'CodeLLDB' });
   assert.deepEqual(debugExtensionFor('cppdbg'), { extensionId: 'ms-vscode.cpptools', label: 'C/C++ (cpptools)' });

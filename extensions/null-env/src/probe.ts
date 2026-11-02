@@ -33,6 +33,9 @@ export function executableNames(
 export function extraToolDirs(): string[] {
   const home = os.homedir();
   const dirs = [path.join(home, '.cargo', 'bin')];
+  if (process.env.JAVA_HOME) {
+    dirs.push(path.join(process.env.JAVA_HOME, 'bin'));
+  }
   if (process.platform === 'win32') {
     dirs.push(
       'C:\Program Files\LLVM\bin',

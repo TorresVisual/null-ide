@@ -21,6 +21,11 @@ const MATCHERS: readonly Matcher[] = [
   { language: 'cpp', exact: '.clangd' },
   { language: 'node', exact: 'package.json' },
   { language: 'dotnet', suffix: '.csproj' },
+  { language: 'java', exact: 'pom.xml' },
+  { language: 'java', exact: 'build.gradle' },
+  { language: 'java', exact: 'build.gradle.kts' },
+  // Standalone assignments with no build file. ponytail: workspace root only, so a src/ tree without pom/gradle is missed.
+  { language: 'java', suffix: '.java' },
 ];
 
 const defaultListDir = (folderPath: string): string[] => fs.readdirSync(folderPath);

@@ -24,6 +24,13 @@ test('a .csproj file of any name is a dotnet project, reported once', () => {
   );
 });
 
+test('Maven, Gradle and loose .java files are java projects, reported once per manifest', () => {
+  assert.deepEqual(detectProjects('/x', list(['pom.xml'])), [{ language: 'java', manifest: 'pom.xml' }]);
+  assert.deepEqual(detectProjects('/x', list(['build.gradle.kts'])), [{ language: 'java', manifest: 'build.gradle.kts' }]);
+  assert.deepEqual(detectProjects('/x', list(['A.java', 'B.java'])), [{ language: 'java', manifest: '.java' }]);
+  assert.deepEqual(detectLanguages('/x', list(['pom.xml', 'build.gradle', 'Main.java'])), ['java']);
+});
+
 test('manifest names match case-insensitively', () => {
   assert.deepEqual(detectProjects('/x', list(['cmakelists.txt'])), [{ language: 'cpp', manifest: 'CMakeLists.txt' }]);
 });

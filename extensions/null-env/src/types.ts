@@ -1,4 +1,4 @@
-export type Language = 'cpp' | 'rust' | 'node' | 'dotnet';
+export type Language = 'cpp' | 'rust' | 'node' | 'dotnet' | 'java';
 export type Severity = 'required' | 'recommended';
 
 export type Fix =
