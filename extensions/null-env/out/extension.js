@@ -40,6 +40,7 @@ const commands_1 = require("./commands");
 const detect_1 = require("./detect");
 const envState_1 = require("./envState");
 const fix_1 = require("./fix");
+const jdkCommand_1 = require("./jdkCommand");
 const probe_1 = require("./probe");
 const probes_1 = require("./probes");
 const statusBar_1 = require("./statusBar");
@@ -47,6 +48,7 @@ function activate(context) {
     const state = new envState_1.EnvState(probes_1.vscodeProbes, context.workspaceState);
     context.subscriptions.push(state, vscode.workspace.onDidChangeWorkspaceFolders(() => state.refresh()), vscode.extensions.onDidChange(() => state.refresh()));
     (0, commands_1.registerCommands)(context, state);
+    (0, jdkCommand_1.registerJdkCommand)(context);
     (0, statusBar_1.registerStatusBar)(context, state);
     state.refresh();
     return {
