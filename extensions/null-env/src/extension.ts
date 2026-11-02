@@ -4,6 +4,7 @@ import { registerCommands } from './commands';
 import { detectProjects } from './detect';
 import { EnvState } from './envState';
 import { ensureDebugType } from './fix';
+import { registerJdkCommand } from './jdkCommand';
 import { findClangFormatPath, findExecutable, findRustfmtPath } from './probe';
 import { vscodeProbes } from './probes';
 import { registerStatusBar } from './statusBar';
@@ -16,6 +17,7 @@ export function activate(context: vscode.ExtensionContext): NullEnvApi {
     vscode.extensions.onDidChange(() => state.refresh()),
   );
   registerCommands(context, state);
+  registerJdkCommand(context);
   registerStatusBar(context, state);
   state.refresh();
 

@@ -23,12 +23,16 @@
       {
         "command": "null.env.check",
         "title": "Null: Check Environment"
+      },
+      {
+        "command": "null.java.selectJdk",
+        "title": "Null: Select JDK"
       }
     ]
   },
   "scripts": {
     "compile": "tsc -p tsconfig.json",
-    "test": "tsc -p tsconfig.json && node --test out/detect.test.js out/probe.test.js out/rules.test.js out/check.test.js",
+    "test": "tsc -p tsconfig.json && node --test out/detect.test.js out/probe.test.js out/rules.test.js out/check.test.js out/jdk.test.js",
     "pretest:integration": "tsc -p tsconfig.json",
     "test:integration": "node ./out/test/runTest.js"
   },
