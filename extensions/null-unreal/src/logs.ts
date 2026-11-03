@@ -49,6 +49,23 @@ export function rotate(projectDir: string, cmd: Command, keep = 10): void {
   }
 }
 
+// The newest log of any command (the stamp, not the command name, orders them).
+export function latestLogAny(projectDir: string): string | undefined {
+  let names: string[];
+  try {
+    names = fs.readdirSync(logDir(projectDir));
+  } catch {
+    return undefined;
+  }
+  const stamped = names.flatMap((n) => {
+    const m = /^[a-z]+-(\d{8}-\d{6})\.log$/.exec(n);
+    return m ? [{ n, stamp: m[1] }] : [];
+  });
+  stamped.sort((a, b) => a.stamp.localeCompare(b.stamp) || a.n.localeCompare(b.n));
+  const newest = stamped.pop();
+  return newest ? path.join(logDir(projectDir), newest.n) : undefined;
+}
+
 // The newest log of one command, or undefined when none exists yet.
 export function latestLog(projectDir: string, cmd: Command): string | undefined {
   const dir = logDir(projectDir);

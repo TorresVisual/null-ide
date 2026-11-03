@@ -3,7 +3,7 @@ import * as assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { latestLog, openLog, rotate } from './logs';
+import { latestLog, latestLogAny, openLog, rotate } from './logs';
 
 function tempProject(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'null-unreal-logs-'));
@@ -52,4 +52,18 @@ test('latestLog returns the newest log of that command, or undefined', () => {
     fs.writeFileSync(path.join(dir, 'Saved', 'NullUnreal', n), '');
   }
   assert.equal(latestLog(dir, 'export'), path.join(dir, 'Saved', 'NullUnreal', 'export-20240102-090000.log'));
+});
+
+test('latestLogAny picks the newest stamp across commands and ignores other files', () => {
+  const dir = tempProject();
+  const logDir = path.join(dir, 'Saved', 'NullUnreal');
+  fs.mkdirSync(logDir, { recursive: true });
+  for (const n of ['build-20260101-000001.log', 'test-20260102-000001.log', 'smoke-20260101-235959.log', 'export-request-1.json', 'export.lock']) {
+    fs.writeFileSync(path.join(logDir, n), '');
+  }
+  assert.equal(path.basename(latestLogAny(dir)!), 'test-20260102-000001.log');
+});
+
+test('latestLogAny is undefined when there are no logs', () => {
+  assert.equal(latestLogAny(tempProject()), undefined);
 });

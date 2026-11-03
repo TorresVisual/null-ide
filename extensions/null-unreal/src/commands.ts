@@ -1,8 +1,11 @@
 import { spawn } from 'node:child_process';
 import * as vscode from 'vscode';
 import { Command } from './commandLine';
+import { realProjectFs } from './cli';
+import { latestLogAny } from './logs';
 import { cliUsageSnippet } from './shim';
 import { parseLogPath } from './result';
+import { ResolveError, resolveProject } from './uproject';
 
 export interface CliContext { cliPath: string; output: vscode.OutputChannel }
 
@@ -15,6 +18,8 @@ export function registerCommands(
     context.subscriptions.push(vscode.commands.registerCommand(`null-unreal.${cmd}`, () => runCli(cmd, ctx)));
   }
   context.subscriptions.push(
+    vscode.commands.registerCommand('null-unreal.generateClangdDatabase', () => generateClangdDatabase(ctx)),
+    vscode.commands.registerCommand('null-unreal.openLastLog', openLastLog),
     vscode.commands.registerCommand('null-unreal.showCliPath', () => showCliPath(o.shimPath)),
   );
 }
@@ -55,15 +60,15 @@ export function spawnCli(args: string[], cwd: string, output: vscode.OutputChann
   });
 }
 
-async function execute(cmd: Command, ctx: CliContext): Promise<void> {
+async function execute(cmd: Command, ctx: CliContext): Promise<boolean> {
   const folder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (!folder) {
     void vscode.window.showWarningMessage('Null Unreal: open the folder that holds the .uproject first.');
-    return;
+    return false;
   }
   ctx.output.appendLine(`> null-unreal ${cmd}`);
   const { code, text } = await spawnCli(cliArgs(cmd, ctx.cliPath), folder, ctx.output);
-  if (code === 0) return;
+  if (code === 0) return true;
 
   const logPath = parseLogPath(text);
   const actions = logPath ? ['Open Log'] : [];
@@ -75,16 +80,52 @@ async function execute(cmd: Command, ctx: CliContext): Promise<void> {
   if (pick === 'Open Log' && logPath) {
     await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(vscode.Uri.file(logPath)));
   }
+  return false;
 }
 
 // `run` launches the editor and is not awaited by the UI: only a non-zero exit is reported.
 async function runCli(cmd: Command, ctx: CliContext): Promise<void> {
-  const go = () => execute(cmd, ctx);
+  const go = async () => void (await execute(cmd, ctx));
   if (cmd === 'run') return go();
   await vscode.window.withProgress(
     { location: vscode.ProgressLocation.Notification, title: `Null Unreal: ${cmd}` },
     go,
   );
+}
+
+// compile_commands.json lands beside the .uproject; clangd only needs a restart to read it.
+async function generateClangdDatabase(ctx: CliContext): Promise<void> {
+  const ok = await vscode.window.withProgress(
+    { location: vscode.ProgressLocation.Notification, title: 'Null Unreal: generating the clangd database' },
+    () => execute('compdb', ctx),
+  );
+  if (!ok) return;
+  if ((await vscode.commands.getCommands(true)).includes('clangd.restart')) {
+    await vscode.commands.executeCommand('clangd.restart');
+  }
+  void vscode.window.showInformationMessage('Null Unreal: compile_commands.json written next to the .uproject.');
+}
+
+async function openLastLog(): Promise<void> {
+  const folder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  if (!folder) {
+    void vscode.window.showWarningMessage('Null Unreal: open the folder that holds the .uproject first.');
+    return;
+  }
+  let file: string | undefined;
+  try {
+    const project = vscode.workspace.getConfiguration('null-unreal').get<string>('project', '');
+    file = latestLogAny(resolveProject(folder, project || undefined, realProjectFs).dir);
+  } catch (e) {
+    if (!(e instanceof ResolveError)) throw e;
+    void vscode.window.showWarningMessage(`Null Unreal: ${e.message}`);
+    return;
+  }
+  if (!file) {
+    void vscode.window.showInformationMessage('Null Unreal: no log yet.');
+    return;
+  }
+  await vscode.window.showTextDocument(vscode.Uri.file(file), { preview: true });
 }
 
 async function showCliPath(shimPath: string): Promise<void> {
