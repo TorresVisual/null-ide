@@ -58,3 +58,6 @@ setup/target/
 launcher/target/
 setup/app/gen/
 launcher/gen/
+
+# null-unreal viewer bundles (built by npm run build)
+extensions/null-unreal/lib/

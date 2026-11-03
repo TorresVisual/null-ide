@@ -3,7 +3,7 @@ import * as assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { openLog, rotate } from './logs';
+import { latestLog, openLog, rotate } from './logs';
 
 function tempProject(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'null-unreal-logs-'));
@@ -42,4 +42,14 @@ test('openLog returns a warning instead of throwing when Saved is a file', () =>
   const log = openLog(dir, 'smoke', new Date());
   assert.equal(log.path, undefined);
   assert.equal(typeof (log as { warning: string }).warning, 'string');
+});
+
+test('latestLog returns the newest log of that command, or undefined', () => {
+  const dir = tempProject();
+  assert.equal(latestLog(dir, 'export'), undefined);
+  fs.mkdirSync(path.join(dir, 'Saved', 'NullUnreal'), { recursive: true });
+  for (const n of ['export-20240101-100000.log', 'export-20240102-090000.log', 'build-20240103-000000.log']) {
+    fs.writeFileSync(path.join(dir, 'Saved', 'NullUnreal', n), '');
+  }
+  assert.equal(latestLog(dir, 'export'), path.join(dir, 'Saved', 'NullUnreal', 'export-20240102-090000.log'));
 });

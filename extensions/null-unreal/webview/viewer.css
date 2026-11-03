@@ -1,0 +1,42 @@
+/* Colours come from the VS Code theme so the viewers follow Null Dark and every other theme. */
+html, body, #app { height: 100%; margin: 0; }
+body {
+  background: var(--vscode-editor-background);
+  color: var(--vscode-foreground);
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+}
+#app { display: flex; flex-direction: column; height: 100%; }
+.bar { display: flex; align-items: center; gap: 12px; padding: 6px 10px; border-bottom: 1px solid var(--vscode-panel-border); }
+.bar .name { font-weight: 600; }
+.bar .kind, .bar .badge { color: var(--vscode-descriptionForeground); }
+.bar .badge { border: 1px solid var(--vscode-panel-border); border-radius: 3px; padding: 0 6px; }
+.bar button { margin-left: auto; }
+.banner {
+  background: var(--vscode-inputValidation-warningBackground);
+  color: var(--vscode-inputValidation-warningForeground);
+  border: 0; padding: 4px 10px; text-align: left; cursor: pointer;
+}
+.stage { position: relative; flex: 1; min-height: 0; display: flex; overflow: hidden; }
+.body { flex: 1; min-width: 0; overflow: auto; padding: 10px; }
+.inspector {
+  position: absolute; top: 0; right: 0; bottom: 0; width: 320px; overflow: auto;
+  background: var(--vscode-sideBar-background);
+  border-left: 1px solid var(--vscode-panel-border);
+  padding: 10px;
+}
+.status { padding: 20px; }
+.status .hint { color: var(--vscode-descriptionForeground); }
+.row { display: flex; gap: 12px; padding: 2px 0; font-family: var(--vscode-editor-font-family); }
+.row .key { color: var(--vscode-foreground); min-width: 160px; }
+details { margin-left: 4px; }
+summary { cursor: pointer; padding: 2px 0; }
+button {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  border: 1px solid transparent;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+button:hover { background: var(--vscode-button-hoverBackground); }
+button:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: 2px; }

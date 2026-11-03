@@ -10,7 +10,7 @@ import { MAX_PER_RUN, peekAsset } from './exporter';
 import { uassetsIn } from './packagePath';
 import { ResolveError, resolveProject, Uproject } from './uproject';
 
-interface Resolved { project: Uproject; engine: Engine }
+export interface Resolved { project: Uproject; engine: Engine }
 
 // The project and engine do not change under a running window, and resolving the engine runs `reg query`.
 // A settings change drops the memo.
@@ -39,7 +39,10 @@ function errorsFrom(text: string, files: string[]): Map<string, string> {
   return new Map(files.map((f) => [f, reason]));
 }
 
-export function registerAssets(context: vscode.ExtensionContext, ctx: CliContext): AssetStore {
+export function registerAssets(
+  context: vscode.ExtensionContext,
+  ctx: CliContext,
+): { store: AssetStore; resolve: () => Resolved } {
   const resolve = resolver(context);
 
   const store = new AssetStore({
@@ -70,7 +73,7 @@ export function registerAssets(context: vscode.ExtensionContext, ctx: CliContext
     vscode.commands.registerCommand('null-unreal.exportAsset', (uri?: vscode.Uri) => exportAsset(store, resolve, uri)),
     vscode.commands.registerCommand('null-unreal.clearAssetCache', () => clearCache(resolve)),
   );
-  return store;
+  return { store, resolve };
 }
 
 // The explorer passes the clicked file; otherwise the active tab if it is a .uasset; otherwise ask for a folder.

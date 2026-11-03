@@ -48,3 +48,17 @@ export function rotate(projectDir: string, cmd: Command, keep = 10): void {
     }
   }
 }
+
+// The newest log of one command, or undefined when none exists yet.
+export function latestLog(projectDir: string, cmd: Command): string | undefined {
+  const dir = logDir(projectDir);
+  let names: string[];
+  try {
+    names = fs.readdirSync(dir);
+  } catch {
+    return undefined;
+  }
+  const re = new RegExp(`^${cmd}-\\d{8}-\\d{6}\\.log$`);
+  const newest = names.filter((n) => re.test(n)).sort().pop();
+  return newest ? path.join(dir, newest) : undefined;
+}

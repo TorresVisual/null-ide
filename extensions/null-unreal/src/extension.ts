@@ -6,6 +6,7 @@ import { registerAssets } from './assets';
 import { registerCommands } from './commands';
 import { createRunStatusBar } from './statusBar';
 import { shimFiles } from './shim';
+import { registerViewer } from './viewerProvider';
 
 // Returns the shim folder and the asset store so the integration spec and the viewers can reach them.
 export function activate(context: vscode.ExtensionContext): { shimDir: string; assetStore: AssetStore } {
@@ -19,7 +20,8 @@ export function activate(context: vscode.ExtensionContext): { shimDir: string; a
 
   const output = vscode.window.createOutputChannel('Null Unreal');
   registerCommands(context, { cliPath, output, shimPath: path.join(shimDir, 'null-unreal.cmd') });
-  const assetStore = registerAssets(context, { cliPath, output });
+  const { store: assetStore, resolve } = registerAssets(context, { cliPath, output });
+  registerViewer(context, assetStore, resolve);
   context.subscriptions.push(output, createRunStatusBar());
   return { shimDir, assetStore };
 }
