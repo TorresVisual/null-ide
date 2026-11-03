@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
-import { fitView, zoomAbout } from './geometry';
+import { fitView, hitNode, linkPath, zoomAbout } from './geometry';
 
 test('fitView scales content to the viewport and centres it', () => {
   assert.deepEqual(fitView({ w: 100, h: 50 }, { w: 200, h: 200 }, 0), { scale: 2, x: 0, y: 50 });
@@ -19,4 +19,19 @@ test('zoomAbout keeps the point under the cursor fixed', () => {
 test('zoomAbout clamps at the limits', () => {
   assert.equal(zoomAbout({ scale: 30, x: 0, y: 0 }, { x: 0, y: 0 }, 4, { min: 0.05, max: 32 }).scale, 32);
   assert.equal(zoomAbout({ scale: 0.06, x: 0, y: 0 }, { x: 0, y: 0 }, 0.1, { min: 0.05, max: 32 }).scale, 0.05);
+});
+
+test('linkPath is a cubic from a to b with horizontal handles', () => {
+  assert.equal(linkPath({ x: 0, y: 0 }, { x: 100, y: 50 }), 'M 0 0 C 50 0 50 50 100 50');
+  assert.ok(linkPath({ x: 0, y: 0 }, { x: 10, y: 5 }).startsWith('M 0 0 C'));
+});
+
+test('hitNode returns the topmost node under the point, undefined outside', () => {
+  const nodes = [
+    { id: 1, x: 0, y: 0, w: 100, h: 100 },
+    { id: 2, x: 50, y: 50, w: 100, h: 100 },
+  ];
+  assert.equal(hitNode(nodes, { x: 60, y: 60 }), 2);
+  assert.equal(hitNode(nodes, { x: 10, y: 10 }), 1);
+  assert.equal(hitNode(nodes, { x: 500, y: 500 }), undefined);
 });

@@ -125,10 +125,10 @@
   },
   "scripts": {
     "compile": "tsc -p tsconfig.json && npm run typecheck:webview",
-    "test": "tsc -p tsconfig.json && node --test out/uproject.test.js out/engine.test.js out/commandLine.test.js out/logs.test.js out/runner.test.js out/result.test.js out/cli.test.js out/shim.test.js out/exportFormat.test.js out/packagePath.test.js out/cache.test.js out/lock.test.js out/exporter.test.js out/assetStore.test.js out/viewer/page.test.js out/viewer/refs.test.js out/viewer/value.test.js out/viewer/geometry.test.js out/viewer/channels.test.js out/viewer/instance.test.js out/viewer/tree.test.js",
+    "test": "tsc -p tsconfig.json && node --test out/uproject.test.js out/engine.test.js out/commandLine.test.js out/logs.test.js out/runner.test.js out/result.test.js out/cli.test.js out/shim.test.js out/exportFormat.test.js out/packagePath.test.js out/cache.test.js out/lock.test.js out/exporter.test.js out/assetStore.test.js out/viewer/page.test.js out/viewer/refs.test.js out/viewer/value.test.js out/viewer/geometry.test.js out/viewer/channels.test.js out/viewer/instance.test.js out/viewer/tree.test.js out/viewer/colors.test.js out/viewer/renderModel.test.js",
     "pretest:integration": "tsc -p tsconfig.json",
     "test:integration": "node ./out/test/runTest.js",
-    "build": "esbuild webview/properties.ts webview/texture.ts --bundle --minify --format=iife --target=es2020 --outdir=lib && esbuild webview/viewer.css --minify --outdir=lib",
+    "build": "esbuild webview/properties.ts webview/texture.ts webview/material.ts --bundle --minify --format=iife --target=es2020 --outdir=lib && esbuild webview/viewer.css --minify --outdir=lib",
     "typecheck:webview": "tsc -p webview/tsconfig.json --noEmit"
   },
   "devDependencies": {
