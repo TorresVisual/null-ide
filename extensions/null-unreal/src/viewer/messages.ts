@@ -1,5 +1,7 @@
 import type { Kind } from '../exportFormat';
 
+export type Layout = Record<string, [number, number]>;
+
 // Host -> webview. `extra` carries page-specific data (the material-instance parent chain).
 export type ToWebview =
   | { type: 'exporting' }
@@ -12,6 +14,8 @@ export type ToWebview =
       data: Record<string, unknown>;
       sidecars: Record<string, string | { unreadable: string }>;
       extra?: unknown;
+      // Dragged node positions saved for this asset: node id -> offset from the exported layout.
+      layout?: Layout;
     }
   | { type: 'thumbs'; byPackage: Record<string, string | null> };
 
@@ -23,4 +27,5 @@ export type FromWebview =
   | { type: 'reopenText' }
   | { type: 'openLog' }
   | { type: 'exportReferenced' }
-  | { type: 'openAsset'; package: string };
+  | { type: 'openAsset'; package: string }
+  | { type: 'layout'; layout: Layout };

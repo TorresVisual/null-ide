@@ -9,7 +9,7 @@ import { Resolved } from './assets';
 import { ExportDoc } from './exportFormat';
 import { latestLog } from './logs';
 import { findMounts, Mount } from './packagePath';
-import { FromWebview, ToWebview } from './viewer/messages';
+import { FromWebview, Layout, ToWebview } from './viewer/messages';
 import { buildHtml, Page, pageFor } from './viewer/page';
 import { packageToFile, sidecarFile, thumbnailMap } from './viewer/refs';
 
@@ -60,6 +60,7 @@ function attach(
   panel: vscode.WebviewPanel,
 ): void {
   const file = uri.fsPath;
+  const layoutKey = `null-unreal.layout:${file}`;
   const lib = vscode.Uri.joinPath(context.extensionUri, 'lib');
 
   // The assets folder and the mounts need the project; without one, nothing resolves and nothing is linked.
@@ -155,7 +156,8 @@ function attach(
       thumbs = undefined;
     }
     const extra = doc.kind === 'material-instance' ? instanceExtra(doc) : undefined;
-    return { type: 'ready', name: path.posix.basename(doc.package), kind: doc.kind, data: doc.data, sidecars, extra };
+    const layout = context.workspaceState.get<Layout>(layoutKey);
+    return { type: 'ready', name: path.posix.basename(doc.package), kind: doc.kind, data: doc.data, sidecars, extra, layout };
   };
 
   const open = async (force: boolean): Promise<void> => {
@@ -225,6 +227,9 @@ function attach(
         break;
       case 'exportReferenced':
         void exportReferenced();
+        break;
+      case 'layout':
+        void context.workspaceState.update(layoutKey, Object.keys(m.layout).length ? m.layout : undefined);
         break;
       case 'openAsset': {
         const f = packageToFile(m.package, mounts());

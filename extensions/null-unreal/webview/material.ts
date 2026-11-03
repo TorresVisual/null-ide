@@ -2,7 +2,7 @@ import { familyColor, Family, pinColor } from '../src/viewer/colors';
 import { fitView, hitNode, linkPath, View, zoomAbout } from '../src/viewer/geometry';
 import { buildRenderModel, RenderModel, RLink, RNode, RESULT_ID } from '../src/viewer/renderModel';
 import { describe } from '../src/viewer/value';
-import type { ToWebview } from '../src/viewer/messages';
+import type { Layout, ToWebview } from '../src/viewer/messages';
 import { Frame, mountFrame } from './frame';
 
 const SVG = 'http://www.w3.org/2000/svg';
@@ -29,6 +29,18 @@ interface Ui {
   list: boolean;
   notes: string[];
   fitted: boolean;
+  // Dragged positions as offsets from the exported layout, so a re-export that moves a node still keeps the rest.
+  layout: Layout;
+}
+
+// Pins hold absolute coordinates, so they move with their node.
+function moveNode(n: RNode, dx: number, dy: number): void {
+  n.x += dx;
+  n.y += dy;
+  for (const p of [...n.inputs, ...n.outputs]) {
+    p.x += dx;
+    p.y += dy;
+  }
 }
 
 // Graph page: one SVG with the nodes and links in a single transformed group. Pan and zoom only change the group.
@@ -84,7 +96,11 @@ function renderGraph(ui: Ui, frame: Frame): void {
 
   const applyView = () => world.setAttribute('transform', `translate(${ui.view.x} ${ui.view.y}) scale(${ui.view.scale})`);
   const fitAll = () => {
-    const b = ui.model.bounds;
+    // Recomputed from the nodes, since dragging and the saved layout move them off the exported bounds.
+    const xs = ui.model.nodes;
+    const x0 = Math.min(...xs.map((n) => n.x));
+    const y0 = Math.min(...xs.map((n) => n.y));
+    const b = { x: x0, y: y0, w: Math.max(...xs.map((n) => n.x + n.w)) - x0, h: Math.max(...xs.map((n) => n.y + n.h)) - y0 };
     const v = fitView({ w: b.w, h: b.h }, { w: graph.clientWidth, h: graph.clientHeight }, 24);
     ui.view = { scale: v.scale, x: v.x - b.x * v.scale, y: v.y - b.y * v.scale };
     applyView();
@@ -129,15 +145,11 @@ function renderGraph(ui: Ui, frame: Frame): void {
     if (drag.node) {
       // Hold still until the threshold is crossed, so a click never nudges a node.
       if (!drag.moved) return;
-      const n = drag.node;
       const wx = dx / ui.view.scale;
       const wy = dy / ui.view.scale;
-      n.x += wx;
-      n.y += wy;
-      for (const p of [...n.inputs, ...n.outputs]) {
-        p.x += wx;
-        p.y += wy;
-      }
+      moveNode(drag.node, wx, wy);
+      const [ox, oy] = ui.layout[drag.node.id] ?? [0, 0];
+      ui.layout[drag.node.id] = [ox + wx, oy + wy];
       drawWorld();
     } else {
       ui.view = { ...ui.view, x: ui.view.x + dx, y: ui.view.y + dy };
@@ -147,6 +159,7 @@ function renderGraph(ui: Ui, frame: Frame): void {
   });
   graph.addEventListener('pointerup', (e) => {
     const wasDrag = drag?.moved;
+    if (wasDrag && drag?.node) frame.send({ type: 'layout', layout: ui.layout });
     drag = undefined;
     if (wasDrag) return;
     const p = toWorld(e);
@@ -275,7 +288,16 @@ function listView(ui: Ui): HTMLElement {
 const frame = mountFrame((m: ToWebview) => {
   if (m.type === 'ready') {
     const model = buildRenderModel(m.data);
-    ui = { model, thumbs: {}, view: { scale: 1, x: 0, y: 0 }, list: false, notes: model.notes, fitted: false };
+    // Offsets for nodes that no longer exist are dropped, so a re-export that removes one does not leave a stale entry.
+    const layout: Layout = {};
+    for (const n of model.nodes) {
+      const o = m.layout?.[n.id];
+      if (o && Number.isFinite(o[0]) && Number.isFinite(o[1])) {
+        moveNode(n, o[0], o[1]);
+        layout[n.id] = o;
+      }
+    }
+    ui = { model, thumbs: {}, view: { scale: 1, x: 0, y: 0 }, list: false, notes: model.notes, fitted: false, layout };
     renderGraph(ui, frame);
   } else if (m.type === 'thumbs' && ui) {
     ui.thumbs = m.byPackage;
