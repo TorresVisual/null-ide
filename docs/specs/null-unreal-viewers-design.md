@@ -1,5 +1,6 @@
 # Null Unreal — Asset Viewers Design
-nIssue: [#151 Unreal asset viewers](https://github.com/TorresVisual/null-ide/issues/151)
+
+Issue: [#151 Unreal asset viewers](https://github.com/TorresVisual/null-ide/issues/151)
 
 Third of three specs for Unreal Engine support in Null IDE, and the reason for the other two. It builds on [null-unreal-tooling-design.md](null-unreal-tooling-design.md) (the `null-unreal` extension, engine and project resolution) and [null-unreal-asset-core-design.md](null-unreal-asset-core-design.md) (the `.uasset` → JSON export, its cache and sidecar files). Both are implemented first; this plan assumes the `AssetStore` from the asset core spec exists.
 

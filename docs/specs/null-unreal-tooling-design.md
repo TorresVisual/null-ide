@@ -1,5 +1,6 @@
 # Null Unreal — Engine Tooling Design
-nIssue: [#149 Unreal Engine tooling](https://github.com/TorresVisual/null-ide/issues/149)
+
+Issue: [#149 Unreal Engine tooling](https://github.com/TorresVisual/null-ide/issues/149)
 
 First of three specs for Unreal Engine support in Null IDE. This one covers the project tooling: build, test, run, smoke and the clangd database. Follow-ups, each with its own spec:
 
