@@ -30,6 +30,8 @@ function buildPlan(cmd, engine, project, o) {
                 args: [uproject, '-game', '-windowed', `-ResX=${o.resX ?? 1280}`, `-ResY=${o.resY ?? 720}`, ...o.extraArgs],
                 timeoutSec: undefined,
             };
+        case 'editor':
+            return { exe: engine.editor, args: [uproject, ...o.extraArgs], timeoutSec: undefined };
         case 'export':
             // The script reads its request from the environment: a path with spaces needs no quoting there.
             // UE unescapes backslashes in -Script (`\r` -> CR, `\n` -> LF), so the script path must use forward slashes.

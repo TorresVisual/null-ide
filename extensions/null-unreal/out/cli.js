@@ -46,11 +46,11 @@ const runner_1 = require("./runner");
 const result_1 = require("./result");
 const summary_1 = require("./summary");
 const uproject_1 = require("./uproject");
-const COMMANDS = ['build', 'test', 'run', 'smoke', 'compdb', 'export'];
+const COMMANDS = ['build', 'test', 'run', 'editor', 'smoke', 'compdb', 'export'];
 const VALUE_FLAGS = ['--project', '--engine', '--filter', '--timeout'];
 const BOOL_FLAGS = ['--json', '--force'];
 const USAGE = [
-    'usage: null-unreal <build|test|run|smoke|compdb> [--project <p>] [--engine <path>] [--filter <prefix>] [--timeout <s>] [-- <extra engine args>]',
+    'usage: null-unreal <build|test|run|editor|smoke|compdb> [--project <p>] [--engine <path>] [--filter <prefix>] [--timeout <s>] [-- <extra engine args>]',
     '       null-unreal export <asset.uasset|folder>... [--json] [--force] [--project <p>] [--engine <path>] [--timeout <s>] [-- <extra engine args>]',
 ].join('\n');
 exports.realProjectFs = {
@@ -251,7 +251,7 @@ async function main(argv, deps) {
     const warning = log.path === undefined ? log.warning : undefined;
     let code = (0, result_1.exitCodeOf)(r);
     let summary = [];
-    if (command !== 'run') {
+    if (command !== 'run' && command !== 'editor') {
         // The log is the one copy of the output; without it there is nothing to summarize and nothing proven.
         const text = log.path !== undefined ? deps.readLog(log.path) : undefined;
         const s = text !== undefined ? (0, summary_1.summarizeLog)(command, text, log.path) : undefined;

@@ -77,6 +77,12 @@ const none = { extraArgs: [] };
     ]);
     assert.equal(p.timeoutSec, undefined);
 });
+(0, node_test_1.test)('editor opens the project in the editor with no game flags', () => {
+    const p = (0, commandLine_1.buildPlan)('editor', engine, project, none);
+    assert.equal(p.exe, engine.editor);
+    assert.deepEqual(p.args, ['C:\\Games\\MyGame\\MyGame.uproject']);
+    assert.equal(p.timeoutSec, undefined);
+});
 (0, node_test_1.test)('smoke runs UnrealEditor-Cmd headless with a 120 s timeout', () => {
     const p = (0, commandLine_1.buildPlan)('smoke', engine, project, none);
     assert.equal(p.exe, engine.editorCmd);
