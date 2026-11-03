@@ -35,6 +35,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.VIEW_TYPE = void 0;
 exports.registerViewer = registerViewer;
+const crypto = __importStar(require("node:crypto"));
 const fs = __importStar(require("node:fs"));
 const path = __importStar(require("node:path"));
 const vscode = __importStar(require("vscode"));
@@ -289,11 +290,8 @@ async function openLog(resolve) {
     }
     await vscode.window.showTextDocument(vscode.Uri.file(file), { preview: true });
 }
+// Unpredictable per page load: the CSP only holds if a page cannot guess the nonce.
 function nonce() {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let out = '';
-    for (let i = 0; i < 32; i++)
-        out += chars[Math.floor(Math.random() * chars.length)];
-    return out;
+    return crypto.randomBytes(16).toString('base64');
 }
 //# sourceMappingURL=viewerProvider.js.map
