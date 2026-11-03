@@ -56,8 +56,3 @@ test('an out-of-range link index is missing, not a crash', () => {
   assert.equal(r.links.length, 1);
   assert.equal(r.links[0].missing, true);
 });
-
-test('comment boxes marked unreadable add their note', () => {
-  const r = buildRenderModel({ expressions: [], outputs: [], commentBoxes: { unreadable: 'x' } });
-  assert.ok(r.notes.includes('comment boxes are not available in this export'));
-});

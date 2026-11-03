@@ -49,8 +49,4 @@ const m = (0, renderModel_1.buildRenderModel)(data);
     node_assert_1.strict.equal(r.links.length, 1);
     node_assert_1.strict.equal(r.links[0].missing, true);
 });
-(0, node_test_1.test)('comment boxes marked unreadable add their note', () => {
-    const r = (0, renderModel_1.buildRenderModel)({ expressions: [], outputs: [], commentBoxes: { unreadable: 'x' } });
-    node_assert_1.strict.ok(r.notes.includes('comment boxes are not available in this export'));
-});
 //# sourceMappingURL=renderModel.test.js.map

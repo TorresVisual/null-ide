@@ -87,9 +87,6 @@ function buildRenderModel(data) {
     });
     if (missingCount > 0)
         notes.push(`${missingCount} link(s) to unreadable expressions`);
-    if (data.commentBoxes && typeof data.commentBoxes === 'object' && 'unreadable' in data.commentBoxes) {
-        notes.push('comment boxes are not available in this export');
-    }
     const all = [...nodes, result];
     const minX = Math.min(...all.map((n) => n.x));
     const minY = Math.min(...all.map((n) => n.y));

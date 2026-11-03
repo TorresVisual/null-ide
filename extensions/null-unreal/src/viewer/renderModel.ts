@@ -122,9 +122,6 @@ export function buildRenderModel(data: Record<string, unknown>): RenderModel {
   });
 
   if (missingCount > 0) notes.push(`${missingCount} link(s) to unreadable expressions`);
-  if (data.commentBoxes && typeof data.commentBoxes === 'object' && 'unreadable' in data.commentBoxes) {
-    notes.push('comment boxes are not available in this export');
-  }
 
   const all = [...nodes, result];
   const minX = Math.min(...all.map((n) => n.x));
