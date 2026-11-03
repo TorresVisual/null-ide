@@ -1,0 +1,55 @@
+Starting AutomationTool...
+Parsing command line: BuildCookRun -project=D:\Proj\MyGame\MyGame.uproject -platform=Win64 -build -cook
+Initializing script modules...
+Total script module initialization time: 0.30 s.
+Using C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe
+Executing commands...
+Setting up ProjectParams for D:\Proj\MyGame\MyGame.uproject
+********** BUILD COMMAND STARTED **********
+Running: C:\EpicGames\UE_5.8\Engine\Binaries\ThirdParty\DotNet\10.0\win-x64\dotnet.exe "C:\EpicGames\UE_5.8\Engine\Binaries\DotNET\UnrealBuildTool\UnrealBuildTool.dll" -Target="MyGameEditor Win64 Development -Project=D:\Proj\MyGame\MyGame.uproject" -Target="MyGame Win64 Development -Project=D:\Proj\MyGame\MyGame.uproject  -remoteini=\"D:\Proj\MyGame\"  " -log="C:\Users\dev\AppData\Roaming\Unreal Engine\AutomationTool\Logs\C+EpicGames+UE_5.8\UBA-MyGameEditor-Win64-Development.txt"
+Log file: C:\Users\dev\AppData\Roaming\Unreal Engine\AutomationTool\Logs\C+EpicGames+UE_5.8\UBA-MyGameEditor-Win64-Development.txt
+Determining max actions to execute in parallel (16 physical cores, 32 logical cores)
+  Executing up to 16 processes, one per physical core
+UbaServer - Listening on 0.0.0.0:1345
+Building MyGame and MyGameEditor...
+===== Toolchain Information =====
+MyGame Win64 Development:
+  Using ISPC compiler (C:\EpicGames\UE_5.8\Engine\Source\ThirdParty\Intel\ISPC\bin\Windows\ispc.exe)
+    Intel(r) Implicit SPMD Program Compiler (Intel(r) ISPC), 1.24.0 (build commit  @ 20250404, LLVM 18.1.2)
+  Using Visual Studio 14.44.35229 toolchain (C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.44.35207) and Windows 10.0.22621.0 SDK (C:\Program Files (x86)\Windows Kits\10).
+MyGameEditor Win64 Development:
+  Using ISPC compiler (C:\EpicGames\UE_5.8\Engine\Source\ThirdParty\Intel\ISPC\bin\Windows\ispc.exe)
+    Intel(r) Implicit SPMD Program Compiler (Intel(r) ISPC), 1.24.0 (build commit  @ 20250404, LLVM 18.1.2)
+  Using Visual Studio 14.44.35229 toolchain (C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.44.35207) and Windows 10.0.22621.0 SDK (C:\Program Files (x86)\Windows Kits\10).
+===== End Toolchain Information =====
+Using Unreal Build Accelerator local executor to run 7 action(s)
+  CPU 16 physical cores, 32 logical cores
+  Memory 63.91 GB physical, 52.92 GB/80.49 GB committed
+  UBA Storage capacity 40 GB
+** For MyGameEditor-Win64-Development **
+[1/7] Compile [x64] MyGameTests.cpp
+D:\Proj\MyGame\Source\MyGame\MyGameTests.cpp(16,19): error C2065: 'UndeclaredThing': undeclared identifier
+static int GBad = UndeclaredThing + 1;
+                  ^
+D:\Proj\MyGame\Source\MyGame\MyGameTests.cpp(17,28): error C2440: 'initializing': cannot convert from 'const char [5]' to 'int'
+static void Oops() { int a = "text"; }
+                           ^
+D:\Proj\MyGame\Source\MyGame\MyGameTests.cpp(17,28): note: There is no context in which this conversion is possible
+** For MyGame-Win64-Development **
+[2/7] Compile [x64] MyGameTests.cpp
+D:\Proj\MyGame\Source\MyGame\MyGameTests.cpp(16,19): error C2065: 'UndeclaredThing': undeclared identifier
+static int GBad = UndeclaredThing + 1;
+                  ^
+D:\Proj\MyGame\Source\MyGame\MyGameTests.cpp(17,28): error C2440: 'initializing': cannot convert from 'const char [5]' to 'int'
+static void Oops() { int a = "text"; }
+                           ^
+D:\Proj\MyGame\Source\MyGame\MyGameTests.cpp(17,28): note: There is no context in which this conversion is possible
+Total time in Unreal Build Accelerator local executor: 2.13 seconds
+
+Result: Failed (OtherCompilationError)
+Total execution time: 3.44 seconds
+Trace written to file C:\Users\dev\AppData\Local\UnrealBuildTool\Trace.uba with size 6.2kb
+Took 3.74s to run dotnet.exe, ExitCode=6
+UnrealBuildTool failed. See log for more details. (C:\Users\dev\AppData\Roaming\Unreal Engine\AutomationTool\Logs\C+EpicGames+UE_5.8\UBA-MyGameEditor-Win64-Development.txt)
+AutomationTool executed for 0h 0m 5s
+AutomationTool exiting with ExitCode=6 (6)

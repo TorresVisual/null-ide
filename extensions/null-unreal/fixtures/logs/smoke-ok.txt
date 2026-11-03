@@ -1,0 +1,15 @@
+[2026.11.03-19.51.27:159][  0]LogPython: Display: Running start-up script C:/EpicGames/UE_5.8/Engine/Plugins/Animation/IKRig/Content/Python/init_unreal.py... started...
+[2026.11.03-19.51.27:174][  0]LogPython: Display: Running start-up script C:/EpicGames/UE_5.8/Engine/Plugins/Animation/IKRig/Content/Python/init_unreal.py... took 13.914 ms
+[2026.11.03-19.51.27:174][  0]LogPython: Display: Running start-up script C:/EpicGames/UE_5.8/Engine/Plugins/Animation/ControlRig/Content/Python/init_unreal.py... started...
+[2026.11.03-19.51.27:198][  0]LogPython: Display: Running start-up script C:/EpicGames/UE_5.8/Engine/Plugins/Animation/ControlRig/Content/Python/init_unreal.py... took 23.642 ms (total: 37.557 ms)
+[2026.11.03-19.51.27:199][  1]LogInit: Display: PreExit Game.
+[2026.11.03-19.51.27:610][  1]LogAudio: Display: Beginning Audio Device Manager Shutdown (Module: AudioMixerWasapi)...
+[2026.11.03-19.51.27:610][  1]LogAudio: Display: Destroying 1 Remaining Audio Device(s)...
+[2026.11.03-19.51.27:610][  1]LogAudio: Display: Audio Device unregistered from world 'OpenWorld'.
+[2026.11.03-19.51.27:610][  1]LogAudio: Display: Shutting down audio device while 1 references to it are still alive. For more information, compile with INSTRUMENT_AUDIODEVICE_HANDLES.
+[2026.11.03-19.51.27:612][  1]LogAudioMixer: Display: FAudioMixerWasapi::StopAudioStream() InstanceID=1, StreamState=4
+[2026.11.03-19.51.27:616][  1]LogAudioMixerWasapi: Display: FWasapiServiceWatcher stopped.
+[2026.11.03-19.51.27:622][  1]LogAudio: Display: Audio Device Manager Shutdown
+[2026.11.03-19.51.27:799][  1]LogAssetRegistry: Display: CleanupOrphanedCacheFiles (PostWrite): 1 .ref files found, 1 referenced binaries
+[2026.11.03-19.51.27:799][  1]LogAssetRegistry: Display: CleanupOrphanedCacheFiles: 1 total binaries, 1 referenced (kept), 0 old-style pre-migration (kept), 0 orphans deleted, 0 orphans locked (kept)
+[2026.11.03-19.51.28:001][  1]LogShaderCompilers: Display: Exiting ShaderCompilingThread

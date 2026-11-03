@@ -1,0 +1,82 @@
+Starting AutomationTool...
+Parsing command line: BuildCookRun -project=D:\Proj\MyGame\MyGame.uproject -platform=Win64 -build -cook
+Initializing script modules...
+Total script module initialization time: 0.32 s.
+Using C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe
+Executing commands...
+Setting up ProjectParams for D:\Proj\MyGame\MyGame.uproject
+********** BUILD COMMAND STARTED **********
+Running: C:\EpicGames\UE_5.8\Engine\Binaries\ThirdParty\DotNet\10.0\win-x64\dotnet.exe "C:\EpicGames\UE_5.8\Engine\Binaries\DotNET\UnrealBuildTool\UnrealBuildTool.dll" -Target="MyGameEditor Win64 Development -Project=D:\Proj\MyGame\MyGame.uproject" -Target="MyGame Win64 Development -Project=D:\Proj\MyGame\MyGame.uproject  -remoteini=\"D:\Proj\MyGame\"  " -log="C:\Users\dev\AppData\Roaming\Unreal Engine\AutomationTool\Logs\C+EpicGames+UE_5.8\UBA-MyGameEditor-Win64-Development.txt"
+Log file: C:\Users\dev\AppData\Roaming\Unreal Engine\AutomationTool\Logs\C+EpicGames+UE_5.8\UBA-MyGameEditor-Win64-Development.txt
+Determining max actions to execute in parallel (16 physical cores, 32 logical cores)
+  Executing up to 16 processes, one per physical core
+Creating makefile for MyGame (no existing makefile)
+Creating makefile for MyGameEditor (no existing makefile)
+UbaServer - Listening on 0.0.0.0:1345
+UHT compiled-in object format Default
+UHT compiled-in object format Default
+UHT processed MyGame in 5.698816 seconds (0 generated files written)
+Building MyGame and MyGameEditor...
+===== Toolchain Information =====
+MyGame Win64 Development:
+  Using ISPC compiler (C:\EpicGames\UE_5.8\Engine\Source\ThirdParty\Intel\ISPC\bin\Windows\ispc.exe)
+    Intel(r) Implicit SPMD Program Compiler (Intel(r) ISPC), 1.24.0 (build commit  @ 20250404, LLVM 18.1.2)
+  Using Visual Studio 14.44.35229 toolchain (C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.44.35207) and Windows 10.0.22621.0 SDK (C:\Program Files (x86)\Windows Kits\10).
+MyGameEditor Win64 Development:
+  Using ISPC compiler (C:\EpicGames\UE_5.8\Engine\Source\ThirdParty\Intel\ISPC\bin\Windows\ispc.exe)
+    Intel(r) Implicit SPMD Program Compiler (Intel(r) ISPC), 1.24.0 (build commit  @ 20250404, LLVM 18.1.2)
+  Using Visual Studio 14.44.35229 toolchain (C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.44.35207) and Windows 10.0.22621.0 SDK (C:\Program Files (x86)\Windows Kits\10).
+===== End Toolchain Information =====
+Using Unreal Build Accelerator local executor to run 20 action(s)
+  CPU 16 physical cores, 32 logical cores
+  Memory 63.91 GB physical, 54.5 GB/77.41 GB committed
+  UBA Storage capacity 40 GB
+** For MyGame-Win64-Development **
+[1/20] Copy MyGame-Default.rc2
+[2/20] Copy D3D12Core.dll
+[3/20] Copy d3d12SDKLayers.dll
+[4/20] Copy tbbmalloc.dll
+[5/20] Copy tbb12.dll
+[6/20] Copy DirectML.dll
+** For MyGameEditor-Win64-Development **
+[7/20] Compile Resource [x64] Default.rc2
+** For MyGame-Win64-Development **
+[8/20] Compile Resource [x64] MyGame-Default.rc2
+[9/20] Compile [x64] SharedPCH.Engine.Project.ValApi.ValExpApi.Cpp20.cpp
+[10/20] Compile [x64] MyGame.cpp
+[11/20] Compile [x64] MyGameTests.cpp
+** For MyGameEditor-Win64-Development **
+[12/20] Compile [x64] SharedPCH.UnrealEd.Project.ValApi.ValExpApi.Cpp20.cpp
+[13/20] Compile [x64] PerModuleInline.gen.cpp
+[14/20] Compile [x64] MyGameTests.cpp
+[15/20] Compile [x64] MyGame.cpp
+[16/20] Link [x64] UnrealEditor-MyGame.lib
+[17/20] Link [x64] UnrealEditor-MyGame.dll
+[18/20] WriteMetadata MyGameEditor.target [NoUba]
+** For MyGame-Win64-Development **
+[19/20] Link [x64] MyGame.exe
+[20/20] WriteMetadata MyGame.target [NoUba]
+
+Total time in Unreal Build Accelerator local executor: 60.71 seconds
+Output binary: D:\Proj\MyGame\Binaries\Win64\MyGame.exe
+Output binary: C:\EpicGames\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe
+
+Result: Succeeded
+Total execution time: 81.09 seconds
+Trace written to file C:\Users\dev\AppData\Local\UnrealBuildTool\Trace.uba with size 15.9kb
+Took 81.95s to run dotnet.exe, ExitCode=0
+No build products were made
+Build command time: 81.96 s
+[... cook output trimmed ...]
+LogAssetRegistry: Display: CleanupOrphanedCacheFiles: 1 total binaries, 1 referenced (kept), 0 old-style pre-migration (kept), 0 orphans deleted, 0 orphans locked (kept)
+LogStreaming: Display: ============ Loader Stats ============
+LogStreaming: Display: Unique Partial Flushes: 0
+LogStreaming: Display: ============ Loader Stats End ============
+LogShaderCompilers: Display: Exiting ShaderCompilingThread
+Took 54.20s to run UnrealEditor-Cmd.exe, ExitCode=0
+Cook command time: 54.29 s
+********** COOK COMMAND COMPLETED **********
+BuildCookRun time: 137.61 s
+BUILD SUCCESSFUL
+AutomationTool executed for 0h 2m 18s
+AutomationTool exiting with ExitCode=0 (Success)

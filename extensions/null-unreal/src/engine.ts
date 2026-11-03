@@ -10,7 +10,7 @@ export interface EngineReaders {
   exists(p: string): boolean;
 }
 
-export interface Engine { root: string; editor: string; editorCmd: string; automationTool: string }
+export interface Engine { root: string; editor: string; editorCmd: string; automationTool: string; buildTool: string }
 
 const LAUNCHER_DAT = 'C:\\ProgramData\\Epic\\UnrealEngineLauncher\\LauncherInstalled.dat';
 const VERSION_KEY = 'HKLM\\SOFTWARE\\EpicGames\\Unreal Engine';
@@ -27,6 +27,7 @@ function engineAt(root: string, r: EngineReaders): Engine | undefined {
     editor,
     editorCmd: win.join(bin, 'Win64', 'UnrealEditor-Cmd.exe'),
     automationTool: win.join(bin, 'DotNET', 'AutomationTool', 'AutomationTool.exe'),
+    buildTool: win.join(bin, 'DotNET', 'UnrealBuildTool', 'UnrealBuildTool.exe'),
   };
 }
 

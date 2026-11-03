@@ -1,0 +1,59 @@
+[2026.11.03-19.53.04:179][  0]Cmd: MAP LOAD FILE="../../../Engine/Content/Maps/Templates/OpenWorld.umap" TEMPLATE=1 SHOWPROGRESS=1 FEATURELEVEL=4
+[2026.11.03-19.53.04:616][  0]Cmd: MAP CHECKDEP NOCLEARLOG
+[2026.11.03-19.53.06:003][  0]Cmd: Automation RunTests MyGame.; Quit
+[2026.11.03-19.53.06:003][  0]Automation: RunTests='MyGame.' Queued.
+[2026.11.03-19.53.06:003][  0]Automation: Quit Command Queued.
+[2026.11.03-19.53.06:541][  2]LogAutomationCommandLine: Display: Ready to start automation
+[2026.11.03-19.53.11:559][589]LogAutomationWorker: Received FindWorkersMessage from AA0570614019AC26BA9E96858F58938B
+[2026.11.03-19.53.11:566][590]LogAutomationController: Received FindWorkersResponseMessage from 736D518A4EC4ECAE43691F96FD3503AB
+[2026.11.03-19.53.11:567][590]LogAutomationController: Requesting test list from 736D518A4EC4ECAE43691F96FD3503AB
+[2026.11.03-19.53.11:567][590]LogAutomationWorker: Received RequestTestsMessage from AA0570614019AC26BA9E96858F58938B
+[2026.11.03-19.53.11:611][590]LogAutomationWorker: Set 6365 tests to AA0570614019AC26BA9E96858F58938B
+[2026.11.03-19.53.11:611][590]LogAutomationController: Received RequestTestsReplyCompleteMessage from 736D518A4EC4ECAE43691F96FD3503AB
+[2026.11.03-19.53.11:615][590]LogAutomationController: 6365 tests available on 736D518A4EC4ECAE43691F96FD3503AB
+[2026.11.03-19.53.11:659][590]LogAutomationCommandLine: Display: Found 4 automation tests based on 'MyGame.'
+[2026.11.03-19.53.11:659][590]LogAutomationCommandLine: Display: 	MyGame.Broken.Fail
+[2026.11.03-19.53.11:659][590]LogAutomationCommandLine: Display: 	MyGame.Broken.FailTwice
+[2026.11.03-19.53.11:659][590]LogAutomationCommandLine: Display: 	MyGame.Math.Add
+[2026.11.03-19.53.11:659][590]LogAutomationCommandLine: Display: 	MyGame.Math.Sub
+[2026.11.03-19.53.11:661][590]LogAutomationController: Sending StopTests to 736D518A4EC4ECAE43691F96FD3503AB
+[2026.11.03-19.53.11:666][590]LogAutomationController: Sending StartTestSession to 736D518A4EC4ECAE43691F96FD3503AB
+[2026.11.03-19.53.11:666][590]LogAutomationController: Display: Clearing D:\Proj\MyGame/Saved/Automation/Logs/ and D:\Proj\MyGame/Saved/Automation/Tmp/
+[2026.11.03-19.53.11:666][590]AutomationTestingLog: -----Test Run 3----
+[2026.11.03-19.53.11:669][590]LogAutomationController: Sending RunTest Fail to 736D518A4EC4ECAE43691F96FD3503AB
+[2026.11.03-19.53.11:669][591]LogAutomationController: Display: Test Started. Name={Fail} Path={MyGame.Broken.Fail}
+[2026.11.03-19.53.11:670][591]LogAutomationWorker: Received StopTests from AA0570614019AC26BA9E96858F58938B
+[2026.11.03-19.53.11:670][591]LogAutomationWorker: Received StartTestSession from AA0570614019AC26BA9E96858F58938B
+[2026.11.03-19.53.11:670][591]LogAutomationWorker: Received RunTests Fail from AA0570614019AC26BA9E96858F58938B
+[2026.11.03-19.53.11:762][593]LogAutomationController: Error: Test Completed. Result={Fail} Name={Fail} Path={MyGame.Broken.Fail}
+[2026.11.03-19.53.11:762][593]LogAutomationController: BeginEvents: MyGame.Broken.Fail
+[2026.11.03-19.53.11:762][593]LogAutomationController: Error: Expected 'two is three' to be 3, but it was 2. [D:\Proj\MyGame\Source\MyGame\MyGameTests.cpp(11)]
+[2026.11.03-19.53.11:762][593]LogAutomationController: Warning: heads up [D:\Proj\MyGame\Source\MyGame\MyGameTests.cpp(11)]
+[2026.11.03-19.53.11:762][593]LogAutomationController: EndEvents: MyGame.Broken.Fail
+[2026.11.03-19.53.11:763][593]LogAutomationController: Sending RunTest FailTwice to 736D518A4EC4ECAE43691F96FD3503AB
+[2026.11.03-19.53.11:763][593]LogAutomationController: Display: Test Started. Name={FailTwice} Path={MyGame.Broken.FailTwice}
+[2026.11.03-19.53.11:770][594]LogAutomationWorker: Received RunTests FailTwice from AA0570614019AC26BA9E96858F58938B
+[2026.11.03-19.53.11:779][595]LogAutomationController: Error: Test Completed. Result={Fail} Name={FailTwice} Path={MyGame.Broken.FailTwice}
+[2026.11.03-19.53.11:779][595]LogAutomationController: BeginEvents: MyGame.Broken.FailTwice
+[2026.11.03-19.53.11:779][595]LogAutomationController: Error: Expected 'flag set' to be true. [D:\Proj\MyGame\Source\MyGame\MyGameTests.cpp(13)]
+[2026.11.03-19.53.11:779][595]LogAutomationController: Error: custom failure [D:\Proj\MyGame\Source\MyGame\MyGameTests.cpp(13)]
+[2026.11.03-19.53.11:779][595]LogAutomationController: EndEvents: MyGame.Broken.FailTwice
+[2026.11.03-19.53.11:781][595]LogAutomationController: Sending RunTest Add to 736D518A4EC4ECAE43691F96FD3503AB
+[2026.11.03-19.53.11:781][596]LogAutomationController: Display: Test Started. Name={Add} Path={MyGame.Math.Add}
+[2026.11.03-19.53.11:788][596]LogAutomationWorker: Received RunTests Add from AA0570614019AC26BA9E96858F58938B
+[2026.11.03-19.53.11:803][598]LogAutomationController: Display: Test Completed. Result={Success} Name={Add} Path={MyGame.Math.Add}
+[2026.11.03-19.53.11:803][598]LogAutomationController: BeginEvents: MyGame.Math.Add
+[2026.11.03-19.53.11:803][598]LogAutomationController: EndEvents: MyGame.Math.Add
+[2026.11.03-19.53.11:805][598]LogAutomationController: Sending RunTest Sub to 736D518A4EC4ECAE43691F96FD3503AB
+[2026.11.03-19.53.11:805][598]LogAutomationController: Display: Test Started. Name={Sub} Path={MyGame.Math.Sub}
+[2026.11.03-19.53.11:812][599]LogAutomationWorker: Received RunTests Sub from AA0570614019AC26BA9E96858F58938B
+[2026.11.03-19.53.11:821][600]LogAutomationController: Display: Test Completed. Result={Success} Name={Sub} Path={MyGame.Math.Sub}
+[2026.11.03-19.53.11:821][600]LogAutomationController: BeginEvents: MyGame.Math.Sub
+[2026.11.03-19.53.11:821][600]LogAutomationController: EndEvents: MyGame.Math.Sub
+[2026.11.03-19.53.11:823][600]LogAutomationController: Sending StopTestSession to 736D518A4EC4ECAE43691F96FD3503AB
+[2026.11.03-19.53.11:830][601]LogAutomationWorker: Received StopTestSession from AA0570614019AC26BA9E96858F58938B
+[2026.11.03-19.53.11:830][601]LogAutomationCommandLine: Display: Setting GIsCriticalError due to test failures (will cause non-zero exit code).
+[2026.11.03-19.53.11:830][601]LogAutomationCommandLine: Shutting down. GIsCriticalError=1
+[2026.11.03-19.53.11:830][601]LogAutomationCommandLine: Display: **** TEST COMPLETE. EXIT CODE: -1 ****
+[2026.11.03-19.53.11:830][601]LogWindows: FPlatformMisc::RequestExitWithStatus(1, 255, <NoCallSiteInfo>)
+[2026.11.03-19.53.11:830][601]LogCore: Engine exit requested (reason: Win RequestExit)

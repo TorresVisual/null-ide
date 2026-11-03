@@ -1,7 +1,7 @@
 import { Engine } from './engine';
 import { Uproject } from './uproject';
 
-export type Command = 'build' | 'test' | 'run' | 'smoke' | 'export';
+export type Command = 'build' | 'test' | 'run' | 'smoke' | 'compdb' | 'export';
 export interface Options {
   filter?: string; extraArgs: string[]; platform?: string; resX?: number; resY?: number;
   script?: string; request?: string;
@@ -44,6 +44,13 @@ export function buildPlan(cmd: Command, engine: Engine, project: Uproject, o: Op
         args: [uproject, '-run=PythonScript', `-Script=${o.script}`, '-nullrhi', '-unattended', '-stdout', '-NoSplash', ...o.extraArgs],
         timeoutSec: undefined,
         env: { NULL_UNREAL_REQUEST: o.request ?? '' },
+      };
+    case 'compdb':
+      // Written beside the .uproject, where clangd finds it by walking up from any source file.
+      return {
+        exe: engine.buildTool,
+        args: ['-mode=GenerateClangDatabase', `-project=${uproject}`, `${project.name}Editor`, 'Development', o.platform ?? 'Win64', `-OutputDir=${project.dir}`, ...o.extraArgs],
+        timeoutSec: undefined,
       };
     case 'smoke':
       return {

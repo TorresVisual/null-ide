@@ -1,0 +1,19 @@
+[2026.11.03-19.52.06:709][  0]Cmd: MAP LOAD FILE="../../../Engine/Content/Maps/Templates/OpenWorld.umap" TEMPLATE=1 SHOWPROGRESS=1 FEATURELEVEL=4
+[2026.11.03-19.52.07:143][  0]Cmd: MAP CHECKDEP NOCLEARLOG
+[2026.11.03-19.52.08:600][  0]Cmd: Automation RunTests Nothing.Matches; Quit
+[2026.11.03-19.52.08:602][  0]Automation: RunTests='Nothing.Matches' Queued.
+[2026.11.03-19.52.08:602][  0]Automation: Quit Command Queued.
+[2026.11.03-19.52.09:164][  2]LogAutomationCommandLine: Display: Ready to start automation
+[2026.11.03-19.52.14:182][588]LogAutomationWorker: Received FindWorkersMessage from DB4A306B4C55B67D534A888579B33C69
+[2026.11.03-19.52.14:188][589]LogAutomationController: Received FindWorkersResponseMessage from 26F352AC4811D6EF7B157AAFDA3ADA9E
+[2026.11.03-19.52.14:188][589]LogAutomationController: Requesting test list from 26F352AC4811D6EF7B157AAFDA3ADA9E
+[2026.11.03-19.52.14:190][589]LogAutomationWorker: Received RequestTestsMessage from DB4A306B4C55B67D534A888579B33C69
+[2026.11.03-19.52.14:231][589]LogAutomationWorker: Set 6363 tests to DB4A306B4C55B67D534A888579B33C69
+[2026.11.03-19.52.14:233][589]LogAutomationController: Received RequestTestsReplyCompleteMessage from 26F352AC4811D6EF7B157AAFDA3ADA9E
+[2026.11.03-19.52.14:236][589]LogAutomationController: 6363 tests available on 26F352AC4811D6EF7B157AAFDA3ADA9E
+[2026.11.03-19.52.14:282][589]LogAutomationCommandLine: Error: No automation tests matched 'Nothing.Matches'
+[2026.11.03-19.52.14:283][589]LogAutomationCommandLine: Display: Setting GIsCriticalError due to test failures (will cause non-zero exit code).
+[2026.11.03-19.52.14:283][589]LogAutomationCommandLine: Shutting down. GIsCriticalError=1
+[2026.11.03-19.52.14:283][589]LogAutomationCommandLine: Display: **** TEST COMPLETE. EXIT CODE: -1 ****
+[2026.11.03-19.52.14:283][589]LogWindows: FPlatformMisc::RequestExitWithStatus(1, 255, <NoCallSiteInfo>)
+[2026.11.03-19.52.14:283][589]LogCore: Engine exit requested (reason: Win RequestExit)

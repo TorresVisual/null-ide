@@ -1,0 +1,34 @@
+[2026.11.03-19.52.24:528][  0]LogPython: Display: Running start-up script C:/EpicGames/UE_5.8/Engine/Plugins/Animation/ControlRig/Content/Python/init_unreal.py... took 19.769 ms (total: 32.550 ms)
+[2026.11.03-19.52.24:528][  0]LogEngine: Warning: Printed warning to log.
+[2026.11.03-19.52.24:528][  0]LogOutputDevice: Warning: 
+
+Script Stack (0 frames) :
+
+[2026.11.03-19.52.24:528][  0]LogWindows: Error: appError called: Fatal error: [File:D:\build\++UE5\Sync\Engine\Source\Runtime\Engine\Private\UnrealEngine.cpp] [Line: 11596] 
+Crashing the gamethread at your request
+
+
+
+[2026.11.03-19.52.25:821][  0]LogWindows: Error: === Critical error: ===
+[2026.11.03-19.52.25:821][  0]LogWindows: Error: 
+[2026.11.03-19.52.25:821][  0]LogWindows: Error: Fatal error: [File:D:\build\++UE5\Sync\Engine\Source\Runtime\Engine\Private\UnrealEngine.cpp] [Line: 11596] 
+[2026.11.03-19.52.25:821][  0]LogWindows: Error: Crashing the gamethread at your request
+[2026.11.03-19.52.25:821][  0]LogWindows: Error: 
+[2026.11.03-19.52.25:821][  0]LogWindows: Error: 
+[2026.11.03-19.52.25:821][  0]LogWindows: Error: [Callstack] 0x00007ffa8cfc41e9 UnrealEditor-Engine.dll!UnknownFunction []
+[2026.11.03-19.52.25:821][  0]LogWindows: Error: [Callstack] 0x00007ffa8cf99593 UnrealEditor-Engine.dll!UnknownFunction []
+[2026.11.03-19.52.25:821][  0]LogWindows: Error: [Callstack] 0x00007ffa8cf8c1d5 UnrealEditor-Engine.dll!UnknownFunction []
+[2026.11.03-19.52.25:821][  0]LogWindows: Error: [Callstack] 0x00007ffa9027e11c UnrealEditor-Core.dll!UnknownFunction []
+[2026.11.03-19.52.25:821][  0]LogWindows: Error: [Callstack] 0x00007ffa8cf8b26f UnrealEditor-Engine.dll!UnknownFunction []
+[2026.11.03-19.52.25:821][  0]LogWindows: Error: [Callstack] 0x00007ffa8b699549 UnrealEditor-Engine.dll!UnknownFunction []
+[2026.11.03-19.52.25:821][  0]LogWindows: Error: [Callstack] 0x00007ffa8b71f0bb UnrealEditor-Engine.dll!UnknownFunction []
+[2026.11.03-19.52.25:821][  0]LogWindows: Error: [Callstack] 0x00007ffa8babf6bf UnrealEditor-Engine.dll!UnknownFunction []
+[2026.11.03-19.52.25:821][  0]LogWindows: Error: [Callstack] 0x00007ffa8cfd503e UnrealEditor-Engine.dll!UnknownFunction []
+[2026.11.03-19.52.25:821][  0]LogWindows: Error: [Callstack] 0x00007ff674d33b24 UnrealEditor-Cmd.exe!UnknownFunction []
+[2026.11.03-19.52.25:821][  0]LogWindows: Error: [Callstack] 0x00007ff674d1c4ac UnrealEditor-Cmd.exe!UnknownFunction []
+[2026.11.03-19.52.25:821][  0]LogWindows: Error: [Callstack] 0x00007ff674d1c5ba UnrealEditor-Cmd.exe!UnknownFunction []
+[2026.11.03-19.52.25:821][  0]LogWindows: Error: [Callstack] 0x00007ff674d212d6 UnrealEditor-Cmd.exe!UnknownFunction []
+[2026.11.03-19.52.25:821][  0]LogWindows: Error: [Callstack] 0x00007ff674d35cf4 UnrealEditor-Cmd.exe!UnknownFunction []
+[2026.11.03-19.52.25:821][  0]LogWindows: Error: [Callstack] 0x00007ff674d38422 UnrealEditor-Cmd.exe!UnknownFunction []
+[2026.11.03-19.52.25:821][  0]LogWindows: Error: [Callstack] 0x00007ffbec34cd87 KERNEL32.DLL!UnknownFunction []
+[2026.11.03-19.52.25:821][  0]LogWindows: Error: 

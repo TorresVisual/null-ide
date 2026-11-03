@@ -24,7 +24,7 @@ function setup(n = 2) {
   const engineRoot = path.join(root, 'UE');
   fs.mkdirSync(path.join(engineRoot, 'Engine', 'Build'), { recursive: true });
   fs.writeFileSync(path.join(engineRoot, 'Engine', 'Build', 'Build.version'), '{"MajorVersion":5,"MinorVersion":8,"PatchVersion":4}');
-  const engine: Engine = { root: engineRoot, editor: 'e', editorCmd: 'ec', automationTool: 'at' };
+  const engine: Engine = { root: engineRoot, editor: 'e', editorCmd: 'ec', automationTool: 'at', buildTool: 'ubt' };
   return { root, project, engine, files };
 }
 

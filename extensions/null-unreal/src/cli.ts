@@ -8,6 +8,7 @@ import { LockIo } from './lock';
 import { openLog, rotate } from './logs';
 import { run as runEngine, RunResult } from './runner';
 import { exitCodeOf, formatResult } from './result';
+import { summarizeLog } from './summary';
 import { ProjectFs, ResolveError, resolveProject } from './uproject';
 
 export interface Deps {
@@ -19,13 +20,14 @@ export interface Deps {
   out(line: string): void;
   err(line: string): void;   // diagnostics that must stay off stdout (`export --json`)
   exp: Pick<ExportDeps, 'fs' | 'lock' | 'scriptPath'>;
+  readLog(file: string): string | undefined;
 }
 
-const COMMANDS: Command[] = ['build', 'test', 'run', 'smoke', 'export'];
+const COMMANDS: Command[] = ['build', 'test', 'run', 'smoke', 'compdb', 'export'];
 const VALUE_FLAGS = ['--project', '--engine', '--filter', '--timeout'];
 const BOOL_FLAGS = ['--json', '--force'];
 const USAGE = [
-  'usage: null-unreal <build|test|run|smoke> [--project <p>] [--engine <path>] [--filter <prefix>] [--timeout <s>] [-- <extra engine args>]',
+  'usage: null-unreal <build|test|run|smoke|compdb> [--project <p>] [--engine <path>] [--filter <prefix>] [--timeout <s>] [-- <extra engine args>]',
   '       null-unreal export <asset.uasset|folder>... [--json] [--force] [--project <p>] [--engine <path>] [--timeout <s>] [-- <extra engine args>]',
 ].join('\n');
 
@@ -228,8 +230,19 @@ export async function main(argv: string[], deps: Deps): Promise<number> {
   }
 
   const warning = log.path === undefined ? log.warning : undefined;
-  for (const line of formatResult(command, r, log.path, warning).split('\n')) deps.out(line);
-  return exitCodeOf(r);
+  let code = exitCodeOf(r);
+  let summary: string[] = [];
+  if (command !== 'run') {
+    // The log is the one copy of the output; without it there is nothing to summarize and nothing proven.
+    const text = log.path !== undefined ? deps.readLog(log.path) : undefined;
+    const s = text !== undefined ? summarizeLog(command, text, log.path) : undefined;
+    summary = s?.lines ?? ['could not summarize (no log was kept)'];
+    // A run the summary calls failed, or cannot judge, is never green: exit 0 becomes 1.
+    if (code === 0 && s?.verdict !== 'ok') code = 1;
+  }
+  for (const line of formatResult(command, { ...r, code: r.timedOut ? r.code : code }, log.path, warning).split('\n')) deps.out(line);
+  for (const line of summary) deps.out(line);
+  return code;
 }
 
 if (require.main === module) {
@@ -242,6 +255,7 @@ if (require.main === module) {
     out: (line) => console.log(line),
     err: (line) => console.error(line),
     exp: { fs: realExportFs, lock: realLockIo, scriptPath: path.join(__dirname, '..', 'engine', 'export_asset.py') },
+    readLog: realExportFs.readFile,
   }).then((code) => {
     process.exitCode = code;
   });

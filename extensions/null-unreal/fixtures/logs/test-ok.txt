@@ -1,0 +1,41 @@
+[2026.11.03-19.51.08:473][  0]Cmd: MAP LOAD FILE="../../../Engine/Content/Maps/Templates/OpenWorld.umap" TEMPLATE=1 SHOWPROGRESS=1 FEATURELEVEL=4
+[2026.11.03-19.51.08:901][  0]Cmd: MAP CHECKDEP NOCLEARLOG
+[2026.11.03-19.51.11:341][  0]LogAutomationController: Ignoring very large delta of 16794726.16 seconds in calls to FAutomationControllerManager::Tick() and not penalizing unresponsive tests
+[2026.11.03-19.51.11:382][  0]Cmd: Automation RunTests MyGame.; Quit
+[2026.11.03-19.51.11:383][  0]Automation: RunTests='MyGame.' Queued.
+[2026.11.03-19.51.11:383][  0]Automation: Quit Command Queued.
+[2026.11.03-19.51.11:926][  2]LogAutomationCommandLine: Display: Ready to start automation
+[2026.11.03-19.51.16:944][588]LogAutomationWorker: Received FindWorkersMessage from 904989624ECAD51D5E1D2487C04FE50E
+[2026.11.03-19.51.16:951][589]LogAutomationController: Received FindWorkersResponseMessage from DBE43875468BF7F11B276B921E618DBC
+[2026.11.03-19.51.16:951][589]LogAutomationController: Requesting test list from DBE43875468BF7F11B276B921E618DBC
+[2026.11.03-19.51.16:952][589]LogAutomationWorker: Received RequestTestsMessage from 904989624ECAD51D5E1D2487C04FE50E
+[2026.11.03-19.51.17:031][589]LogAutomationWorker: Set 6363 tests to 904989624ECAD51D5E1D2487C04FE50E
+[2026.11.03-19.51.17:031][589]LogAutomationController: Received RequestTestsReplyCompleteMessage from DBE43875468BF7F11B276B921E618DBC
+[2026.11.03-19.51.17:037][589]LogAutomationController: 6363 tests available on DBE43875468BF7F11B276B921E618DBC
+[2026.11.03-19.51.17:082][589]LogAutomationCommandLine: Display: Found 2 automation tests based on 'MyGame.'
+[2026.11.03-19.51.17:082][589]LogAutomationCommandLine: Display: 	MyGame.Math.Add
+[2026.11.03-19.51.17:082][589]LogAutomationCommandLine: Display: 	MyGame.Math.Sub
+[2026.11.03-19.51.17:084][589]LogAutomationController: Sending StopTests to DBE43875468BF7F11B276B921E618DBC
+[2026.11.03-19.51.17:089][589]LogAutomationController: Sending StartTestSession to DBE43875468BF7F11B276B921E618DBC
+[2026.11.03-19.51.17:089][589]LogAutomationController: Display: Clearing D:\Proj\MyGame/Saved/Automation/Logs/ and D:\Proj\MyGame/Saved/Automation/Tmp/
+[2026.11.03-19.51.17:089][589]AutomationTestingLog: -----Test Run 3----
+[2026.11.03-19.51.17:092][589]LogAutomationController: Sending RunTest Add to DBE43875468BF7F11B276B921E618DBC
+[2026.11.03-19.51.17:092][590]LogAutomationController: Display: Test Started. Name={Add} Path={MyGame.Math.Add}
+[2026.11.03-19.51.17:093][590]LogAutomationWorker: Received StopTests from 904989624ECAD51D5E1D2487C04FE50E
+[2026.11.03-19.51.17:094][590]LogAutomationWorker: Received StartTestSession from 904989624ECAD51D5E1D2487C04FE50E
+[2026.11.03-19.51.17:094][590]LogAutomationWorker: Received RunTests Add from 904989624ECAD51D5E1D2487C04FE50E
+[2026.11.03-19.51.17:102][591]LogAutomationController: Display: Test Completed. Result={Success} Name={Add} Path={MyGame.Math.Add}
+[2026.11.03-19.51.17:102][591]LogAutomationController: BeginEvents: MyGame.Math.Add
+[2026.11.03-19.51.17:104][591]LogAutomationController: EndEvents: MyGame.Math.Add
+[2026.11.03-19.51.17:104][591]LogAutomationController: Sending RunTest Sub to DBE43875468BF7F11B276B921E618DBC
+[2026.11.03-19.51.17:104][592]LogAutomationController: Display: Test Started. Name={Sub} Path={MyGame.Math.Sub}
+[2026.11.03-19.51.17:110][592]LogAutomationWorker: Received RunTests Sub from 904989624ECAD51D5E1D2487C04FE50E
+[2026.11.03-19.51.17:125][594]LogAutomationController: Display: Test Completed. Result={Success} Name={Sub} Path={MyGame.Math.Sub}
+[2026.11.03-19.51.17:125][594]LogAutomationController: BeginEvents: MyGame.Math.Sub
+[2026.11.03-19.51.17:125][594]LogAutomationController: EndEvents: MyGame.Math.Sub
+[2026.11.03-19.51.17:127][594]LogAutomationController: Sending StopTestSession to DBE43875468BF7F11B276B921E618DBC
+[2026.11.03-19.51.17:127][594]LogAutomationWorker: Received StopTestSession from 904989624ECAD51D5E1D2487C04FE50E
+[2026.11.03-19.51.17:136][595]LogAutomationCommandLine: Shutting down. GIsCriticalError=0
+[2026.11.03-19.51.17:136][595]LogAutomationCommandLine: Display: **** TEST COMPLETE. EXIT CODE: 0 ****
+[2026.11.03-19.51.17:136][595]LogWindows: FPlatformMisc::RequestExitWithStatus(1, 0, <NoCallSiteInfo>)
+[2026.11.03-19.51.17:136][595]LogCore: Engine exit requested (reason: Win RequestExit)

@@ -10,6 +10,7 @@ const engine: Engine = {
   editor: 'C:\\UE\\Engine\\Binaries\\Win64\\UnrealEditor.exe',
   editorCmd: 'C:\\UE\\Engine\\Binaries\\Win64\\UnrealEditor-Cmd.exe',
   automationTool: 'C:\\UE\\Engine\\Binaries\\DotNET\\AutomationTool\\AutomationTool.exe',
+  buildTool: 'C:\\UE\\Engine\\Binaries\\DotNET\\UnrealBuildTool\\UnrealBuildTool.exe',
 };
 const project: Uproject = {
   file: 'C:\\Games\\MyGame\\MyGame.uproject',
@@ -88,4 +89,13 @@ test('export runs the PythonScript commandlet headless and passes the request th
   assert.equal(p.exe, engine.editorCmd);
   assert.deepEqual(p.args, [project.file, '-run=PythonScript', `-Script=${script}`, '-nullrhi', '-unattended', '-stdout', '-NoSplash', '-Foo']);
   assert.deepEqual(p.env, { NULL_UNREAL_REQUEST: request });
+});
+
+test('compdb runs UnrealBuildTool GenerateClangDatabase for the editor target and writes beside the .uproject', () => {
+  const p = buildPlan('compdb', engine, project, { extraArgs: ['-Foo'] });
+  assert.equal(p.exe, engine.buildTool);
+  assert.deepEqual(p.args, [
+    '-mode=GenerateClangDatabase', `-project=${project.file}`, 'MyGameEditor', 'Development', 'Win64', `-OutputDir=${project.dir}`, '-Foo',
+  ]);
+  assert.equal(p.timeoutSec, undefined);
 });
