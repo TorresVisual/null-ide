@@ -1,3 +1,4 @@
+import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
@@ -270,9 +271,7 @@ async function openLog(resolve: () => Resolved): Promise<void> {
   await vscode.window.showTextDocument(vscode.Uri.file(file), { preview: true });
 }
 
+// Unpredictable per page load: the CSP only holds if a page cannot guess the nonce.
 function nonce(): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let out = '';
-  for (let i = 0; i < 32; i++) out += chars[Math.floor(Math.random() * chars.length)];
-  return out;
+  return crypto.randomBytes(16).toString('base64');
 }
