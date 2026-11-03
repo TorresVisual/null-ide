@@ -62,7 +62,7 @@
   },
   "scripts": {
     "compile": "tsc -p tsconfig.json",
-    "test": "tsc -p tsconfig.json && node --test out/uproject.test.js out/engine.test.js out/commandLine.test.js out/logs.test.js",
+    "test": "tsc -p tsconfig.json && node --test out/uproject.test.js out/engine.test.js out/commandLine.test.js out/logs.test.js out/runner.test.js",
     "pretest:integration": "tsc -p tsconfig.json",
     "test:integration": "node ./out/test/runTest.js"
   },
