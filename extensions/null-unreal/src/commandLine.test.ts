@@ -83,11 +83,12 @@ test('a project path with spaces stays one argument', () => {
 
 
 test('export runs the PythonScript commandlet headless and passes the request through the environment', () => {
-  const script = path.join('ext', 'engine', 'export_asset.py');
+  const script = 'C:\\Users\\me\\Null IDE\\resources\\app\\extensions\\null-unreal\\engine\\export_asset.py';
   const request = path.join('saved', 'export-request-1.json');
   const p = buildPlan('export', engine, project, { extraArgs: ['-Foo'], script, request });
   assert.equal(p.exe, engine.editorCmd);
-  assert.deepEqual(p.args, [project.file, '-run=PythonScript', `-Script=${script}`, '-nullrhi', '-unattended', '-stdout', '-NoSplash', '-Foo']);
+  // Forward slashes: UE turns `\r` and `\n` in the -Script value into control characters.
+  assert.deepEqual(p.args, [project.file, '-run=PythonScript', '-Script=C:/Users/me/Null IDE/resources/app/extensions/null-unreal/engine/export_asset.py', '-nullrhi', '-unattended', '-stdout', '-NoSplash', '-Foo']);
   assert.deepEqual(p.env, { NULL_UNREAL_REQUEST: request });
 });
 
