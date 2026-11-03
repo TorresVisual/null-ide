@@ -16,6 +16,8 @@ This spec is built in two milestones, so the viewers are reached before the poli
 
 The implementation plan for M1 is written first. Plans for M2, the asset core and the viewers wait for the asset core's capture spike.
 
+**Status:** M1 and M2 are implemented. M2 was built straight from captured UE 5.8 logs (`extensions/null-unreal/fixtures/logs/`) without a separate plan document.
+
 ## Goal
 
 Make an Unreal project feel native in Null IDE, for two users of the same commands:
@@ -113,7 +115,7 @@ New extension touches the same places as the last one: `build.yml` (compile step
 ## Open items for the builder
 
 - Confirm `ELECTRON_RUN_AS_NODE` via `null.exe` works for the shim (Decision 2); fall back to requiring `node` on PATH only if it cannot.
-- `GenerateClangDatabase` output location and whether clangd needs `.clangd` / `--compile-commands-dir` wiring; decide how `compdb` hands the file to clangd and whether `null-cpp` needs to change at all.
+- ~~`GenerateClangDatabase` output location~~ Resolved: `-OutputDir=<project dir>` writes `compile_commands.json` beside the `.uproject`, which clangd finds by walking up from any source file. No `.clangd` wiring; `null-cpp` already detects `compile_commands.json`. The command restarts clangd afterwards.
 - How `null-cpp`'s C++ detection should treat a UE project (header/source switching is wanted; it should not offer CMake affordances).
 - Whether `null-env` gains a `*.uproject` entry (recommended: clangd) — optional, not needed for v1.
 

@@ -1,11 +1,13 @@
 # null-unreal
 
-Unreal Engine project tooling (issue #149, M1) and the asset core (issue #150). Workspace-side (no `extensionKind`), activated by `workspaceContains:**/*.uproject`. Windows only and labelled experimental; **not in the REH list** in `build.yml` because the engine is Windows-only and remote hosts are Linux.
+Unreal Engine project tooling (issue #149, M1 and M2) and the asset core (issue #150). Workspace-side (no `extensionKind`), activated by `workspaceContains:**/*.uproject`. Windows only and labelled experimental; **not in the REH list** in `build.yml` because the engine is Windows-only and remote hosts are Linux.
 
 Pure modules (no `vscode` import), tested with `node --test` and listed explicitly in `package.json`'s `test` script:
 - `uproject` resolves the project (walk up, or `--project`); `engine` resolves the engine (override, registry, `LauncherInstalled.dat`, walk-up). All engine paths live here.
 - `commandLine` is the only place a command line is built. `logs` opens and rotates `Saved/NullUnreal` logs. `runner` spawns with `shell: false` and kills the whole tree on timeout (`taskkill /T /F`).
 - `result` formats the two output lines and maps exit codes; `cli` is the entry point (`out/cli.js`), `main(argv, deps)` returns the exit code.
+- `summary` (M2) turns a finished log into a `Summary {verdict: ok|failed|unknown, lines}` for `build`, `test`, `smoke` and `compdb`; `cli` reads the kept log back and prints the lines after the two result lines. `ok` needs a positive signal; an exit 0 whose verdict is not `ok` becomes exit 1. The patterns come from UE 5.8 logs in `fixtures/logs/*.txt` (scrubbed; capture new ones by running the CLI against a scratch project, never a real one). Failing `test` runs already exit 255 on 5.8 and a filter matching nothing logs `No automation tests matched`; both are still decided from the log.
+- `compdb` runs `UnrealBuildTool -mode=GenerateClangDatabase <Name>Editor Development Win64 -OutputDir=<project dir>` (`engine.buildTool`); the editor target name is assumed to be `<ProjectName>Editor`. `Generate clangd Database` runs it then `clangd.restart`; `Open Last Log` opens the newest `Saved/NullUnreal/*.log` of any command (`logs.latestLogAny`).
 - `shim` writes the `null-unreal.cmd` and POSIX `null-unreal` launchers that run the CLI with `ELECTRON_RUN_AS_NODE=1`.
 
 Asset core (`null-unreal export`, `Export Asset`, `Clear Asset Cache`):
@@ -14,7 +16,7 @@ Asset core (`null-unreal export`, `Export Asset`, `Clear Asset Cache`):
 - Engine quirks: `get_material_property_input_node` with `MP_MAX` crashes the editor (the script queries a whitelist); a project with an unbuilt module exits 1 with no log line naming it, so a missing manifest is classified from the log as best it can; `PythonScriptPlugin` set to disabled in a `.uproject` still ran in 5.8, so that error path is unverified.
 - Adding a field to an export means editing `export_asset.py` and `exportFormat.ts`; changing a field's meaning bumps `SCHEMA` (old entries become stale).
 
-Only `extension.ts`, `commands.ts`, `assets.ts`, `viewerProvider.ts` and `statusBar.ts` import `vscode`. The extension spawns `out/cli.js` on the editor's runtime (`process.execPath` with `ELECTRON_RUN_AS_NODE=1`); it never builds a command line itself. The integration spec (`npm run test:integration`, via `/verify-local null-unreal`) checks activation, the five commands and the shim.
+Only `extension.ts`, `commands.ts`, `assets.ts`, `viewerProvider.ts` and `statusBar.ts` import `vscode`. The extension spawns `out/cli.js` on the editor's runtime (`process.execPath` with `ELECTRON_RUN_AS_NODE=1`); it never builds a command line itself. The integration spec (`npm run test:integration`, via `/verify-local null-unreal`) checks activation, the registered commands and the shim.
 
 Asset viewers (#151): `viewerProvider.ts` is a `CustomReadonlyEditorProvider` (`null-unreal.assetViewer`, `*.uasset`/`*.umap`, priority `default`). It chooses the webview page by the export kind (`src/viewer/page.ts`); the webview never reads files, and its `localResourceRoots` are `lib/` plus `Saved/NullUnreal/assets`. Pages are TypeScript under `webview/` bundled by esbuild into `lib/*.js` (`npm run build`, run by `compile`); `three` is only in `lib/mesh.js`. Pure modules in `src/viewer/` import neither `vscode` nor the DOM and are tested with `node --test`. The message protocol is `src/viewer/messages.ts`. Pin colours and node families are data tables in `src/viewer/colors.ts`. Export shape for material outputs: `{name, link|null}`, where `null` link is an unconnected property. `lib/` is gitignored. Not yet verified in a real build against a project (see the plan's manual checks).
 

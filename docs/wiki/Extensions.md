@@ -31,22 +31,24 @@ See [Features](Features) for what each does day to day.
 
 Experimental and Windows only. It activates in a folder that holds a `.uproject`.
 
-- **Status bar:** a Run button launches the editor. The command palette has `Null Unreal: Run`, `Build`, `Test`, `Smoke`, `Show CLI Path`, `Export Asset` and `Clear Asset Cache`.
-- **Settings:** `null-unreal.enginePath` (the engine root, overriding `EngineAssociation`), `null-unreal.project` (picks one `.uproject` when a folder holds several), and `null-unreal.build|test|run|smoke|export.args` (extra engine arguments).
+- **Status bar:** a Run button launches the editor. The command palette has `Null Unreal: Run`, `Build`, `Test`, `Smoke`, `Generate clangd Database`, `Open Last Log`, `Show CLI Path`, `Export Asset` and `Clear Asset Cache`.
+- **Settings:** `null-unreal.enginePath` (the engine root, overriding `EngineAssociation`), `null-unreal.project` (picks one `.uproject` when a folder holds several), and `null-unreal.build|test|run|smoke|compdb|export.args` (extra engine arguments).
 - **Terminal CLI:** `null-unreal` is on the PATH of the integrated terminal. Agents outside it can use `Show CLI Path` to get the absolute shim path.
 
 ```
-null-unreal <build|test|run|smoke> [--project <file>] [--engine <path>] [--filter <prefix>] [--timeout <s>] [-- <extra engine args>]
+null-unreal <build|test|run|smoke|compdb> [--project <file>] [--engine <path>] [--filter <prefix>] [--timeout <s>] [-- <extra engine args>]
 ```
 
 - `--filter` limits `test` (it defaults to `<ProjectName>.`). `smoke` times out after 120 s and `test` after 600 s. `--timeout` overrides either.
-- The output is two lines: the result, then `log: <path>`. Each run keeps its full log in `<project>/Saved/NullUnreal/`, the latest 10 per command.
-- M1 prints the result and the log path only, not a summary. Read the log for the details.
+- The output is the result line, `log: <path>`, then a short summary instead of the engine's log. Each run keeps its full log in `<project>/Saved/NullUnreal/`, the latest 10 per command, and `Null Unreal: Open Last Log` opens the newest.
+- `build` lists compile, link and cook errors (at most 30, duplicates collapsed with a count). `test` gives the counts and each failing test with its messages (at most 20). `smoke` reports a fatal error or a missing clean shutdown. `run` prints no summary.
+- A green summary needs a positive signal in the log (`BUILD SUCCESSFUL`, a passing test, a clean shutdown). When the log shows nothing recognisable the summary says `could not summarize` and prints the last 40 lines, and the exit code is 1, never 0.
+- `compdb` runs UnrealBuildTool `-mode=GenerateClangDatabase` for `<ProjectName>Editor` and writes `compile_commands.json` next to the `.uproject`, where clangd finds it. `Null Unreal: Generate clangd Database` runs it and restarts clangd. It needs a clang toolchain (the LLVM that ships with Visual Studio, or an install).
 
 | Exit code | Meaning |
 |---|---|
 | the engine's own code | the process failed; passed through |
-| 1 | `export` only: an asset failed or was not exported |
+| 1 | the process exited 0 but the summary found a failure or could not tell (failed tests, no tests, unrecognised output); for `export`, an asset failed or was not exported |
 | 2 | usage or resolution error (no engine, no or several `.uproject`) |
 | 124 | timed out; the whole process tree was killed |
 | 255 | the process was killed without an exit code |

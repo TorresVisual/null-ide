@@ -111,7 +111,7 @@ Null IDE is built on [VSCodium](https://vscodium.com) and ships with a dark them
 | **null-startup** | Startup profiler |
 | **null-sync** | Encrypted cross-device sync through one secret GitHub Gist (off by default) |
 | **null-devcontainer** | Minimal dev containers: reopen a folder in its `devcontainer.json` image (needs Docker) |
-| **null-unreal** | Unreal Engine projects: build, test, run and smoke from the status bar and a terminal CLI (Windows, experimental) |
+| **null-unreal** | Unreal Engine projects: build, test, run and smoke from the status bar and a terminal CLI that prints short summaries, plus a clangd database (Windows, experimental) |
 | **Code Spell Checker** | Bundled [`streetsidesoftware.code-spell-checker`](https://marketplace.visualstudio.com/items?itemName=streetsidesoftware.code-spell-checker) |
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
