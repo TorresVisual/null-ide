@@ -33,23 +33,142 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.realProjectFs = void 0;
+exports.realLockIo = exports.realExportFs = exports.realProjectFs = void 0;
 exports.main = main;
 const fs = __importStar(require("node:fs"));
+const path = __importStar(require("node:path"));
 const commandLine_1 = require("./commandLine");
 const engine_1 = require("./engine");
+const exporter_1 = require("./exporter");
+const exportFormat_1 = require("./exportFormat");
 const logs_1 = require("./logs");
 const runner_1 = require("./runner");
 const result_1 = require("./result");
 const uproject_1 = require("./uproject");
-const COMMANDS = ['build', 'test', 'run', 'smoke'];
+const COMMANDS = ['build', 'test', 'run', 'smoke', 'export'];
 const VALUE_FLAGS = ['--project', '--engine', '--filter', '--timeout'];
-const USAGE = 'usage: null-unreal <build|test|run|smoke> [--project <p>] [--engine <path>] [--filter <prefix>] [--timeout <s>] [-- <extra engine args>]';
+const BOOL_FLAGS = ['--json', '--force'];
+const USAGE = [
+    'usage: null-unreal <build|test|run|smoke> [--project <p>] [--engine <path>] [--filter <prefix>] [--timeout <s>] [-- <extra engine args>]',
+    '       null-unreal export <asset.uasset|folder>... [--json] [--force] [--project <p>] [--engine <path>] [--timeout <s>] [-- <extra engine args>]',
+].join('\n');
 exports.realProjectFs = {
     readdir: (dir) => fs.readdirSync(dir),
     readFile: (p) => fs.readFileSync(p, 'utf8'),
     exists: (p) => fs.existsSync(p),
 };
+exports.realExportFs = {
+    list: (dir) => {
+        try {
+            return fs.readdirSync(dir, { withFileTypes: true }).map((e) => ({ name: e.name, isDirectory: e.isDirectory() }));
+        }
+        catch {
+            return [];
+        }
+    },
+    exists: (p) => fs.existsSync(p),
+    readFile: (p) => {
+        try {
+            return fs.readFileSync(p, 'utf8');
+        }
+        catch {
+            return undefined;
+        }
+    },
+    stat: (p) => {
+        try {
+            const st = fs.statSync(p);
+            return { mtimeMs: st.mtimeMs, size: st.size };
+        }
+        catch {
+            return undefined;
+        }
+    },
+    isDirectory: (p) => {
+        try {
+            return fs.statSync(p).isDirectory();
+        }
+        catch {
+            return false;
+        }
+    },
+    mkdir: (p) => void fs.mkdirSync(p, { recursive: true }),
+    writeFile: (p, text) => fs.writeFileSync(p, text),
+    remove: (p) => fs.rmSync(p, { force: true }),
+};
+exports.realLockIo = {
+    create(file, contents) {
+        try {
+            fs.writeFileSync(file, contents, { flag: 'wx' });
+            return true;
+        }
+        catch (e) {
+            if (e.code === 'EEXIST')
+                return false;
+            throw e;
+        }
+    },
+    read: (file) => exports.realExportFs.readFile(file),
+    remove: (file) => fs.rmSync(file, { force: true }),
+    alive(pid) {
+        try {
+            process.kill(pid, 0);
+            return true;
+        }
+        catch (e) {
+            return e.code === 'EPERM';
+        }
+    },
+    sleep: (ms) => new Promise((done) => setTimeout(done, ms)),
+    now: () => Date.now(),
+    pid: process.pid,
+};
+// One line per asset: package, kind, status, then the summary or the error.
+function assetLine(o) {
+    const kind = o.doc?.kind ?? '-';
+    if (o.doc && (o.status === 'hit' || o.status === 'exported')) {
+        return `${o.package}  ${kind}  ${o.status === 'hit' ? 'cached' : 'exported'}  ${(0, exportFormat_1.summarize)(o.doc)}`;
+    }
+    return `${o.package}  ${kind}  ${o.status}${o.error ? `  ${o.error}` : ''}`;
+}
+async function runExport(deps, uproject, engine, targets, o) {
+    const say = o.json ? deps.err : deps.out; // under --json stdout carries only the JSON
+    let r;
+    try {
+        r = await (0, exporter_1.exportAssets)({
+            project: uproject,
+            engine,
+            targets: targets.map((t) => path.resolve(deps.cwd, t)),
+            force: o.force,
+            extraArgs: o.extraArgs,
+            timeoutSec: o.timeout,
+        }, { ...deps.exp, run: deps.run, now: deps.now });
+    }
+    catch (e) {
+        if (e instanceof uproject_1.ResolveError) {
+            say(e.message);
+            return 2;
+        }
+        throw e;
+    }
+    for (const a of r.outcomes)
+        say(assetLine(a));
+    if (r.message)
+        say(`null-unreal export: ${r.message}`);
+    // One asset prints its object, several print an array.
+    const docs = r.outcomes.flatMap((a) => (a.doc ? [a.doc] : []));
+    if (o.json && docs.length > 0)
+        deps.out(JSON.stringify(docs.length === 1 ? docs[0] : docs, null, 2));
+    if (!r.ran) {
+        say('null-unreal export: exit 0 (served from the cache)');
+    }
+    else {
+        const result = { code: r.code, timedOut: r.timedOut, seconds: r.seconds };
+        for (const line of (0, result_1.formatResult)('export', result, r.logPath, r.logWarning).split('\n'))
+            say(line);
+    }
+    return r.code;
+}
 // Returns the exit code. Output is the two result lines (plus any usage or resolution message).
 async function main(argv, deps) {
     const [cmd, ...rest] = argv;
@@ -60,18 +179,33 @@ async function main(argv, deps) {
     }
     const command = cmd;
     const flags = {};
+    const bools = new Set();
+    const targets = [];
     let extraArgs = [];
     for (let i = 0; i < rest.length; i++) {
         if (rest[i] === '--') {
             extraArgs = rest.slice(i + 1);
             break;
         }
-        if (!VALUE_FLAGS.includes(rest[i]) || i + 1 >= rest.length) {
+        if (command === 'export' && BOOL_FLAGS.includes(rest[i])) {
+            bools.add(rest[i]);
+        }
+        else if (command === 'export' && !rest[i].startsWith('-')) {
+            targets.push(rest[i]);
+        }
+        else if (VALUE_FLAGS.includes(rest[i]) && i + 1 < rest.length) {
+            flags[rest[i]] = rest[++i];
+        }
+        else {
             deps.out(`null-unreal: bad argument ${rest[i]}`);
             deps.out(USAGE);
             return 2;
         }
-        flags[rest[i]] = rest[++i];
+    }
+    if (command === 'export' && targets.length === 0) {
+        deps.out('null-unreal: export needs at least one .uasset file or folder');
+        deps.out(USAGE);
+        return 2;
     }
     const timeout = flags['--timeout'] !== undefined ? Number(flags['--timeout']) : undefined;
     if (timeout !== undefined && !(timeout > 0)) {
@@ -86,10 +220,18 @@ async function main(argv, deps) {
     }
     catch (e) {
         if (e instanceof uproject_1.ResolveError) {
-            deps.out(e.message);
+            (bools.has('--json') ? deps.err : deps.out)(e.message);
             return 2;
         }
         throw e;
+    }
+    if (command === 'export') {
+        return runExport(deps, uproject, engine, targets, {
+            json: bools.has('--json'),
+            force: bools.has('--force'),
+            timeout,
+            extraArgs,
+        });
     }
     const plan = (0, commandLine_1.buildPlan)(command, engine, uproject, { filter: flags['--filter'], extraArgs });
     if (timeout !== undefined)
@@ -118,6 +260,8 @@ if (require.main === module) {
         run: runner_1.run,
         now: () => new Date(),
         out: (line) => console.log(line),
+        err: (line) => console.error(line),
+        exp: { fs: exports.realExportFs, lock: exports.realLockIo, scriptPath: path.join(__dirname, '..', 'engine', 'export_asset.py') },
     }).then((code) => {
         process.exitCode = code;
     });

@@ -38,10 +38,11 @@ exports.deactivate = deactivate;
 const fs = __importStar(require("node:fs"));
 const path = __importStar(require("node:path"));
 const vscode = __importStar(require("vscode"));
+const assets_1 = require("./assets");
 const commands_1 = require("./commands");
 const statusBar_1 = require("./statusBar");
 const shim_1 = require("./shim");
-// Returns the shim folder so the integration spec can check it; nothing else reads the return value.
+// Returns the shim folder and the asset store so the integration spec and the viewers can reach them.
 function activate(context) {
     const shimDir = path.join(context.globalStorageUri.fsPath, 'bin');
     fs.mkdirSync(shimDir, { recursive: true });
@@ -52,8 +53,9 @@ function activate(context) {
     context.environmentVariableCollection.prepend('PATH', shimDir + path.delimiter);
     const output = vscode.window.createOutputChannel('Null Unreal');
     (0, commands_1.registerCommands)(context, { cliPath, output, shimPath: path.join(shimDir, 'null-unreal.cmd') });
+    const assetStore = (0, assets_1.registerAssets)(context, { cliPath, output });
     context.subscriptions.push(output, (0, statusBar_1.createRunStatusBar)());
-    return { shimDir };
+    return { shimDir, assetStore };
 }
 function deactivate() { }
 //# sourceMappingURL=extension.js.map

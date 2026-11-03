@@ -57,11 +57,11 @@ const CLI = 'C:\\Users\\Me\\AppData\\Local\\Programs\\Null IDE\\resources\\app\\
     assert.match(sh, /exec "/);
     assert.ok(sh.includes('"$@"'));
 });
-(0, node_test_1.test)('the usage snippet names the absolute shim path and all four commands', () => {
+(0, node_test_1.test)('the usage snippet names the absolute shim path and all five commands', () => {
     const shimPath = 'C:\\Users\\Me\\AppData\\Local\\Null\\bin\\null-unreal.cmd';
     const s = (0, shim_1.cliUsageSnippet)(shimPath);
     assert.ok(s.includes(shimPath));
-    for (const c of ['build', 'test', 'run', 'smoke'])
+    for (const c of ['build', 'test', 'run', 'smoke', 'export'])
         assert.ok(s.includes(c), `mentions ${c}`);
 });
 //# sourceMappingURL=shim.test.js.map

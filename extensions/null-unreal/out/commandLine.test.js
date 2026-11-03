@@ -35,6 +35,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 const node_test_1 = require("node:test");
 const assert = __importStar(require("node:assert/strict"));
+const path = __importStar(require("node:path"));
 const commandLine_1 = require("./commandLine");
 const engine = {
     root: 'C:\\UE',
@@ -101,5 +102,13 @@ const none = { extraArgs: [] };
     const spaced = { ...project, file: 'C:\\My Games\\My Game\\MyGame.uproject' };
     const p = (0, commandLine_1.buildPlan)('run', engine, spaced, none);
     assert.equal(p.args[0], 'C:\\My Games\\My Game\\MyGame.uproject');
+});
+(0, node_test_1.test)('export runs the PythonScript commandlet headless and passes the request through the environment', () => {
+    const script = path.join('ext', 'engine', 'export_asset.py');
+    const request = path.join('saved', 'export-request-1.json');
+    const p = (0, commandLine_1.buildPlan)('export', engine, project, { extraArgs: ['-Foo'], script, request });
+    assert.equal(p.exe, engine.editorCmd);
+    assert.deepEqual(p.args, [project.file, '-run=PythonScript', `-Script=${script}`, '-nullrhi', '-unattended', '-stdout', '-NoSplash', '-Foo']);
+    assert.deepEqual(p.env, { NULL_UNREAL_REQUEST: request });
 });
 //# sourceMappingURL=commandLine.test.js.map

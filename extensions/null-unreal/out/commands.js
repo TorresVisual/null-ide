@@ -34,6 +34,8 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.registerCommands = registerCommands;
+exports.cliArgs = cliArgs;
+exports.spawnCli = spawnCli;
 const node_child_process_1 = require("node:child_process");
 const vscode = __importStar(require("vscode"));
 const shim_1 = require("./shim");
@@ -46,9 +48,9 @@ function registerCommands(context, o) {
     context.subscriptions.push(vscode.commands.registerCommand('null-unreal.showCliPath', () => showCliPath(o.shimPath)));
 }
 // The extension never builds an engine command line: it passes settings to the CLI as flags.
-function cliArgs(cmd, cliPath) {
+function cliArgs(cmd, cliPath, before = []) {
     const cfg = vscode.workspace.getConfiguration('null-unreal');
-    const args = [cliPath, cmd];
+    const args = [cliPath, cmd, ...before];
     const project = cfg.get('project', '');
     const enginePath = cfg.get('enginePath', '');
     if (project)

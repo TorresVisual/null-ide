@@ -18,7 +18,12 @@ function run(plan, sink, echo) {
                 clearTimeout(timer);
             resolve({ code, timedOut, seconds: (Date.now() - started) / 1000 });
         };
-        const child = (0, node_child_process_1.spawn)(plan.exe, plan.args, { shell: false, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+        const child = (0, node_child_process_1.spawn)(plan.exe, plan.args, {
+            shell: false,
+            windowsHide: true,
+            stdio: ['ignore', 'pipe', 'pipe'],
+            env: plan.env ? { ...process.env, ...plan.env } : undefined,
+        });
         const pipe = (chunk) => {
             sink?.write(chunk);
             if (echo)

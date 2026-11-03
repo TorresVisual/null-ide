@@ -60,6 +60,8 @@ function deps(cwd, o = {}) {
         },
         now: () => new Date(2026, 0, 2, 3, 4, 5),
         out: (l) => lines.push(l),
+        err: (l) => lines.push(l),
+        exp: { fs: cli_1.realExportFs, lock: cli_1.realLockIo, scriptPath: 'export_asset.py' },
         lines,
     };
     return d;
@@ -114,5 +116,79 @@ function deps(cwd, o = {}) {
     const logPath = path.join(dir, 'Saved', 'NullUnreal', 'smoke-20260102-030405.log');
     assert.ok(fs.existsSync(logPath), 'log file exists');
     assert.ok(d.lines.includes(`log: ${logPath}`));
+});
+// An engine folder with a Build.version and a project holding one asset; `run` plays the export script.
+function exportSetup() {
+    const dir = tempDir();
+    fs.mkdirSync(path.join(dir, 'Content'));
+    fs.writeFileSync(path.join(dir, 'Content', 'T.uasset'), 'abc');
+    const engineRoot = path.join(dir, 'UE');
+    fs.mkdirSync(path.join(engineRoot, 'Engine', 'Build'), { recursive: true });
+    fs.writeFileSync(path.join(engineRoot, 'Engine', 'Build', 'Build.version'), '{"MajorVersion":5,"MinorVersion":8,"PatchVersion":4}');
+    const d = deps(dir);
+    d.run = async (plan) => {
+        const req = JSON.parse(fs.readFileSync(plan.env.NULL_UNREAL_REQUEST, 'utf8'));
+        const a = req.assets[0];
+        const file = path.join(req.outputDir, 'Game', 'T.json');
+        fs.mkdirSync(path.dirname(file), { recursive: true });
+        fs.writeFileSync(file, JSON.stringify({
+            schema: 1, engineVersion: req.engineVersion, sourceMtime: a.sourceMtime, sourceSize: a.sourceSize, package: a.package,
+            kind: 'texture', class: 'Texture2D', references: { dependencies: [] }, data: { width: 8, height: 4, compression: 'TC_DEFAULT' }, sidecars: {},
+        }));
+        fs.writeFileSync(req.manifest, JSON.stringify({ schema: 1, assets: { [a.package]: { status: 'exported' } } }));
+        return { code: 0, timedOut: false, seconds: 1 };
+    };
+    const err = [];
+    d.err = (l) => err.push(l);
+    return { dir, engineRoot, d, err };
+}
+(0, node_test_1.test)('export without an asset is a usage error (2)', async () => {
+    const d = deps(tempDir());
+    assert.equal(await (0, cli_1.main)(['export', '--engine', ROOT], d), 2);
+    assert.ok(d.lines.some((l) => l.includes('at least one')));
+});
+(0, node_test_1.test)('export prints one line per asset and the result lines, then serves the second call from the cache', async () => {
+    const { dir, engineRoot, d } = exportSetup();
+    assert.equal(await (0, cli_1.main)(['export', path.join('Content', 'T.uasset'), '--engine', engineRoot], d), 0);
+    assert.ok(d.lines.includes('/Game/T  texture  exported  Texture 8x4, TC_DEFAULT'), d.lines.join('\n'));
+    assert.ok(d.lines.some((l) => l.startsWith('null-unreal export: exit 0')));
+    assert.ok(d.lines.some((l) => l.startsWith('log: ') && l.includes('export-')));
+    d.lines.length = 0;
+    assert.equal(await (0, cli_1.main)(['export', path.join(dir, 'Content'), '--engine', engineRoot], d), 0);
+    assert.ok(d.lines.includes('/Game/T  texture  cached  Texture 8x4, TC_DEFAULT'));
+    assert.ok(d.lines.some((l) => l.includes('served from the cache')));
+});
+(0, node_test_1.test)('export --json puts only the JSON on stdout and the human lines on stderr', async () => {
+    const { engineRoot, d, err } = exportSetup();
+    assert.equal(await (0, cli_1.main)(['export', path.join('Content', 'T.uasset'), '--json', '--engine', engineRoot], d), 0);
+    assert.equal(JSON.parse(d.lines.join('\n')).package, '/Game/T');
+    assert.ok(err.some((l) => l.startsWith('/Game/T  texture  exported')));
+});
+(0, node_test_1.test)('export --json of several assets prints an array', async () => {
+    const { dir, engineRoot, d } = exportSetup();
+    fs.writeFileSync(path.join(dir, 'Content', 'U.uasset'), 'abcd');
+    d.run = async (plan) => {
+        const req = JSON.parse(fs.readFileSync(plan.env.NULL_UNREAL_REQUEST, 'utf8'));
+        const assets = {};
+        for (const a of req.assets) {
+            const file = path.join(req.outputDir, ...a.package.split('/').filter(Boolean)) + '.json';
+            fs.mkdirSync(path.dirname(file), { recursive: true });
+            fs.writeFileSync(file, JSON.stringify({
+                schema: 1, engineVersion: req.engineVersion, sourceMtime: a.sourceMtime, sourceSize: a.sourceSize, package: a.package,
+                kind: 'generic', class: 'Thing', references: { dependencies: [] }, data: {}, sidecars: {},
+            }));
+            assets[a.package] = { status: 'exported' };
+        }
+        fs.writeFileSync(req.manifest, JSON.stringify({ schema: 1, assets }));
+        return { code: 0, timedOut: false, seconds: 1 };
+    };
+    assert.equal(await (0, cli_1.main)(['export', path.join(dir, 'Content'), '--json', '--engine', engineRoot], d), 0);
+    assert.deepEqual(JSON.parse(d.lines.join('\n')).map((x) => x.package), ['/Game/T', '/Game/U']);
+});
+(0, node_test_1.test)('an asset outside any Content root is exit 2 with the reason', async () => {
+    const { dir, engineRoot, d } = exportSetup();
+    fs.writeFileSync(path.join(dir, 'Stray.uasset'), 'x');
+    assert.equal(await (0, cli_1.main)(['export', 'Stray.uasset', '--engine', engineRoot], d), 2);
+    assert.ok(d.lines.some((l) => l.includes('not a .uasset under')));
 });
 //# sourceMappingURL=cli.test.js.map

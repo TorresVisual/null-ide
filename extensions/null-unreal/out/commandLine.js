@@ -30,6 +30,14 @@ function buildPlan(cmd, engine, project, o) {
                 args: [uproject, '-game', '-windowed', `-ResX=${o.resX ?? 1280}`, `-ResY=${o.resY ?? 720}`, ...o.extraArgs],
                 timeoutSec: undefined,
             };
+        case 'export':
+            // The script reads its request from the environment: a path with spaces needs no quoting there.
+            return {
+                exe: engine.editorCmd,
+                args: [uproject, '-run=PythonScript', `-Script=${o.script}`, '-nullrhi', '-unattended', '-stdout', '-NoSplash', ...o.extraArgs],
+                timeoutSec: undefined,
+                env: { NULL_UNREAL_REQUEST: o.request ?? '' },
+            };
         case 'smoke':
             return {
                 exe: engine.editorCmd,
