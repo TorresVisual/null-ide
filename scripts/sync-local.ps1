@@ -346,7 +346,8 @@ $Extensions = [ordered]@{
         Copy          = @(
             "package.json",
             "out",
-            "engine"
+            "engine",
+            "lib"
         )
     }
 
