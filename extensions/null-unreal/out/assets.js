@@ -101,7 +101,7 @@ function registerAssets(context, ctx) {
         },
     });
     context.subscriptions.push(vscode.commands.registerCommand('null-unreal.exportAsset', (uri) => exportAsset(store, resolve, uri)), vscode.commands.registerCommand('null-unreal.clearAssetCache', () => clearCache(resolve)));
-    return store;
+    return { store, resolve };
 }
 // The explorer passes the clicked file; otherwise the active tab if it is a .uasset; otherwise ask for a folder.
 async function exportAsset(store, resolve, clicked) {

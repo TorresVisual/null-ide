@@ -42,6 +42,7 @@ const assets_1 = require("./assets");
 const commands_1 = require("./commands");
 const statusBar_1 = require("./statusBar");
 const shim_1 = require("./shim");
+const viewerProvider_1 = require("./viewerProvider");
 // Returns the shim folder and the asset store so the integration spec and the viewers can reach them.
 function activate(context) {
     const shimDir = path.join(context.globalStorageUri.fsPath, 'bin');
@@ -53,7 +54,8 @@ function activate(context) {
     context.environmentVariableCollection.prepend('PATH', shimDir + path.delimiter);
     const output = vscode.window.createOutputChannel('Null Unreal');
     (0, commands_1.registerCommands)(context, { cliPath, output, shimPath: path.join(shimDir, 'null-unreal.cmd') });
-    const assetStore = (0, assets_1.registerAssets)(context, { cliPath, output });
+    const { store: assetStore, resolve } = (0, assets_1.registerAssets)(context, { cliPath, output });
+    (0, viewerProvider_1.registerViewer)(context, assetStore, resolve);
     context.subscriptions.push(output, (0, statusBar_1.createRunStatusBar)());
     return { shimDir, assetStore };
 }

@@ -72,4 +72,13 @@ function tempProject() {
     assert.equal(log.path, undefined);
     assert.equal(typeof log.warning, 'string');
 });
+(0, node_test_1.test)('latestLog returns the newest log of that command, or undefined', () => {
+    const dir = tempProject();
+    assert.equal((0, logs_1.latestLog)(dir, 'export'), undefined);
+    fs.mkdirSync(path.join(dir, 'Saved', 'NullUnreal'), { recursive: true });
+    for (const n of ['export-20240101-100000.log', 'export-20240102-090000.log', 'build-20240103-000000.log']) {
+        fs.writeFileSync(path.join(dir, 'Saved', 'NullUnreal', n), '');
+    }
+    assert.equal((0, logs_1.latestLog)(dir, 'export'), path.join(dir, 'Saved', 'NullUnreal', 'export-20240102-090000.log'));
+});
 //# sourceMappingURL=logs.test.js.map

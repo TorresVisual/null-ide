@@ -35,6 +35,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.openLog = openLog;
 exports.rotate = rotate;
+exports.latestLog = latestLog;
 const fs = __importStar(require("node:fs"));
 const path = __importStar(require("node:path"));
 const pad = (n) => String(n).padStart(2, '0');
@@ -77,5 +78,19 @@ function rotate(projectDir, cmd, keep = 10) {
             // A locked log (Windows keeps files open) is not worth failing a run for.
         }
     }
+}
+// The newest log of one command, or undefined when none exists yet.
+function latestLog(projectDir, cmd) {
+    const dir = logDir(projectDir);
+    let names;
+    try {
+        names = fs.readdirSync(dir);
+    }
+    catch {
+        return undefined;
+    }
+    const re = new RegExp(`^${cmd}-\\d{8}-\\d{6}\\.log$`);
+    const newest = names.filter((n) => re.test(n)).sort().pop();
+    return newest ? path.join(dir, newest) : undefined;
 }
 //# sourceMappingURL=logs.js.map
