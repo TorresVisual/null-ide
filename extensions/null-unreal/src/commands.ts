@@ -20,9 +20,9 @@ export function registerCommands(
 }
 
 // The extension never builds an engine command line: it passes settings to the CLI as flags.
-function cliArgs(cmd: Command, cliPath: string): string[] {
+export function cliArgs(cmd: Command, cliPath: string, before: string[] = []): string[] {
   const cfg = vscode.workspace.getConfiguration('null-unreal');
-  const args = [cliPath, cmd];
+  const args = [cliPath, cmd, ...before];
   const project = cfg.get<string>('project', '');
   const enginePath = cfg.get<string>('enginePath', '');
   if (project) args.push('--project', project);
@@ -31,7 +31,7 @@ function cliArgs(cmd: Command, cliPath: string): string[] {
   return args;
 }
 
-function spawnCli(args: string[], cwd: string, output: vscode.OutputChannel): Promise<{ code: number | null; text: string }> {
+export function spawnCli(args: string[], cwd: string, output: vscode.OutputChannel): Promise<{ code: number | null; text: string }> {
   return new Promise((resolve) => {
     let text = '';
     const onData = (d: Buffer) => {

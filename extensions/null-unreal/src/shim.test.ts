@@ -27,9 +27,9 @@ test('the POSIX shim is a sh script that forwards "$@"', () => {
   assert.ok(sh.includes('"$@"'));
 });
 
-test('the usage snippet names the absolute shim path and all four commands', () => {
+test('the usage snippet names the absolute shim path and all five commands', () => {
   const shimPath = 'C:\\Users\\Me\\AppData\\Local\\Null\\bin\\null-unreal.cmd';
   const s = cliUsageSnippet(shimPath);
   assert.ok(s.includes(shimPath));
-  for (const c of ['build', 'test', 'run', 'smoke']) assert.ok(s.includes(c), `mentions ${c}`);
+  for (const c of ['build', 'test', 'run', 'smoke', 'export']) assert.ok(s.includes(c), `mentions ${c}`);
 });
