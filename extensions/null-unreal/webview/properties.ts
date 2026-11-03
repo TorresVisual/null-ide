@@ -3,34 +3,13 @@ import { resolveParams, ParamRow, ParamSource } from '../src/viewer/instance';
 import { boneTree, BoneNode } from '../src/viewer/tree';
 import type { ToWebview } from '../src/viewer/messages';
 import { Frame, mountFrame } from './frame';
-
-// A value that is itself a branch: a non-empty array, or an object that is not an {unreadable} marker.
-const isBranch = (v: unknown): v is Record<string, unknown> | unknown[] =>
-  Array.isArray(v) ? v.length > 0 : typeof v === 'object' && v !== null && !('unreadable' in v);
+import { renderTree, row } from './rows';
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: string): HTMLElementTagNameMap[K] {
   const e = document.createElement(tag);
   if (cls) e.className = cls;
   if (text !== undefined) e.textContent = text;
   return e;
-}
-
-function row(key: string, value: unknown): HTMLElement {
-  if (!isBranch(value)) {
-    const r = el('div', 'row');
-    r.append(el('span', 'key', key), el('span', 'value', describe(value)));
-    return r;
-  }
-  const d = el('details');
-  d.open = true;
-  d.append(el('summary', undefined, `${key} (${describe(value)})`));
-  for (const [k, v] of Object.entries(value)) d.append(row(k, v));
-  return d;
-}
-
-// Generic view: the export's data as a collapsible tree.
-function renderTree(data: Record<string, unknown>, into: HTMLElement): void {
-  for (const [k, v] of Object.entries(data)) into.append(row(k, v));
 }
 
 // Parameter values: a texture shows its thumbnail when cached, a placeholder otherwise.
