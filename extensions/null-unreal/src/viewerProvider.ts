@@ -5,10 +5,12 @@ import { AssetStore } from './assetStore';
 import { assetsDir } from './cache';
 import { ExportDoc } from './exportFormat';
 import { Resolved } from './assets';
+import { realExportFs } from './cli';
 import { latestLog } from './logs';
+import { findMounts, Mount } from './packagePath';
+import { packageToFile, sidecarFile, thumbnailMap } from './viewer/refs';
 import { FromWebview, ToWebview } from './viewer/messages';
 import { buildHtml, Page, pageFor } from './viewer/page';
-import { sidecarFile } from './viewer/refs';
 
 export const VIEW_TYPE = 'null-unreal.assetViewer';
 
@@ -96,6 +98,32 @@ function attach(
     else send(m);
   };
 
+  // A material instance also gets its cached parent chain and the thumbnails of its texture overrides; nothing is exported.
+  const instanceExtra = (doc: ExportDoc, assets: string | undefined) => {
+    const mounts: Mount[] = findMountsSafe(resolve);
+    const chain: { package: string; kind: string; data: Record<string, unknown> }[] = [];
+    let pkg: unknown = doc.data.parent;
+    while (typeof pkg === 'string' && chain.length < 32) {
+      const file = packageToFile(pkg, mounts);
+      const parent = file ? store.peek(file) : undefined;
+      if (!parent) break;
+      chain.push({ package: parent.package, kind: parent.kind, data: parent.data });
+      pkg = parent.kind === 'material-instance' ? parent.data.parent : undefined;
+    }
+    const textureOverrides = [doc.data, ...chain.map((c) => c.data)].flatMap((d) => {
+      const o = d.overrides as { texture?: Record<string, unknown> } | undefined;
+      return Object.values(o?.texture ?? {});
+    });
+    const packages = textureOverrides.filter((p): p is string => typeof p === 'string');
+    const thumbs = thumbnailMap(packages, (p) => {
+      const file = packageToFile(p, mounts);
+      const d = file ? store.peek(file) : undefined;
+      const png = d && assets ? sidecarFile(assets, d, 'preview') : undefined;
+      return png && fs.existsSync(png) ? panel.webview.asWebviewUri(vscode.Uri.file(png)).toString() : undefined;
+    });
+    return { chain, thumbs };
+  };
+
   const readyMessage = (doc: ExportDoc): ToWebview => {
     const assets = assetsRoot();
     const sidecars: Record<string, string | { unreadable: string }> = {};
@@ -110,7 +138,8 @@ function attach(
           ? panel.webview.asWebviewUri(vscode.Uri.file(p)).toString()
           : { unreadable: 'the file is missing from the cache' };
     }
-    return { type: 'ready', name: path.posix.basename(doc.package), kind: doc.kind, data: doc.data, sidecars };
+    const extra = doc.kind === 'material-instance' ? instanceExtra(doc, assets) : undefined;
+    return { type: 'ready', name: path.posix.basename(doc.package), kind: doc.kind, data: doc.data, sidecars, extra };
   };
 
   const open = async (force: boolean): Promise<void> => {
@@ -153,6 +182,11 @@ function attach(
       case 'update':
         void open(false);
         break;
+      case 'openAsset': {
+        const file = packageToFile(m.package, findMountsSafe(resolve));
+        if (file) void vscode.commands.executeCommand('vscode.openWith', vscode.Uri.file(file), VIEW_TYPE);
+        break;
+      }
       case 'reopenText':
         void vscode.commands.executeCommand('vscode.openWith', uri, 'default');
         break;
@@ -169,6 +203,15 @@ function attach(
   const hit = store.peek(file);
   show(hit ? pageFor(hit.kind) : 'properties');
   void open(false);
+}
+
+// The mounts need the project; without one, no package resolves and links stay inert.
+function findMountsSafe(resolve: () => Resolved): Mount[] {
+  try {
+    return findMounts(resolve().project.dir, realExportFs);
+  } catch {
+    return [];
+  }
 }
 
 async function openLog(resolve: () => Resolved): Promise<void> {
