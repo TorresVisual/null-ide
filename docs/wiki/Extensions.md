@@ -31,8 +31,8 @@ See [Features](Features) for what each does day to day.
 
 Experimental and Windows only. It activates in a folder that holds a `.uproject`.
 
-- **Status bar:** a Run button launches the editor. The command palette has `Null Unreal: Run`, `Build`, `Test`, `Smoke` and `Show CLI Path`.
-- **Settings:** `null-unreal.enginePath` (the engine root, overriding `EngineAssociation`), `null-unreal.project` (picks one `.uproject` when a folder holds several), and `null-unreal.build|test|run|smoke.args` (extra engine arguments).
+- **Status bar:** a Run button launches the editor. The command palette has `Null Unreal: Run`, `Build`, `Test`, `Smoke`, `Show CLI Path`, `Export Asset` and `Clear Asset Cache`.
+- **Settings:** `null-unreal.enginePath` (the engine root, overriding `EngineAssociation`), `null-unreal.project` (picks one `.uproject` when a folder holds several), and `null-unreal.build|test|run|smoke|export.args` (extra engine arguments).
 - **Terminal CLI:** `null-unreal` is on the PATH of the integrated terminal. Agents outside it can use `Show CLI Path` to get the absolute shim path.
 
 ```
@@ -46,9 +46,21 @@ null-unreal <build|test|run|smoke> [--project <file>] [--engine <path>] [--filte
 | Exit code | Meaning |
 |---|---|
 | the engine's own code | the process failed; passed through |
+| 1 | `export` only: an asset failed or was not exported |
 | 2 | usage or resolution error (no engine, no or several `.uproject`) |
 | 124 | timed out; the whole process tree was killed |
 | 255 | the process was killed without an exit code |
+
+### Reading assets
+
+`null-unreal export <asset.uasset|folder>... [--json] [--force]` has the engine load `.uasset` files and writes what it finds as JSON (plus a PNG for textures and a GLB for skeletal meshes) into `<project>/Saved/NullUnreal/assets/`. Material, material instance, texture, skeletal mesh and skeleton have their own layout; any other class gets a generic property dump and the engine's text export.
+
+- The first export costs a few seconds (the engine starts once for up to 50 assets); an unchanged asset is served from the cache afterwards. The cache is keyed on file modification time, file size and engine version, so it always reflects the **saved** file, never unsaved editor state.
+- `--json` prints the export (an object for one asset, an array for several) on stdout, for agents; the report goes to stderr. `--force` ignores the cache.
+- Needs the Python plugin enabled in the `.uproject` and the project's editor modules built (run `null-unreal build` on a fresh checkout). `null-unreal` never edits the `.uproject`.
+- What Unreal's Python API cannot reach (node sizes, comment boxes, a texture's pixel format and mip count, triangle counts) is recorded as `{"unreadable": "<reason>"}`.
+- `Null Unreal: Export Asset` exports the open `.uasset`, the one clicked in the Explorer, or a chosen folder. `Null Unreal: Clear Asset Cache` deletes `Saved/NullUnreal/assets`.
+- Exit codes: 0 all exported or cached, 1 an asset failed, 2 the requirements are missing, 124 timed out. Only one export runs per project at a time.
 
 The Null Unreal output channel shows the same output. There is no Problems-panel integration in v1: the summary is not a diagnostics list.
 

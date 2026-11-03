@@ -82,6 +82,20 @@ One JSON file per asset:
 
 What the Python API can actually reach is not fully known. The first build phase is a **capture spike**: for each kind, run the exporter against the real `MyGame` assets, record what is reachable, and fix the schema to what exists. Gaps become `unreadable` entries or a documented limit, not guesses. If the Python route cannot reach enough of a material (pin types, node sizes, comment boxes), the fallback order is (a) a degraded but honest graph (uncoloured pins, default node size, missing data marked `unreadable`), then (b) parse the engine's text export of the material; never a C++ commandlet or plugin added to the user's game project. [decided] PNG and GLB export availability is part of this spike. [my call to include sidecars; drop the mesh GLB if the glTF exporter is not available by default]
 
+## Spike results (UE 5.8.4, `MyGame`, 12 assets)
+
+Recorded while building #150. `engine/export_asset.py` implements exactly this; anything not listed as reachable is `unreadable` in the export.
+
+- **Boot:** one run for all 12 assets took 15 s (PNG and GLB export dominate); a single texture with `--force` took 9 s. `-Script=<path with spaces>` works as one spawn argument; the request path travels in `NULL_UNREAL_REQUEST`.
+- **Material:** every expression with class, position, own properties, input pins (name, type bitmask, link source and output name) and output pin names; output wiring for a whitelist of material properties (Substrate's `FrontMaterial` included); parameters with group and default; used textures (read from the expressions; `get_used_textures` returned nothing for an uncompiled material). **Not reachable:** node size and comment boxes (recorded `unreadable`; the viewer derives a size from the pin counts). Asking `get_material_property_input_node` for `MP_MAX` crashes the engine.
+- **Material instance:** parent, scalar, vector and texture overrides, overridden static switches.
+- **Texture:** size, built size, compression, sRGB, LOD group, mip-gen, filter, addressing, VT and more; PNG through `AssetExportTask` works at full resolution. **Not reachable:** pixel format and mip count.
+- **Skeletal mesh:** skeleton path, bone names and parents, LOD count with vertex and section counts, material slots, morph targets, bounds; the glTF exporter is available by default, so the GLB sidecar stays. **Not reachable:** triangle counts.
+- **Skeleton** is its own kind (`skeleton`: bones with parents read through the preview mesh, preview mesh path). **Generic:** the exposed properties as a tree plus the T3D text export.
+- **Dependencies:** the asset registry's hard and soft package references, minus self and `/Script/`.
+- **Sidecar keys:** `preview` (texture PNG) and `model` (mesh GLB), each a file name beside the JSON or `{"unreadable": reason}`.
+- **Failure signatures:** a project whose editor module is not built exits 1 and the log has no line naming it, so a missing manifest is explained from what the log does show (no script start line: "the engine exited before running the export script, run `null-unreal build`"). A `.uproject` that sets `PythonScriptPlugin` to disabled still ran the script in 5.8, so the missing-plugin message (matched on the engine's "commandlet not found" text) is unverified.
+
 ## Surfaces
 
 - **CLI:** `null-unreal export <asset-or-folder>…` prints, per asset, the package path, kind, cache status (hit, exported, failed), and a one-line summary (for example `Material, 221 expressions`). `--json` prints the export JSON itself to stdout for agents. `--force` ignores the cache. Failed assets show the error from the manifest, and the log path is printed as in the tooling spec.
