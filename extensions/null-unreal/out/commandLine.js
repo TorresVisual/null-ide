@@ -32,9 +32,10 @@ function buildPlan(cmd, engine, project, o) {
             };
         case 'export':
             // The script reads its request from the environment: a path with spaces needs no quoting there.
+            // UE unescapes backslashes in -Script (`\r` -> CR, `\n` -> LF), so the script path must use forward slashes.
             return {
                 exe: engine.editorCmd,
-                args: [uproject, '-run=PythonScript', `-Script=${o.script}`, '-nullrhi', '-unattended', '-stdout', '-NoSplash', ...o.extraArgs],
+                args: [uproject, '-run=PythonScript', `-Script=${(o.script ?? '').replace(/\\/g, '/')}`, '-nullrhi', '-unattended', '-stdout', '-NoSplash', ...o.extraArgs],
                 timeoutSec: undefined,
                 env: { NULL_UNREAL_REQUEST: o.request ?? '' },
             };
