@@ -79,6 +79,7 @@ function registerViewer(context, store, resolve) {
 // is known and differs from the page on screen; a swapped page sends `ready` and gets the document then.
 function attach(context, store, resolve, uri, panel) {
     const file = uri.fsPath;
+    const layoutKey = `null-unreal.layout:${file}`;
     const lib = vscode.Uri.joinPath(context.extensionUri, 'lib');
     // The assets folder and the mounts need the project; without one, nothing resolves and nothing is linked.
     const assetsRoot = () => {
@@ -176,7 +177,8 @@ function attach(context, store, resolve, uri, panel) {
             thumbs = undefined;
         }
         const extra = doc.kind === 'material-instance' ? instanceExtra(doc) : undefined;
-        return { type: 'ready', name: path.posix.basename(doc.package), kind: doc.kind, data: doc.data, sidecars, extra };
+        const layout = context.workspaceState.get(layoutKey);
+        return { type: 'ready', name: path.posix.basename(doc.package), kind: doc.kind, data: doc.data, sidecars, extra, layout };
     };
     const open = async (force) => {
         try {
@@ -245,6 +247,9 @@ function attach(context, store, resolve, uri, panel) {
                 break;
             case 'exportReferenced':
                 void exportReferenced();
+                break;
+            case 'layout':
+                void context.workspaceState.update(layoutKey, Object.keys(m.layout).length ? m.layout : undefined);
                 break;
             case 'openAsset': {
                 const f = (0, refs_1.packageToFile)(m.package, mounts());
