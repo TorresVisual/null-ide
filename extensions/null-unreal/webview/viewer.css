@@ -7,10 +7,10 @@ body {
   font-size: var(--vscode-font-size);
 }
 #app { display: flex; flex-direction: column; height: 100%; }
-.bar { display: flex; align-items: center; gap: 12px; padding: 6px 10px; border-bottom: 1px solid var(--vscode-panel-border); }
+.bar { display: flex; align-items: center; gap: 8px; min-height: 35px; box-sizing: border-box; padding: 0 10px; border-bottom: 1px solid var(--vscode-panel-border); }
 .bar .name { font-weight: 600; }
-.bar .kind, .bar .badge { color: var(--vscode-descriptionForeground); }
-.bar .badge { border: 1px solid var(--vscode-panel-border); border-radius: 3px; padding: 0 6px; }
+.bar .kind { color: var(--vscode-descriptionForeground); }
+.bar .badge { color: var(--vscode-descriptionForeground); font-size: 11px; line-height: 16px; padding: 0 6px; border: 1px solid var(--vscode-panel-border); border-radius: 8px; }
 .bar button { margin-left: auto; }
 .banner {
   background: var(--vscode-inputValidation-warningBackground);
@@ -31,19 +31,32 @@ body {
 .row .key { color: var(--vscode-foreground); min-width: 160px; }
 details { margin-left: 4px; }
 summary { cursor: pointer; padding: 2px 0; }
+/* Secondary by default so a row of toolbar buttons does not shout; primary is for the status actions and the on state of a toggle. */
 button {
-  background: var(--vscode-button-background);
-  color: var(--vscode-button-foreground);
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
   border: 1px solid transparent;
+  border-radius: 2px;
   padding: 3px 10px;
+  font: inherit;
   cursor: pointer;
 }
-button:hover { background: var(--vscode-button-hoverBackground); }
+button:hover { background: var(--vscode-button-secondaryHoverBackground); }
+.status button, button[aria-pressed="true"] { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
+.status button:hover, button[aria-pressed="true"]:hover { background: var(--vscode-button-hoverBackground); }
 button:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: 2px; }
 .body { display: flex; flex-direction: column; }
-.toolbar { display: flex; gap: 6px; align-items: center; padding-bottom: 8px; flex-wrap: wrap; }
-.toolbar button[aria-pressed="false"] { opacity: 0.5; }
-.note { color: var(--vscode-editorWarning-foreground); }
+.toolbar { display: flex; gap: 4px; align-items: center; padding-bottom: 8px; flex-wrap: wrap; }
+.note {
+  display: flex; align-items: center; gap: 8px; margin: 0 0 8px; padding: 3px 4px 3px 10px;
+  color: var(--vscode-foreground);
+  background: color-mix(in srgb, var(--vscode-editorWarning-foreground) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--vscode-editorWarning-foreground) 40%, transparent);
+  border-radius: 2px;
+}
+.note span { flex: 1; }
+.note button { background: transparent; color: var(--vscode-descriptionForeground); padding: 0 6px; line-height: 18px; }
+.note button:hover { background: var(--vscode-toolbar-hoverBackground); color: var(--vscode-foreground); }
 .canvas-wrap {
   position: relative; flex: 1; min-height: 300px;
   background-color: var(--vscode-editor-background);
