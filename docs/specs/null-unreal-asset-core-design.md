@@ -1,4 +1,5 @@
 # Null Unreal — Asset Core Design
+nIssue: [#150 Unreal asset core](https://github.com/TorresVisual/null-ide/issues/150)
 
 Second of three specs for Unreal Engine support in Null IDE. Builds on [null-unreal-tooling-design.md](null-unreal-tooling-design.md) (engine and project resolution, the `null-unreal` CLI, logs, timeouts, exit codes). The third spec, the asset viewers, consumes what this one produces.
 
