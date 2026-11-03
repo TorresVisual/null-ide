@@ -19,7 +19,12 @@ export function run(plan: Plan, sink: NodeJS.WritableStream | undefined, echo: b
       resolve({ code, timedOut, seconds: (Date.now() - started) / 1000 });
     };
 
-    const child = spawn(plan.exe, plan.args, { shell: false, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(plan.exe, plan.args, {
+      shell: false,
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: plan.env ? { ...process.env, ...plan.env } : undefined,
+    });
 
     const pipe = (chunk: Buffer) => {
       sink?.write(chunk);

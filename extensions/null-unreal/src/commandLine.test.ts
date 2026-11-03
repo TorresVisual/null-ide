@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import * as assert from 'node:assert/strict';
+import * as path from 'node:path';
 import { buildPlan } from './commandLine';
 import { Engine } from './engine';
 import { Uproject } from './uproject';
@@ -77,4 +78,14 @@ test('a project path with spaces stays one argument', () => {
   const spaced = { ...project, file: 'C:\\My Games\\My Game\\MyGame.uproject' };
   const p = buildPlan('run', engine, spaced, none);
   assert.equal(p.args[0], 'C:\\My Games\\My Game\\MyGame.uproject');
+});
+
+
+test('export runs the PythonScript commandlet headless and passes the request through the environment', () => {
+  const script = path.join('ext', 'engine', 'export_asset.py');
+  const request = path.join('saved', 'export-request-1.json');
+  const p = buildPlan('export', engine, project, { extraArgs: ['-Foo'], script, request });
+  assert.equal(p.exe, engine.editorCmd);
+  assert.deepEqual(p.args, [project.file, '-run=PythonScript', `-Script=${script}`, '-nullrhi', '-unattended', '-stdout', '-NoSplash', '-Foo']);
+  assert.deepEqual(p.env, { NULL_UNREAL_REQUEST: request });
 });
