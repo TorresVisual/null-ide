@@ -27,6 +27,31 @@ Remote development (`open-remote-wsl`, `open-remote-ssh`) is bundled as well. A 
 
 See [Features](Features) for what each does day to day.
 
+## Unreal Engine (`null-unreal`)
+
+Experimental and Windows only. It activates in a folder that holds a `.uproject`.
+
+- **Status bar:** a Run button launches the editor. The command palette has `Null Unreal: Run`, `Build`, `Test`, `Smoke` and `Show CLI Path`.
+- **Settings:** `null-unreal.enginePath` (the engine root, overriding `EngineAssociation`), `null-unreal.project` (picks one `.uproject` when a folder holds several), and `null-unreal.build|test|run|smoke.args` (extra engine arguments).
+- **Terminal CLI:** `null-unreal` is on the PATH of the integrated terminal. Agents outside it can use `Show CLI Path` to get the absolute shim path.
+
+```
+null-unreal <build|test|run|smoke> [--project <file>] [--engine <path>] [--filter <prefix>] [--timeout <s>] [-- <extra engine args>]
+```
+
+- `--filter` limits `test` (it defaults to `<ProjectName>.`). `smoke` times out after 120 s and `test` after 600 s. `--timeout` overrides either.
+- The output is two lines: the result, then `log: <path>`. Each run keeps its full log in `<project>/Saved/NullUnreal/`, the latest 10 per command.
+- M1 prints the result and the log path only, not a summary. Read the log for the details.
+
+| Exit code | Meaning |
+|---|---|
+| the engine's own code | the process failed; passed through |
+| 2 | usage or resolution error (no engine, no or several `.uproject`) |
+| 124 | timed out; the whole process tree was killed |
+| 255 | the process was killed without an exit code |
+
+The Null Unreal output channel shows the same output. There is no Problems-panel integration in v1: the summary is not a diagnostics list.
+
 ## Installing more
 
 Null IDE uses the VS Marketplace. Install from the Extensions view (`Ctrl+Shift+X`) or the CLI:
