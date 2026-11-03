@@ -19,6 +19,11 @@
         "title": "Null Unreal: Run"
       },
       {
+        "command": "null-unreal.openEditor",
+        "title": "Null Unreal: Open in Unreal Editor",
+        "icon": "$(play)"
+      },
+      {
         "command": "null-unreal.build",
         "title": "Null Unreal: Build"
       },
@@ -52,7 +57,19 @@
       }
     ],
     "menus": {
+      "editor/title": [
+        {
+          "command": "null-unreal.openEditor",
+          "when": "resourceExtname == .uproject",
+          "group": "navigation"
+        }
+      ],
       "explorer/context": [
+        {
+          "command": "null-unreal.openEditor",
+          "when": "resourceExtname == .uproject",
+          "group": "null-unreal"
+        },
         {
           "command": "null-unreal.exportAsset",
           "when": "resourceExtname == .uasset",
@@ -96,6 +113,14 @@
           },
           "default": [],
           "description": "Extra arguments appended to the run command."
+        },
+        "null-unreal.editor.args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Extra arguments appended to the command that opens a .uproject in the Unreal Editor."
         },
         "null-unreal.export.args": {
           "type": "array",

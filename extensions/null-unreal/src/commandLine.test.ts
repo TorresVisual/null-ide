@@ -49,6 +49,13 @@ test('run launches the editor windowed at 1280x720 with no timeout', () => {
   assert.equal(p.timeoutSec, undefined);
 });
 
+test('editor opens the project in the editor with no game flags', () => {
+  const p = buildPlan('editor', engine, project, none);
+  assert.equal(p.exe, engine.editor);
+  assert.deepEqual(p.args, ['C:\\Games\\MyGame\\MyGame.uproject']);
+  assert.equal(p.timeoutSec, undefined);
+});
+
 test('smoke runs UnrealEditor-Cmd headless with a 120 s timeout', () => {
   const p = buildPlan('smoke', engine, project, none);
   assert.equal(p.exe, engine.editorCmd);

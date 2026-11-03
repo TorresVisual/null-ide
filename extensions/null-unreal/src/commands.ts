@@ -18,6 +18,11 @@ export function registerCommands(
     context.subscriptions.push(vscode.commands.registerCommand(`null-unreal.${cmd}`, () => runCli(cmd, ctx)));
   }
   context.subscriptions.push(
+    // From the editor title or the explorer the .uproject is the argument; the palette falls back to the open editor.
+    vscode.commands.registerCommand('null-unreal.openEditor', (uri?: vscode.Uri) => {
+      const file = (uri ?? vscode.window.activeTextEditor?.document.uri)?.fsPath;
+      return execute('editor', ctx, file?.toLowerCase().endsWith('.uproject') ? file : undefined).then(() => undefined);
+    }),
     vscode.commands.registerCommand('null-unreal.generateClangdDatabase', () => generateClangdDatabase(ctx)),
     vscode.commands.registerCommand('null-unreal.openLastLog', openLastLog),
     vscode.commands.registerCommand('null-unreal.showCliPath', () => showCliPath(o.shimPath)),
@@ -25,10 +30,10 @@ export function registerCommands(
 }
 
 // The extension never builds an engine command line: it passes settings to the CLI as flags.
-export function cliArgs(cmd: Command, cliPath: string, before: string[] = []): string[] {
+export function cliArgs(cmd: Command, cliPath: string, before: string[] = [], projectFile?: string): string[] {
   const cfg = vscode.workspace.getConfiguration('null-unreal');
   const args = [cliPath, cmd, ...before];
-  const project = cfg.get<string>('project', '');
+  const project = projectFile ?? cfg.get<string>('project', '');
   const enginePath = cfg.get<string>('enginePath', '');
   if (project) args.push('--project', project);
   if (enginePath) args.push('--engine', enginePath);
@@ -60,14 +65,14 @@ export function spawnCli(args: string[], cwd: string, output: vscode.OutputChann
   });
 }
 
-async function execute(cmd: Command, ctx: CliContext): Promise<boolean> {
+async function execute(cmd: Command, ctx: CliContext, projectFile?: string): Promise<boolean> {
   const folder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (!folder) {
     void vscode.window.showWarningMessage('Null Unreal: open the folder that holds the .uproject first.');
     return false;
   }
   ctx.output.appendLine(`> null-unreal ${cmd}`);
-  const { code, text } = await spawnCli(cliArgs(cmd, ctx.cliPath), folder, ctx.output);
+  const { code, text } = await spawnCli(cliArgs(cmd, ctx.cliPath, [], projectFile), folder, ctx.output);
   if (code === 0) return true;
 
   const logPath = parseLogPath(text);

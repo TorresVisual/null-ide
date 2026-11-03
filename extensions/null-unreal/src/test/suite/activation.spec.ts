@@ -11,7 +11,7 @@ suite('null-unreal activation', () => {
     assert.strictEqual(extension!.isActive, true);
 
     const commands = await vscode.commands.getCommands(true);
-    for (const c of ['run', 'build', 'test', 'smoke', 'generateClangdDatabase', 'openLastLog', 'showCliPath', 'exportAsset', 'clearAssetCache']) {
+    for (const c of ['run', 'openEditor', 'build', 'test', 'smoke', 'generateClangdDatabase', 'openLastLog', 'showCliPath', 'exportAsset', 'clearAssetCache']) {
       assert.ok(commands.includes(`null-unreal.${c}`), `null-unreal.${c} not registered`);
     }
     assert.ok(fs.existsSync(path.join(api.shimDir, 'null-unreal.cmd')), 'null-unreal.cmd shim missing');

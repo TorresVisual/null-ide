@@ -23,11 +23,11 @@ export interface Deps {
   readLog(file: string): string | undefined;
 }
 
-const COMMANDS: Command[] = ['build', 'test', 'run', 'smoke', 'compdb', 'export'];
+const COMMANDS: Command[] = ['build', 'test', 'run', 'editor', 'smoke', 'compdb', 'export'];
 const VALUE_FLAGS = ['--project', '--engine', '--filter', '--timeout'];
 const BOOL_FLAGS = ['--json', '--force'];
 const USAGE = [
-  'usage: null-unreal <build|test|run|smoke|compdb> [--project <p>] [--engine <path>] [--filter <prefix>] [--timeout <s>] [-- <extra engine args>]',
+  'usage: null-unreal <build|test|run|editor|smoke|compdb> [--project <p>] [--engine <path>] [--filter <prefix>] [--timeout <s>] [-- <extra engine args>]',
   '       null-unreal export <asset.uasset|folder>... [--json] [--force] [--project <p>] [--engine <path>] [--timeout <s>] [-- <extra engine args>]',
 ].join('\n');
 
@@ -232,7 +232,7 @@ export async function main(argv: string[], deps: Deps): Promise<number> {
   const warning = log.path === undefined ? log.warning : undefined;
   let code = exitCodeOf(r);
   let summary: string[] = [];
-  if (command !== 'run') {
+  if (command !== 'run' && command !== 'editor') {
     // The log is the one copy of the output; without it there is nothing to summarize and nothing proven.
     const text = log.path !== undefined ? deps.readLog(log.path) : undefined;
     const s = text !== undefined ? summarizeLog(command, text, log.path) : undefined;

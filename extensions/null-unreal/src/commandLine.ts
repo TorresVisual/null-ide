@@ -1,7 +1,7 @@
 import { Engine } from './engine';
 import { Uproject } from './uproject';
 
-export type Command = 'build' | 'test' | 'run' | 'smoke' | 'compdb' | 'export';
+export type Command = 'build' | 'test' | 'run' | 'editor' | 'smoke' | 'compdb' | 'export';
 export interface Options {
   filter?: string; extraArgs: string[]; platform?: string; resX?: number; resY?: number;
   script?: string; request?: string;
@@ -37,6 +37,8 @@ export function buildPlan(cmd: Command, engine: Engine, project: Uproject, o: Op
         args: [uproject, '-game', '-windowed', `-ResX=${o.resX ?? 1280}`, `-ResY=${o.resY ?? 720}`, ...o.extraArgs],
         timeoutSec: undefined,
       };
+    case 'editor':
+      return { exe: engine.editor, args: [uproject, ...o.extraArgs], timeoutSec: undefined };
     case 'export':
       // The script reads its request from the environment: a path with spaces needs no quoting there.
       // UE unescapes backslashes in -Script (`\r` -> CR, `\n` -> LF), so the script path must use forward slashes.
