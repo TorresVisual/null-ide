@@ -32,6 +32,17 @@ function button(text: string, onClick: () => void, label?: string): HTMLButtonEl
   return b;
 }
 
+// 16px stroke icon in currentColor so it follows the button's text colour. Attributes only: the page's CSP allows no inline style.
+function refreshIcon(): SVGSVGElement {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  for (const [k, v] of Object.entries({ viewBox: '0 0 16 16', width: '14', height: '14', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' })) svg.setAttribute(k, v);
+  const path = document.createElementNS(ns, 'path');
+  path.setAttribute('d', 'M13.5 8a5.5 5.5 0 1 1-1.8-4.07M13.5 2.5v3h-3');
+  svg.append(path);
+  return svg;
+}
+
 // Header, body and inspector for every page. The frame owns the exporting, failed and stale states;
 // a page only renders a `ready` document, which it receives through onMessage.
 export function mountFrame(onMessage: (m: ToWebview) => void): Frame {
@@ -39,7 +50,8 @@ export function mountFrame(onMessage: (m: ToWebview) => void): Frame {
   const name = el('span', { cls: 'name' });
   const kind = el('span', { cls: 'kind' });
   const badge = el('span', { cls: 'badge', text: 'saved file' });
-  const reexport = button('↻ Re-export', () => send({ type: 'reexport' }), 'Re-export from Unreal');
+  const reexport = button('Re-export', () => send({ type: 'reexport' }), 'Re-export from Unreal');
+  reexport.prepend(refreshIcon());
   const header = el('header', { cls: 'bar' }, name, kind, badge, reexport);
 
   const banner = button('File changed — click to update', () => send({ type: 'update' }));
