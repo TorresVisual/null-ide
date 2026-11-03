@@ -39,9 +39,14 @@ function renderGraph(ui: Ui, frame: Frame): void {
 
   const toolbar = html('div', undefined, 'toolbar');
   const fit = html('button', 'Fit');
-  const listToggle = html('button', 'List view');
+  const listToggle = html('button', ui.list ? 'Graph view' : 'List view');
   listToggle.setAttribute('aria-pressed', String(ui.list));
-  toolbar.append(fit, listToggle);
+  // Wired before the list early return below, or the list view has no way back.
+  listToggle.addEventListener('click', () => {
+    ui.list = !ui.list;
+    renderGraph(ui, frame);
+  });
+  toolbar.append(...(ui.list ? [] : [fit]), listToggle);
   body.append(toolbar);
 
   for (const note of ui.notes) {
@@ -69,8 +74,13 @@ function renderGraph(ui: Ui, frame: Frame): void {
     return pins.find((p) => p.name === name) ?? pins[0];
   };
 
-  for (const l of ui.model.links) drawLink(world, l, byId, pinAt);
-  for (const n of ui.model.nodes) drawNode(world, n, ui, n.id === ui.selected);
+  // Redraws only the world group, so a drag in progress keeps its pointer capture on `graph`.
+  const drawWorld = () => {
+    world.replaceChildren();
+    for (const l of ui.model.links) drawLink(world, l, byId, pinAt);
+    for (const n of ui.model.nodes) drawNode(world, n, ui, n.id === ui.selected);
+  };
+  drawWorld();
 
   const applyView = () => world.setAttribute('transform', `translate(${ui.view.x} ${ui.view.y}) scale(${ui.view.scale})`);
   const fitAll = () => {
@@ -80,10 +90,6 @@ function renderGraph(ui: Ui, frame: Frame): void {
     applyView();
   };
   fit.addEventListener('click', fitAll);
-  listToggle.addEventListener('click', () => {
-    ui.list = !ui.list;
-    renderGraph(ui, frame);
-  });
   applyView();
   if (!ui.fitted) {
     ui.fitted = true;
@@ -108,9 +114,11 @@ function renderGraph(ui: Ui, frame: Frame): void {
     { passive: false },
   );
 
-  let drag: { x: number; y: number; moved: boolean } | undefined;
+  // `node` set: the drag moves that node (pins hold absolute coordinates, so they move with it); unset: it pans.
+  let drag: { x: number; y: number; moved: boolean; node?: RNode } | undefined;
   graph.addEventListener('pointerdown', (e) => {
-    drag = { x: e.clientX, y: e.clientY, moved: false };
+    const id = hitNode(ui.model.nodes, toWorld(e));
+    drag = { x: e.clientX, y: e.clientY, moved: false, node: id === undefined ? undefined : byId.get(id) };
     graph.setPointerCapture(e.pointerId);
   });
   graph.addEventListener('pointermove', (e) => {
@@ -118,9 +126,24 @@ function renderGraph(ui: Ui, frame: Frame): void {
     const dx = e.clientX - drag.x;
     const dy = e.clientY - drag.y;
     if (Math.abs(dx) + Math.abs(dy) > 4) drag.moved = true;
-    ui.view = { ...ui.view, x: ui.view.x + dx, y: ui.view.y + dy };
-    drag = { x: e.clientX, y: e.clientY, moved: drag.moved };
-    applyView();
+    if (drag.node) {
+      // Hold still until the threshold is crossed, so a click never nudges a node.
+      if (!drag.moved) return;
+      const n = drag.node;
+      const wx = dx / ui.view.scale;
+      const wy = dy / ui.view.scale;
+      n.x += wx;
+      n.y += wy;
+      for (const p of [...n.inputs, ...n.outputs]) {
+        p.x += wx;
+        p.y += wy;
+      }
+      drawWorld();
+    } else {
+      ui.view = { ...ui.view, x: ui.view.x + dx, y: ui.view.y + dy };
+      applyView();
+    }
+    drag = { ...drag, x: e.clientX, y: e.clientY };
   });
   graph.addEventListener('pointerup', (e) => {
     const wasDrag = drag?.moved;
