@@ -77,7 +77,8 @@ function renderMesh(m: Ready, frame: Frame, url: string): void {
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
   pmrem.dispose();
-  const sun = new THREE.DirectionalLight(0xffffff, 1.5);
+  scene.environmentIntensity = 0.5;
+  const sun = new THREE.DirectionalLight(0xffffff, 0.8);
   sun.position.set(1, 2, 1.5);
   scene.add(sun);
 
