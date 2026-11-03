@@ -42,8 +42,8 @@ const cache_1 = require("./cache");
 const cli_1 = require("./cli");
 const logs_1 = require("./logs");
 const packagePath_1 = require("./packagePath");
-const refs_1 = require("./viewer/refs");
 const page_1 = require("./viewer/page");
+const refs_1 = require("./viewer/refs");
 exports.VIEW_TYPE = 'null-unreal.assetViewer';
 const errorText = (e) => (e instanceof Error ? e.message : String(e));
 class AssetDocument {
@@ -79,7 +79,7 @@ function registerViewer(context, store, resolve) {
 function attach(context, store, resolve, uri, panel) {
     const file = uri.fsPath;
     const lib = vscode.Uri.joinPath(context.extensionUri, 'lib');
-    // The assets folder needs the project, so it is absent when the project does not resolve.
+    // The assets folder and the mounts need the project; without one, nothing resolves and nothing is linked.
     const assetsRoot = () => {
         try {
             return (0, cache_1.assetsDir)(resolve().project.dir);
@@ -88,6 +88,7 @@ function attach(context, store, resolve, uri, panel) {
             return undefined;
         }
     };
+    const mounts = () => findMountsSafe(resolve);
     const roots = [lib];
     const first = assetsRoot();
     if (first)
@@ -96,6 +97,8 @@ function attach(context, store, resolve, uri, panel) {
     let page;
     let loaded = false;
     let last = { type: 'exporting' };
+    // Thumbnails are sent after the document, so a page that is still loading gets them on its `ready`.
+    let thumbs;
     const send = (m) => {
         if (loaded)
             void panel.webview.postMessage(m);
@@ -119,31 +122,37 @@ function attach(context, store, resolve, uri, panel) {
         else
             send(m);
     };
-    // A material instance also gets its cached parent chain and the thumbnails of its texture overrides; nothing is exported.
-    const instanceExtra = (doc, assets) => {
-        const mounts = findMountsSafe(resolve);
+    // Cached PNG of each package, as a webview URI; null when that texture is not cached. Peeks only, never exports.
+    const thumbsFor = (packages) => {
+        const assets = assetsRoot();
+        const all = mounts();
+        return (0, refs_1.thumbnailMap)(packages, (p) => {
+            const f = (0, refs_1.packageToFile)(p, all);
+            const d = f ? store.peek(f) : undefined;
+            const png = d && assets ? (0, refs_1.sidecarFile)(assets, d, 'preview') : undefined;
+            return png && fs.existsSync(png) ? panel.webview.asWebviewUri(vscode.Uri.file(png)).toString() : undefined;
+        });
+    };
+    const textureOverrides = (d) => {
+        const o = d.overrides;
+        return Object.values(o?.texture ?? {}).filter((p) => typeof p === 'string');
+    };
+    const stringsIn = (v) => (Array.isArray(v) ? v.filter((p) => typeof p === 'string') : []);
+    // A material instance walks its cached parent chain (peek only) and sends it with its texture thumbnails.
+    const instanceExtra = (doc) => {
+        const all = mounts();
         const chain = [];
         let pkg = doc.data.parent;
         while (typeof pkg === 'string' && chain.length < 32) {
-            const file = (0, refs_1.packageToFile)(pkg, mounts);
-            const parent = file ? store.peek(file) : undefined;
+            const f = (0, refs_1.packageToFile)(pkg, all);
+            const parent = f ? store.peek(f) : undefined;
             if (!parent)
                 break;
             chain.push({ package: parent.package, kind: parent.kind, data: parent.data });
             pkg = parent.kind === 'material-instance' ? parent.data.parent : undefined;
         }
-        const textureOverrides = [doc.data, ...chain.map((c) => c.data)].flatMap((d) => {
-            const o = d.overrides;
-            return Object.values(o?.texture ?? {});
-        });
-        const packages = textureOverrides.filter((p) => typeof p === 'string');
-        const thumbs = (0, refs_1.thumbnailMap)(packages, (p) => {
-            const file = (0, refs_1.packageToFile)(p, mounts);
-            const d = file ? store.peek(file) : undefined;
-            const png = d && assets ? (0, refs_1.sidecarFile)(assets, d, 'preview') : undefined;
-            return png && fs.existsSync(png) ? panel.webview.asWebviewUri(vscode.Uri.file(png)).toString() : undefined;
-        });
-        return { chain, thumbs };
+        const packages = [doc.data, ...chain.map((c) => c.data)].flatMap(textureOverrides);
+        return { chain, thumbs: thumbsFor(packages) };
     };
     const readyMessage = (doc) => {
         const assets = assetsRoot();
@@ -159,7 +168,13 @@ function attach(context, store, resolve, uri, panel) {
                     ? panel.webview.asWebviewUri(vscode.Uri.file(p)).toString()
                     : { unreadable: 'the file is missing from the cache' };
         }
-        const extra = doc.kind === 'material-instance' ? instanceExtra(doc, assets) : undefined;
+        if (doc.kind === 'material') {
+            thumbs = { type: 'thumbs', byPackage: thumbsFor(stringsIn(doc.data.usedTextures)) };
+        }
+        else {
+            thumbs = undefined;
+        }
+        const extra = doc.kind === 'material-instance' ? instanceExtra(doc) : undefined;
         return { type: 'ready', name: path.posix.basename(doc.package), kind: doc.kind, data: doc.data, sidecars, extra };
     };
     const open = async (force) => {
@@ -184,6 +199,29 @@ function attach(context, store, resolve, uri, panel) {
             publish({ type: 'failed', error: errorText(e) }, page ?? 'properties');
         }
     };
+    // Export the used textures that are not cached yet, in one batched run, then send the new thumbnails.
+    const exportReferenced = async () => {
+        const doc = store.peek(file);
+        if (!doc || doc.kind !== 'material')
+            return;
+        const all = mounts();
+        const missing = stringsIn(doc.data.usedTextures)
+            .filter((p) => {
+            const f = (0, refs_1.packageToFile)(p, all);
+            return f !== undefined && store.peek(f) === undefined;
+        })
+            .map((p) => (0, refs_1.packageToFile)(p, all));
+        if (missing.length === 0)
+            return;
+        try {
+            await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Null Unreal: exporting ${missing.length} referenced texture(s)` }, () => store.getMany(missing));
+        }
+        catch (e) {
+            void vscode.window.showErrorMessage(`Null Unreal: ${errorText(e)}`);
+        }
+        thumbs = { type: 'thumbs', byPackage: thumbsFor(stringsIn(doc.data.usedTextures)) };
+        send(thumbs);
+    };
     // A change on disk only tells the webview; the store is never asked to export.
     const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(path.dirname(file), path.basename(file)));
     watcher.onDidChange(() => {
@@ -195,6 +233,8 @@ function attach(context, store, resolve, uri, panel) {
             case 'ready':
                 loaded = true;
                 send(last);
+                if (thumbs)
+                    send(thumbs);
                 break;
             case 'reexport':
                 void open(true);
@@ -202,10 +242,13 @@ function attach(context, store, resolve, uri, panel) {
             case 'update':
                 void open(false);
                 break;
+            case 'exportReferenced':
+                void exportReferenced();
+                break;
             case 'openAsset': {
-                const file = (0, refs_1.packageToFile)(m.package, findMountsSafe(resolve));
-                if (file)
-                    void vscode.commands.executeCommand('vscode.openWith', vscode.Uri.file(file), exports.VIEW_TYPE);
+                const f = (0, refs_1.packageToFile)(m.package, mounts());
+                if (f)
+                    void vscode.commands.executeCommand('vscode.openWith', vscode.Uri.file(f), exports.VIEW_TYPE);
                 break;
             }
             case 'reopenText':
@@ -213,9 +256,6 @@ function attach(context, store, resolve, uri, panel) {
                 break;
             case 'openLog':
                 void openLog(resolve);
-                break;
-            default:
-                // exportReferenced and openAsset arrive with the material graph.
                 break;
         }
     });

@@ -52,3 +52,11 @@ button:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-off
   overflow: hidden;
 }
 .texture-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; }
+.graph { flex: 1; min-height: 400px; width: 100%; display: block; cursor: grab; user-select: none; }
+.graph .card { fill: var(--vscode-editorWidget-background); stroke-width: 1.5; }
+.node.selected .card { stroke-width: 3; }
+.graph .label { fill: var(--vscode-foreground); font-size: 12px; font-weight: 600; }
+.graph .pin { fill: var(--vscode-descriptionForeground); font-size: 11px; }
+.graph .pin.end { text-anchor: end; }
+.graph .link { fill: none; stroke: var(--vscode-editorLineNumber-foreground); stroke-width: 1.6; }
+.graph .link.missing { stroke: var(--vscode-errorForeground); stroke-dasharray: 4 3; }
