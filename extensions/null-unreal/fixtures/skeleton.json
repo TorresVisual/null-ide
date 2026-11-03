@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "engineVersion": "5.4.4-0+UE5",
+  "sourceMtime": 1700000000,
+  "sourceSize": 4096,
+  "package": "/Game/Characters/SKEL_Example",
+  "kind": "skeleton",
+  "class": "Skeleton",
+  "references": {
+    "dependencies": []
+  },
+  "data": {
+    "bones": [
+      {
+        "name": "root",
+        "parent": null
+      },
+      {
+        "name": "pelvis",
+        "parent": "root"
+      },
+      {
+        "name": "spine_01",
+        "parent": {
+          "unreadable": "bone index out of range"
+        }
+      }
+    ]
+  },
+  "sidecars": {}
+}

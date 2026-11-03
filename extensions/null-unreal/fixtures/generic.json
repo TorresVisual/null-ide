@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "engineVersion": "5.4.4-0+UE5",
+  "sourceMtime": 1700000000,
+  "sourceSize": 4096,
+  "package": "/Game/Meshes/SM_Crate",
+  "kind": "generic",
+  "class": "StaticMesh",
+  "references": {
+    "dependencies": []
+  },
+  "data": {
+    "props": {
+      "numLods": 1,
+      "materials": 2,
+      "unreadable": {
+        "unreadable": "collision data not exported"
+      }
+    }
+  },
+  "sidecars": {}
+}

@@ -1,0 +1,214 @@
+{
+  "schema": 1,
+  "engineVersion": "5.4.4-0+UE5",
+  "sourceMtime": 1700000000,
+  "sourceSize": 4096,
+  "package": "/Game/Materials/M_Example",
+  "kind": "material",
+  "class": "Material",
+  "references": {
+    "dependencies": []
+  },
+  "data": {
+    "expressions": [
+      {
+        "class": "MaterialExpressionScalarParameter",
+        "name": "ScalarParameter",
+        "x": -600,
+        "y": -120,
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "",
+            "type": 1
+          }
+        ],
+        "props": {
+          "parameterName": "Roughness",
+          "defaultValue": 0.5
+        }
+      },
+      {
+        "class": "MaterialExpressionTextureSampleParameter2D",
+        "name": "TextureSampleParameter2D",
+        "x": -600,
+        "y": 40,
+        "inputs": [
+          {
+            "name": "UVs",
+            "type": 2,
+            "link": null
+          }
+        ],
+        "outputs": [
+          {
+            "name": "RGB",
+            "type": 4
+          },
+          {
+            "name": "A",
+            "type": 1
+          }
+        ],
+        "props": {
+          "parameterName": "Albedo",
+          "texture": "/Game/Textures/T_Albedo"
+        }
+      },
+      {
+        "class": "MaterialExpressionReroute",
+        "name": "Reroute",
+        "x": -380,
+        "y": -120,
+        "inputs": [
+          {
+            "name": "",
+            "type": null,
+            "link": {
+              "from": 0,
+              "pin": ""
+            }
+          }
+        ],
+        "outputs": [
+          {
+            "name": "",
+            "type": null
+          }
+        ],
+        "props": {}
+      },
+      {
+        "class": "MaterialExpressionConstant",
+        "name": "Constant",
+        "x": -600,
+        "y": 220,
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "",
+            "type": 1
+          }
+        ],
+        "props": {
+          "r": 1
+        }
+      },
+      {
+        "class": "MaterialExpressionMultiply",
+        "name": "Multiply",
+        "x": -150,
+        "y": 40,
+        "inputs": [
+          {
+            "name": "A",
+            "type": 4,
+            "link": {
+              "from": 1,
+              "pin": ""
+            }
+          },
+          {
+            "name": "B",
+            "type": 1,
+            "link": {
+              "from": 2,
+              "pin": ""
+            }
+          },
+          {
+            "name": "C",
+            "type": 1,
+            "link": {
+              "from": {
+                "unreadable": "expression not exported"
+              },
+              "pin": ""
+            }
+          }
+        ],
+        "outputs": [
+          {
+            "name": "",
+            "type": 4
+          }
+        ],
+        "props": {}
+      },
+      {
+        "class": "MaterialExpressionMultiply",
+        "name": "Multiply",
+        "x": 120,
+        "y": -20,
+        "inputs": [
+          {
+            "name": "A",
+            "type": 4,
+            "link": {
+              "from": 4,
+              "pin": ""
+            }
+          },
+          {
+            "name": "B",
+            "type": 1,
+            "link": {
+              "from": 3,
+              "pin": ""
+            }
+          }
+        ],
+        "outputs": [
+          {
+            "name": "",
+            "type": 4
+          }
+        ],
+        "props": {}
+      }
+    ],
+    "outputs": [
+      {
+        "name": "Base Color",
+        "link": {
+          "from": 5,
+          "pin": ""
+        }
+      },
+      {
+        "name": "Roughness",
+        "link": null
+      },
+      {
+        "name": "Emissive Color",
+        "link": {
+          "from": {
+            "unreadable": "expression not exported"
+          },
+          "pin": ""
+        }
+      }
+    ],
+    "parameters": [
+      {
+        "name": "Roughness",
+        "type": "scalar",
+        "default": 0.5
+      },
+      {
+        "name": "Albedo",
+        "type": "texture",
+        "default": "/Game/Textures/T_Albedo"
+      }
+    ],
+    "usedTextures": [
+      "/Game/Textures/T_Albedo"
+    ],
+    "commentBoxes": {
+      "unreadable": "comment boxes are not exported by the engine API"
+    },
+    "blendMode": "Opaque",
+    "shadingModel": "DefaultLit"
+  },
+  "sidecars": {}
+}

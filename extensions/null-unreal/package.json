@@ -14,17 +14,42 @@
   ],
   "contributes": {
     "commands": [
-      { "command": "null-unreal.run", "title": "Null Unreal: Run" },
-      { "command": "null-unreal.build", "title": "Null Unreal: Build" },
-      { "command": "null-unreal.test", "title": "Null Unreal: Test" },
-      { "command": "null-unreal.smoke", "title": "Null Unreal: Smoke" },
-      { "command": "null-unreal.showCliPath", "title": "Null Unreal: Show CLI Path" },
-      { "command": "null-unreal.exportAsset", "title": "Null Unreal: Export Asset" },
-      { "command": "null-unreal.clearAssetCache", "title": "Null Unreal: Clear Asset Cache" }
+      {
+        "command": "null-unreal.run",
+        "title": "Null Unreal: Run"
+      },
+      {
+        "command": "null-unreal.build",
+        "title": "Null Unreal: Build"
+      },
+      {
+        "command": "null-unreal.test",
+        "title": "Null Unreal: Test"
+      },
+      {
+        "command": "null-unreal.smoke",
+        "title": "Null Unreal: Smoke"
+      },
+      {
+        "command": "null-unreal.showCliPath",
+        "title": "Null Unreal: Show CLI Path"
+      },
+      {
+        "command": "null-unreal.exportAsset",
+        "title": "Null Unreal: Export Asset"
+      },
+      {
+        "command": "null-unreal.clearAssetCache",
+        "title": "Null Unreal: Clear Asset Cache"
+      }
     ],
     "menus": {
       "explorer/context": [
-        { "command": "null-unreal.exportAsset", "when": "resourceExtname == .uasset", "group": "null-unreal" }
+        {
+          "command": "null-unreal.exportAsset",
+          "when": "resourceExtname == .uasset",
+          "group": "null-unreal"
+        }
       ]
     },
     "configuration": {
@@ -42,31 +67,41 @@
         },
         "null-unreal.build.args": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "default": [],
           "description": "Extra arguments appended to the build command."
         },
         "null-unreal.test.args": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "default": [],
           "description": "Extra arguments appended to the test command."
         },
         "null-unreal.run.args": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "default": [],
           "description": "Extra arguments appended to the run command."
         },
         "null-unreal.export.args": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "default": [],
           "description": "Extra arguments appended to the engine command line of an asset export."
         },
         "null-unreal.smoke.args": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "default": [],
           "description": "Extra arguments appended to the smoke command."
         }
@@ -75,7 +110,7 @@
   },
   "scripts": {
     "compile": "tsc -p tsconfig.json",
-    "test": "tsc -p tsconfig.json && node --test out/uproject.test.js out/engine.test.js out/commandLine.test.js out/logs.test.js out/runner.test.js out/result.test.js out/cli.test.js out/shim.test.js out/exportFormat.test.js out/packagePath.test.js out/cache.test.js out/lock.test.js out/exporter.test.js out/assetStore.test.js",
+    "test": "tsc -p tsconfig.json && node --test out/uproject.test.js out/engine.test.js out/commandLine.test.js out/logs.test.js out/runner.test.js out/result.test.js out/cli.test.js out/shim.test.js out/exportFormat.test.js out/packagePath.test.js out/cache.test.js out/lock.test.js out/exporter.test.js out/assetStore.test.js out/viewer/page.test.js out/viewer/refs.test.js out/viewer/value.test.js",
     "pretest:integration": "tsc -p tsconfig.json",
     "test:integration": "node ./out/test/runTest.js"
   },

@@ -1,0 +1,69 @@
+{
+  "schema": 1,
+  "engineVersion": "5.4.4-0+UE5",
+  "sourceMtime": 1700000000,
+  "sourceSize": 4096,
+  "package": "/Game/Characters/SK_Example",
+  "kind": "skeletal-mesh",
+  "class": "SkeletalMesh",
+  "references": {
+    "dependencies": []
+  },
+  "data": {
+    "bones": [
+      {
+        "name": "root",
+        "parent": null
+      },
+      {
+        "name": "pelvis",
+        "parent": "root"
+      },
+      {
+        "name": "spine_01",
+        "parent": "pelvis"
+      },
+      {
+        "name": "orphan",
+        "parent": "missing_bone"
+      },
+      {
+        "name": "hand_l",
+        "parent": {
+          "unreadable": "bone index out of range"
+        }
+      }
+    ],
+    "lods": [
+      {
+        "vertices": 12034,
+        "sections": 4,
+        "triangles": {
+          "unreadable": "not exposed by the Python API"
+        }
+      }
+    ],
+    "materialSlots": [
+      {
+        "name": "Body",
+        "material": "/Game/Materials/MI_Example"
+      }
+    ],
+    "morphTargets": [],
+    "bounds": {
+      "min": [
+        -40,
+        -30,
+        0
+      ],
+      "max": [
+        40,
+        30,
+        180
+      ]
+    }
+  },
+  "sidecars": {
+    "model": "SK_Example.glb"
+  }
+}

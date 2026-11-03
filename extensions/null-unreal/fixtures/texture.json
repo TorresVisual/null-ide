@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "engineVersion": "5.4.4-0+UE5",
+  "sourceMtime": 1700000000,
+  "sourceSize": 4096,
+  "package": "/Game/Textures/T_Albedo",
+  "kind": "texture",
+  "class": "Texture2D",
+  "references": {
+    "dependencies": []
+  },
+  "data": {
+    "width": 2048,
+    "height": 1024,
+    "builtWidth": 2048,
+    "builtHeight": 1024,
+    "compression": "TC_Default",
+    "sRGB": true,
+    "lodGroup": "TEXTUREGROUP_World",
+    "mipGenSettings": "TMGS_FromTextureGroup",
+    "format": {
+      "unreadable": "PNG export has no HDR format"
+    },
+    "mipCount": {
+      "unreadable": "mip count not exposed by the Python API"
+    }
+  },
+  "sidecars": {
+    "preview": "T_Albedo.png"
+  }
+}

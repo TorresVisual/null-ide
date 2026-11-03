@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "engineVersion": "5.4.4-0+UE5",
+  "sourceMtime": 1700000000,
+  "sourceSize": 4096,
+  "package": "/Game/Materials/MI_Example",
+  "kind": "material-instance",
+  "class": "MaterialInstanceConstant",
+  "references": {
+    "dependencies": []
+  },
+  "data": {
+    "parent": "/Game/Materials/M_Example",
+    "overrides": {
+      "scalar": {
+        "Roughness": 0.8
+      },
+      "vector": {},
+      "texture": {
+        "Albedo": "/Game/Textures/T_Albedo"
+      }
+    }
+  },
+  "sidecars": {}
+}
