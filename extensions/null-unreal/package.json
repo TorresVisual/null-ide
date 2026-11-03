@@ -1,0 +1,78 @@
+{
+  "name": "null-unreal",
+  "displayName": "Null Unreal",
+  "description": "Unreal Engine project tooling for Null IDE: build, test, run and smoke from the status bar, the command palette and a terminal CLI (Windows, experimental)",
+  "version": "0.1.0",
+  "publisher": "null",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.93.0"
+  },
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "workspaceContains:**/*.uproject"
+  ],
+  "contributes": {
+    "commands": [
+      { "command": "null-unreal.run", "title": "Null Unreal: Run" },
+      { "command": "null-unreal.build", "title": "Null Unreal: Build" },
+      { "command": "null-unreal.test", "title": "Null Unreal: Test" },
+      { "command": "null-unreal.smoke", "title": "Null Unreal: Smoke" },
+      { "command": "null-unreal.showCliPath", "title": "Null Unreal: Show CLI Path" }
+    ],
+    "configuration": {
+      "title": "Null Unreal",
+      "properties": {
+        "null-unreal.enginePath": {
+          "type": "string",
+          "default": "",
+          "description": "Unreal Engine root folder (the one that contains Engine\\). Overrides EngineAssociation resolution."
+        },
+        "null-unreal.project": {
+          "type": "string",
+          "default": "",
+          "description": "The .uproject to use when the folder holds more than one."
+        },
+        "null-unreal.build.args": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Extra arguments appended to the build command."
+        },
+        "null-unreal.test.args": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Extra arguments appended to the test command."
+        },
+        "null-unreal.run.args": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Extra arguments appended to the run command."
+        },
+        "null-unreal.smoke.args": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Extra arguments appended to the smoke command."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p tsconfig.json",
+    "test": "tsc -p tsconfig.json",
+    "pretest:integration": "tsc -p tsconfig.json",
+    "test:integration": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0",
+    "@types/vscode": "^1.93.0",
+    "@types/node": "^22.0.0",
+    "@vscode/test-electron": "^3.1.0",
+    "mocha": "^11.8.0",
+    "@types/mocha": "^10.0.10",
+    "glob": "^13.0.6"
+  }
+}

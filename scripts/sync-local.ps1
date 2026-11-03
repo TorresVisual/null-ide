@@ -340,6 +340,15 @@ $Extensions = [ordered]@{
         )
     }
 
+    "null-unreal" = @{
+        Compile       = $true
+        CompileScript = "compile"
+        Copy          = @(
+            "package.json",
+            "out"
+        )
+    }
+
 }
 
 # ============================================================
