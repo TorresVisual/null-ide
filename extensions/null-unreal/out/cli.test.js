@@ -62,6 +62,7 @@ function deps(cwd, o = {}) {
         out: (l) => lines.push(l),
         err: (l) => lines.push(l),
         exp: { fs: cli_1.realExportFs, lock: cli_1.realLockIo, scriptPath: 'export_asset.py' },
+        readLog: cli_1.realExportFs.readFile,
         lines,
     };
     return d;
@@ -190,5 +191,67 @@ function exportSetup() {
     fs.writeFileSync(path.join(dir, 'Stray.uasset'), 'x');
     assert.equal(await (0, cli_1.main)(['export', 'Stray.uasset', '--engine', engineRoot], d), 2);
     assert.ok(d.lines.some((l) => l.includes('not a .uasset under')));
+});
+// A fake engine run that writes `text` to the log sink and exits with `code`.
+function withOutput(d, text, code = 0) {
+    d.run = async (_plan, sink) => {
+        sink?.write(text);
+        return { code, timedOut: false, seconds: 1 };
+    };
+}
+(0, node_test_1.test)('exit 0 with a clean summary stays 0 and prints the summary after the result lines', async () => {
+    const d = deps(tempDir());
+    withOutput(d, 'LogInit: Display: PreExit Game.\n');
+    assert.equal(await (0, cli_1.main)(['smoke', '--engine', ROOT], d), 0);
+    assert.equal(d.lines[0], 'null-unreal smoke: exit 0 in 1s');
+    assert.equal(d.lines[d.lines.length - 1], 'smoke passed');
+});
+(0, node_test_1.test)('exit 0 whose summary proves a failure becomes 1 and the result line says so', async () => {
+    const d = deps(tempDir());
+    withOutput(d, 'LogWindows: Error: appError called: Fatal error: boom\n');
+    assert.equal(await (0, cli_1.main)(['smoke', '--engine', ROOT], d), 1);
+    assert.equal(d.lines[0], 'null-unreal smoke: exit 1 in 1s');
+    assert.ok(d.lines.includes('smoke failed: fatal error at startup'));
+});
+(0, node_test_1.test)('exit 0 with output nothing recognises becomes 1 and prints the tail', async () => {
+    const d = deps(tempDir());
+    withOutput(d, 'one\ntwo\n');
+    assert.equal(await (0, cli_1.main)(['build', '--engine', ROOT], d), 1);
+    assert.ok(d.lines.some((l) => l.startsWith('could not summarize')));
+    assert.ok(d.lines.includes('two'));
+});
+(0, node_test_1.test)('a non-zero engine exit passes through unchanged, with the summary', async () => {
+    const d = deps(tempDir());
+    withOutput(d, 'a.cpp(1,2): error C2065: x\nAutomationTool exiting with ExitCode=6 (6)\n', 6);
+    assert.equal(await (0, cli_1.main)(['build', '--engine', ROOT], d), 6);
+    assert.ok(d.lines.includes('build failed: 1 error, AutomationTool exit 6'));
+});
+(0, node_test_1.test)('a timeout keeps 124 and still summarizes what was logged', async () => {
+    const d = deps(tempDir());
+    d.run = async (_plan, sink) => {
+        sink?.write('LogAutomationController: Display: Test Started. Name={A} Path={X.A}\n');
+        return { code: null, timedOut: true, seconds: 600 };
+    };
+    assert.equal(await (0, cli_1.main)(['test', '--engine', ROOT], d), 124);
+    assert.ok(d.lines.some((l) => l.startsWith('null-unreal test: timed out')));
+    assert.ok(d.lines.includes('HUNG X.A (started, never completed)'));
+});
+(0, node_test_1.test)('run prints only the result lines', async () => {
+    const d = deps(tempDir());
+    withOutput(d, 'anything');
+    assert.equal(await (0, cli_1.main)(['run', '--engine', ROOT], d), 0);
+    assert.equal(d.lines.length, 2);
+});
+(0, node_test_1.test)('compdb runs UnrealBuildTool and prints the database path', async () => {
+    const plans = [];
+    const d = deps(tempDir(), { plans });
+    const run = d.run;
+    d.run = async (plan, sink, echo) => {
+        sink?.write('ClangDatabase written to C:\P\compile_commands.json\n\nResult: Succeeded\n');
+        return run(plan, sink, echo);
+    };
+    assert.equal(await (0, cli_1.main)(['compdb', '--engine', ROOT], d), 0);
+    assert.ok(plans[0].args.includes('-mode=GenerateClangDatabase'));
+    assert.ok(d.lines.includes('compile database: C:\P\compile_commands.json'));
 });
 //# sourceMappingURL=cli.test.js.map

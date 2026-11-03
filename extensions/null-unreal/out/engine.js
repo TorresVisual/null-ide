@@ -54,6 +54,7 @@ function engineAt(root, r) {
         editor,
         editorCmd: node_path_1.win32.join(bin, 'Win64', 'UnrealEditor-Cmd.exe'),
         automationTool: node_path_1.win32.join(bin, 'DotNET', 'AutomationTool', 'AutomationTool.exe'),
+        buildTool: node_path_1.win32.join(bin, 'DotNET', 'UnrealBuildTool', 'UnrealBuildTool.exe'),
     };
 }
 function resolveEngine(project, override, r) {

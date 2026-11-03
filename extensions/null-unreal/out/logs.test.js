@@ -81,4 +81,16 @@ function tempProject() {
     }
     assert.equal((0, logs_1.latestLog)(dir, 'export'), path.join(dir, 'Saved', 'NullUnreal', 'export-20240102-090000.log'));
 });
+(0, node_test_1.test)('latestLogAny picks the newest stamp across commands and ignores other files', () => {
+    const dir = tempProject();
+    const logDir = path.join(dir, 'Saved', 'NullUnreal');
+    fs.mkdirSync(logDir, { recursive: true });
+    for (const n of ['build-20260101-000001.log', 'test-20260102-000001.log', 'smoke-20260101-235959.log', 'export-request-1.json', 'export.lock']) {
+        fs.writeFileSync(path.join(logDir, n), '');
+    }
+    assert.equal(path.basename((0, logs_1.latestLogAny)(dir)), 'test-20260102-000001.log');
+});
+(0, node_test_1.test)('latestLogAny is undefined when there are no logs', () => {
+    assert.equal((0, logs_1.latestLogAny)(tempProject()), undefined);
+});
 //# sourceMappingURL=logs.test.js.map

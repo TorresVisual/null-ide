@@ -44,12 +44,13 @@ const exportFormat_1 = require("./exportFormat");
 const logs_1 = require("./logs");
 const runner_1 = require("./runner");
 const result_1 = require("./result");
+const summary_1 = require("./summary");
 const uproject_1 = require("./uproject");
-const COMMANDS = ['build', 'test', 'run', 'smoke', 'export'];
+const COMMANDS = ['build', 'test', 'run', 'smoke', 'compdb', 'export'];
 const VALUE_FLAGS = ['--project', '--engine', '--filter', '--timeout'];
 const BOOL_FLAGS = ['--json', '--force'];
 const USAGE = [
-    'usage: null-unreal <build|test|run|smoke> [--project <p>] [--engine <path>] [--filter <prefix>] [--timeout <s>] [-- <extra engine args>]',
+    'usage: null-unreal <build|test|run|smoke|compdb> [--project <p>] [--engine <path>] [--filter <prefix>] [--timeout <s>] [-- <extra engine args>]',
     '       null-unreal export <asset.uasset|folder>... [--json] [--force] [--project <p>] [--engine <path>] [--timeout <s>] [-- <extra engine args>]',
 ].join('\n');
 exports.realProjectFs = {
@@ -248,9 +249,22 @@ async function main(argv, deps) {
         r = await deps.run(plan, undefined, false);
     }
     const warning = log.path === undefined ? log.warning : undefined;
-    for (const line of (0, result_1.formatResult)(command, r, log.path, warning).split('\n'))
+    let code = (0, result_1.exitCodeOf)(r);
+    let summary = [];
+    if (command !== 'run') {
+        // The log is the one copy of the output; without it there is nothing to summarize and nothing proven.
+        const text = log.path !== undefined ? deps.readLog(log.path) : undefined;
+        const s = text !== undefined ? (0, summary_1.summarizeLog)(command, text, log.path) : undefined;
+        summary = s?.lines ?? ['could not summarize (no log was kept)'];
+        // A run the summary calls failed, or cannot judge, is never green: exit 0 becomes 1.
+        if (code === 0 && s?.verdict !== 'ok')
+            code = 1;
+    }
+    for (const line of (0, result_1.formatResult)(command, { ...r, code: r.timedOut ? r.code : code }, log.path, warning).split('\n'))
         deps.out(line);
-    return (0, result_1.exitCodeOf)(r);
+    for (const line of summary)
+        deps.out(line);
+    return code;
 }
 if (require.main === module) {
     main(process.argv.slice(2), {
@@ -262,6 +276,7 @@ if (require.main === module) {
         out: (line) => console.log(line),
         err: (line) => console.error(line),
         exp: { fs: exports.realExportFs, lock: exports.realLockIo, scriptPath: path.join(__dirname, '..', 'engine', 'export_asset.py') },
+        readLog: exports.realExportFs.readFile,
     }).then((code) => {
         process.exitCode = code;
     });

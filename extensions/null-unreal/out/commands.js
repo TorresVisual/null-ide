@@ -38,14 +38,17 @@ exports.cliArgs = cliArgs;
 exports.spawnCli = spawnCli;
 const node_child_process_1 = require("node:child_process");
 const vscode = __importStar(require("vscode"));
+const cli_1 = require("./cli");
+const logs_1 = require("./logs");
 const shim_1 = require("./shim");
 const result_1 = require("./result");
+const uproject_1 = require("./uproject");
 function registerCommands(context, o) {
     const ctx = { cliPath: o.cliPath, output: o.output };
     for (const cmd of ['run', 'build', 'test', 'smoke']) {
         context.subscriptions.push(vscode.commands.registerCommand(`null-unreal.${cmd}`, () => runCli(cmd, ctx)));
     }
-    context.subscriptions.push(vscode.commands.registerCommand('null-unreal.showCliPath', () => showCliPath(o.shimPath)));
+    context.subscriptions.push(vscode.commands.registerCommand('null-unreal.generateClangdDatabase', () => generateClangdDatabase(ctx)), vscode.commands.registerCommand('null-unreal.openLastLog', openLastLog), vscode.commands.registerCommand('null-unreal.showCliPath', () => showCliPath(o.shimPath)));
 }
 // The extension never builds an engine command line: it passes settings to the CLI as flags.
 function cliArgs(cmd, cliPath, before = []) {
@@ -87,12 +90,12 @@ async function execute(cmd, ctx) {
     const folder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!folder) {
         void vscode.window.showWarningMessage('Null Unreal: open the folder that holds the .uproject first.');
-        return;
+        return false;
     }
     ctx.output.appendLine(`> null-unreal ${cmd}`);
     const { code, text } = await spawnCli(cliArgs(cmd, ctx.cliPath), folder, ctx.output);
     if (code === 0)
-        return;
+        return true;
     const logPath = (0, result_1.parseLogPath)(text);
     const actions = logPath ? ['Open Log'] : [];
     const pick = await vscode.window.showErrorMessage(`Null Unreal: ${cmd} failed (exit ${code ?? 'killed'}).`, ...actions);
@@ -100,13 +103,47 @@ async function execute(cmd, ctx) {
     if (pick === 'Open Log' && logPath) {
         await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(vscode.Uri.file(logPath)));
     }
+    return false;
 }
 // `run` launches the editor and is not awaited by the UI: only a non-zero exit is reported.
 async function runCli(cmd, ctx) {
-    const go = () => execute(cmd, ctx);
+    const go = async () => void (await execute(cmd, ctx));
     if (cmd === 'run')
         return go();
     await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Null Unreal: ${cmd}` }, go);
+}
+// compile_commands.json lands beside the .uproject; clangd only needs a restart to read it.
+async function generateClangdDatabase(ctx) {
+    const ok = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: 'Null Unreal: generating the clangd database' }, () => execute('compdb', ctx));
+    if (!ok)
+        return;
+    if ((await vscode.commands.getCommands(true)).includes('clangd.restart')) {
+        await vscode.commands.executeCommand('clangd.restart');
+    }
+    void vscode.window.showInformationMessage('Null Unreal: compile_commands.json written next to the .uproject.');
+}
+async function openLastLog() {
+    const folder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!folder) {
+        void vscode.window.showWarningMessage('Null Unreal: open the folder that holds the .uproject first.');
+        return;
+    }
+    let file;
+    try {
+        const project = vscode.workspace.getConfiguration('null-unreal').get('project', '');
+        file = (0, logs_1.latestLogAny)((0, uproject_1.resolveProject)(folder, project || undefined, cli_1.realProjectFs).dir);
+    }
+    catch (e) {
+        if (!(e instanceof uproject_1.ResolveError))
+            throw e;
+        void vscode.window.showWarningMessage(`Null Unreal: ${e.message}`);
+        return;
+    }
+    if (!file) {
+        void vscode.window.showInformationMessage('Null Unreal: no log yet.');
+        return;
+    }
+    await vscode.window.showTextDocument(vscode.Uri.file(file), { preview: true });
 }
 async function showCliPath(shimPath) {
     const snippet = (0, shim_1.cliUsageSnippet)(shimPath);
