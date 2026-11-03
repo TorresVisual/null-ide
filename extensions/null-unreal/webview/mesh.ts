@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { ToWebview } from '../src/viewer/messages';
 import { Frame, mountFrame } from './frame';
 import { renderTree, row } from './rows';
@@ -72,7 +73,10 @@ function renderMesh(m: Ready, frame: Frame, url: string): void {
   const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 10000);
   const controls = new OrbitControls(camera, canvas);
   controls.enableDamping = true;
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.2));
+  // glTF materials default to metallic 1, which renders black without an environment to reflect; lights alone only give rim highlights.
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  pmrem.dispose();
   const sun = new THREE.DirectionalLight(0xffffff, 1.5);
   sun.position.set(1, 2, 1.5);
   scene.add(sun);
