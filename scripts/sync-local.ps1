@@ -340,6 +340,16 @@ $Extensions = [ordered]@{
         )
     }
 
+    "null-database" = @{
+        Compile       = $true
+        CompileScript = "compile"
+        Copy          = @(
+            "package.json",
+            "out",
+            "media"
+        )
+    }
+
     "null-unreal" = @{
         Compile       = $true
         CompileScript = "compile"
